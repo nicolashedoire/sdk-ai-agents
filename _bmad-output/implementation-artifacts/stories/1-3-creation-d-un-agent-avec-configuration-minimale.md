@@ -85,3 +85,4 @@ interface AgentConfig {
 **Status:** done  
 **Implementation:** Complète dans `src/sdk.ts` et `src/agent.ts`
 
+
