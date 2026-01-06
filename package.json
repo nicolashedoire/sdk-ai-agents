@@ -1,0 +1,71 @@
+{
+  "name": "@sdk-ai-agents/core",
+  "version": "0.1.0",
+  "description": "Infrastructure de gouvernance des agents IA avec event-sourcing natif, replay et sécurité by design",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "lint": "biome lint src",
+    "lint:fix": "biome lint --write src",
+    "format": "biome format --write src",
+    "check": "biome check src",
+    "check:fix": "biome check --write src",
+    "example:quick-start": "tsx examples/quick-start.ts",
+    "example:complete": "tsx examples/complete-example.ts",
+    "test:api": "tsx examples/test-api.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "llm",
+    "event-sourcing",
+    "governance",
+    "replay",
+    "typescript"
+  ],
+  "author": "Nicolashedoire",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
+    "openai": "^4.20.0",
+    "uuid": "^9.0.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.7.0",
+    "@types/node": "^20.10.0",
+    "@types/pg": "^8.10.9",
+    "@types/uuid": "^9.0.7",
+    "@vitest/coverage-v8": "^1.0.4",
+    "pg": "^8.11.3",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.2",
+    "vitest": "^1.0.4"
+  },
+  "peerDependencies": {
+    "pg": "^8.11.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nicolashedoire/SDK_AI_Agents.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nicolashedoire/SDK_AI_Agents/issues"
+  },
+  "homepage": "https://github.com/nicolashedoire/SDK_AI_Agents#readme"
+}

@@ -1,0 +1,15 @@
+node_modules/
+src/
+*.test.ts
+*.spec.ts
+.env
+.env.example
+coverage/
+.git/
+.gitignore
+README.md
+tsconfig.json
+biome.json
+vitest.config.ts
+events/
+

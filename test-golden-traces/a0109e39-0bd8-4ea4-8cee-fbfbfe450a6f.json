@@ -1,0 +1,62 @@
+{
+  "id": "a0109e39-0bd8-4ea4-8cee-fbfbfe450a6f",
+  "name": "Trace YAML",
+  "runId": "run_06043f2c-8f72-419c-85a7-f7e3f7a34bb0",
+  "agentId": "8d27a288-73ef-4dd5-a1dd-86d49c325d59",
+  "createdAt": 1767711092880,
+  "trace": {
+    "runId": "run_06043f2c-8f72-419c-85a7-f7e3f7a34bb0",
+    "agentId": "8d27a288-73ef-4dd5-a1dd-86d49c325d59",
+    "status": "failed",
+    "events": [
+      {
+        "id": "evt_0a11e40e-aade-4f16-a592-5e4f09252476",
+        "runId": "run_06043f2c-8f72-419c-85a7-f7e3f7a34bb0",
+        "type": "run.started",
+        "timestamp": 1767711092691,
+        "data": {
+          "input": {
+            "message": "Hello"
+          }
+        },
+        "metadata": {
+          "agentId": "8d27a288-73ef-4dd5-a1dd-86d49c325d59",
+          "agentVersion": "1.0.0"
+        }
+      },
+      {
+        "id": "evt_442b1af5-13b6-4bbc-a423-35a8515aed62",
+        "runId": "run_06043f2c-8f72-419c-85a7-f7e3f7a34bb0",
+        "type": "run.failed",
+        "timestamp": 1767711092876,
+        "data": {
+          "error": "LLM provider error: openai"
+        },
+        "metadata": {
+          "agentId": "8d27a288-73ef-4dd5-a1dd-86d49c325d59",
+          "agentVersion": "1.0.0"
+        }
+      }
+    ],
+    "timeline": [
+      {
+        "timestamp": 1767711092691,
+        "type": "run.started",
+        "description": "Run started"
+      },
+      {
+        "timestamp": 1767711092876,
+        "type": "run.failed",
+        "description": "Run failed: LLM provider error: openai"
+      }
+    ],
+    "summary": {
+      "totalEvents": 2,
+      "duration": 185,
+      "intentionsGenerated": 0,
+      "actionsExecuted": 0,
+      "policiesChecked": 0,
+      "toolsCalled": 0
+    }
+  }
+}
