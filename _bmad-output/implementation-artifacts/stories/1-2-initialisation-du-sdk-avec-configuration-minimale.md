@@ -80,3 +80,4 @@ interface SDKConfig {
 **Status:** done  
 **Implementation:** Complète dans `src/sdk.ts`
 
+

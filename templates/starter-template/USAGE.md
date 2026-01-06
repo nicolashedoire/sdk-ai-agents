@@ -86,3 +86,4 @@ Consultez la documentation complète du SDK :
 - Assurez-vous d'avoir Node.js >= 20.0.0
 - Les erreurs TypeScript concernant `@sdk-ai-agents/core` sont normales tant que le package n'est pas installé
 
+

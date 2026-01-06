@@ -42,3 +42,4 @@ Pour créer un nouveau template :
 
 Les templates sont maintenus avec le SDK principal. Pour proposer un nouveau template ou améliorer un existant, ouvrez une issue ou une pull request.
 
+

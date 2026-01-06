@@ -36,3 +36,4 @@ export interface ComparisonDifference {
   severity?: 'low' | 'medium' | 'high';
 }
 
+

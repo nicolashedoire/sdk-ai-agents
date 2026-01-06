@@ -222,3 +222,4 @@ Le MVP est un succès ! Tous les objectifs ont été atteints :
 
 **Prochaine action recommandée:** `/bmad:bmm:workflows:sprint-planning` pour planifier Phase 2
 
+

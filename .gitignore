@@ -15,3 +15,6 @@ test-events/
 *.test.ts.snap
 coverage/
 
+
+# Auto Claude data directory
+.auto-claude/
