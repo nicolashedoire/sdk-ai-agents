@@ -1,0 +1,17 @@
+[
+  {
+    "id": "evt_a2c53ba2-77b8-4109-b71d-2c665d06911a",
+    "runId": "run_c5a44d5d-431b-427f-a7a2-ba6ae79f8c0b",
+    "type": "run.started",
+    "timestamp": 1767710787021,
+    "data": {
+      "input": {
+        "message": "Hello"
+      }
+    },
+    "metadata": {
+      "agentId": "32879e66-a5fa-484e-9ab0-098b740430d5",
+      "agentVersion": "1.0.0"
+    }
+  }
+]

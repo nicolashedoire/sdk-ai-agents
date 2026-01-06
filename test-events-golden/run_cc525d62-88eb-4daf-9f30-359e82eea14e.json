@@ -1,0 +1,30 @@
+[
+  {
+    "id": "evt_3b9acb9e-0696-4d37-8f29-1880fe942362",
+    "runId": "run_cc525d62-88eb-4daf-9f30-359e82eea14e",
+    "type": "run.started",
+    "timestamp": 1767710800665,
+    "data": {
+      "input": {
+        "message": "Hello"
+      }
+    },
+    "metadata": {
+      "agentId": "de16ecad-8a99-4ef5-bbf9-9c4ae57d4369",
+      "agentVersion": "1.0.0"
+    }
+  },
+  {
+    "id": "evt_0f864414-25ae-4609-b225-de6602102186",
+    "runId": "run_cc525d62-88eb-4daf-9f30-359e82eea14e",
+    "type": "run.failed",
+    "timestamp": 1767710800847,
+    "data": {
+      "error": "LLM provider error: openai"
+    },
+    "metadata": {
+      "agentId": "de16ecad-8a99-4ef5-bbf9-9c4ae57d4369",
+      "agentVersion": "1.0.0"
+    }
+  }
+]
