@@ -34,19 +34,24 @@ flowchart LR
   Q([Problem]) --> R[Represent]
   R --> H[Hypothesize]
   H --> S[Simulate]
+  S -->|prediction| T[Test]
+  T -->|refuted| V[Revise]
+  V --> S
+  T -->|confirmed| C
   S --> C[Critique]
   C -->|unknown matters| I[Seek information]
   I --> C
   C --> P[Compare]
   P --> D[Decide]
-  D --> A([Answer + rationale + next actions])
+  D --> A([Committed, provisional or abstain — with rationale and next actions])
 ```
 
 Both kinds share the same tools, policies, event store, replay, costs and incident alerts.
 
 ## What you get
 
-- **Explicit reasoning** — seven operations on a mental state, with invariants enforced in code (a rejected hypothesis cannot be selected, a fatal critique rejects a hypothesis, the last step always decides).
+- **Explicit reasoning** — ten operations on a mental state, with invariants enforced in code (a rejected hypothesis cannot be selected, a fatal critique rejects a hypothesis, the last step always concludes).
+- **Evidence you can audit** — observations with provenance, predictions tested by your own evaluator, refuted rules revised into scoped variants, preferences kept apart from evidence, and a conclusion guard that answers `committed`, `provisional` or `abstain`.
 - **Personal reasoning styles** — distill a thinker profile from topics explained in your own words, then correct the agent with `match`, `partial` or `mismatch` verdicts.
 - **Typed decisions** — [TypeSafe Jev](https://docs.typesafe.ai) or any compatible backend answers Noul, Choice and Score questions with calibrated probabilities.
 - **MCP connectors** — expose your tools as an MCP server, import any MCP server as governed tools.

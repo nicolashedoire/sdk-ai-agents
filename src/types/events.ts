@@ -28,6 +28,7 @@ export type EventType =
   | 'cognition.thought'
   | 'cognition.operation_failed'
   | 'cognition.concluded'
+  | 'cognition.evaluated'
   | 'cognition.feedback'
   | 'decision.evaluated';
 

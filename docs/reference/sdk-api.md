@@ -28,7 +28,7 @@ const sdk = createSDK(config);
 | Method | Returns | |
 | --- | --- | --- |
 | `createAgent(config)` | `AgentImpl` | Governed agent: `run(input)`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name` |
-| `createCognitiveAgent(config)` | `CognitiveAgent` | `think(input)`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()` |
+| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()` |
 | `defineTool(definition)` | `Tool` | Registers a tool; the handler is typed from its Zod schema |
 | `defineCapability(definition)` | `Capability` | Groups tools |
 | `listTools()` | `Tool[]` | Every registered tool |
@@ -43,16 +43,38 @@ const sdk = createSDK(config);
 | `profile` | `DEFAULT_THINKER_PROFILE` | How the agent reasons |
 | `tools`, `policies` | `[]` | Governed like everywhere else |
 | `systemPrompt` | — | Extra instructions for every prompt |
-| `limits` | see [Cognitive agents](../guide/cognitive-agents#limits) | `maxSteps`, `timeoutMs`, `maxHypotheses`, `maxToolCalls`, `decisionThreshold`, `maxConsecutiveFailures` |
+| `limits` | see [Cognitive agents](../guide/cognitive-agents#limits) | `maxSteps`, `timeoutMs`, `maxHypotheses`, `maxToolCalls`, `decisionThreshold`, `maxConsecutiveFailures`, `maxPredictionTests`, `preferenceWeight` |
 | `controller` | `'auto'` | `'heuristic'`, `'typed'` or a `CognitiveController` |
 | `controllerOptions` | — | `minConfidence` (0.35), `readinessThreshold` (0.8), `fallback`, `model` |
-| `assessment` | `'auto'` | `'llm'` or `'typed'` for the `compare` operation |
+| `assessment` | `'auto'` | `'llm'`, `'typed'` or your own `HypothesisAssessor` for the `compare` operation |
+| `evaluator` | — | An `OutcomeEvaluator` that tests predictions; enables `test_prediction` |
+| `generator` | LLM generator on `model` | Your own `ThoughtGenerator` (observation comparisons included); its thoughts still go through the engine's admission rules |
 | `temperature`, `maxTokens` | `0.4`, — | Thought generation settings |
 | `providerSettings` | — | Settings for tool selection (native reasoning engine) |
 
 ### `CognitiveRunResult`
 
-`{ runId, status, answer?, decision?, state, error? }` — `status` is `completed`, `failed` or `cancelled`; `state` is the final `MentalState`.
+`{ runId, status, answer?, decision?, state, error? }` — `status` is `completed`, `failed` or `cancelled`; `decision.status` is `committed`, `provisional` or `abstain`, with `decision.missing` listing what is not established; `state` is the final `MentalState`.
+
+### `OutcomeEvaluator`
+
+```ts
+interface OutcomeEvaluator {
+  readonly id: string;
+  readonly version: string;
+  evaluate(input: { prediction; hypothesis; state; abortSignal? }): Promise<{
+    verdict: 'confirmed' | 'refuted' | 'inconclusive';
+    observed?: unknown;
+    summary?: string;
+    context?: string;
+    metrics?: Record<string, number>;
+    causeCandidates?: string[];
+    reason?: string;
+  }>;
+}
+```
+
+See [Evidence & verification](../guide/evidence-and-verification).
 
 ## Reasoning & profiles
 
@@ -104,4 +126,4 @@ Question helpers: `noul(instructions, criteria?)`, `choice(instructions, options
 
 ## Building blocks
 
-Everything the SDK uses is exported for custom setups: `JevClient`, `DecisionService`, `LLMThoughtGenerator`, `HeuristicController`, `TypedDecisionController`, `TypedHypothesisAssessor`, `applyThought`, `rebuildMentalState`, `defineThinkerProfile`, `refineProfile`, `withRetry`, `RetryingLLMProvider`, `MonitoredEventStore`, `EmailIncidentNotifier`, `WebhookIncidentNotifier`, `ResendEmailTransport`, `computeRunCost`, `FileEventStore`, `SQLiteEventStore`, `PostgreSQLEventStore`, and all the types.
+Everything the SDK uses is exported for custom setups: `JevClient`, `DecisionService`, `LLMThoughtGenerator`, `HeuristicController`, `TypedDecisionController`, `TypedHypothesisAssessor`, `PredictionTester`, `applyThought`, `assembleThought`, `assessReadiness`, `rankHypotheses`, `rebuildMentalState`, `describeMentalState`, `fingerprint`, `defineThinkerProfile`, `refineProfile`, `withRetry`, `RetryingLLMProvider`, `MonitoredEventStore`, `EmailIncidentNotifier`, `WebhookIncidentNotifier`, `ResendEmailTransport`, `computeRunCost`, `FileEventStore`, `SQLiteEventStore`, `PostgreSQLEventStore`, and all the types.

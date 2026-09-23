@@ -1,10 +1,11 @@
 import type { CognitiveOperation } from './cognitive-operations.js';
 import type { CognitiveRunRecorder } from './cognitive-run-recorder.js';
-import type { HypothesisAssessor } from './hypothesis-assessor.js';
+import { HypothesisAssessmentError, type HypothesisAssessor } from './hypothesis-assessor.js';
 import type { InformationSeeker } from './information-seeker.js';
 import type { ThoughtGenerator } from './llm-thought-generator.js';
 import type { MentalState } from './mental-state.js';
 import { failureOutcome, toError, truncate, type OperationOutcome } from './operation-outcome.js';
+import type { PredictionTester } from './outcome-evaluator.js';
 import type { ThinkerProfile } from './thinker-profile.js';
 
 export interface OperationPerformerDependencies {
@@ -12,12 +13,14 @@ export interface OperationPerformerDependencies {
   seeker: InformationSeeker;
   recorder: CognitiveRunRecorder;
   assessor?: HypothesisAssessor;
+  tester?: PredictionTester;
 }
 
 /**
  * Executes one cognitive operation and returns its outcome without touching the state:
- * tools for `seek_information`, the typed-decision assessor for `compare` when configured,
- * the thought generator otherwise. Failures become outcomes, except cancellation.
+ * tools for `seek_information`, the outcome evaluator for `test_prediction`, the
+ * typed-decision assessor for `compare` when configured, the thought generator otherwise.
+ * Failures become outcomes, except cancellation.
  */
 export class OperationPerformer {
   constructor(private readonly deps: OperationPerformerDependencies) {}
@@ -30,13 +33,20 @@ export class OperationPerformer {
     step: number;
     signal: AbortSignal;
   }): Promise<OperationOutcome> {
-    const { runId, operation, state, profile, signal } = input;
+    const { runId, operation, profile, signal } = input;
     try {
+      // Components get a copy: whatever they do with it cannot alter the recorded state.
+      const state = isolatedCopy(input.state);
       if (operation === 'seek_information') {
         return await this.deps.seeker.investigate({ runId, state, profile, signal });
       }
+      if (operation === 'test_prediction') {
+        return this.deps.tester
+          ? await this.deps.tester.test({ runId, state, step: input.step, signal })
+          : { failure: new Error('no outcome evaluator is configured') };
+      }
       if (operation === 'compare' && this.deps.assessor) {
-        const assessed = await this.assess(this.deps.assessor, input);
+        const assessed = await this.assess(this.deps.assessor, { ...input, state });
         if (assessed) return assessed;
       }
       const generated = await this.deps.generator.generate({
@@ -47,7 +57,7 @@ export class OperationPerformer {
         abortSignal: signal,
       });
       return {
-        patch: generated.patch,
+        proposal: { contract: operation, patch: generated.patch },
         ignoredFields: generated.ignoredFields,
         ...(generated.model ? { model: generated.model } : {}),
         ...(generated.requestedModel ? { requestedModel: generated.requestedModel } : {}),
@@ -77,9 +87,13 @@ export class OperationPerformer {
         abortSignal: input.signal,
       });
       await this.deps.recorder.evaluations(input.runId, input.step, assessment.evaluations);
-      return { patch: assessment.patch };
+      return { proposal: { contract: 'compare', patch: assessment.patch } };
     } catch (error) {
       if (input.signal.aborted) throw error;
+      if (error instanceof HypothesisAssessmentError) {
+        // Calls made before the failure were billed: keep them in the trace and the costs.
+        await this.deps.recorder.evaluations(input.runId, input.step, error.evaluations);
+      }
       await this.deps.recorder.record(input.runId, 'cognition.operation_failed', {
         step: input.step,
         operation: 'compare',
@@ -89,4 +103,13 @@ export class OperationPerformer {
       return undefined;
     }
   }
+}
+
+/**
+ * Deep copy of what the engine owns (it is plain JSON data). The problem's `context` is
+ * passed as given: it belongs to the caller and may hold values that cannot be cloned.
+ */
+function isolatedCopy(state: MentalState): MentalState {
+  const { context, ...owned } = state;
+  return { ...structuredClone(owned), ...(context ? { context } : {}) };
 }

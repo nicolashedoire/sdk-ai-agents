@@ -3,7 +3,8 @@ import { availableOperations, MAX_ATTEMPTS_PER_UNKNOWN } from '../cognition/cogn
 import { HeuristicController } from '../cognition/cognitive-controller.js';
 import { extractJsonObject, parseThought } from '../cognition/llm-thought-generator.js';
 import { applyThought } from '../cognition/mental-state-reducer.js';
-import { createMentalState, thoughtPatchSchema, type MentalState, type ThoughtPatchInput } from '../cognition/mental-state.js';
+import { createMentalState, type MentalState } from '../cognition/mental-state.js';
+import { thoughtPatchSchema, type ThoughtPatchInput } from '../cognition/thought-patch.js';
 import {
   DEFAULT_THINKER_PROFILE,
   MAX_PROFILE_EXAMPLES,
@@ -83,12 +84,15 @@ describe('mental state reducer', () => {
       'cannot resolve unknown U7: not found',
       'cannot critique hypothesis H9: not found',
       'contradiction references unknown id Z3',
+      // Nothing was critiqued: the step counts as a failed attempt.
+      'critique examined no hypothesis that lacked a critique',
     ]);
+    expect(state.trail.at(-1)?.failed).toBe(true);
     expect(state.contradictions[0]).toMatchObject({ id: 'C1', between: ['F1'], resolved: false });
   });
 
-  it('never selects a rejected hypothesis', () => {
-    let state = think(framedState(), 'critique', {
+  it('refuses a decision on a rejected hypothesis', () => {
+    const state = think(framedState(), 'critique', {
       summary: 'reject H1',
       hypothesisUpdates: [{ hypothesisId: 'H1', reject: true, reason: 'too slow' }],
     }).state;
@@ -96,10 +100,28 @@ describe('mental state reducer', () => {
       summary: 'decide',
       decision: { hypothesisId: 'H1', answer: 'Build it', rationale: 'r', confidence: 0.6 },
     });
-    state = decided;
+    expect(issues).toEqual(['decision refused: H1 was rejected (too slow)']);
+    expect(decided.decision).toBeUndefined();
+  });
+
+  it('rebuilds legacy (v1) runs with their original decision rule', () => {
+    let state = createMentalState('Build or buy?', undefined, { schemaVersion: 1 });
+    state = think(state, 'hypothesize', { summary: 'h', addHypotheses: [{ statement: 'Build' }] }).state;
+    state = think(state, 'critique', {
+      summary: 'reject H1',
+      hypothesisUpdates: [{ hypothesisId: 'H1', reject: true, reason: 'too slow' }],
+      confidence: 0.4,
+    }).state;
+    expect(state.confidence).toBe(0.4);
+    const { state: decided, issues } = think(state, 'decide', {
+      summary: 'decide',
+      decision: { hypothesisId: 'H1', answer: 'Build it', rationale: 'r', confidence: 0.6 },
+    });
     expect(issues).toEqual(['decision cannot select rejected hypothesis H1']);
-    expect(state.decision?.hypothesisId).toBeUndefined();
-    expect(state.confidence).toBe(0.6);
+    expect(decided.decision).toMatchObject({ answer: 'Build it' });
+    expect(decided.decision?.hypothesisId).toBeUndefined();
+    expect(decided.decision?.status).toBeUndefined();
+    expect(decided.confidence).toBe(0.6);
   });
 
   it('counts investigations and marks comparisons', () => {
@@ -124,7 +146,8 @@ describe('available operations', () => {
 
   it('only offers what the state allows', () => {
     const state = framedState();
-    expect(availableOperations(state, context)).toEqual(['hypothesize', 'simulate', 'critique', 'seek_information', 'decide']);
+    // Nothing was examined yet, so no answer can be committed.
+    expect(availableOperations(state, context)).toEqual(['hypothesize', 'simulate', 'critique', 'seek_information']);
     expect(availableOperations(state, { ...context, canSeekInformation: false })).not.toContain('seek_information');
   });
 

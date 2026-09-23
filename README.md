@@ -25,9 +25,10 @@ import { createSDK } from '@sdk-ai-agents/core';
 const sdk = createSDK({ apiKey: process.env.OPENAI_API_KEY, jev: { apiKey: process.env.TYPESAFE_API_KEY } });
 
 const analyst = sdk.createCognitiveAgent({ name: 'analyst', model: 'gpt-4o', tools: [lookupMetric] });
-const { answer, state, runId } = await analyst.think({ problem: 'Should we build or buy our analytics module?' });
+const { answer, decision, state, runId } = await analyst.think({ problem: 'Should we build or buy our analytics module?' });
 
 console.log(answer);                        // the decision, with its rationale and next actions
+console.log(decision?.status);              // committed, provisional (with what is missing) or abstain
 console.log(state.hypotheses);              // every option considered, simulated and critiqued
 console.log(await sdk.getRunCost(runId));   // what it cost, per model
 ```
@@ -36,21 +37,30 @@ console.log(await sdk.getRunCost(runId));   // what it cost, per model
 
 <img src="docs/public/images/reasoning-loop.svg" alt="The cognitive loop" align="right" width="340" />
 
-A classic LLM call goes straight from question to answer. A **cognitive agent** keeps an explicit **mental state** — facts, assumptions, constraints, unknowns, hypotheses, contradictions, confidence — and improves it one operation at a time:
+A classic LLM call goes straight from question to answer. A **cognitive agent** keeps an explicit **mental state** — observations, facts, assumptions, constraints, unknowns, hypotheses, predictions, contradictions, confidence — and improves it one operation at a time:
 
-1. **Represent** the problem
-2. **Hypothesize** several answers
-3. **Simulate** their consequences
-4. **Critique** each one
-5. **Seek information** with governed tools
-6. **Compare** what survives
-7. **Decide**, with a rationale and next actions
+1. **Represent** the problem and what was observed
+2. **Compare observations** — similarities, differences, counterexamples
+3. **Hypothesize** answers, rules or explanations
+4. **Simulate** their consequences and **predict**
+5. **Test** predictions with your own evaluator
+6. **Revise** what the evidence refuted
+7. **Critique** each hypothesis
+8. **Seek information** with governed tools
+9. **Compare** what survives
+10. **Decide** — committed, provisional or abstain, with a rationale and next actions
 
-A **controller** picks the next operation — a deterministic heuristic, or **Jev** with calibrated confidence and automatic fallback. Invariants live in code: a rejected hypothesis cannot be selected, a fatal critique rejects its hypothesis, an agent only runs the tools it was given, the last step is always a decision. Every thought is an event, so any run's mental state can be **rebuilt, audited and replayed**.
+A **controller** picks the next operation — a deterministic heuristic, or **Jev** with calibrated confidence and automatic fallback. Invariants live in code: a rejected hypothesis cannot be selected, a fatal critique rejects its hypothesis, an agent only runs the tools it was given, the last step always concludes. Every thought is an event, so any run's mental state can be **rebuilt, audited and replayed**.
 
 <br clear="right" />
 
 <p align="center"><img src="docs/public/images/mental-state.svg" alt="A mental state rebuilt from events" width="720" /></p>
+
+## Believe what you can justify
+
+<p align="center"><img src="docs/public/images/evidence-loop.svg" alt="Observe, compare, deduce, test, revise, then conclude" width="100%" /></p>
+
+Give the agent what you observed; tool results and test results are observations too, each with its **provenance** (source, event, time, context, origin). It **compares** observations, induces **rules** with the premises they rest on, deduces **predictions** with the observation that would refute them, and your own **outcome evaluator** — a simulator, a measurement, a test suite — says `confirmed`, `refuted` or `inconclusive`. A refuted rule is **revised** into a scoped variant, never silently revived. Evidence and the thinker's **preferences are scored apart**: preferences may reorder actions, never make a claim more credible. And an answer is **committed** only when the evidence holds; otherwise the agent says it is **provisional** and what is missing — or **abstains**. [Evidence & verification →](https://nicolashedoire.github.io/sdk-ai-agents/guide/evidence-and-verification)
 
 ## Teach it how you think
 
@@ -142,6 +152,7 @@ Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25; zod 4 is not supported yet).
 | [Introduction](https://nicolashedoire.github.io/sdk-ai-agents/guide/introduction) | Why and what |
 | [Getting started](https://nicolashedoire.github.io/sdk-ai-agents/guide/getting-started) | First agent in five minutes |
 | [Cognitive agents](https://nicolashedoire.github.io/sdk-ai-agents/guide/cognitive-agents) | Mental state, operations, controllers |
+| [Evidence & verification](https://nicolashedoire.github.io/sdk-ai-agents/guide/evidence-and-verification) | Provenance, predictions, tests, revisions, conclusion guard |
 | [Thinker profiles](https://nicolashedoire.github.io/sdk-ai-agents/guide/thinker-profiles) | Distill, correct, export a dataset |
 | [Typed decisions](https://nicolashedoire.github.io/sdk-ai-agents/guide/typed-decisions) | Jev, context injection, choices |
 | [MCP connectors](https://nicolashedoire.github.io/sdk-ai-agents/guide/mcp) | Expose and import tools |

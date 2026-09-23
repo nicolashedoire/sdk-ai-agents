@@ -1,10 +1,25 @@
-import { applyDecision, applyHypothesisChanges } from './hypothesis-transitions.js';
-import type { Contradiction, MentalState, ThoughtPatch } from './mental-state.js';
+import { stateConfidence } from './decision-readiness.js';
+import { applyContradictionChanges } from './contradiction-transitions.js';
+import {
+  applyComparisons,
+  applyEvaluations,
+  applyFactChanges,
+  applyObservations,
+} from './evidence-transitions.js';
+import {
+  applyDecision,
+  applyHypothesisProposals,
+  applyHypothesisUpdates,
+} from './hypothesis-transitions.js';
+import { comparableObservations, type Hypothesis, type MentalState } from './mental-state.js';
+import type { ThoughtPatch } from './thought-patch.js';
 
 export interface ThoughtApplication {
   state: MentalState;
   /** References the reducer ignored (unknown ids, forbidden transitions). */
   issues: string[];
+  /** Set when the operation changed nothing it was meant to change (schema version 2). */
+  noEffect?: string;
 }
 
 /**
@@ -12,8 +27,9 @@ export interface ThoughtApplication {
  * existing items, so folding the same patches always rebuilds the same state.
  *
  * Invariants enforced here rather than trusted to the model:
- * - a fatal critique without rebuttal rejects its hypothesis;
- * - a rejected hypothesis cannot be revived or selected;
+ * - a fatal critique without rebuttal, or a refuted prediction, rejects its hypothesis;
+ * - a rejected hypothesis cannot be revived, restated or selected;
+ * - evidence changes make earlier assessments stale; preferences never change support;
  * - references to unknown ids are ignored and reported as issues.
  */
 export function applyThought(
@@ -23,36 +39,12 @@ export function applyThought(
 ): ThoughtApplication {
   const step = previous.step + 1;
   const issues: string[] = [];
-  const state: MentalState = {
-    ...previous,
-    step,
-    facts: [...previous.facts],
-    assumptions: [...previous.assumptions],
-    constraints: [...previous.constraints],
-    unknowns: previous.unknowns.map((unknown) => ({ ...unknown })),
-    hypotheses: previous.hypotheses.map((hypothesis) => ({
-      ...hypothesis,
-      simulations: [...hypothesis.simulations],
-      critiques: [...hypothesis.critiques],
-    })),
-    contradictions: previous.contradictions.map((contradiction) => ({ ...contradiction })),
-    failures: [...previous.failures],
-    trail: [
-      ...previous.trail,
-      { step, operation, summary: patch.summary, ...(patch.failed ? { failed: true } : {}) },
-    ],
-  };
+  const state = copyState(previous, step, operation, patch);
 
-  for (const fact of patch.addFacts) {
-    state.facts.push({
-      id: `F${state.facts.length + 1}`,
-      statement: fact.statement,
-      source: fact.source,
-      confidence: fact.confidence,
-      ...(fact.evidence ? { evidence: fact.evidence } : {}),
-      step,
-    });
-  }
+  // Observations and test results are recorded by the engine; the rest is written by the model.
+  let engineEvidence = applyObservations(state, patch, step);
+  let evidenceChanged = engineEvidence;
+  evidenceChanged = applyFactChanges(state, patch, step, issues) || evidenceChanged;
   for (const assumption of patch.addAssumptions) {
     state.assumptions.push({
       id: `A${state.assumptions.length + 1}`,
@@ -77,11 +69,12 @@ export function applyThought(
       step,
     });
   }
-
   applyUnknownChanges(state, patch, issues);
-  applyHypothesisChanges(state, patch, step, issues);
-  applyContradictionChanges(state, patch, step, issues);
-
+  applyHypothesisProposals(state, patch, step, issues);
+  evidenceChanged = applyComparisons(state, patch, step, issues) || evidenceChanged;
+  engineEvidence = applyEvaluations(state, patch, step, issues) || engineEvidence;
+  evidenceChanged = engineEvidence || evidenceChanged;
+  evidenceChanged = applyContradictionChanges(state, patch, step, issues) || evidenceChanged;
   for (const failure of patch.addFailures) {
     state.failures.push({
       id: `X${state.failures.length + 1}`,
@@ -91,18 +84,141 @@ export function applyThought(
     });
   }
 
-  if (operation === 'compare') {
-    state.comparedAtStep = step;
+  const legacy = state.schemaVersion < 2;
+  if (evidenceChanged && !legacy) {
+    state.evidenceRevision += 1;
   }
-  if (patch.confidence !== undefined) {
-    state.confidence = patch.confidence;
-  }
-  if (patch.decision) {
-    state.decision = applyDecision(state, patch.decision, step, issues);
-    state.confidence = state.decision.confidence;
+  applyHypothesisUpdates(state, patch, step, issues);
+  let failed = patch.failed === true;
+  let noEffect: string | undefined;
+  if (!legacy) {
+    // An operation that changed nothing it was meant to change counts as a failed attempt,
+    // so it is not repeated blindly. The entry keeps the evidence revision it happened at.
+    noEffect = failed ? undefined : missingEffect(previous, state, operation);
+    if (noEffect) {
+      issues.push(noEffect);
+      failed = true;
+    }
+    // A failed step only brings new evidence through what the engine recorded.
+    stampTrail(state, failed, evidenceChanged && (!failed || engineEvidence));
   }
 
-  return { state, issues };
+  if (operation === 'compare' && (legacy || !failed)) {
+    state.comparedAtStep = step;
+    state.comparedAtRevision = state.evidenceRevision;
+  }
+  if (operation === 'compare_observations' && !failed) {
+    state.observationsCompared = comparableObservations(state).length;
+  }
+
+  if (legacy) {
+    if (patch.confidence !== undefined) state.confidence = patch.confidence;
+  } else {
+    state.confidence = stateConfidence(state);
+  }
+  if (patch.decision) {
+    const decision = applyDecision(state, patch.decision, step, issues);
+    if (decision) {
+      state.decision = decision;
+      if (legacy || decision.status !== 'abstain') state.confidence = decision.confidence;
+    }
+  }
+
+  return { state, issues, ...(noEffect ? { noEffect } : {}) };
+}
+
+/** What an operation was meant to change and did not, if anything. */
+function missingEffect(
+  previous: MentalState,
+  state: MentalState,
+  operation: string
+): string | undefined {
+  switch (operation) {
+    case 'hypothesize':
+    case 'revise':
+      return state.hypotheses.length > previous.hypotheses.length
+        ? undefined
+        : `${operation} added no hypothesis`;
+    case 'simulate':
+      return newlyExamined(previous, state, (hypothesis) => hypothesis.simulations.length)
+        ? undefined
+        : 'simulate examined no hypothesis that lacked a simulation';
+    case 'critique':
+      return newlyExamined(previous, state, (hypothesis) => hypothesis.critiques.length) ||
+        newlyRejected(previous, state)
+        ? undefined
+        : 'critique examined no hypothesis that lacked a critique';
+    case 'compare_observations':
+      return state.comparisons.length > previous.comparisons.length
+        ? undefined
+        : 'compare_observations recorded no comparison';
+    default:
+      return undefined;
+  }
+}
+
+/** True when a hypothesis that had none of something (simulation, critique) now has one. */
+function newlyExamined(
+  previous: MentalState,
+  state: MentalState,
+  count: (hypothesis: Hypothesis) => number
+): boolean {
+  return previous.hypotheses.some((before) => {
+    const after = state.hypotheses.find((hypothesis) => hypothesis.id === before.id);
+    return count(before) === 0 && after !== undefined && count(after) > 0;
+  });
+}
+
+function newlyRejected(previous: MentalState, state: MentalState): boolean {
+  return state.hypotheses.some(
+    (hypothesis) =>
+      hypothesis.status === 'rejected' &&
+      previous.hypotheses.find((before) => before.id === hypothesis.id)?.status !== 'rejected'
+  );
+}
+
+function stampTrail(state: MentalState, failed: boolean, newEvidence: boolean): void {
+  const last = state.trail.at(-1);
+  if (!last) return;
+  state.trail[state.trail.length - 1] = {
+    ...last,
+    ...(failed ? { failed: true } : {}),
+    revision: state.evidenceRevision,
+    ...(newEvidence ? { newEvidence: true } : {}),
+  };
+}
+
+function copyState(
+  previous: MentalState,
+  step: number,
+  operation: string,
+  patch: ThoughtPatch
+): MentalState {
+  return {
+    ...previous,
+    step,
+    observations: [...previous.observations],
+    facts: previous.facts.map((fact) => ({ ...fact })),
+    assumptions: [...previous.assumptions],
+    constraints: [...previous.constraints],
+    unknowns: previous.unknowns.map((unknown) => ({ ...unknown })),
+    hypotheses: previous.hypotheses.map((hypothesis) => ({
+      ...hypothesis,
+      premiseRefs: [...hypothesis.premiseRefs],
+      evidenceRefs: [...hypothesis.evidenceRefs],
+      counterEvidenceRefs: [...hypothesis.counterEvidenceRefs],
+      simulations: [...hypothesis.simulations],
+      critiques: [...hypothesis.critiques],
+    })),
+    comparisons: [...previous.comparisons],
+    predictions: previous.predictions.map((prediction) => ({ ...prediction })),
+    contradictions: previous.contradictions.map((contradiction) => ({ ...contradiction })),
+    failures: [...previous.failures],
+    trail: [
+      ...previous.trail,
+      { step, operation, summary: patch.summary, ...(patch.failed ? { failed: true } : {}) },
+    ],
+  };
 }
 
 function applyUnknownChanges(state: MentalState, patch: ThoughtPatch, issues: string[]): void {
@@ -135,48 +251,5 @@ function applyUnknownChanges(state: MentalState, patch: ThoughtPatch, issues: st
       unknown.status = 'dropped';
       unknown.resolution = dropped.reason;
     }
-  }
-}
-
-function applyContradictionChanges(
-  state: MentalState,
-  patch: ThoughtPatch,
-  step: number,
-  issues: string[]
-): void {
-  const knownIds = new Set<string>([
-    ...state.facts.map((item) => item.id),
-    ...state.assumptions.map((item) => item.id),
-    ...state.constraints.map((item) => item.id),
-    ...state.unknowns.map((item) => item.id),
-    ...state.hypotheses.map((item) => item.id),
-  ]);
-
-  for (const contradiction of patch.addContradictions) {
-    const between = contradiction.between.filter((id) => {
-      if (knownIds.has(id)) return true;
-      issues.push(`contradiction references unknown id ${id}`);
-      return false;
-    });
-    const created: Contradiction = {
-      id: `C${state.contradictions.length + 1}`,
-      description: contradiction.description,
-      between,
-      resolved: false,
-      step,
-    };
-    state.contradictions.push(created);
-  }
-
-  for (const resolution of patch.resolveContradictions) {
-    const contradiction = state.contradictions.find(
-      (item) => item.id === resolution.contradictionId
-    );
-    if (!contradiction) {
-      issues.push(`cannot resolve contradiction ${resolution.contradictionId}: not found`);
-      continue;
-    }
-    contradiction.resolved = true;
-    contradiction.resolution = resolution.resolution;
   }
 }

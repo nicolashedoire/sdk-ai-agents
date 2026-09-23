@@ -11,6 +11,9 @@
     "src/__tests__/cognition-guards.test.ts",
     "src/__tests__/cognitive-agent.test.ts",
     "src/__tests__/decision-service.test.ts",
+    "src/__tests__/epistemic-guards.test.ts",
+    "src/__tests__/epistemic-liveness.test.ts",
+    "src/__tests__/epistemic-state.test.ts",
     "src/__tests__/file-event-store-flush.test.ts",
     "src/__tests__/golden-trace-manager.test.ts",
     "src/__tests__/governed-allowlist.test.ts",
@@ -18,10 +21,12 @@
     "src/__tests__/jev-client.test.ts",
     "src/__tests__/mcp.test.ts",
     "src/__tests__/resilience.test.ts",
+    "src/__tests__/rule-discovery.test.ts",
     "src/__tests__/sdk-cognition.test.ts",
     "src/__tests__/sdk-golden-traces.test.ts",
     "examples/cognitive-agent.ts",
-    "examples/mcp-server.ts"
+    "examples/mcp-server.ts",
+    "examples/rule-discovery.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

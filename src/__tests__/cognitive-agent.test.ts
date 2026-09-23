@@ -219,7 +219,7 @@ describe('cognitive agent', () => {
 
     const result = await agent.think({ problem: PROBLEM });
 
-    expect(result).toMatchObject({ status: 'failed', error: expect.objectContaining({ message: '2 consecutive operations failed' }) });
+    expect(result).toMatchObject({ status: 'failed', error: expect.objectContaining({ message: '2 consecutive operations failed (last: model unavailable)' }) });
     expect((await env.sdk.getTrace(result.runId)).status).toBe('failed');
   });
 
@@ -307,11 +307,14 @@ describe('cognitive agent with typed decisions', () => {
     // A single possible operation does not cost a model call.
     expect(chosen[1]?.data).toMatchObject({ operation: 'hypothesize', controller: 'memory', rationale: 'only available operation' });
     expect(chosen[2]?.data).toMatchObject({ operation: 'critique', controller: 'memory', confidence: expect.any(Number) });
-    // Hypothesis comparison was scored by the decision model, combined in code.
+    // Hypothesis comparison was scored by the decision model: evidence without the thinker's
+    // profile, then fit with the thinker for proposals, kept apart in code.
     const h2 = result.state.hypotheses.find((hypothesis) => hypothesis.id === 'H2');
     expect(h2?.support).toBe(1);
     const assessments = events.filter((event) => event.data.purpose === 'hypothesis_assessment');
-    expect(assessments).toHaveLength(1);
+    expect(assessments).toHaveLength(2);
+    expect(assessments[0]?.data.state).not.toHaveProperty('thinker');
+    expect(assessments[1]?.data.state).toHaveProperty('thinker');
 
     const cost = await env.sdk.getRunCost(result.runId);
     const decisionLine = cost.lines.find((line) => line.source === 'decision');

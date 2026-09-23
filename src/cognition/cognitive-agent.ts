@@ -4,21 +4,28 @@ import type { RunStatus } from '../types/events.js';
 import type { Tool } from '../types/tool.js';
 import { generateRunId } from '../utils/id.js';
 import type { CognitiveController } from './cognitive-controller.js';
-import { capNewHypotheses, type CognitiveOperation } from './cognitive-operations.js';
+import type { CognitiveOperation } from './cognitive-operations.js';
 import { CognitiveRunRecorder } from './cognitive-run-recorder.js';
 import type { HypothesisAssessor } from './hypothesis-assessor.js';
 import type { InformationSeeker } from './information-seeker.js';
 import type { ThoughtGenerator } from './llm-thought-generator.js';
 import { applyThought } from './mental-state-reducer.js';
 import {
+  CURRENT_SCHEMA_VERSION,
   createMentalState,
-  thoughtPatchSchema,
-  type Decision,
+  type CommitRules,
   type MentalState,
 } from './mental-state.js';
+import {
+  observationFromInput,
+  observationInputSchema,
+  type ObservationInput,
+} from './observation-records.js';
 import { toError, truncate, type OperationOutcome } from './operation-outcome.js';
 import { OperationPerformer } from './operation-performer.js';
 import { OperationSelector, type CognitiveLimits } from './operation-selector.js';
+import { PredictionTester, type OutcomeEvaluator } from './outcome-evaluator.js';
+import { assembleThought } from './patch-admission.js';
 import { learnFromRun } from './profile-learning.js';
 import {
   defineThinkerProfile,
@@ -26,6 +33,7 @@ import {
   type ThinkerProfile,
   type ThinkerProfileInput,
 } from './thinker-profile.js';
+import type { Decision, ObservationRecord } from './thought-patch.js';
 
 export interface CognitiveAgentDependencies {
   identity: { id: string; name: string; version: string; model: string; tools: Tool[] };
@@ -34,6 +42,8 @@ export interface CognitiveAgentDependencies {
   generator: ThoughtGenerator;
   controller: CognitiveController;
   assessor?: HypothesisAssessor;
+  /** Confronts predictions with real tests; without it predictions stay untested. */
+  evaluator?: OutcomeEvaluator;
   seeker: InformationSeeker;
   eventStore: IEventStore;
 }
@@ -42,6 +52,8 @@ export interface ThinkInput {
   /** The problem, question or decision to reason about. */
   problem: string;
   context?: Record<string, unknown>;
+  /** What was already observed (measurements, cases, documents), with its origin. */
+  observations?: ObservationInput[];
   metadata?: Record<string, unknown>;
 }
 
@@ -49,6 +61,7 @@ export interface CognitiveRunResult {
   runId: string;
   status: RunStatus;
   answer?: string;
+  /** `decision.status` says whether the answer is committed, provisional or an abstention. */
   decision?: Decision;
   state: MentalState;
   error?: Error;
@@ -60,6 +73,8 @@ interface RunContext {
   timedOut: boolean;
   toolCalls: number;
   consecutiveFailures: number;
+  /** Reason of the last failed operation, reported when the run gives up. */
+  lastFailure?: string;
   /** Profile snapshot: feedback given during the run applies to the next one. */
   profile: ThinkerProfile;
   recorder: CognitiveRunRecorder;
@@ -68,8 +83,9 @@ interface RunContext {
 
 /**
  * An agent that reasons before it answers: it keeps an explicit mental state and loops
- * over cognitive operations (represent, hypothesize, simulate, critique, seek information,
- * compare, decide) until it can commit to a decision.
+ * over cognitive operations (represent, compare observations, hypothesize, simulate, test
+ * predictions, revise, critique, seek information, compare, decide) until it can commit to
+ * a decision — or says, at the end of its budget, what is still missing.
  *
  * Every choice and every thought is an event: the run can be audited, its state rebuilt
  * with `rebuildMentalState`, and its tool calls replayed like any other run. Tools go
@@ -112,6 +128,7 @@ export class CognitiveAgent {
     if (!problem) {
       throw new ValidationError('problem', 'a problem to think about is required');
     }
+    const observations = this.initialObservations(input.observations ?? []);
 
     const { limits } = this.deps;
     const profile = this.profile;
@@ -133,6 +150,9 @@ export class CognitiveAgent {
         seeker: this.deps.seeker,
         recorder,
         ...(this.deps.assessor ? { assessor: this.deps.assessor } : {}),
+        ...(this.deps.evaluator
+          ? { tester: new PredictionTester(this.deps.evaluator, recorder) }
+          : {}),
       }),
     };
     this.activeRuns.set(run.runId, run);
@@ -141,18 +161,29 @@ export class CognitiveAgent {
       run.abortController.abort();
     }, limits.timeoutMs);
 
-    let state = createMentalState(problem, input.context);
+    const commitRules: CommitRules = {
+      decisionThreshold: limits.decisionThreshold,
+      maxPredictionTests: this.deps.evaluator ? limits.maxPredictionTests : 0,
+      preferenceWeight: limits.preferenceWeight,
+    };
+    let state = createMentalState(problem, input.context, { observations, commitRules });
     try {
       await run.recorder.record(run.runId, 'run.started', {
         input: { message: problem, context: input.context, metadata: input.metadata },
         mode: 'cognitive',
       });
       await run.recorder.record(run.runId, 'cognition.started', {
+        schemaVersion: CURRENT_SCHEMA_VERSION,
         goal: problem,
         ...(input.context ? { context: input.context } : {}),
+        observations,
+        commitRules,
         profile: { id: profile.id, name: profile.name, version: profile.version },
         controller: this.deps.controller.name,
         assessor: this.deps.assessor?.name ?? 'llm',
+        ...(this.deps.evaluator
+          ? { evaluator: { id: this.deps.evaluator.id, version: this.deps.evaluator.version } }
+          : {}),
         allowedTools: this.deps.identity.tools.map((tool) => tool.name),
         limits,
       });
@@ -178,7 +209,14 @@ export class CognitiveAgent {
           signal: run.abortController.signal,
         });
         if (outcome.toolCalled) run.toolCalls++;
-        state = await this.apply(run, state, step, selection.decision.operation, outcome);
+        state = await this.apply(
+          run,
+          state,
+          step,
+          selection.decision.operation,
+          outcome,
+          selection.forced
+        );
         if (state.decision) {
           await run.recorder.conclusion(run.runId, state, state.decision);
           return {
@@ -190,7 +228,9 @@ export class CognitiveAgent {
           };
         }
         if (run.consecutiveFailures >= limits.maxConsecutiveFailures) {
-          throw new Error(`${run.consecutiveFailures} consecutive operations failed`);
+          throw new Error(
+            `${run.consecutiveFailures} consecutive operations failed (last: ${run.lastFailure ?? 'unknown'})`
+          );
         }
       }
       throw new Error(`No decision reached within ${limits.maxSteps} steps`);
@@ -239,41 +279,61 @@ export class CognitiveAgent {
     return this.profile;
   }
 
+  private initialObservations(inputs: ObservationInput[]): ObservationRecord[] {
+    const now = Date.now();
+    return inputs.map((input, index) => {
+      const parsed = observationInputSchema.safeParse(input);
+      if (!parsed.success) {
+        throw new ValidationError(
+          `observations.${index}`,
+          parsed.error.issues[0]?.message ?? 'invalid observation'
+        );
+      }
+      return observationFromInput(parsed.data, now);
+    });
+  }
+
   private async apply(
     run: RunContext,
     state: MentalState,
     step: number,
     operation: CognitiveOperation,
-    outcome: OperationOutcome
+    outcome: OperationOutcome,
+    forced: boolean
   ): Promise<MentalState> {
-    let patch = outcome.patch;
-    if (outcome.failure || !patch) {
+    const thought = assembleThought({
+      operation,
+      outcome,
+      state,
+      maxHypotheses: this.deps.limits.maxHypotheses,
+      forced,
+    });
+    const { state: next, issues, noEffect } = applyThought(state, operation, thought.patch);
+    const failure = thought.failureMessage ?? noEffect;
+
+    // Only failures of the model or its tools count toward `maxConsecutiveFailures`. A
+    // deferred decision or a step that changed nothing is an engine verdict: it counts as a
+    // failed attempt of that operation (see `recentFailures`), never as a reason to abort.
+    if (thought.failed && !thought.deferred) {
       run.consecutiveFailures++;
-      const message = truncate(outcome.failure?.message ?? 'operation produced no thought');
+      run.lastFailure = failure;
+    } else if (!failure) {
+      run.consecutiveFailures = 0;
+    }
+    if (failure) {
       await run.recorder.record(run.runId, 'cognition.operation_failed', {
         step,
         operation,
-        error: message,
+        error: failure,
       });
-      patch = thoughtPatchSchema.parse({
-        summary: `${operation} failed: ${message}`,
-        failed: true,
-        addFailures: [{ description: message }],
-        ...(outcome.investigatedUnknownId
-          ? { investigatedUnknownId: outcome.investigatedUnknownId }
-          : {}),
-      });
-    } else {
-      run.consecutiveFailures = 0;
     }
-
-    const bounded = capNewHypotheses(patch, state, this.deps.limits.maxHypotheses);
-    const { state: next, issues } = applyThought(state, operation, bounded.patch);
     await run.recorder.thought(run.runId, {
       step,
       operation,
-      patch: bounded.patch,
-      issues: [...bounded.issues, ...issues],
+      patch: thought.patch,
+      issues: [...thought.issues, ...issues],
+      failed: failure !== undefined,
+      ignoredFields: [...(outcome.ignoredFields ?? []), ...thought.ignoredFields],
       outcome,
     });
     return next;

@@ -15,10 +15,14 @@ export interface CognitiveLimits {
   /** Maximum number of hypotheses in play at the same time. */
   maxHypotheses: number;
   maxToolCalls: number;
-  /** Confidence at which exploration may stop. */
+  /** Minimum evidence support of a committed answer; exploration may stop above it. */
   decisionThreshold: number;
   /** The run fails after this many operations fail in a row. */
   maxConsecutiveFailures: number;
+  /** Predictions the outcome evaluator may test in one run (ignored without an evaluator). */
+  maxPredictionTests: number;
+  /** Weight of the thinker's preferences when ranking proposals, in [0, 1]. */
+  preferenceWeight: number;
 }
 
 const MAX_TIMER_MS = 2_147_483_647;
@@ -31,6 +35,8 @@ export const cognitiveLimitsSchema = z.object({
   maxToolCalls: z.number().int().min(0),
   decisionThreshold: z.number().min(0).max(1),
   maxConsecutiveFailures: z.number().int().min(1),
+  maxPredictionTests: z.number().int().min(0),
+  preferenceWeight: z.number().min(0).max(1),
 }) satisfies z.ZodType<CognitiveLimits>;
 
 export const DEFAULT_COGNITIVE_LIMITS: CognitiveLimits = {
@@ -40,12 +46,16 @@ export const DEFAULT_COGNITIVE_LIMITS: CognitiveLimits = {
   maxToolCalls: 5,
   decisionThreshold: 0.75,
   maxConsecutiveFailures: 3,
+  maxPredictionTests: 4,
+  preferenceWeight: 0.4,
 };
 
 export interface OperationSelection {
   decision: ControllerDecision;
   available: CognitiveOperation[];
   stepsRemaining: number;
+  /** True when the engine imposed a decision (last step, or nothing else possible). */
+  forced: boolean;
 }
 
 /**
@@ -79,6 +89,7 @@ export class OperationSelector {
       return {
         available,
         stepsRemaining,
+        forced: true,
         decision: {
           operation: 'decide',
           controller: 'engine',
@@ -108,6 +119,7 @@ export class OperationSelector {
       return {
         available,
         stepsRemaining,
+        forced: false,
         decision: {
           ...fallback,
           fallbackFrom: {
@@ -118,13 +130,14 @@ export class OperationSelector {
       };
     }
     if (available.includes(decision.operation)) {
-      return { decision, available, stepsRemaining };
+      return { decision, available, stepsRemaining, forced: false };
     }
 
     const fallback = await this.heuristic.selectNext(controllerInput);
     return {
       available,
       stepsRemaining,
+      forced: false,
       decision: {
         ...fallback,
         fallbackFrom: {

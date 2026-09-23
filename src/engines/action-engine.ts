@@ -56,7 +56,7 @@ export class ActionEngine {
     const startTime = Date.now();
 
     try {
-      await this.logEvent(context, 'tool.called', {
+      const called = await this.logEvent(context, 'tool.called', {
         toolName: intention.toolName,
         parameters: intention.parameters,
       });
@@ -77,7 +77,7 @@ export class ActionEngine {
       }
 
       const duration = Date.now() - startTime;
-      await this.logEvent(context, 'action.executed', {
+      const executed = await this.logEvent(context, 'action.executed', {
         toolName: intention.toolName,
         parameters: intention.parameters,
         result: result.result,
@@ -87,7 +87,7 @@ export class ActionEngine {
       return {
         success: true,
         result: result.result,
-        events: [],
+        events: [called, executed],
       };
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -145,13 +145,14 @@ export class ActionEngine {
       },
       {
         ...(context.abortSignal ? { signal: context.abortSignal } : {}),
-        onRetry: (info) =>
-          this.logEvent(context, 'tool.retry', {
+        onRetry: async (info) => {
+          await this.logEvent(context, 'tool.retry', {
             toolName,
             retry: info.retry,
             delayMs: info.delayMs,
             error: info.error instanceof Error ? info.error.message : String(info.error),
-          }),
+          });
+        },
       }
     );
   }
@@ -234,12 +235,13 @@ export class ActionEngine {
     }
   }
 
+  /** Appends an event and returns it, so callers can reference what was recorded. */
   private async logEvent(
     context: ActionContext,
     type: Event['type'],
     data: Record<string, unknown>
-  ): Promise<void> {
-    await this.eventStore.append(context.runId, {
+  ): Promise<Event> {
+    const event: Event = {
       id: generateEventId(),
       runId: context.runId,
       type,
@@ -248,6 +250,8 @@ export class ActionEngine {
       metadata: {
         agentId: context.agentId,
       },
-    });
+    };
+    await this.eventStore.append(context.runId, event);
+    return event;
   }
 }

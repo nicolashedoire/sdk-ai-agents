@@ -62,10 +62,21 @@ export class LLMProviderError extends SDKError {
     public retryable = true,
     options: { connectionFailure?: boolean } = {}
   ) {
-    super(`LLM provider error: ${provider}`, 'LLM_ERROR', originalError);
+    // The vendor's message says what went wrong (rate limit, no credit, invalid key…). Key
+    // fragments some vendors echo back are masked: this message reaches events and alerts.
+    super(
+      `LLM provider error: ${provider}: ${redactApiKeys(originalError.message)}`,
+      'LLM_ERROR',
+      originalError
+    );
     this.name = 'LLMProviderError';
     this.connectionFailure = options.connectionFailure;
   }
+}
+
+/** Masks API keys (even partial ones, such as `sk-proj-ab…yz12`) in a message. */
+export function redactApiKeys(text: string): string {
+  return text.replace(/\b(sk|rk|pk)-[A-Za-z0-9_\-*.…]{3,}/g, '$1-***');
 }
 
 export class EventStoreError extends SDKError {

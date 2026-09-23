@@ -1,4 +1,15 @@
-import { z } from 'zod';
+import type {
+  ComparisonRelation,
+  ContradictionCategory,
+  CritiqueSeverity,
+  Decision,
+  FactSource,
+  HypothesisKind,
+  InferenceKind,
+  ObservationRecord,
+  OutcomeVerdict,
+  ResolutionAction,
+} from './thought-patch.js';
 
 /**
  * Explicit mental state of a cognitive run.
@@ -8,95 +19,23 @@ import { z } from 'zod';
  * A run's reasoning can therefore be rebuilt, audited and replayed from its event log.
  */
 
-const unitInterval = z.number().min(0).max(1);
-const requiredText = z.string().trim().min(1);
+/**
+ * Version of the reasoning rules a run was recorded with. Version 1 runs (before evidence
+ * tracking) are rebuilt with their original rules; new runs use version 2.
+ */
+export type SchemaVersion = 1 | 2;
+export const CURRENT_SCHEMA_VERSION: SchemaVersion = 2;
 
-export const factSourceSchema = z.enum(['input', 'tool', 'inference']);
-export const critiqueSeveritySchema = z.enum(['minor', 'major', 'fatal']);
+/** Something the run observed, with its provenance. Recorded by the engine, never the model. */
+export interface Observation extends ObservationRecord {
+  id: string;
+  /** Step that recorded it; 0 for observations given with the problem. */
+  step: number;
+  /** Earlier observation with the same content from the same origin: it adds no weight. */
+  duplicateOf?: string;
+}
 
-export const decisionSchema = z.object({
-  hypothesisId: z.string().optional(),
-  answer: requiredText,
-  rationale: requiredText,
-  confidence: unitInterval,
-  nextActions: z.array(requiredText).default([]),
-});
-
-/** Delta produced by one cognitive operation. Ids of new items are assigned by the reducer. */
-export const thoughtPatchSchema = z.object({
-  summary: requiredText,
-  addFacts: z
-    .array(
-      z.object({
-        statement: requiredText,
-        source: factSourceSchema.default('inference'),
-        confidence: unitInterval.default(0.7),
-        evidence: z.string().optional(),
-      })
-    )
-    .default([]),
-  addAssumptions: z
-    .array(z.object({ statement: requiredText, confidence: unitInterval.default(0.5) }))
-    .default([]),
-  addConstraints: z.array(z.object({ statement: requiredText })).default([]),
-  addUnknowns: z.array(z.object({ question: requiredText })).default([]),
-  resolveUnknowns: z
-    .array(z.object({ unknownId: requiredText, resolution: requiredText }))
-    .default([]),
-  dropUnknowns: z.array(z.object({ unknownId: requiredText, reason: requiredText })).default([]),
-  addHypotheses: z
-    .array(z.object({ statement: requiredText, rationale: z.string().optional() }))
-    .default([]),
-  simulations: z
-    .array(
-      z.object({
-        hypothesisId: requiredText,
-        steps: z.array(requiredText).min(1),
-        outcome: requiredText,
-        sideEffects: z.array(requiredText).default([]),
-      })
-    )
-    .default([]),
-  critiques: z
-    .array(
-      z.object({
-        hypothesisId: requiredText,
-        objection: requiredText,
-        severity: critiqueSeveritySchema,
-        rebuttal: z.string().optional(),
-      })
-    )
-    .default([]),
-  hypothesisUpdates: z
-    .array(
-      z.object({
-        hypothesisId: requiredText,
-        support: unitInterval.optional(),
-        reject: z.boolean().optional(),
-        reason: z.string().optional(),
-      })
-    )
-    .default([]),
-  addContradictions: z
-    .array(z.object({ description: requiredText, between: z.array(requiredText).default([]) }))
-    .default([]),
-  resolveContradictions: z
-    .array(z.object({ contradictionId: requiredText, resolution: requiredText }))
-    .default([]),
-  addFailures: z.array(z.object({ description: requiredText })).default([]),
-  /** Set by the engine when an operation investigated an unknown (counts attempts). */
-  investigatedUnknownId: z.string().optional(),
-  /** Set by the engine on the thought recorded for an operation that failed. */
-  failed: z.boolean().optional(),
-  confidence: unitInterval.optional(),
-  decision: decisionSchema.optional(),
-});
-
-export type ThoughtPatchInput = z.input<typeof thoughtPatchSchema>;
-export type ThoughtPatch = z.output<typeof thoughtPatchSchema>;
-export type Decision = z.output<typeof decisionSchema>;
-export type FactSource = z.infer<typeof factSourceSchema>;
-export type CritiqueSeverity = z.infer<typeof critiqueSeveritySchema>;
+export type FactStatus = 'active' | 'superseded' | 'retracted';
 
 export interface Fact {
   id: string;
@@ -104,6 +43,11 @@ export interface Fact {
   source: FactSource;
   confidence: number;
   evidence?: string;
+  /** Observations the fact was read from. */
+  observationRefs: string[];
+  status: FactStatus;
+  /** Why the fact is no longer active, and what replaced it. */
+  revision?: { reason: string; step: number; replacedBy?: string };
   step: number;
 }
 
@@ -151,9 +95,28 @@ export interface Hypothesis {
   id: string;
   statement: string;
   rationale?: string;
+  kind: HypothesisKind;
+  inference?: InferenceKind;
   status: HypothesisStatus;
-  /** Estimated support in [0, 1]; starts neutral at 0.5. */
+  /** How well the evidence supports it, in [0, 1]; starts neutral at 0.5. Preferences never change it. */
   support: number;
+  /** How well a proposal suits the thinker, in [0, 1]. Only ranks actions. */
+  preferenceFit?: number;
+  /** Evidence revision at which `support` was last judged. */
+  assessedAtRevision?: number;
+  /** References the last assessment relied on. */
+  assessmentBasis?: string[];
+  /** Observations, facts or assumptions it was inferred from. */
+  premiseRefs: string[];
+  /** Observations that confirmed its predictions. */
+  evidenceRefs: string[];
+  /** Observations that contradict it. */
+  counterEvidenceRefs: string[];
+  scope?: string;
+  /** Hypothesis this one revises. */
+  parentId?: string;
+  /** What changed compared with the parent. */
+  difference?: string;
   simulations: Simulation[];
   critiques: Critique[];
   rejectionReason?: string;
@@ -161,12 +124,55 @@ export interface Hypothesis {
   updatedAtStep: number;
 }
 
+/** A relation the reasoning found between observations or facts. */
+export interface ObservationComparison {
+  id: string;
+  left: string[];
+  right: string[];
+  relation: ComparisonRelation;
+  aspect: string;
+  context?: string;
+  rationale: string;
+  hypothesisId?: string;
+  step: number;
+}
+
+export type PredictionStatus = 'pending' | OutcomeVerdict;
+
+export interface PredictionEvaluation {
+  verdict: OutcomeVerdict;
+  evaluatorId: string;
+  evaluatorVersion: string;
+  observationId?: string;
+  metrics?: Record<string, number>;
+  causeCandidates: string[];
+  reason?: string;
+  step: number;
+}
+
+/** A consequence of a hypothesis, recorded before it is tested. */
+export interface Prediction {
+  id: string;
+  hypothesisId: string;
+  expected: string;
+  falsifier: string;
+  context?: string;
+  test?: Record<string, unknown>;
+  status: PredictionStatus;
+  evaluation?: PredictionEvaluation;
+  step: number;
+}
+
 export interface Contradiction {
   id: string;
   description: string;
   between: string[];
+  category?: ContradictionCategory;
   resolved: boolean;
   resolution?: string;
+  resolutionAction?: ResolutionAction;
+  /** Observations or facts that justify the resolution. */
+  resolutionBasis?: string[];
   step: number;
 }
 
@@ -181,50 +187,145 @@ export interface TrailEntry {
   step: number;
   operation: string;
   summary: string;
-  /** True when the operation failed (its thought only records the failure). */
+  /** True when the operation failed or changed nothing it was meant to change. */
   failed?: boolean;
+  /** Evidence revision after the step (schema version 2). */
+  revision?: number;
+  /**
+   * True when the step brought new evidence: any evidence change for a step that succeeded,
+   * only engine records (observations, test results) for a step that failed.
+   */
+  newEvidence?: boolean;
 }
 
+/** Rules the conclusion guard applies. Recorded with the run so a rebuild applies the same ones. */
+export interface CommitRules {
+  /** Minimum evidence support of a committed answer. */
+  decisionThreshold: number;
+  /** Predictions that may be tested in the run; 0 when no evaluator is configured. */
+  maxPredictionTests: number;
+  /** Weight of the thinker's preferences when ranking proposals (never for rules or explanations). */
+  preferenceWeight: number;
+}
+
+export const DEFAULT_COMMIT_RULES: CommitRules = {
+  decisionThreshold: 0.75,
+  maxPredictionTests: 0,
+  preferenceWeight: 0.4,
+};
+
 export interface MentalState {
+  schemaVersion: SchemaVersion;
   goal: string;
   context?: Record<string, unknown>;
   /** Number of thoughts applied so far. */
   step: number;
+  observations: Observation[];
   facts: Fact[];
   assumptions: Assumption[];
   constraints: Constraint[];
   unknowns: Unknown[];
   hypotheses: Hypothesis[];
+  comparisons: ObservationComparison[];
+  predictions: Prediction[];
   contradictions: Contradiction[];
   failures: Failure[];
-  /** Overall confidence in the current best answer, in [0, 1]. */
+  /** Confidence in the current best answer, in [0, 1]. */
   confidence: number;
+  /** Increments whenever the evidence changes; older assessments become stale. */
+  evidenceRevision: number;
   /** Step of the last comparison of hypotheses. */
   comparedAtStep?: number;
+  /** Evidence revision covered by the last comparison of hypotheses. */
+  comparedAtRevision?: number;
+  /** Number of comparable observations covered by the last comparison of observations. */
+  observationsCompared: number;
+  commitRules: CommitRules;
   decision?: Decision;
   trail: TrailEntry[];
 }
 
-export function createMentalState(goal: string, context?: Record<string, unknown>): MentalState {
-  return {
+export interface MentalStateOptions {
+  schemaVersion?: SchemaVersion;
+  /** Observations given with the problem. */
+  observations?: ObservationRecord[];
+  commitRules?: Partial<CommitRules>;
+}
+
+export function createMentalState(
+  goal: string,
+  context?: Record<string, unknown>,
+  options: MentalStateOptions = {}
+): MentalState {
+  const state: MentalState = {
+    schemaVersion: options.schemaVersion ?? CURRENT_SCHEMA_VERSION,
     goal,
     ...(context ? { context } : {}),
     step: 0,
+    observations: [],
     facts: [],
     assumptions: [],
     constraints: [],
     unknowns: [],
     hypotheses: [],
+    comparisons: [],
+    predictions: [],
     contradictions: [],
     failures: [],
     confidence: 0,
+    evidenceRevision: 0,
+    observationsCompared: 0,
+    commitRules: { ...DEFAULT_COMMIT_RULES, ...options.commitRules },
     trail: [],
   };
+  for (const record of options.observations ?? []) {
+    appendObservation(state, record, 0);
+  }
+  return state;
+}
+
+/**
+ * Adds an observation to a state being built. An observation with the same content and
+ * origin as an earlier one is kept for the record but marked as a duplicate.
+ */
+export function appendObservation(
+  state: MentalState,
+  record: ObservationRecord,
+  step: number
+): { observation: Observation; isNew: boolean } {
+  const original = state.observations.find(
+    (existing) =>
+      existing.fingerprint === record.fingerprint && existing.originGroup === record.originGroup
+  );
+  const observation: Observation = {
+    ...record,
+    id: `O${state.observations.length + 1}`,
+    step,
+    ...(original ? { duplicateOf: original.duplicateOf ?? original.id } : {}),
+  };
+  state.observations.push(observation);
+  return { observation, isNew: !original };
+}
+
+/** True when two statements say the same thing, ignoring case, punctuation and spacing. */
+export function sameStatement(left: string, right: string): boolean {
+  return normalizeStatement(left) === normalizeStatement(right);
+}
+
+function normalizeStatement(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
 }
 
 /** Hypotheses still in play (not rejected). */
 export function activeHypotheses(state: MentalState): Hypothesis[] {
   return state.hypotheses.filter((hypothesis) => hypothesis.status !== 'rejected');
+}
+
+export function activeFacts(state: MentalState): Fact[] {
+  return state.facts.filter((fact) => fact.status === 'active');
 }
 
 export function openUnknowns(state: MentalState): Unknown[] {
@@ -235,58 +336,37 @@ export function unresolvedContradictions(state: MentalState): Contradiction[] {
   return state.contradictions.filter((contradiction) => !contradiction.resolved);
 }
 
-/**
- * Compact, id-addressable view of the state, shared by LLM prompts and typed-decision
- * requests. Rejected hypotheses are kept (with their reason) so they are not proposed again.
- */
-export function describeMentalState(state: MentalState): Record<string, unknown> {
-  return {
-    goal: state.goal,
-    ...(state.context ? { context: state.context } : {}),
-    step: state.step,
-    confidence: round(state.confidence),
-    facts: state.facts.map((fact) => ({
-      id: fact.id,
-      statement: fact.statement,
-      source: fact.source,
-      confidence: round(fact.confidence),
-    })),
-    assumptions: state.assumptions.map((assumption) => ({
-      id: assumption.id,
-      statement: assumption.statement,
-      confidence: round(assumption.confidence),
-    })),
-    constraints: state.constraints.map((constraint) => ({
-      id: constraint.id,
-      statement: constraint.statement,
-    })),
-    unknowns: state.unknowns.map((unknown) => ({
-      id: unknown.id,
-      question: unknown.question,
-      status: unknown.status,
-      ...(unknown.resolution ? { resolution: unknown.resolution } : {}),
-    })),
-    hypotheses: state.hypotheses.map((hypothesis) => ({
-      id: hypothesis.id,
-      statement: hypothesis.statement,
-      status: hypothesis.status,
-      support: round(hypothesis.support),
-      simulations: hypothesis.simulations.map((simulation) => simulation.outcome),
-      critiques: hypothesis.critiques.map(
-        (critique) => `[${critique.severity}] ${critique.objection}`
-      ),
-      ...(hypothesis.rejectionReason ? { rejectionReason: hypothesis.rejectionReason } : {}),
-    })),
-    contradictions: unresolvedContradictions(state).map((contradiction) => ({
-      id: contradiction.id,
-      description: contradiction.description,
-      between: contradiction.between,
-    })),
-    failures: state.failures.map((failure) => `${failure.operation}: ${failure.description}`),
-    recentOperations: state.trail.slice(-5).map((entry) => entry.operation),
-  };
+/** Observations from the problem or from tools that are not repetitions. */
+export function comparableObservations(state: MentalState): Observation[] {
+  return state.observations.filter(
+    (observation) => observation.sourceKind !== 'evaluation' && !observation.duplicateOf
+  );
 }
 
-function round(value: number): number {
-  return Math.round(value * 100) / 100;
+/** Pending predictions of hypotheses still in play. */
+export function pendingPredictions(state: MentalState): Prediction[] {
+  const live = new Set(activeHypotheses(state).map((hypothesis) => hypothesis.id));
+  return state.predictions.filter(
+    (prediction) => prediction.status === 'pending' && live.has(prediction.hypothesisId)
+  );
+}
+
+/** Predictions tests still allowed in the run. */
+export function predictionTestsLeft(state: MentalState): number {
+  const done = state.predictions.filter((prediction) => prediction.evaluation).length;
+  return Math.max(0, state.commitRules.maxPredictionTests - done);
+}
+
+/** Every id an item of the state can be referenced by. */
+export function knownReferences(state: MentalState): Set<string> {
+  return new Set<string>([
+    ...state.observations.map((item) => item.id),
+    ...state.facts.map((item) => item.id),
+    ...state.assumptions.map((item) => item.id),
+    ...state.constraints.map((item) => item.id),
+    ...state.unknowns.map((item) => item.id),
+    ...state.hypotheses.map((item) => item.id),
+    ...state.comparisons.map((item) => item.id),
+    ...state.predictions.map((item) => item.id),
+  ]);
 }

@@ -1,0 +1,1975 @@
+{
+  "description": "Cognitive runs recorded by the SDK before schemaVersion existed, with the state that version rebuilt from them.",
+  "runs": {
+    "withTool": {
+      "status": "completed",
+      "events": [
+        {
+          "id": "evt_bb5a553a-c25b-4e95-9c98-2c3769baea98",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "run.started",
+          "timestamp": 1790177264215,
+          "data": {
+            "input": {
+              "message": "Should we build or buy the analytics module?",
+              "context": {
+                "recordedWith": "v0.2.0 before schemaVersion"
+              }
+            },
+            "mode": "cognitive"
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_43f5dfa5-e0ac-43f8-8cda-cb89d73478ff",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.started",
+          "timestamp": 1790177264215,
+          "data": {
+            "goal": "Should we build or buy the analytics module?",
+            "context": {
+              "recordedWith": "v0.2.0 before schemaVersion"
+            },
+            "profile": {
+              "id": "balanced-analyst",
+              "name": "Balanced analyst",
+              "version": "1.0.0"
+            },
+            "controller": "heuristic",
+            "assessor": "llm",
+            "allowedTools": ["lookup_metric"],
+            "limits": {
+              "maxSteps": 12,
+              "timeoutMs": 180000,
+              "maxHypotheses": 3,
+              "maxToolCalls": 5,
+              "decisionThreshold": 0.75,
+              "maxConsecutiveFailures": 3
+            }
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_012c4e35-018b-4f14-995e-c7f3b6715ba7",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264215,
+          "data": {
+            "step": 1,
+            "operation": "represent",
+            "controller": "heuristic",
+            "available": ["represent"],
+            "stepsRemaining": 12,
+            "rationale": "only available operation"
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_e441395e-99d1-47d4-ad21-666a0baaf2e0",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.thought",
+          "timestamp": 1790177264216,
+          "data": {
+            "step": 1,
+            "operation": "represent",
+            "patch": {
+              "summary": "Framed the build-or-buy question",
+              "addFacts": [
+                {
+                  "statement": "Budget is 10k EUR",
+                  "source": "input",
+                  "confidence": 0.9
+                }
+              ],
+              "addAssumptions": [],
+              "addConstraints": [
+                {
+                  "statement": "Must ship before Q4"
+                }
+              ],
+              "addUnknowns": [
+                {
+                  "question": "What is the current monthly churn?"
+                }
+              ],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": []
+            },
+            "issues": [],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_0da3b397-3cb0-47fa-8fd2-838ecb3418ac",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264216,
+          "data": {
+            "step": 2,
+            "operation": "hypothesize",
+            "controller": "heuristic",
+            "available": ["hypothesize", "seek_information"],
+            "stepsRemaining": 11,
+            "rationale": "no hypothesis in play"
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_29822fdc-a78f-4e7a-9ca5-afb4738d7eba",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.thought",
+          "timestamp": 1790177264216,
+          "data": {
+            "step": 2,
+            "operation": "hypothesize",
+            "patch": {
+              "summary": "Two options",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [
+                {
+                  "statement": "Build the module in-house",
+                  "rationale": "Full control"
+                },
+                {
+                  "statement": "Buy a SaaS analytics tool",
+                  "rationale": "Fast to ship"
+                }
+              ],
+              "simulations": [],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": []
+            },
+            "issues": [],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_df11d9de-97cc-4e71-a212-b47458221fad",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264216,
+          "data": {
+            "step": 3,
+            "operation": "simulate",
+            "controller": "heuristic",
+            "available": ["hypothesize", "simulate", "critique", "seek_information", "decide"],
+            "stepsRemaining": 10,
+            "rationale": "a hypothesis has not been simulated"
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_0390ae46-be72-4b9d-b6f6-c24b9e58ec8d",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.thought",
+          "timestamp": 1790177264216,
+          "data": {
+            "step": 3,
+            "operation": "simulate",
+            "patch": {
+              "summary": "Projected both options",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [
+                {
+                  "hypothesisId": "H1",
+                  "steps": ["Hire", "Build for 6 months"],
+                  "outcome": "Misses Q4",
+                  "sideEffects": []
+                },
+                {
+                  "hypothesisId": "H2",
+                  "steps": ["Pilot for 2 weeks", "Roll out"],
+                  "outcome": "Ships in Q3",
+                  "sideEffects": ["Vendor dependency"]
+                }
+              ],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": []
+            },
+            "issues": [],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_c655814e-2add-4bde-b3c4-6c492493ef00",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264216,
+          "data": {
+            "step": 4,
+            "operation": "critique",
+            "controller": "heuristic",
+            "available": ["hypothesize", "critique", "seek_information", "decide"],
+            "stepsRemaining": 9,
+            "rationale": "a hypothesis has not been critiqued"
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_a58a2280-88ee-4a3e-afd4-d5005009db4a",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.thought",
+          "timestamp": 1790177264216,
+          "data": {
+            "step": 4,
+            "operation": "critique",
+            "patch": {
+              "summary": "Stress-tested both",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [],
+              "critiques": [
+                {
+                  "hypothesisId": "H1",
+                  "objection": "No team available before Q4",
+                  "severity": "major"
+                },
+                {
+                  "hypothesisId": "H2",
+                  "objection": "Vendor lock-in",
+                  "severity": "minor",
+                  "rebuttal": "Data export API exists"
+                }
+              ],
+              "hypothesisUpdates": [
+                {
+                  "hypothesisId": "H1",
+                  "support": 0.3
+                },
+                {
+                  "hypothesisId": "H2",
+                  "support": 0.7
+                }
+              ],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": []
+            },
+            "issues": [],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_9cd8472c-5622-4502-a24b-adabc59aa9ab",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264219,
+          "data": {
+            "step": 5,
+            "operation": "seek_information",
+            "controller": "heuristic",
+            "available": ["hypothesize", "seek_information", "compare", "decide"],
+            "stepsRemaining": 8,
+            "rationale": "an open unknown can be investigated"
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_7c75cc82-15ae-49fb-8bed-ef92d45e6bb1",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.thought",
+          "timestamp": 1790177264221,
+          "data": {
+            "step": 5,
+            "operation": "seek_information",
+            "patch": {
+              "summary": "Churn measured",
+              "addFacts": [
+                {
+                  "statement": "Monthly churn is 4%",
+                  "source": "tool",
+                  "confidence": 0.95
+                }
+              ],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [
+                {
+                  "unknownId": "U1",
+                  "resolution": "4% monthly"
+                }
+              ],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": [],
+              "investigatedUnknownId": "U1"
+            },
+            "issues": [],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_1769fdba-2ef6-457e-998b-4ca95c60b82d",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264221,
+          "data": {
+            "step": 6,
+            "operation": "compare",
+            "controller": "heuristic",
+            "available": ["hypothesize", "compare", "decide"],
+            "stepsRemaining": 7,
+            "rationale": "hypotheses changed since the last comparison"
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_2f83dae6-940d-432e-8c9e-1be579871093",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.thought",
+          "timestamp": 1790177264221,
+          "data": {
+            "step": 6,
+            "operation": "compare",
+            "patch": {
+              "summary": "Buying wins",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [],
+              "critiques": [],
+              "hypothesisUpdates": [
+                {
+                  "hypothesisId": "H1",
+                  "support": 0.25
+                },
+                {
+                  "hypothesisId": "H2",
+                  "support": 0.8
+                }
+              ],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": [],
+              "confidence": 0.8
+            },
+            "issues": [],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_9f321960-7caf-4235-a24e-9c4a614657a7",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264221,
+          "data": {
+            "step": 7,
+            "operation": "decide",
+            "controller": "heuristic",
+            "available": ["hypothesize", "decide"],
+            "stepsRemaining": 6,
+            "rationale": "hypotheses examined"
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_6c93908d-b372-4dbe-8783-50ec7342f4c2",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.thought",
+          "timestamp": 1790177264222,
+          "data": {
+            "step": 7,
+            "operation": "decide",
+            "patch": {
+              "summary": "Commit to buying",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": [],
+              "decision": {
+                "hypothesisId": "H2",
+                "answer": "Buy a SaaS analytics tool and run a two-week pilot.",
+                "rationale": "Only option that ships before Q4 within budget.",
+                "confidence": 0.8,
+                "nextActions": ["Run a two-week pilot"]
+              }
+            },
+            "issues": [],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_bed0701b-b72b-4d09-8724-245df34ca489",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "cognition.concluded",
+          "timestamp": 1790177264222,
+          "data": {
+            "decision": {
+              "hypothesisId": "H2",
+              "answer": "Buy a SaaS analytics tool and run a two-week pilot.",
+              "rationale": "Only option that ships before Q4 within budget.",
+              "confidence": 0.8,
+              "nextActions": ["Run a two-week pilot"]
+            },
+            "confidence": 0.8,
+            "steps": 7,
+            "hypotheses": [
+              {
+                "id": "H1",
+                "statement": "Build the module in-house",
+                "status": "critiqued",
+                "support": 0.25
+              },
+              {
+                "id": "H2",
+                "statement": "Buy a SaaS analytics tool",
+                "status": "selected",
+                "support": 0.8
+              }
+            ]
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_7f1c6f79-4686-4e59-8f4d-641e50c9171e",
+          "runId": "run_a374661e-ceeb-42c4-82ec-6163891d1057",
+          "type": "run.completed",
+          "timestamp": 1790177264222,
+          "data": {
+            "output": "Buy a SaaS analytics tool and run a two-week pilot.",
+            "decision": {
+              "hypothesisId": "H2",
+              "answer": "Buy a SaaS analytics tool and run a two-week pilot.",
+              "rationale": "Only option that ships before Q4 within budget.",
+              "confidence": 0.8,
+              "nextActions": ["Run a two-week pilot"]
+            }
+          },
+          "metadata": {
+            "agentId": "448109f8-5f75-4171-85db-4e5d61b369e0",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        }
+      ],
+      "state": {
+        "goal": "Should we build or buy the analytics module?",
+        "context": {
+          "recordedWith": "v0.2.0 before schemaVersion"
+        },
+        "step": 7,
+        "facts": [
+          {
+            "id": "F1",
+            "statement": "Budget is 10k EUR",
+            "source": "input",
+            "confidence": 0.9,
+            "step": 1
+          },
+          {
+            "id": "F2",
+            "statement": "Monthly churn is 4%",
+            "source": "tool",
+            "confidence": 0.95,
+            "step": 5
+          }
+        ],
+        "assumptions": [],
+        "constraints": [
+          {
+            "id": "K1",
+            "statement": "Must ship before Q4",
+            "step": 1
+          }
+        ],
+        "unknowns": [
+          {
+            "id": "U1",
+            "question": "What is the current monthly churn?",
+            "status": "resolved",
+            "attempts": 1,
+            "step": 1,
+            "resolution": "4% monthly"
+          }
+        ],
+        "hypotheses": [
+          {
+            "id": "H1",
+            "statement": "Build the module in-house",
+            "rationale": "Full control",
+            "status": "critiqued",
+            "support": 0.25,
+            "simulations": [
+              {
+                "steps": ["Hire", "Build for 6 months"],
+                "outcome": "Misses Q4",
+                "sideEffects": [],
+                "step": 3
+              }
+            ],
+            "critiques": [
+              {
+                "objection": "No team available before Q4",
+                "severity": "major",
+                "step": 4
+              }
+            ],
+            "createdAtStep": 2,
+            "updatedAtStep": 6
+          },
+          {
+            "id": "H2",
+            "statement": "Buy a SaaS analytics tool",
+            "rationale": "Fast to ship",
+            "status": "selected",
+            "support": 0.8,
+            "simulations": [
+              {
+                "steps": ["Pilot for 2 weeks", "Roll out"],
+                "outcome": "Ships in Q3",
+                "sideEffects": ["Vendor dependency"],
+                "step": 3
+              }
+            ],
+            "critiques": [
+              {
+                "objection": "Vendor lock-in",
+                "severity": "minor",
+                "rebuttal": "Data export API exists",
+                "step": 4
+              }
+            ],
+            "createdAtStep": 2,
+            "updatedAtStep": 7
+          }
+        ],
+        "contradictions": [],
+        "failures": [],
+        "confidence": 0.8,
+        "trail": [
+          {
+            "step": 1,
+            "operation": "represent",
+            "summary": "Framed the build-or-buy question"
+          },
+          {
+            "step": 2,
+            "operation": "hypothesize",
+            "summary": "Two options"
+          },
+          {
+            "step": 3,
+            "operation": "simulate",
+            "summary": "Projected both options"
+          },
+          {
+            "step": 4,
+            "operation": "critique",
+            "summary": "Stress-tested both"
+          },
+          {
+            "step": 5,
+            "operation": "seek_information",
+            "summary": "Churn measured"
+          },
+          {
+            "step": 6,
+            "operation": "compare",
+            "summary": "Buying wins"
+          },
+          {
+            "step": 7,
+            "operation": "decide",
+            "summary": "Commit to buying"
+          }
+        ],
+        "comparedAtStep": 6,
+        "decision": {
+          "hypothesisId": "H2",
+          "answer": "Buy a SaaS analytics tool and run a two-week pilot.",
+          "rationale": "Only option that ships before Q4 within budget.",
+          "confidence": 0.8,
+          "nextActions": ["Run a two-week pilot"]
+        }
+      }
+    },
+    "rejectedDecision": {
+      "status": "completed",
+      "events": [
+        {
+          "id": "evt_a570b558-d87e-47be-9202-b16beb4785b2",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "run.started",
+          "timestamp": 1790177264245,
+          "data": {
+            "input": {
+              "message": "Should we build or buy?",
+              "context": {
+                "recordedWith": "v0.2.0 before schemaVersion"
+              }
+            },
+            "mode": "cognitive"
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_4265ae9e-c4d7-419e-b710-9d46e1fc4e33",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.started",
+          "timestamp": 1790177264245,
+          "data": {
+            "goal": "Should we build or buy?",
+            "context": {
+              "recordedWith": "v0.2.0 before schemaVersion"
+            },
+            "profile": {
+              "id": "balanced-analyst",
+              "name": "Balanced analyst",
+              "version": "1.0.0"
+            },
+            "controller": "heuristic",
+            "assessor": "llm",
+            "allowedTools": [],
+            "limits": {
+              "maxSteps": 12,
+              "timeoutMs": 180000,
+              "maxHypotheses": 3,
+              "maxToolCalls": 5,
+              "decisionThreshold": 0.75,
+              "maxConsecutiveFailures": 3
+            }
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_d3d9cc3a-c17e-4ebe-9989-6a2e24a4a934",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264245,
+          "data": {
+            "step": 1,
+            "operation": "represent",
+            "controller": "heuristic",
+            "available": ["represent"],
+            "stepsRemaining": 12,
+            "rationale": "only available operation"
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_f7d4b419-7865-440c-8921-de533f08f1dd",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.thought",
+          "timestamp": 1790177264246,
+          "data": {
+            "step": 1,
+            "operation": "represent",
+            "patch": {
+              "summary": "framed",
+              "addFacts": [
+                {
+                  "statement": "Budget is 10k",
+                  "source": "input",
+                  "confidence": 0.7
+                }
+              ],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [
+                {
+                  "description": "Budget vs scope",
+                  "between": ["F1"]
+                }
+              ],
+              "resolveContradictions": [
+                {
+                  "contradictionId": "C1",
+                  "resolution": "Scope reduced"
+                }
+              ],
+              "addFailures": []
+            },
+            "issues": [],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_de53ae9e-2c27-4dec-8152-192cd5b2903f",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264246,
+          "data": {
+            "step": 2,
+            "operation": "hypothesize",
+            "controller": "heuristic",
+            "available": ["hypothesize"],
+            "stepsRemaining": 11,
+            "rationale": "only available operation"
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_8f309fe0-07c8-4e71-aa87-0f4b3c57bafe",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.thought",
+          "timestamp": 1790177264246,
+          "data": {
+            "step": 2,
+            "operation": "hypothesize",
+            "patch": {
+              "summary": "options",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [
+                {
+                  "statement": "Build it"
+                },
+                {
+                  "statement": "Buy it"
+                }
+              ],
+              "simulations": [],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": []
+            },
+            "issues": [],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_f189a71c-47eb-4de9-89e2-6317f651d5c9",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264246,
+          "data": {
+            "step": 3,
+            "operation": "simulate",
+            "controller": "heuristic",
+            "available": ["hypothesize", "simulate", "critique", "decide"],
+            "stepsRemaining": 10,
+            "rationale": "a hypothesis has not been simulated"
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_1ece24f1-e405-4ab9-8119-09463bb1e0b8",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.thought",
+          "timestamp": 1790177264246,
+          "data": {
+            "step": 3,
+            "operation": "simulate",
+            "patch": {
+              "summary": "projected",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [
+                {
+                  "hypothesisId": "H1",
+                  "steps": ["hire"],
+                  "outcome": "late",
+                  "sideEffects": []
+                },
+                {
+                  "hypothesisId": "H2",
+                  "steps": ["pilot"],
+                  "outcome": "on time",
+                  "sideEffects": []
+                }
+              ],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": []
+            },
+            "issues": [],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_dc08b91d-a680-41c1-a532-a4f5d3aec633",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264246,
+          "data": {
+            "step": 4,
+            "operation": "critique",
+            "controller": "heuristic",
+            "available": ["hypothesize", "critique", "decide"],
+            "stepsRemaining": 9,
+            "rationale": "a hypothesis has not been critiqued"
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_437a90a1-d370-4eb2-bad1-905ebae3b6b4",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.thought",
+          "timestamp": 1790177264246,
+          "data": {
+            "step": 4,
+            "operation": "critique",
+            "patch": {
+              "summary": "critiqued",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [],
+              "critiques": [
+                {
+                  "hypothesisId": "H1",
+                  "objection": "No team",
+                  "severity": "fatal"
+                },
+                {
+                  "hypothesisId": "H2",
+                  "objection": "Lock-in",
+                  "severity": "minor"
+                }
+              ],
+              "hypothesisUpdates": [
+                {
+                  "hypothesisId": "H2",
+                  "support": 0.6
+                }
+              ],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": [],
+              "confidence": 0.6
+            },
+            "issues": [],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_d6ebfefa-7994-4397-a6ce-4ce6d3aa9a4a",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 5,
+            "operation": "hypothesize",
+            "controller": "heuristic",
+            "available": ["hypothesize", "compare", "decide"],
+            "stepsRemaining": 8,
+            "rationale": "explore an alternative before committing"
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_01882b7e-6d06-4c6a-a121-1399dda83c63",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.thought",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 5,
+            "operation": "hypothesize",
+            "patch": {
+              "summary": "options",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [
+                {
+                  "statement": "Build it"
+                },
+                {
+                  "statement": "Buy it"
+                }
+              ],
+              "simulations": [],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": []
+            },
+            "issues": [],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_943e3774-6093-4229-a6ce-56bdf69368bd",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 6,
+            "operation": "simulate",
+            "controller": "heuristic",
+            "available": ["simulate", "critique", "compare", "decide"],
+            "stepsRemaining": 7,
+            "rationale": "a hypothesis has not been simulated"
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_a5db958b-a55f-4911-823d-7b0eb5d93fa2",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.thought",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 6,
+            "operation": "simulate",
+            "patch": {
+              "summary": "projected",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [
+                {
+                  "hypothesisId": "H1",
+                  "steps": ["hire"],
+                  "outcome": "late",
+                  "sideEffects": []
+                },
+                {
+                  "hypothesisId": "H2",
+                  "steps": ["pilot"],
+                  "outcome": "on time",
+                  "sideEffects": []
+                }
+              ],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": []
+            },
+            "issues": ["cannot simulate hypothesis H1: already rejected"],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_f1127c7f-787e-4533-9c04-7cf16d645dca",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 7,
+            "operation": "simulate",
+            "controller": "heuristic",
+            "available": ["simulate", "critique", "compare", "decide"],
+            "stepsRemaining": 6,
+            "rationale": "a hypothesis has not been simulated"
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_ff22de25-6ff4-4a32-b1f0-82a1063d2458",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.thought",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 7,
+            "operation": "simulate",
+            "patch": {
+              "summary": "projected",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [
+                {
+                  "hypothesisId": "H1",
+                  "steps": ["hire"],
+                  "outcome": "late",
+                  "sideEffects": []
+                },
+                {
+                  "hypothesisId": "H2",
+                  "steps": ["pilot"],
+                  "outcome": "on time",
+                  "sideEffects": []
+                }
+              ],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": []
+            },
+            "issues": ["cannot simulate hypothesis H1: already rejected"],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_92a24098-4248-4b49-a652-95173fc1e6c5",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 8,
+            "operation": "simulate",
+            "controller": "heuristic",
+            "available": ["simulate", "critique", "compare", "decide"],
+            "stepsRemaining": 5,
+            "rationale": "a hypothesis has not been simulated"
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_ebd9f20d-e25d-44df-baf9-4612a7a0f29e",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.thought",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 8,
+            "operation": "simulate",
+            "patch": {
+              "summary": "projected",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [
+                {
+                  "hypothesisId": "H1",
+                  "steps": ["hire"],
+                  "outcome": "late",
+                  "sideEffects": []
+                },
+                {
+                  "hypothesisId": "H2",
+                  "steps": ["pilot"],
+                  "outcome": "on time",
+                  "sideEffects": []
+                }
+              ],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": []
+            },
+            "issues": ["cannot simulate hypothesis H1: already rejected"],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_ff1baf52-4e41-44c3-bf23-c438f34f49dd",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 9,
+            "operation": "simulate",
+            "controller": "heuristic",
+            "available": ["simulate", "critique", "compare", "decide"],
+            "stepsRemaining": 4,
+            "rationale": "a hypothesis has not been simulated"
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_887cf6a9-89ce-4c7c-b916-c5d4a3ce7705",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.thought",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 9,
+            "operation": "simulate",
+            "patch": {
+              "summary": "projected",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [
+                {
+                  "hypothesisId": "H1",
+                  "steps": ["hire"],
+                  "outcome": "late",
+                  "sideEffects": []
+                },
+                {
+                  "hypothesisId": "H2",
+                  "steps": ["pilot"],
+                  "outcome": "on time",
+                  "sideEffects": []
+                }
+              ],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": []
+            },
+            "issues": ["cannot simulate hypothesis H1: already rejected"],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_991800ac-70ef-4c9e-b05b-10748d59c9d3",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 10,
+            "operation": "simulate",
+            "controller": "heuristic",
+            "available": ["simulate", "critique", "compare", "decide"],
+            "stepsRemaining": 3,
+            "rationale": "a hypothesis has not been simulated"
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_a26cc3b1-da52-462c-812c-38613ecc7a9a",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.thought",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 10,
+            "operation": "simulate",
+            "patch": {
+              "summary": "projected",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [
+                {
+                  "hypothesisId": "H1",
+                  "steps": ["hire"],
+                  "outcome": "late",
+                  "sideEffects": []
+                },
+                {
+                  "hypothesisId": "H2",
+                  "steps": ["pilot"],
+                  "outcome": "on time",
+                  "sideEffects": []
+                }
+              ],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": []
+            },
+            "issues": ["cannot simulate hypothesis H1: already rejected"],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_dfb88069-de21-44a5-aa60-bf55586d0f4a",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 11,
+            "operation": "compare",
+            "controller": "heuristic",
+            "available": ["simulate", "critique", "compare", "decide"],
+            "stepsRemaining": 2,
+            "rationale": "weigh hypotheses before the final step"
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_61ed571d-05ce-4825-963a-a3f7c87444cf",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.thought",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 11,
+            "operation": "compare",
+            "patch": {
+              "summary": "ranked",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [],
+              "critiques": [],
+              "hypothesisUpdates": [
+                {
+                  "hypothesisId": "H2",
+                  "support": 0.65
+                }
+              ],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": [],
+              "confidence": 0.65
+            },
+            "issues": [],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_1b0f52a1-b40f-4b00-9f38-64c58603af6f",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.operation_selected",
+          "timestamp": 1790177264247,
+          "data": {
+            "step": 12,
+            "operation": "decide",
+            "controller": "engine",
+            "available": ["simulate", "critique", "decide"],
+            "stepsRemaining": 1,
+            "rationale": "last step: a decision is required"
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_e2a6e523-3d5c-4aad-93b4-5a4c90806755",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.thought",
+          "timestamp": 1790177264248,
+          "data": {
+            "step": 12,
+            "operation": "decide",
+            "patch": {
+              "summary": "decided",
+              "addFacts": [],
+              "addAssumptions": [],
+              "addConstraints": [],
+              "addUnknowns": [],
+              "resolveUnknowns": [],
+              "dropUnknowns": [],
+              "addHypotheses": [],
+              "simulations": [],
+              "critiques": [],
+              "hypothesisUpdates": [],
+              "addContradictions": [],
+              "resolveContradictions": [],
+              "addFailures": [],
+              "decision": {
+                "hypothesisId": "H1",
+                "answer": "Build it",
+                "rationale": "Control",
+                "confidence": 0.7,
+                "nextActions": []
+              }
+            },
+            "issues": ["decision cannot select rejected hypothesis H1"],
+            "failed": false,
+            "model": "test-model",
+            "requestedModel": "test-model",
+            "usage": {
+              "promptTokens": 100,
+              "completionTokens": 20,
+              "calls": 1
+            }
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_12963aa0-1cab-40a5-913c-db96bd3bf002",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "cognition.concluded",
+          "timestamp": 1790177264248,
+          "data": {
+            "decision": {
+              "answer": "Build it",
+              "rationale": "Control",
+              "confidence": 0.7,
+              "nextActions": []
+            },
+            "confidence": 0.7,
+            "steps": 12,
+            "hypotheses": [
+              {
+                "id": "H1",
+                "statement": "Build it",
+                "status": "rejected",
+                "support": 0.5
+              },
+              {
+                "id": "H2",
+                "statement": "Buy it",
+                "status": "critiqued",
+                "support": 0.65
+              },
+              {
+                "id": "H3",
+                "statement": "Build it",
+                "status": "proposed",
+                "support": 0.5
+              },
+              {
+                "id": "H4",
+                "statement": "Buy it",
+                "status": "proposed",
+                "support": 0.5
+              }
+            ]
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        },
+        {
+          "id": "evt_d2576a4c-d828-47e3-bcc4-cdd27a862f8b",
+          "runId": "run_a8308a63-0360-4e6e-837e-92f9e9128890",
+          "type": "run.completed",
+          "timestamp": 1790177264248,
+          "data": {
+            "output": "Build it",
+            "decision": {
+              "answer": "Build it",
+              "rationale": "Control",
+              "confidence": 0.7,
+              "nextActions": []
+            }
+          },
+          "metadata": {
+            "agentId": "7ced6b76-b4ae-4abb-967f-8006d15ed282",
+            "agentVersion": "1.0.0",
+            "profileId": "balanced-analyst",
+            "profileVersion": "1.0.0"
+          }
+        }
+      ],
+      "state": {
+        "goal": "Should we build or buy?",
+        "context": {
+          "recordedWith": "v0.2.0 before schemaVersion"
+        },
+        "step": 12,
+        "facts": [
+          {
+            "id": "F1",
+            "statement": "Budget is 10k",
+            "source": "input",
+            "confidence": 0.7,
+            "step": 1
+          }
+        ],
+        "assumptions": [],
+        "constraints": [],
+        "unknowns": [],
+        "hypotheses": [
+          {
+            "id": "H1",
+            "statement": "Build it",
+            "status": "rejected",
+            "support": 0.5,
+            "simulations": [
+              {
+                "steps": ["hire"],
+                "outcome": "late",
+                "sideEffects": [],
+                "step": 3
+              }
+            ],
+            "critiques": [
+              {
+                "objection": "No team",
+                "severity": "fatal",
+                "step": 4
+              }
+            ],
+            "createdAtStep": 2,
+            "updatedAtStep": 4,
+            "rejectionReason": "No team"
+          },
+          {
+            "id": "H2",
+            "statement": "Buy it",
+            "status": "critiqued",
+            "support": 0.65,
+            "simulations": [
+              {
+                "steps": ["pilot"],
+                "outcome": "on time",
+                "sideEffects": [],
+                "step": 3
+              },
+              {
+                "steps": ["pilot"],
+                "outcome": "on time",
+                "sideEffects": [],
+                "step": 6
+              },
+              {
+                "steps": ["pilot"],
+                "outcome": "on time",
+                "sideEffects": [],
+                "step": 7
+              },
+              {
+                "steps": ["pilot"],
+                "outcome": "on time",
+                "sideEffects": [],
+                "step": 8
+              },
+              {
+                "steps": ["pilot"],
+                "outcome": "on time",
+                "sideEffects": [],
+                "step": 9
+              },
+              {
+                "steps": ["pilot"],
+                "outcome": "on time",
+                "sideEffects": [],
+                "step": 10
+              }
+            ],
+            "critiques": [
+              {
+                "objection": "Lock-in",
+                "severity": "minor",
+                "step": 4
+              }
+            ],
+            "createdAtStep": 2,
+            "updatedAtStep": 11
+          },
+          {
+            "id": "H3",
+            "statement": "Build it",
+            "status": "proposed",
+            "support": 0.5,
+            "simulations": [],
+            "critiques": [],
+            "createdAtStep": 5,
+            "updatedAtStep": 5
+          },
+          {
+            "id": "H4",
+            "statement": "Buy it",
+            "status": "proposed",
+            "support": 0.5,
+            "simulations": [],
+            "critiques": [],
+            "createdAtStep": 5,
+            "updatedAtStep": 5
+          }
+        ],
+        "contradictions": [
+          {
+            "id": "C1",
+            "description": "Budget vs scope",
+            "between": ["F1"],
+            "resolved": true,
+            "step": 1,
+            "resolution": "Scope reduced"
+          }
+        ],
+        "failures": [],
+        "confidence": 0.7,
+        "trail": [
+          {
+            "step": 1,
+            "operation": "represent",
+            "summary": "framed"
+          },
+          {
+            "step": 2,
+            "operation": "hypothesize",
+            "summary": "options"
+          },
+          {
+            "step": 3,
+            "operation": "simulate",
+            "summary": "projected"
+          },
+          {
+            "step": 4,
+            "operation": "critique",
+            "summary": "critiqued"
+          },
+          {
+            "step": 5,
+            "operation": "hypothesize",
+            "summary": "options"
+          },
+          {
+            "step": 6,
+            "operation": "simulate",
+            "summary": "projected"
+          },
+          {
+            "step": 7,
+            "operation": "simulate",
+            "summary": "projected"
+          },
+          {
+            "step": 8,
+            "operation": "simulate",
+            "summary": "projected"
+          },
+          {
+            "step": 9,
+            "operation": "simulate",
+            "summary": "projected"
+          },
+          {
+            "step": 10,
+            "operation": "simulate",
+            "summary": "projected"
+          },
+          {
+            "step": 11,
+            "operation": "compare",
+            "summary": "ranked"
+          },
+          {
+            "step": 12,
+            "operation": "decide",
+            "summary": "decided"
+          }
+        ],
+        "comparedAtStep": 11,
+        "decision": {
+          "answer": "Build it",
+          "rationale": "Control",
+          "confidence": 0.7,
+          "nextActions": []
+        }
+      }
+    }
+  }
+}

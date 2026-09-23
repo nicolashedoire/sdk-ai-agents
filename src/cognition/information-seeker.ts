@@ -6,7 +6,8 @@ import type { ProviderSettings } from '../types/agent.js';
 import type { Tool } from '../types/tool.js';
 import { nextUnknownToInvestigate } from './cognitive-operations.js';
 import type { ThoughtGenerator } from './llm-thought-generator.js';
-import { thoughtPatchSchema, type MentalState } from './mental-state.js';
+import { activeFacts, type MentalState } from './mental-state.js';
+import { observationFromTool } from './observation-records.js';
 import { failureOutcome, toError, truncate, type OperationOutcome } from './operation-outcome.js';
 import type { ThinkerProfile } from './thinker-profile.js';
 
@@ -28,8 +29,9 @@ export interface InformationSeekerDependencies {
 
 /**
  * Performs `seek_information`: the native reasoning engine picks a tool for the next open
- * unknown, the governed ActionEngine executes it (policies, approvals and budgets apply)
- * and the thought generator integrates the observation into the mental state.
+ * unknown, the governed ActionEngine executes it (policies, approvals and budgets apply),
+ * the engine records the result as an observation linked to its `action.executed` event,
+ * and the thought generator integrates it into the mental state.
  */
 export class InformationSeeker {
   constructor(private readonly deps: InformationSeekerDependencies) {}
@@ -59,7 +61,11 @@ export class InformationSeeker {
           'You investigate one open question for a reasoning process. Call exactly one tool whose result helps answer it.',
           'If no tool can help, answer with one sentence explaining why instead of calling a tool.',
           `Overall goal: ${state.goal}`,
-          `Known facts: ${state.facts.map((fact) => fact.statement).join(' | ') || 'none yet'}`,
+          `Known facts: ${
+            activeFacts(state)
+              .map((fact) => fact.statement)
+              .join(' | ') || 'none yet'
+          }`,
         ].join('\n'),
         ...(this.deps.providerSettings ? { providerSettings: this.deps.providerSettings } : {}),
       },
@@ -69,19 +75,19 @@ export class InformationSeeker {
 
     if (intention.type !== 'tool_call' || !intention.toolName) {
       return {
-        patch: thoughtPatchSchema.parse({
+        engine: {
           summary: `No tool can answer ${unknown.id}`,
-          addFailures: [
-            {
-              description: `No tool selected for ${unknown.id}: ${intention.reasoning ?? 'no explanation given'}`,
-            },
+          failures: [
+            `No tool selected for ${unknown.id}: ${intention.reasoning ?? 'no explanation given'}`,
           ],
           investigatedUnknownId: unknown.id,
-        }),
+        },
       };
     }
 
+    const parameters = intention.parameters ?? {};
     let result: unknown;
+    let executedEvent: { id: string; timestamp: number } | undefined;
     try {
       const action = await this.deps.actionEngine.executeIntention(intention, {
         runId,
@@ -90,18 +96,30 @@ export class InformationSeeker {
         allowedTools: this.deps.tools.map((tool) => tool.name),
       });
       result = action.result;
+      executedEvent = action.events.find((event) => event.type === 'action.executed');
     } catch (error) {
       if (signal.aborted) throw error;
       return {
         // A denied call never ran, so it does not consume the tool budget.
         toolCalled: !(error instanceof PolicyViolationError),
-        patch: thoughtPatchSchema.parse({
+        engine: {
           summary: `Could not investigate ${unknown.id} with ${intention.toolName}`,
-          addFailures: [{ description: describeActionError(error) }],
+          failures: [describeActionError(error)],
           investigatedUnknownId: unknown.id,
-        }),
+        },
       };
     }
+
+    const observation = observationFromTool({
+      toolName: intention.toolName,
+      parameters,
+      result,
+      ...(executedEvent ? { sourceEventId: executedEvent.id } : {}),
+      observedAt: executedEvent?.timestamp ?? Date.now(),
+      context: `${unknown.id}: ${unknown.question}`,
+    });
+    // The tool result is kept even if its interpretation fails.
+    const engine = { observations: [observation], investigatedUnknownId: unknown.id };
 
     try {
       const generated = await this.deps.generator.generate({
@@ -111,15 +129,17 @@ export class InformationSeeker {
         profile,
         observation: {
           unknownId: unknown.id,
+          observationId: `O${state.observations.length + 1}`,
           toolName: intention.toolName,
-          parameters: intention.parameters ?? {},
+          parameters,
           result,
         },
         abortSignal: signal,
       });
       return {
         toolCalled: true,
-        patch: { ...generated.patch, investigatedUnknownId: unknown.id },
+        proposal: { contract: 'integrate', patch: generated.patch },
+        engine,
         ignoredFields: generated.ignoredFields,
         ...(generated.model ? { model: generated.model } : {}),
         ...(generated.requestedModel ? { requestedModel: generated.requestedModel } : {}),
@@ -127,7 +147,7 @@ export class InformationSeeker {
       };
     } catch (error) {
       if (signal.aborted) throw error;
-      return { ...failureOutcome(error), toolCalled: true, investigatedUnknownId: unknown.id };
+      return { ...failureOutcome(error), toolCalled: true, engine };
     }
   }
 }
