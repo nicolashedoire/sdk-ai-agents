@@ -19,7 +19,7 @@ export interface AgentConfig {
   providerSettings?: {
     openai?: ProviderSettings;
     anthropic?: ProviderSettings;
-    default?: ProviderSettings; // Settings par défaut pour tous les providers
+    default?: ProviderSettings; // Default settings for every provider
   };
 }
 

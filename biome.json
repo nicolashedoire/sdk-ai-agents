@@ -18,7 +18,8 @@
         "noUnusedVariables": "error"
       },
       "complexity": {
-        "noForEach": "off"
+        "noForEach": "off",
+        "noStaticOnlyClass": "off"
       }
     }
   },
@@ -50,5 +51,3 @@
     ]
   }
 }
-
-

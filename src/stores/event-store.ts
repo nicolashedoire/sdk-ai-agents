@@ -1,4 +1,10 @@
-import type { Event, EventFilters, EventLog, EventAggregation, EventQueryResult } from '../types/events.js';
+import type {
+  Event,
+  EventFilters,
+  EventLog,
+  EventAggregation,
+  EventQueryResult,
+} from '../types/events.js';
 
 export interface IEventStore {
   append(runId: string, event: Event): Promise<void>;
@@ -9,9 +15,15 @@ export interface IEventStore {
   queryEvents?(filters?: EventFilters, aggregation?: EventAggregation): Promise<EventQueryResult>;
   getEventsByAgent?(agentId: string, filters?: Omit<EventFilters, 'agentId'>): Promise<Event[]>;
   getEventsByUser?(userId: string, filters?: Omit<EventFilters, 'userId'>): Promise<Event[]>;
-  getEventsBySession?(sessionId: string, filters?: Omit<EventFilters, 'sessionId'>): Promise<Event[]>;
+  getEventsBySession?(
+    sessionId: string,
+    filters?: Omit<EventFilters, 'sessionId'>
+  ): Promise<Event[]>;
   countEvents?(filters?: EventFilters): Promise<number>;
-  groupEventsBy?(groupBy: EventAggregation['groupBy'], filters?: EventFilters): Promise<Array<{ key: string; count: number }>>;
+  groupEventsBy?(
+    groupBy: EventAggregation['groupBy'],
+    filters?: EventFilters
+  ): Promise<Array<{ key: string; count: number }>>;
   // Backup and restore methods (optional - may not be supported by all implementations)
   backup?(): Promise<BackupData>;
   restore?(backupData: BackupData): Promise<void>;

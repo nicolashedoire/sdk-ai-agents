@@ -4,7 +4,7 @@ import type { Assertion, AssertionCondition, AssertionResult } from '../types/as
 export class AssertionEvaluator {
   static evaluate(assertion: Assertion, events: Event[]): AssertionResult {
     try {
-      const result = this.evaluateCondition(assertion.condition, events);
+      const result = AssertionEvaluator.evaluateCondition(assertion.condition, events);
       const status: AssertionResult['status'] = result.passed ? 'pass' : 'fail';
 
       return {
@@ -32,17 +32,17 @@ export class AssertionEvaluator {
   ): { passed: boolean; message?: string; details?: Record<string, unknown> } {
     switch (condition.type) {
       case 'event_present':
-        return this.evaluateEventPresent(condition, events);
+        return AssertionEvaluator.evaluateEventPresent(condition, events);
       case 'event_absent':
-        return this.evaluateEventAbsent(condition, events);
+        return AssertionEvaluator.evaluateEventAbsent(condition, events);
       case 'event_order':
-        return this.evaluateEventOrder(condition, events);
+        return AssertionEvaluator.evaluateEventOrder(condition, events);
       case 'event_count':
-        return this.evaluateEventCount(condition, events);
+        return AssertionEvaluator.evaluateEventCount(condition, events);
       case 'event_value':
-        return this.evaluateEventValue(condition, events);
+        return AssertionEvaluator.evaluateEventValue(condition, events);
       case 'custom':
-        return this.evaluateCustom(condition, events);
+        return AssertionEvaluator.evaluateCustom(condition, events);
       default:
         throw new Error(`Unknown assertion type: ${(condition as AssertionCondition).type}`);
     }
@@ -115,7 +115,10 @@ export class AssertionEvaluator {
       return {
         passed: false,
         message: `Before event type ${condition.beforeEventType} not found`,
-        details: { beforeEventType: condition.beforeEventType, afterEventType: condition.afterEventType },
+        details: {
+          beforeEventType: condition.beforeEventType,
+          afterEventType: condition.afterEventType,
+        },
       };
     }
 
@@ -123,7 +126,10 @@ export class AssertionEvaluator {
       return {
         passed: false,
         message: `After event type ${condition.afterEventType} not found`,
-        details: { beforeEventType: condition.beforeEventType, afterEventType: condition.afterEventType },
+        details: {
+          beforeEventType: condition.beforeEventType,
+          afterEventType: condition.afterEventType,
+        },
       };
     }
 
@@ -196,8 +202,13 @@ export class AssertionEvaluator {
 
     return {
       passed: true,
-      message: `Event count is within expected range`,
-      details: { foundCount, eventTypes: targetTypes, minCount: condition.minCount, maxCount: condition.maxCount },
+      message: 'Event count is within expected range',
+      details: {
+        foundCount,
+        eventTypes: targetTypes,
+        minCount: condition.minCount,
+        maxCount: condition.maxCount,
+      },
     };
   }
 
@@ -221,8 +232,8 @@ export class AssertionEvaluator {
     const failedEvents: Array<{ eventId: string; value: unknown }> = [];
 
     for (const event of matchingEvents) {
-      const value = this.getNestedValue(event.data, condition.valuePath);
-      const matches = this.matchValue(value, condition.valueMatcher);
+      const value = AssertionEvaluator.getNestedValue(event.data, condition.valuePath);
+      const matches = AssertionEvaluator.matchValue(value, condition.valueMatcher);
 
       if (!matches) {
         failedEvents.push({ eventId: event.id, value });
@@ -244,7 +255,7 @@ export class AssertionEvaluator {
 
     return {
       passed: true,
-      message: `All events match value condition`,
+      message: 'All events match value condition',
       details: {
         eventType: condition.eventType,
         valuePath: condition.valuePath,
@@ -270,7 +281,9 @@ export class AssertionEvaluator {
         details: { customEvaluator: 'custom' },
       };
     } catch (error) {
-      throw new Error(`Custom evaluator error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Custom evaluator error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -297,15 +310,27 @@ export class AssertionEvaluator {
       case 'ne':
         return value !== matcher.value;
       case 'gt':
-        return typeof value === 'number' && typeof matcher.value === 'number' && value > matcher.value;
+        return (
+          typeof value === 'number' && typeof matcher.value === 'number' && value > matcher.value
+        );
       case 'gte':
-        return typeof value === 'number' && typeof matcher.value === 'number' && value >= matcher.value;
+        return (
+          typeof value === 'number' && typeof matcher.value === 'number' && value >= matcher.value
+        );
       case 'lt':
-        return typeof value === 'number' && typeof matcher.value === 'number' && value < matcher.value;
+        return (
+          typeof value === 'number' && typeof matcher.value === 'number' && value < matcher.value
+        );
       case 'lte':
-        return typeof value === 'number' && typeof matcher.value === 'number' && value <= matcher.value;
+        return (
+          typeof value === 'number' && typeof matcher.value === 'number' && value <= matcher.value
+        );
       case 'contains':
-        return typeof value === 'string' && typeof matcher.value === 'string' && value.includes(matcher.value);
+        return (
+          typeof value === 'string' &&
+          typeof matcher.value === 'string' &&
+          value.includes(matcher.value)
+        );
       case 'regex':
         if (typeof value !== 'string' || typeof matcher.value !== 'string') return false;
         try {
@@ -319,4 +344,3 @@ export class AssertionEvaluator {
     }
   }
 }
-

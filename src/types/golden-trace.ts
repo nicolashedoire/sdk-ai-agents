@@ -16,4 +16,3 @@ export interface GoldenTraceConfig {
   description?: string;
   metadata?: Record<string, unknown>;
 }
-

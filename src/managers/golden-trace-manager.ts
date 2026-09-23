@@ -52,8 +52,9 @@ export class GoldenTraceManager {
   }
 
   async getGoldenTrace(goldenTraceId: string): Promise<GoldenTrace | null> {
-    if (this.goldenTracesCache.has(goldenTraceId)) {
-      return this.goldenTracesCache.get(goldenTraceId)!;
+    const cached = this.goldenTracesCache.get(goldenTraceId);
+    if (cached) {
+      return cached;
     }
 
     try {
@@ -104,7 +105,7 @@ export class GoldenTraceManager {
 
   async deleteGoldenTrace(goldenTraceId: string): Promise<boolean> {
     await this.ensureGoldenTracesDir();
-    
+
     try {
       const filePath = join(this.goldenTracesDir, `${goldenTraceId}.json`);
       await fs.unlink(filePath);
@@ -124,7 +125,7 @@ export class GoldenTraceManager {
     format: 'json' | 'yaml' = 'json'
   ): Promise<string> {
     await this.ensureGoldenTracesDir();
-    
+
     const goldenTrace = await this.getGoldenTrace(goldenTraceId);
     if (!goldenTrace) {
       throw new Error(`Golden trace ${goldenTraceId} not found`);
@@ -147,11 +148,9 @@ export class GoldenTraceManager {
       return 'null';
     }
     if (typeof obj === 'string') {
-      const escaped = obj.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
-      if (obj.includes(':') || obj.includes('-') || obj.trim() !== obj || obj === '') {
-        return `"${escaped}"`;
-      }
-      return obj;
+      // Always quoted: an unquoted "true", "null" or "123" would be read back as another type.
+      // A JSON string literal is a valid YAML double-quoted scalar.
+      return JSON.stringify(obj);
     }
     if (typeof obj === 'number' || typeof obj === 'boolean') {
       return String(obj);
@@ -176,4 +175,3 @@ export class GoldenTraceManager {
     return String(obj);
   }
 }
-

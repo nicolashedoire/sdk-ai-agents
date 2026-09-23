@@ -27,7 +27,8 @@ interface RunState {
 }
 
 export class AgentImpl {
-  private activeRuns: Map<string, { cancelled: boolean; abortController: AbortController }> = new Map();
+  private activeRuns: Map<string, { cancelled: boolean; abortController: AbortController }> =
+    new Map();
 
   constructor(
     private agent: Agent,
@@ -36,6 +37,14 @@ export class AgentImpl {
     private policyEngine: PolicyEngine,
     private eventStore: IEventStore
   ) {}
+
+  get id(): string {
+    return this.agent.id;
+  }
+
+  get name(): string {
+    return this.agent.name;
+  }
 
   async run(input: RunInput): Promise<RunResult> {
     const runId = generateRunId();
@@ -165,7 +174,7 @@ export class AgentImpl {
         providerSettings, // Pass providerSettings instead of resolved settings
       },
       this.eventStore,
-      state.abortController?.signal,
+      state.abortController?.signal
     );
   }
 
@@ -175,11 +184,13 @@ export class AgentImpl {
   private mergeProviderSettings(
     agentSettings?: Agent['config']['providerSettings'],
     runSettings?: RunInput['providerSettings']
-  ): {
-    openai?: ProviderSettings;
-    anthropic?: ProviderSettings;
-    default?: ProviderSettings;
-  } | undefined {
+  ):
+    | {
+        openai?: ProviderSettings;
+        anthropic?: ProviderSettings;
+        default?: ProviderSettings;
+      }
+    | undefined {
     if (!agentSettings && !runSettings) {
       return undefined;
     }
@@ -240,7 +251,7 @@ export class AgentImpl {
 
   private async handleRunError(runId: string, error: unknown): Promise<RunResult> {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    
+
     if (errorMessage === 'Run cancelled') {
       return await this.handleRunCancelled(runId);
     }

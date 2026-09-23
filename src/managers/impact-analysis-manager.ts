@@ -29,8 +29,9 @@ export class ImpactAnalysisManager {
   }
 
   async getAnalysis(analysisId: string): Promise<ImpactAnalysis | null> {
-    if (this.analysesCache.has(analysisId)) {
-      return this.analysesCache.get(analysisId)!;
+    const cached = this.analysesCache.get(analysisId);
+    if (cached) {
+      return cached;
     }
 
     await this.ensureAnalysesDir();
@@ -59,5 +60,3 @@ export class ImpactAnalysisManager {
     }
   }
 }
-
-

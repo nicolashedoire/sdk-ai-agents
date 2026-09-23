@@ -1,3 +1,4 @@
+import { PolicyViolationError, ToolExecutionError } from '../errors/index.js';
 import type { IEventStore } from '../stores/event-store.js';
 import type { Event } from '../types/events.js';
 import type { Intention, ReplayModifications, RunResult } from '../types/run.js';
@@ -18,7 +19,11 @@ export class ReplayEngine {
     const intentions = this.extractIntentions(originalEvents);
     await this.logReplayStart(newRunId, originalEvents, runId, modifications);
 
-    const result = await this.executeIntentions(newRunId, intentions);
+    const result = await this.executeIntentions(
+      newRunId,
+      intentions,
+      recordedAllowedTools(originalEvents)
+    );
 
     if (result.hasError && result.error) {
       await this.logReplayFailure(newRunId, result.error, runId);
@@ -65,7 +70,8 @@ export class ReplayEngine {
       type: string;
       data: { intention: Intention };
       metadata?: Record<string, unknown>;
-    }>
+    }>,
+    allowedTools?: string[]
   ): Promise<{ hasError: boolean; finalResult: unknown; error?: string }> {
     let finalResult: unknown = null;
 
@@ -77,12 +83,21 @@ export class ReplayEngine {
           runId: newRunId,
           agentId: (intentionEvent.metadata?.agentId as string) || '',
           mode: 'replay',
+          ...(allowedTools ? { allowedTools } : {}),
         });
 
         if (result.result) {
           finalResult = result.result;
         }
       } catch (error) {
+        // Cognitive runs record tool denials and failures and keep reasoning: their replay
+        // records them again and goes on, like the original run did.
+        if (
+          allowedTools &&
+          (error instanceof PolicyViolationError || error instanceof ToolExecutionError)
+        ) {
+          continue;
+        }
         const errorMessage = error instanceof Error ? error.message : String(error);
         return { hasError: true, finalResult, error: errorMessage };
       }
@@ -141,9 +156,7 @@ export class ReplayEngine {
     };
   }
 
-  private extractIntentions(
-    events: Event[]
-  ): Array<{
+  private extractIntentions(events: Event[]): Array<{
     type: string;
     data: { intention: Intention };
     metadata?: Record<string, unknown>;
@@ -151,15 +164,19 @@ export class ReplayEngine {
     return events
       .filter((e) => e.type === 'intention.generated')
       .map((e) => {
-        // Les intentions sont stockées différemment selon comment elles sont générées
-        // On doit reconstruire l'intention depuis les données de l'événement
+        // Intentions are stored differently depending on how they were generated
+        // so the intention is rebuilt from the event data
         let intention: Intention;
-        
+
         if (e.data?.intention) {
-          // Si l'intention est déjà dans data.intention
+          // The intention is already in data.intention
           intention = e.data.intention as Intention;
-        } else if (e.data?.toolCalls && Array.isArray(e.data.toolCalls) && e.data.toolCalls.length > 0) {
-          // Si on a des tool_calls, créer une intention tool_call
+        } else if (
+          e.data?.toolCalls &&
+          Array.isArray(e.data.toolCalls) &&
+          e.data.toolCalls.length > 0
+        ) {
+          // Tool calls: build a tool_call intention
           const toolCall = e.data.toolCalls[0];
           try {
             const params = JSON.parse(toolCall.function?.arguments || '{}');
@@ -176,7 +193,7 @@ export class ReplayEngine {
             };
           }
         } else if (e.data?.message) {
-          // Si on a un message, créer une intention final_answer
+          // A message: build a final_answer intention
           intention = {
             type: 'final_answer',
             reasoning: typeof e.data.message === 'string' ? e.data.message : undefined,
@@ -197,4 +214,13 @@ export class ReplayEngine {
         };
       });
   }
+}
+
+/** Tools a cognitive run was restricted to, as recorded in its `cognition.started` event. */
+function recordedAllowedTools(events: Event[]): string[] | undefined {
+  const started = events.find((event) => event.type === 'cognition.started');
+  const tools = started?.data.allowedTools;
+  return Array.isArray(tools) && tools.every((tool) => typeof tool === 'string')
+    ? tools
+    : undefined;
 }

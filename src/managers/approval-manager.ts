@@ -17,10 +17,13 @@ export interface ApprovalRequest {
 
 export class ApprovalManager {
   private pendingApprovals: Map<string, ApprovalRequest> = new Map();
-  private approvalPromises: Map<string, {
-    resolve: (approved: boolean) => void;
-    reject: (error: Error) => void;
-  }> = new Map();
+  private approvalPromises: Map<
+    string,
+    {
+      resolve: (approved: boolean) => void;
+      reject: (error: Error) => void;
+    }
+  > = new Map();
 
   /**
    * Creates a new approval request and returns its ID.
@@ -33,7 +36,7 @@ export class ApprovalManager {
     policyId: string
   ): Promise<{ approvalId: string; waitForApproval: Promise<boolean> }> {
     const approvalId = `${runId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-    
+
     const approvalRequest: ApprovalRequest = {
       id: approvalId,
       runId,
@@ -49,7 +52,7 @@ export class ApprovalManager {
     // Create promise that will be resolved when approval is decided
     let resolveApproval!: (approved: boolean) => void;
     let rejectApproval!: (error: Error) => void;
-    
+
     const approvalPromise = new Promise<boolean>((resolve, reject) => {
       resolveApproval = resolve;
       rejectApproval = reject;
@@ -169,5 +172,3 @@ export class ApprovalManager {
     }
   }
 }
-
-

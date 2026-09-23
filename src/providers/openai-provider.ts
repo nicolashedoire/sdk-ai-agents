@@ -6,11 +6,18 @@ export class OpenAIProvider implements LLMProvider {
   private client: OpenAI;
   private defaultModel: string;
 
-  constructor(apiKey: string, defaultModel = 'gpt-4') {
+  /**
+   * @param options.maxRetries Retries performed by the OpenAI client itself. The SDK sets it
+   * to 0 when its own retry policy is active, so retries are not stacked.
+   */
+  constructor(apiKey: string, defaultModel = 'gpt-4', options: { maxRetries?: number } = {}) {
     if (!apiKey || apiKey.trim() === '') {
       throw new Error('OpenAI API key is required');
     }
-    this.client = new OpenAI({ apiKey });
+    this.client = new OpenAI({
+      apiKey,
+      ...(options.maxRetries !== undefined ? { maxRetries: options.maxRetries } : {}),
+    });
     this.defaultModel = defaultModel;
   }
 
@@ -97,9 +104,12 @@ export class OpenAIProvider implements LLMProvider {
 
   private wrapError(error: unknown): LLMProviderError {
     if (error instanceof Error) {
-      return new LLMProviderError('openai', error, true);
+      // Checked with instanceof so it survives minified bundles; guarded for test doubles.
+      const connectionError: unknown = Reflect.get(OpenAI, 'APIConnectionError');
+      const connectionFailure =
+        typeof connectionError === 'function' && error instanceof connectionError;
+      return new LLMProviderError('openai', error, true, { connectionFailure });
     }
     return new LLMProviderError('openai', new Error(String(error)), true);
   }
 }
-

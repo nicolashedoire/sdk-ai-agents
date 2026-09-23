@@ -11,11 +11,22 @@ export class AnthropicProvider implements LLMProvider {
   private client: Anthropic;
   private defaultModel: string;
 
-  constructor(apiKey: string, defaultModel = 'claude-3-5-sonnet-20241022') {
+  /**
+   * @param options.maxRetries Retries performed by the Anthropic client itself. The SDK sets
+   * it to 0 when its own retry policy is active, so retries are not stacked.
+   */
+  constructor(
+    apiKey: string,
+    defaultModel = 'claude-3-5-sonnet-20241022',
+    options: { maxRetries?: number } = {}
+  ) {
     if (!apiKey || apiKey.trim() === '') {
       throw new Error('Anthropic API key is required');
     }
-    this.client = new Anthropic({ apiKey });
+    this.client = new Anthropic({
+      apiKey,
+      ...(options.maxRetries !== undefined ? { maxRetries: options.maxRetries } : {}),
+    });
     this.defaultModel = defaultModel;
   }
 
@@ -69,9 +80,10 @@ export class AnthropicProvider implements LLMProvider {
     return 'anthropic';
   }
 
-  private convertMessages(
-    messages: LLMRequest['messages']
-  ): { system?: string; messages: AnthropicMessage[] } {
+  private convertMessages(messages: LLMRequest['messages']): {
+    system?: string;
+    messages: AnthropicMessage[];
+  } {
     const systemParts: string[] = [];
     const anthropicMessages: AnthropicMessage[] = [];
 
@@ -90,9 +102,7 @@ export class AnthropicProvider implements LLMProvider {
     return { system, messages: anthropicMessages };
   }
 
-  private convertTools(
-    tools?: LLMRequest['tools']
-  ): Anthropic.Tool[] | undefined {
+  private convertTools(tools?: LLMRequest['tools']): Anthropic.Tool[] | undefined {
     if (!tools || tools.length === 0) {
       return undefined;
     }
@@ -107,10 +117,7 @@ export class AnthropicProvider implements LLMProvider {
     }));
   }
 
-  private convertResponse(
-    response: Anthropic.Message,
-    model: string
-  ): LLMResponse {
+  private convertResponse(response: Anthropic.Message, model: string): LLMResponse {
     const contentParts: string[] = [];
     const toolCalls: Array<{
       function: { name: string; arguments: string };
@@ -147,9 +154,12 @@ export class AnthropicProvider implements LLMProvider {
 
   private wrapError(error: unknown): LLMProviderError {
     if (error instanceof Error) {
-      return new LLMProviderError('anthropic', error, true);
+      // Checked with instanceof so it survives minified bundles; guarded for test doubles.
+      const connectionError: unknown = Reflect.get(Anthropic, 'APIConnectionError');
+      const connectionFailure =
+        typeof connectionError === 'function' && error instanceof connectionError;
+      return new LLMProviderError('anthropic', error, true, { connectionFailure });
     }
     return new LLMProviderError('anthropic', new Error(String(error)), true);
   }
 }
-

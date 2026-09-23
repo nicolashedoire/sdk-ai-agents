@@ -23,14 +23,17 @@ export interface BudgetLimit {
 export class BudgetTracker {
   private usageCache: Map<string, BudgetUsage> = new Map();
 
-  constructor(_eventStore: IEventStore) {
-    // EventStore is kept for potential future use (e.g., querying historical data)
-  }
+  /** @param eventStore Kept for historical usage queries (see `getBudgetUsage`). */
+  constructor(readonly eventStore?: IEventStore) {}
 
   /**
    * Gets a cache key for budget usage tracking.
    */
-  private getCacheKey(agentId?: string, toolName?: string, period: BudgetLimit['period'] = 'all'): string {
+  private getCacheKey(
+    agentId?: string,
+    toolName?: string,
+    period: BudgetLimit['period'] = 'all'
+  ): string {
     const parts: string[] = [];
     if (agentId) parts.push(`agent:${agentId}`);
     if (toolName) parts.push(`tool:${toolName}`);
@@ -41,7 +44,10 @@ export class BudgetTracker {
   /**
    * Calculates period boundaries for a given period type.
    */
-  private getPeriodBoundaries(period: BudgetLimit['period'], timestamp: number): { start: number; end: number } {
+  private getPeriodBoundaries(
+    period: BudgetLimit['period'],
+    timestamp: number
+  ): { start: number; end: number } {
     const date = new Date(timestamp);
     let start: number;
     let end: number;
@@ -59,7 +65,7 @@ export class BudgetTracker {
         date.setDate(date.getDate() + 1);
         end = date.getTime();
         break;
-      case 'week':
+      case 'week': {
         const dayOfWeek = date.getDay();
         date.setDate(date.getDate() - dayOfWeek);
         date.setHours(0, 0, 0, 0);
@@ -67,6 +73,7 @@ export class BudgetTracker {
         date.setDate(date.getDate() + 7);
         end = date.getTime();
         break;
+      }
       case 'month':
         date.setDate(1);
         date.setHours(0, 0, 0, 0);
@@ -74,7 +81,6 @@ export class BudgetTracker {
         date.setMonth(date.getMonth() + 1);
         end = date.getTime();
         break;
-      case 'all':
       default:
         start = 0;
         end = Number.MAX_SAFE_INTEGER;
@@ -98,15 +104,35 @@ export class BudgetTracker {
 
     for (const period of periods) {
       const boundaries = this.getPeriodBoundaries(period, timestamp);
-      
+
       // Record for agent-level usage
       const agentKey = this.getCacheKey(agentId, undefined, period);
-      await this.updateUsage(agentKey, agentId, undefined, period, boundaries.start, boundaries.end, tokensUsed, 0, timestamp);
+      await this.updateUsage(
+        agentKey,
+        agentId,
+        undefined,
+        period,
+        boundaries.start,
+        boundaries.end,
+        tokensUsed,
+        0,
+        timestamp
+      );
 
       // Record for tool-level usage if toolName provided
       if (toolName) {
         const toolKey = this.getCacheKey(agentId, toolName, period);
-        await this.updateUsage(toolKey, agentId, toolName, period, boundaries.start, boundaries.end, 0, 1, timestamp);
+        await this.updateUsage(
+          toolKey,
+          agentId,
+          toolName,
+          period,
+          boundaries.start,
+          boundaries.end,
+          0,
+          1,
+          timestamp
+        );
       }
     }
   }
@@ -124,7 +150,17 @@ export class BudgetTracker {
     for (const period of periods) {
       const boundaries = this.getPeriodBoundaries(period, timestamp);
       const toolKey = this.getCacheKey(agentId, toolName, period);
-      await this.updateUsage(toolKey, agentId, toolName, period, boundaries.start, boundaries.end, 0, 1, timestamp);
+      await this.updateUsage(
+        toolKey,
+        agentId,
+        toolName,
+        period,
+        boundaries.start,
+        boundaries.end,
+        0,
+        1,
+        timestamp
+      );
     }
   }
 
@@ -143,7 +179,7 @@ export class BudgetTracker {
     timestamp: number
   ): Promise<void> {
     const existing = this.usageCache.get(key);
-    
+
     const usage: BudgetUsage = {
       agentId,
       toolName,
@@ -180,7 +216,10 @@ export class BudgetTracker {
   /**
    * Calculates usage from event store.
    */
-  private async calculateUsageFromEvents(limit: BudgetLimit, timestamp: number): Promise<BudgetUsage> {
+  private async calculateUsageFromEvents(
+    limit: BudgetLimit,
+    timestamp: number
+  ): Promise<BudgetUsage> {
     const boundaries = this.getPeriodBoundaries(limit.period, timestamp);
 
     // We need to query events, but eventStore doesn't have a method to query by time range across all runs
@@ -208,7 +247,11 @@ export class BudgetTracker {
   /**
    * Checks if a budget limit would be exceeded.
    */
-  async checkBudget(limit: BudgetLimit, additionalTokens: number = 0, additionalToolCalls: number = 0): Promise<{
+  async checkBudget(
+    limit: BudgetLimit,
+    additionalTokens = 0,
+    additionalToolCalls = 0
+  ): Promise<{
     allowed: boolean;
     currentUsage: BudgetUsage;
     wouldExceed: boolean;
@@ -216,10 +259,11 @@ export class BudgetTracker {
   }> {
     const currentUsage = await this.getUsage(limit);
 
-    const wouldExceedTokens = limit.maxTokens !== undefined &&
-      currentUsage.tokensUsed + additionalTokens > limit.maxTokens;
-    
-    const wouldExceedToolCalls = limit.maxToolCalls !== undefined &&
+    const wouldExceedTokens =
+      limit.maxTokens !== undefined && currentUsage.tokensUsed + additionalTokens > limit.maxTokens;
+
+    const wouldExceedToolCalls =
+      limit.maxToolCalls !== undefined &&
       currentUsage.toolCallsCount + additionalToolCalls > limit.maxToolCalls;
 
     const wouldExceed = wouldExceedTokens || wouldExceedToolCalls;
@@ -253,4 +297,3 @@ export class BudgetTracker {
     return Array.from(this.usageCache.values());
   }
 }
-

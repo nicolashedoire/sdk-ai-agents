@@ -28,6 +28,8 @@ export class ToolRegistry {
       version: definition.version || '1.0.0',
       capability: definition.capability,
       metadata: definition.metadata,
+      ...(definition.inputJsonSchema ? { inputJsonSchema: definition.inputJsonSchema } : {}),
+      ...(definition.retry ? { retry: definition.retry } : {}),
     };
 
     this.tools.set(definition.name, tool);
@@ -43,9 +45,7 @@ export class ToolRegistry {
   }
 
   getToolsByCapability(capability: string): Tool[] {
-    return Array.from(this.tools.values()).filter(
-      (tool) => tool.capability === capability
-    );
+    return Array.from(this.tools.values()).filter((tool) => tool.capability === capability);
   }
 
   getTool(name: string): Tool | null {
@@ -118,9 +118,7 @@ export class ToolRegistry {
   }
 
   private formatZodErrors(error: z.ZodError): string {
-    return error.errors
-      .map((e) => `${e.path.join('.')}: ${e.message}`)
-      .join(', ');
+    return error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ');
   }
 
   unregisterTool(name: string): boolean {

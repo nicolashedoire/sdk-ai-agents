@@ -30,10 +30,13 @@ jobs:
         run: npm run lint
 
       - name: Run formatter check
-        run: npm run format -- --check
+        run: npm run format:check
 
       - name: Build
         run: npm run build
+
+      - name: Type-check tests
+        run: npm run typecheck:tests
 
       - name: Run tests
         run: npm test

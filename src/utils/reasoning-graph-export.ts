@@ -11,23 +11,26 @@ export class ReasoningGraphExporter {
   /**
    * Exports the reasoning graph to Graphviz DOT format.
    */
-  static toGraphviz(graph: ReasoningGraph, options?: {
-    direction?: 'TB' | 'LR' | 'BT' | 'RL';
-    nodeShape?: string;
-    nodeStyle?: string;
-  }): string {
+  static toGraphviz(
+    graph: ReasoningGraph,
+    options?: {
+      direction?: 'TB' | 'LR' | 'BT' | 'RL';
+      nodeShape?: string;
+      nodeStyle?: string;
+    }
+  ): string {
     const direction = options?.direction || 'TB';
     const nodeShape = options?.nodeShape || 'box';
     const nodeStyle = options?.nodeStyle || 'rounded';
 
-    let dot = `digraph ReasoningGraph {\n`;
+    let dot = 'digraph ReasoningGraph {\n';
     dot += `  rankdir=${direction};\n`;
     dot += `  node [shape=${nodeShape}, style=${nodeStyle}];\n\n`;
 
     // Add nodes
     for (const node of graph.nodes) {
-      const label = this.escapeLabel(node.label);
-      const color = this.getNodeColor(node.type);
+      const label = ReasoningGraphExporter.escapeLabel(node.label);
+      const color = ReasoningGraphExporter.getNodeColor(node.type);
       dot += `  "${node.id}" [label="${label}", fillcolor="${color}", style="filled,${nodeStyle}"];\n`;
     }
 
@@ -35,8 +38,10 @@ export class ReasoningGraphExporter {
 
     // Add edges
     for (const edge of graph.edges) {
-      const label = edge.label ? ` [label="${this.escapeLabel(edge.label)}"]` : '';
-      const style = this.getEdgeStyle(edge.type);
+      const label = edge.label
+        ? ` [label="${ReasoningGraphExporter.escapeLabel(edge.label)}"]`
+        : '';
+      const style = ReasoningGraphExporter.getEdgeStyle(edge.type);
       dot += `  "${edge.source}" -> "${edge.target}"${label}${style};\n`;
     }
 
@@ -45,10 +50,7 @@ export class ReasoningGraphExporter {
   }
 
   private static escapeLabel(label: string): string {
-    return label
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '\\r');
+    return label.replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
   }
 
   private static getNodeColor(type: string): string {
@@ -87,5 +89,3 @@ export class ReasoningGraphExporter {
     }
   }
 }
-
-

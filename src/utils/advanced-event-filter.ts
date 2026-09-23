@@ -1,5 +1,9 @@
 import type { Event } from '../types/events.js';
-import type { AdvancedEventFilter, DataFilter, MetadataFilter } from '../types/advanced-event-filter.js';
+import type {
+  AdvancedEventFilter,
+  DataFilter,
+  MetadataFilter,
+} from '../types/advanced-event-filter.js';
 
 export class AdvancedEventFilterEvaluator {
   static evaluate(event: Event, filter: AdvancedEventFilter): boolean {
@@ -35,13 +39,17 @@ export class AdvancedEventFilterEvaluator {
     }
 
     if (filter.dataFilters && filter.dataFilters.length > 0) {
-      const dataResults = filter.dataFilters.map((df) => this.evaluateDataFilter(event.data, df));
-      result = this.combineResults(result, dataResults, filter.logic);
+      const dataResults = filter.dataFilters.map((df) =>
+        AdvancedEventFilterEvaluator.evaluateDataFilter(event.data, df)
+      );
+      result = AdvancedEventFilterEvaluator.combineResults(result, dataResults, filter.logic);
     }
 
     if (filter.metadataFilters && filter.metadataFilters.length > 0) {
-      const metadataResults = filter.metadataFilters.map((mf) => this.evaluateMetadataFilter(event.metadata, mf));
-      result = this.combineResults(result, metadataResults, filter.logic);
+      const metadataResults = filter.metadataFilters.map((mf) =>
+        AdvancedEventFilterEvaluator.evaluateMetadataFilter(event.metadata, mf)
+      );
+      result = AdvancedEventFilterEvaluator.combineResults(result, metadataResults, filter.logic);
     }
 
     if (filter.not) {
@@ -52,7 +60,7 @@ export class AdvancedEventFilterEvaluator {
   }
 
   private static evaluateDataFilter(data: unknown, filter: DataFilter): boolean {
-    const value = this.getNestedValue(data, filter.path);
+    const value = AdvancedEventFilterEvaluator.getNestedValue(data, filter.path);
 
     switch (filter.operator) {
       case 'eq':
@@ -60,19 +68,39 @@ export class AdvancedEventFilterEvaluator {
       case 'ne':
         return value !== filter.value;
       case 'gt':
-        return typeof value === 'number' && typeof filter.value === 'number' && value > filter.value;
+        return (
+          typeof value === 'number' && typeof filter.value === 'number' && value > filter.value
+        );
       case 'gte':
-        return typeof value === 'number' && typeof filter.value === 'number' && value >= filter.value;
+        return (
+          typeof value === 'number' && typeof filter.value === 'number' && value >= filter.value
+        );
       case 'lt':
-        return typeof value === 'number' && typeof filter.value === 'number' && value < filter.value;
+        return (
+          typeof value === 'number' && typeof filter.value === 'number' && value < filter.value
+        );
       case 'lte':
-        return typeof value === 'number' && typeof filter.value === 'number' && value <= filter.value;
+        return (
+          typeof value === 'number' && typeof filter.value === 'number' && value <= filter.value
+        );
       case 'contains':
-        return typeof value === 'string' && typeof filter.value === 'string' && value.includes(filter.value);
+        return (
+          typeof value === 'string' &&
+          typeof filter.value === 'string' &&
+          value.includes(filter.value)
+        );
       case 'startsWith':
-        return typeof value === 'string' && typeof filter.value === 'string' && value.startsWith(filter.value);
+        return (
+          typeof value === 'string' &&
+          typeof filter.value === 'string' &&
+          value.startsWith(filter.value)
+        );
       case 'endsWith':
-        return typeof value === 'string' && typeof filter.value === 'string' && value.endsWith(filter.value);
+        return (
+          typeof value === 'string' &&
+          typeof filter.value === 'string' &&
+          value.endsWith(filter.value)
+        );
       case 'exists':
         return value !== undefined && value !== null;
       case 'notExists':
@@ -93,7 +121,10 @@ export class AdvancedEventFilterEvaluator {
     }
   }
 
-  private static evaluateMetadataFilter(metadata: Record<string, unknown> | undefined, filter: MetadataFilter): boolean {
+  private static evaluateMetadataFilter(
+    metadata: Record<string, unknown> | undefined,
+    filter: MetadataFilter
+  ): boolean {
     if (!metadata) {
       return filter.operator === 'notExists';
     }
@@ -106,15 +137,27 @@ export class AdvancedEventFilterEvaluator {
       case 'ne':
         return value !== filter.value;
       case 'gt':
-        return typeof value === 'number' && typeof filter.value === 'number' && value > filter.value;
+        return (
+          typeof value === 'number' && typeof filter.value === 'number' && value > filter.value
+        );
       case 'gte':
-        return typeof value === 'number' && typeof filter.value === 'number' && value >= filter.value;
+        return (
+          typeof value === 'number' && typeof filter.value === 'number' && value >= filter.value
+        );
       case 'lt':
-        return typeof value === 'number' && typeof filter.value === 'number' && value < filter.value;
+        return (
+          typeof value === 'number' && typeof filter.value === 'number' && value < filter.value
+        );
       case 'lte':
-        return typeof value === 'number' && typeof filter.value === 'number' && value <= filter.value;
+        return (
+          typeof value === 'number' && typeof filter.value === 'number' && value <= filter.value
+        );
       case 'contains':
-        return typeof value === 'string' && typeof filter.value === 'string' && value.includes(filter.value);
+        return (
+          typeof value === 'string' &&
+          typeof filter.value === 'string' &&
+          value.includes(filter.value)
+        );
       case 'exists':
         return value !== undefined && value !== null;
       case 'notExists':
@@ -124,7 +167,11 @@ export class AdvancedEventFilterEvaluator {
     }
   }
 
-  private static combineResults(baseResult: boolean, results: boolean[], logic?: 'and' | 'or'): boolean {
+  private static combineResults(
+    baseResult: boolean,
+    results: boolean[],
+    logic?: 'and' | 'or'
+  ): boolean {
     if (results.length === 0) return baseResult;
 
     if (logic === 'or') {
@@ -148,5 +195,3 @@ export class AdvancedEventFilterEvaluator {
     return current;
   }
 }
-
-

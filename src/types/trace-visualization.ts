@@ -1,6 +1,12 @@
 import type { Event } from './events.js';
 
-export type EventGroupType = 'run_lifecycle' | 'reasoning_cycle' | 'tool_execution' | 'policy_check' | 'approval_workflow' | 'error';
+export type EventGroupType =
+  | 'run_lifecycle'
+  | 'reasoning_cycle'
+  | 'tool_execution'
+  | 'policy_check'
+  | 'approval_workflow'
+  | 'error';
 
 export interface EventGroup {
   id: string;
@@ -50,4 +56,3 @@ export interface TraceVisualization {
     };
   };
 }
-

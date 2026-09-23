@@ -1,89 +1,87 @@
-# Comment Utiliser ce Template
+# How to Use This Template
 
-Ce template fournit une structure de base pour démarrer rapidement un projet utilisant SDK_AI_Agents.
+This template provides a base structure to quickly start a project using SDK_AI_Agents.
 
 ## Installation
 
-### Option 1 : Copier le template manuellement
+### Option 1: Copy the template manually
 
-1. Copiez le dossier `starter-template` vers votre nouveau projet :
+1. Copy the `starter-template` folder to your new project:
    ```bash
-   cp -r templates/starter-template mon-nouveau-projet
-   cd mon-nouveau-projet
+   cp -r templates/starter-template my-new-project
+   cd my-new-project
    ```
 
-2. Installez les dépendances :
+2. Install the dependencies:
    ```bash
    npm install
    ```
 
-3. Créez le fichier `.env` :
+3. Create the `.env` file:
    ```bash
    cp ENV_TEMPLATE.txt .env
    ```
-   Puis éditez `.env` et ajoutez votre clé API OpenAI.
+   Then edit `.env` and add your OpenAI API key.
 
-### Option 2 : Utiliser avec npm create (quand le SDK sera publié)
+### Option 2: Use npm create (once the SDK is published)
 
 ```bash
-npm create @sdk-ai-agents/starter mon-nouveau-projet
-cd mon-nouveau-projet
+npm create @sdk-ai-agents/starter my-new-project
+cd my-new-project
 npm install
 ```
 
-## Configuration Initiale
+## Initial Configuration
 
-1. **Variables d'environnement** :
-   - Copiez `ENV_TEMPLATE.txt` vers `.env`
-   - Ajoutez votre clé API OpenAI : `OPENAI_API_KEY=sk-...`
+1. **Environment variables**:
+   - Copy `ENV_TEMPLATE.txt` to `.env`
+   - Add your OpenAI API key: `OPENAI_API_KEY=sk-...`
 
-2. **Personnalisation** :
-   - Modifiez `package.json` pour changer le nom du projet
-   - Personnalisez `src/index.ts` selon vos besoins
+2. **Customization**:
+   - Edit `package.json` to change the project name
+   - Customize `src/index.ts` to your needs
 
-## Structure du Template
+## Template Structure
 
 ```
 starter-template/
 ├── src/
-│   ├── index.ts          # Code principal de votre agent
-│   └── __tests__/        # Tests unitaires
-├── package.json          # Dépendances et scripts
-├── tsconfig.json         # Configuration TypeScript
-├── biome.json            # Configuration linter/formatter
-├── vitest.config.ts      # Configuration tests
-├── README.md             # Documentation du projet
-├── ENV_TEMPLATE.txt      # Template pour .env
-└── .gitignore            # Fichiers à ignorer
+│   ├── index.ts          # Your agent's main code
+│   └── __tests__/        # Unit tests
+├── package.json          # Dependencies and scripts
+├── tsconfig.json         # TypeScript configuration
+├── biome.json            # Linter/formatter configuration
+├── vitest.config.ts      # Test configuration
+├── README.md             # Project documentation
+├── ENV_TEMPLATE.txt      # Template for .env
+└── .gitignore            # Files to ignore
 ```
 
-## Scripts Disponibles
+## Available Scripts
 
-- `npm start` - Exécute le projet
-- `npm run build` - Compile TypeScript
-- `npm run dev` - Mode développement avec watch
-- `npm test` - Lance les tests
-- `npm run lint` - Vérifie le code
-- `npm run format` - Formate le code
+- `npm start` - Runs the project
+- `npm run build` - Compiles TypeScript
+- `npm run dev` - Development mode with watch
+- `npm test` - Runs the tests
+- `npm run lint` - Checks the code
+- `npm run format` - Formats the code
 
-## Prochaines Étapes
+## Next Steps
 
-1. **Définir vos tools** : Créez des tools personnalisés dans `src/index.ts`
-2. **Créer des capabilities** : Organisez vos tools en capabilities
-3. **Configurer des policies** : Ajoutez des règles de gouvernance
-4. **Ajouter des tests** : Écrivez des tests dans `src/__tests__/`
-5. **Personnaliser l'agent** : Ajustez la configuration selon vos besoins
+1. **Define your tools**: Create custom tools in `src/index.ts`
+2. **Create capabilities**: Organize your tools into capabilities
+3. **Configure policies**: Add governance rules
+4. **Add tests**: Write tests in `src/__tests__/`
+5. **Customize the agent**: Adjust the configuration to your needs
 
 ## Documentation
 
-Consultez la documentation complète du SDK :
-- [Quick Start Guide](../../docs/QUICKSTART.md)
-- [Concepts Clés](../../docs/CONCEPTS.md)
+See the full SDK documentation:
+- [Getting started](https://nicolashedoire.github.io/sdk-ai-agents/guide/getting-started)
+- [Core concepts](https://nicolashedoire.github.io/sdk-ai-agents/guide/concepts)
 
 ## Notes
 
-- Le package `@sdk-ai-agents/core` doit être installé depuis npm (ou lié localement pendant le développement)
-- Assurez-vous d'avoir Node.js >= 20.0.0
-- Les erreurs TypeScript concernant `@sdk-ai-agents/core` sont normales tant que le package n'est pas installé
-
-
+- The `@sdk-ai-agents/core` package must be installed from npm (or linked locally during development)
+- Make sure you have Node.js >= 20.0.0
+- TypeScript errors about `@sdk-ai-agents/core` are expected until the package is installed

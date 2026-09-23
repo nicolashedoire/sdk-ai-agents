@@ -2,7 +2,19 @@ import type { EventType } from './events.js';
 
 export interface DataFilter {
   path: string;
-  operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'startsWith' | 'endsWith' | 'exists' | 'notExists' | 'matches';
+  operator:
+    | 'eq'
+    | 'ne'
+    | 'gt'
+    | 'gte'
+    | 'lt'
+    | 'lte'
+    | 'contains'
+    | 'startsWith'
+    | 'endsWith'
+    | 'exists'
+    | 'notExists'
+    | 'matches';
   value?: unknown;
   regex?: string;
 }
@@ -41,4 +53,3 @@ export interface EventStatistics {
   byType: Record<string, number>;
   byAgent: Record<string, number>;
 }
-

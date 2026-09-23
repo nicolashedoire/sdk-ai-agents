@@ -46,5 +46,3 @@ export interface AlternativesAnalysis {
     decisionPointsCount: number;
   };
 }
-
-

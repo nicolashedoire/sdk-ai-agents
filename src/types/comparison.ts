@@ -35,5 +35,3 @@ export interface ComparisonDifference {
   details: string;
   severity?: 'low' | 'medium' | 'high';
 }
-
-

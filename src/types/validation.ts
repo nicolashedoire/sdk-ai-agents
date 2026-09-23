@@ -33,4 +33,3 @@ export interface ValidationDifference {
   actual?: Event;
   details: string;
 }
-

@@ -5,6 +5,8 @@ import type { ToolRegistry } from '../registry/tool-registry.js';
 import type { IEventStore } from '../stores/event-store.js';
 import type { ActionContext, ActionResult, Intention } from '../types/run.js';
 import type { Event } from '../types/events.js';
+import type { ToolResult } from '../types/tool.js';
+import { withRetry } from '../resilience/retry.js';
 import { generateEventId } from '../utils/id.js';
 import type { PolicyEngine } from './policy-engine.js';
 
@@ -48,6 +50,7 @@ export class ActionEngine {
     intention: Intention,
     context: ActionContext
   ): Promise<ActionResult> {
+    await this.enforceAllowedTools(intention, context);
     await this.validatePolicy(intention, context);
 
     const startTime = Date.now();
@@ -62,9 +65,10 @@ export class ActionEngine {
         throw new Error('Tool name is required for tool_call intention');
       }
 
-      const result = await this.toolRegistry.executeTool(
+      const result = await this.executeWithRetry(
         intention.toolName,
-        intention.parameters || {}
+        intention.parameters || {},
+        context
       );
 
       // Record tool call usage in budget tracker
@@ -104,6 +108,52 @@ export class ActionEngine {
         intention.parameters
       );
     }
+  }
+
+  /** Denies tools outside the caller's allowlist, before any policy or execution. */
+  private async enforceAllowedTools(intention: Intention, context: ActionContext): Promise<void> {
+    if (!context.allowedTools || context.allowedTools.includes(intention.toolName ?? '')) {
+      return;
+    }
+    const reason = `tool "${intention.toolName}" is not available to this caller`;
+    await this.logEvent(context, 'policy.violated', {
+      intention,
+      reason,
+      violatedPolicies: ['allowed-tools'],
+    });
+    throw new PolicyViolationError('allowed-tools', intention, reason);
+  }
+
+  /** Executes a tool, retrying tool errors when the tool declares a retry policy. */
+  private async executeWithRetry(
+    toolName: string,
+    parameters: Record<string, unknown>,
+    context: ActionContext
+  ): Promise<ToolResult> {
+    const execute = () => this.toolRegistry.executeTool(toolName, parameters);
+    const retry = this.toolRegistry.getTool(toolName)?.retry;
+    if (!retry || retry.maxRetries <= 0) {
+      return await execute();
+    }
+    return await withRetry(
+      execute,
+      {
+        maxRetries: retry.maxRetries,
+        initialDelayMs: retry.initialDelayMs ?? 200,
+        maxDelayMs: retry.maxDelayMs ?? 5_000,
+        retryOn: (error) => error instanceof ToolExecutionError,
+      },
+      {
+        ...(context.abortSignal ? { signal: context.abortSignal } : {}),
+        onRetry: (info) =>
+          this.logEvent(context, 'tool.retry', {
+            toolName,
+            retry: info.retry,
+            delayMs: info.delayMs,
+            error: info.error instanceof Error ? info.error.message : String(info.error),
+          }),
+      }
+    );
   }
 
   private async validatePolicy(intention: Intention, context: ActionContext): Promise<void> {
@@ -155,19 +205,18 @@ export class ActionEngine {
           });
           // Approval granted, continue execution
           return;
-        } else {
-          await this.logEvent(context, 'approval.rejected', {
-            approvalId,
-            intention,
-            policyId: validation.violatedPolicies?.[0],
-          });
-          // Approval rejected, throw error
-          throw new PolicyViolationError(
-            validation.violatedPolicies?.[0] || 'unknown',
-            intention,
-            validation.reason || 'Approval rejected'
-          );
         }
+        await this.logEvent(context, 'approval.rejected', {
+          approvalId,
+          intention,
+          policyId: validation.violatedPolicies?.[0],
+        });
+        // Approval rejected, throw error
+        throw new PolicyViolationError(
+          validation.violatedPolicies?.[0] || 'unknown',
+          intention,
+          validation.reason || 'Approval rejected'
+        );
       }
 
       // No approval manager or not requires approval - treat as violation

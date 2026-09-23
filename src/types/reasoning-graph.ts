@@ -1,4 +1,11 @@
-export type ReasoningNodeType = 'intention' | 'action' | 'tool' | 'policy' | 'decision' | 'start' | 'end';
+export type ReasoningNodeType =
+  | 'intention'
+  | 'action'
+  | 'tool'
+  | 'policy'
+  | 'decision'
+  | 'start'
+  | 'end';
 
 export interface ReasoningNode {
   id: string;
@@ -57,4 +64,3 @@ export interface ReasoningGraph {
     totalPolicies?: number;
   };
 }
-

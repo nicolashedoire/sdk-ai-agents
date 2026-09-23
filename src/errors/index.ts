@@ -53,13 +53,18 @@ export class ToolNotFoundError extends SDKError {
 }
 
 export class LLMProviderError extends SDKError {
+  /** Set by providers that recognize a connection failure or timeout of their vendor SDK. */
+  public connectionFailure?: boolean;
+
   constructor(
     public provider: string,
     public originalError: Error,
-    public retryable = true
+    public retryable = true,
+    options: { connectionFailure?: boolean } = {}
   ) {
     super(`LLM provider error: ${provider}`, 'LLM_ERROR', originalError);
     this.name = 'LLMProviderError';
+    this.connectionFailure = options.connectionFailure;
   }
 }
 
@@ -70,5 +75,56 @@ export class EventStoreError extends SDKError {
   ) {
     super(`Event store error: ${operation}`, 'EVENT_STORE_ERROR', originalError);
     this.name = 'EventStoreError';
+  }
+}
+
+export class DecisionClientError extends SDKError {
+  public status?: number;
+  public retryable: boolean;
+
+  constructor(
+    public client: string,
+    public detail: string,
+    options: { status?: number; retryable: boolean; originalError?: Error }
+  ) {
+    super(`Decision client error (${client}): ${detail}`, 'DECISION_ERROR', options.originalError);
+    this.name = 'DecisionClientError';
+    this.status = options.status;
+    this.retryable = options.retryable;
+  }
+}
+
+export interface ModelUsage {
+  promptTokens: number;
+  completionTokens: number;
+  /** Number of model calls behind this usage (repairs included). */
+  calls: number;
+}
+
+export class ThoughtGenerationError extends SDKError {
+  /** Tokens consumed by the failed attempts, so they can still be priced. */
+  public usage?: ModelUsage;
+  public model?: string;
+  public requestedModel?: string;
+
+  constructor(
+    public operation: string,
+    public detail: string,
+    options: {
+      originalError?: Error;
+      usage?: ModelUsage;
+      model?: string;
+      requestedModel?: string;
+    } = {}
+  ) {
+    super(
+      `Thought generation failed (${operation}): ${detail}`,
+      'THOUGHT_ERROR',
+      options.originalError
+    );
+    this.name = 'ThoughtGenerationError';
+    this.usage = options.usage;
+    this.model = options.model;
+    this.requestedModel = options.requestedModel;
   }
 }

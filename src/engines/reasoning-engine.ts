@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import { LLMProviderError } from '../errors/index.js';
-import type { LLMProvider } from '../providers/llm-provider.js';
+import type { LLMProvider, LLMResponse } from '../providers/llm-provider.js';
 import { FallbackProvider } from '../providers/fallback-provider.js';
 import type { ProviderSettings } from '../types/agent.js';
 import type { IEventStore } from '../stores/event-store.js';
@@ -69,11 +69,15 @@ export class ReasoningEngine {
       const messages = this.buildMessages(context);
       const tools = this.buildToolsSchema(context.availableTools);
       const model = context.model || this.model;
-      
+
       // Check if provider is a FallbackProvider
-      let response;
-      let fallbackInfo: { usedProvider: string; wasFallback: boolean; attemptedProviders: string[] } | null = null;
-      
+      let response: LLMResponse;
+      let fallbackInfo: {
+        usedProvider: string;
+        wasFallback: boolean;
+        attemptedProviders: string[];
+      } | null = null;
+
       // Resolve temperature and maxTokens for regular providers
       // For FallbackProvider, pass providerSettings and let it resolve per provider
       let temperature: number | undefined;
@@ -86,8 +90,9 @@ export class ReasoningEngine {
         // Also pass direct temperature/maxTokens as fallback
         temperature = context.temperature;
         maxTokens = context.maxTokens;
-        
+
         const result = await this.provider.generateCompletionWithFallback({
+          runId: context.runId,
           model,
           messages,
           tools,
@@ -102,7 +107,7 @@ export class ReasoningEngine {
           wasFallback: result.wasFallback,
           attemptedProviders: result.attemptedProviders,
         };
-        
+
         // Log fallback event if fallback was used
         if (result.wasFallback) {
           await this.logFallbackEvent(context, eventStore, fallbackInfo);
@@ -114,10 +119,12 @@ export class ReasoningEngine {
           providerName,
           context.providerSettings
         );
-        temperature = resolvedSettings.temperature ?? context.temperature ?? DEFAULT_LLM_TEMPERATURE;
+        temperature =
+          resolvedSettings.temperature ?? context.temperature ?? DEFAULT_LLM_TEMPERATURE;
         maxTokens = resolvedSettings.maxTokens ?? context.maxTokens;
-        
+
         response = await this.provider.generateCompletion({
+          runId: context.runId,
           model,
           messages,
           tools,
@@ -127,7 +134,7 @@ export class ReasoningEngine {
         });
       }
 
-      await this.logIntentionGenerated(context, eventStore, response);
+      await this.logIntentionGenerated(context, eventStore, { ...response, requestedModel: model });
 
       return this.parseIntention(response);
     } catch (error) {
@@ -137,7 +144,11 @@ export class ReasoningEngine {
       if (error instanceof LLMProviderError) {
         throw error;
       }
-      throw new LLMProviderError(this.provider.getProviderName(), error instanceof Error ? error : new Error(String(error)), true);
+      throw new LLMProviderError(
+        this.provider.getProviderName(),
+        error instanceof Error ? error : new Error(String(error)),
+        true
+      );
     }
   }
 
@@ -154,11 +165,12 @@ export class ReasoningEngine {
     }
 
     const defaultSettings = providerSettings.default || {};
-    const providerSpecificSettings = providerName === 'openai'
-      ? providerSettings.openai
-      : providerName === 'anthropic'
-      ? providerSettings.anthropic
-      : undefined;
+    const providerSpecificSettings =
+      providerName === 'openai'
+        ? providerSettings.openai
+        : providerName === 'anthropic'
+          ? providerSettings.anthropic
+          : undefined;
 
     return {
       temperature: providerSpecificSettings?.temperature ?? defaultSettings.temperature,
@@ -190,7 +202,13 @@ export class ReasoningEngine {
   private async logIntentionGenerated(
     context: ReasoningContext,
     eventStore: IEventStore,
-    response: { content: string | null; toolCalls?: Array<{ function: { name: string; arguments: string } }> }
+    response: {
+      content: string | null;
+      toolCalls?: Array<{ function: { name: string; arguments: string } }>;
+      model?: string;
+      requestedModel?: string;
+      usage?: LLMResponse['usage'];
+    }
   ): Promise<void> {
     await eventStore.append(context.runId, {
       id: generateEventId(),
@@ -205,6 +223,9 @@ export class ReasoningEngine {
             arguments: tc.function.arguments,
           },
         })),
+        ...(response.model ? { model: response.model } : {}),
+        ...(response.requestedModel ? { requestedModel: response.requestedModel } : {}),
+        ...(response.usage ? { usage: response.usage } : {}),
       },
       metadata: {
         agentId: context.agentId,
@@ -294,7 +315,7 @@ export class ReasoningEngine {
       function: {
         name: tool.name,
         description: tool.description,
-        parameters: this.zodSchemaToJsonSchema(tool.schema),
+        parameters: tool.inputJsonSchema ?? this.zodSchemaToJsonSchema(tool.schema),
       },
     }));
   }

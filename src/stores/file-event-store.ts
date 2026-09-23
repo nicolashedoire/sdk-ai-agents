@@ -3,10 +3,12 @@ import { join } from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import type { Event, EventFilters, EventLog } from '../types/events.js';
 import type { IEventStore } from './event-store.js';
+import { deriveRunStatus } from '../utils/run-status.js';
 
 export class FileEventStore implements IEventStore {
   private eventsDir: string;
   private pendingEvents: Map<string, Event[]> = new Map();
+  private flushChains: Map<string, Promise<void>> = new Map();
   private flushInterval: NodeJS.Timeout | null = null;
   private readonly FLUSH_INTERVAL_MS = 100;
   private readonly FLUSH_THRESHOLD = 10;
@@ -90,6 +92,8 @@ export class FileEventStore implements IEventStore {
 
   async getRunIds(filters?: { since?: number; until?: number }): Promise<string[]> {
     try {
+      // Runs whose events are still buffered would otherwise be missing from the listing.
+      await this.flush();
       const files = await fs.readdir(this.eventsDir);
       const runIds: string[] = [];
 
@@ -160,16 +164,44 @@ export class FileEventStore implements IEventStore {
     await Promise.all(runIds.map((runId) => this.flushRun(runId)));
   }
 
-  private async flushRun(runId: string): Promise<void> {
+  /**
+   * Flushes are serialized per run: two concurrent flushes would otherwise both read the
+   * file and write it back, duplicating or losing events.
+   */
+  private flushRun(runId: string): Promise<void> {
+    const previous = this.flushChains.get(runId) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(() => this.writePending(runId));
+    this.flushChains.set(runId, next);
+    void next
+      .finally(() => {
+        if (this.flushChains.get(runId) === next) {
+          this.flushChains.delete(runId);
+        }
+      })
+      .catch(() => undefined);
+    return next;
+  }
+
+  private async writePending(runId: string): Promise<void> {
     const pending = this.pendingEvents.get(runId);
     if (!pending || pending.length === 0) return;
 
+    // Take the batch before any I/O: events appended meanwhile stay pending.
+    const batch = pending.splice(0);
     const filePath = this.getEventFilePath(runId);
-    const existingEvents = await this.loadExistingEvents(filePath);
-    const allEvents = [...existingEvents, ...pending];
-
-    await fs.writeFile(filePath, JSON.stringify(allEvents, null, 2), 'utf-8');
-    this.pendingEvents.set(runId, []);
+    try {
+      const existingEvents = await this.loadExistingEvents(filePath);
+      const temporaryPath = `${filePath}.${uuidv4()}.tmp`;
+      await fs.writeFile(
+        temporaryPath,
+        JSON.stringify([...existingEvents, ...batch], null, 2),
+        'utf-8'
+      );
+      await fs.rename(temporaryPath, filePath);
+    } catch (error) {
+      pending.unshift(...batch);
+      throw error;
+    }
   }
 
   private async loadExistingEvents(filePath: string): Promise<Event[]> {
@@ -218,19 +250,19 @@ export class FileEventStore implements IEventStore {
   private getStatusFromEvents(
     events: Event[]
   ): 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' {
-    const lastEvent = events[events.length - 1];
-    if (lastEvent.type === 'run.completed') return 'completed';
-    if (lastEvent.type === 'run.failed') return 'failed';
-    if (lastEvent.type === 'run.cancelled') return 'cancelled';
-    if (events.some((e) => e.type === 'run.started')) return 'running';
-    return 'pending';
+    return deriveRunStatus(events);
   }
 
-  destroy(): void {
+  /** Stops the periodic flush and writes pending events. Await it before deleting the directory. */
+  async destroy(): Promise<void> {
     if (this.flushInterval) {
       clearInterval(this.flushInterval);
       this.flushInterval = null;
     }
-    this.flush().catch((error) => this.handleError('Failed to flush events on destroy', error));
+    try {
+      await this.flush();
+    } catch (error) {
+      this.handleError('Failed to flush events on destroy', error);
+    }
   }
 }

@@ -1,6 +1,10 @@
 import type { Trace } from '../types/sdk.js';
 import type { Event, EventType } from '../types/events.js';
-import type { ValidationOptions, ValidationResult, ValidationDifference } from '../types/validation.js';
+import type {
+  ValidationOptions,
+  ValidationResult,
+  ValidationDifference,
+} from '../types/validation.js';
 
 export class TraceValidator {
   static validate(
@@ -10,9 +14,9 @@ export class TraceValidator {
     options: ValidationOptions = {}
   ): ValidationResult {
     const differences: ValidationDifference[] = [];
-    
-    const expectedEvents = this.filterEvents(expectedTrace.events, options);
-    const actualEvents = this.filterEvents(actualTrace.events, options);
+
+    const expectedEvents = TraceValidator.filterEvents(expectedTrace.events, options);
+    const actualEvents = TraceValidator.filterEvents(actualTrace.events, options);
 
     const eventMap = new Map<string, Event>();
     expectedEvents.forEach((event) => {
@@ -35,7 +39,7 @@ export class TraceValidator {
           details: `Event ${expectedEvent.id} (${expectedEvent.type}) was expected but not found in actual trace`,
         });
       } else {
-        const diff = this.compareEvents(expectedEvent, actualEvent, options);
+        const diff = TraceValidator.compareEvents(expectedEvent, actualEvent, options);
         if (diff) {
           differences.push(diff);
         }
@@ -53,14 +57,14 @@ export class TraceValidator {
       });
     }
 
-    const orderDiff = this.checkEventOrder(expectedEvents, actualEvents, options);
+    const orderDiff = TraceValidator.checkEventOrder(expectedEvents, actualEvents, options);
     if (orderDiff) {
       differences.push(orderDiff);
     }
 
-    const metrics = this.calculateMetrics(expectedTrace, actualTrace);
-    const status = this.determineStatus(differences, options);
-    const summary = this.generateSummary(status, differences, metrics);
+    const metrics = TraceValidator.calculateMetrics(expectedTrace, actualTrace);
+    const status = TraceValidator.determineStatus(differences, options);
+    const summary = TraceValidator.generateSummary(status, differences, metrics);
 
     return {
       status,
@@ -75,8 +79,9 @@ export class TraceValidator {
   private static filterEvents(events: Event[], options: ValidationOptions): Event[] {
     let filtered = [...events];
 
-    if (options.ignoreEventTypes && options.ignoreEventTypes.length > 0) {
-      filtered = filtered.filter((e) => !options.ignoreEventTypes!.includes(e.type));
+    const ignored = options.ignoreEventTypes;
+    if (ignored && ignored.length > 0) {
+      filtered = filtered.filter((e) => !ignored.includes(e.type));
     }
 
     if (options.validateAspects && options.validateAspects.length > 0) {
@@ -130,18 +135,20 @@ export class TraceValidator {
       }
     }
 
-    if (!options.compareStructureOnly) {
-      const dataDiff = this.compareData(expected.data, actual.data, options);
-      if (dataDiff) {
-        return {
-          type: 'event_modified',
-          eventId: expected.id,
-          eventType: expected.type,
-          expected,
-          actual,
-          details: `Data mismatch: ${dataDiff}`,
-        };
-      }
+    // In structure-only mode, value differences are still reported (and yield a `partial`
+    // status) so that a run whose values changed never passes as identical.
+    const dataDiff = TraceValidator.compareData(expected.data, actual.data, options);
+    if (dataDiff) {
+      return {
+        type: 'event_modified',
+        eventId: expected.id,
+        eventType: expected.type,
+        expected,
+        actual,
+        details: options.compareStructureOnly
+          ? `Data differs (structure-only comparison): ${dataDiff}`
+          : `Data mismatch: ${dataDiff}`,
+      };
     }
 
     return null;
@@ -160,7 +167,12 @@ export class TraceValidator {
       return `Type mismatch: expected ${typeof expected}, got ${typeof actual}`;
     }
 
-    if (expected === null || actual === null || typeof expected !== 'object' || typeof actual !== 'object') {
+    if (
+      expected === null ||
+      actual === null ||
+      typeof expected !== 'object' ||
+      typeof actual !== 'object'
+    ) {
       return expected !== actual ? 'Value mismatch' : null;
     }
 
@@ -173,7 +185,7 @@ export class TraceValidator {
         return `Array length mismatch: expected ${expected.length}, got ${actual.length}`;
       }
       for (let i = 0; i < expected.length; i++) {
-        const diff = this.compareData(expected[i], actual[i], options);
+        const diff = TraceValidator.compareData(expected[i], actual[i], options);
         if (diff) {
           return `Array[${i}]: ${diff}`;
         }
@@ -196,7 +208,7 @@ export class TraceValidator {
       if (!(key in actualObj)) {
         return `Missing key: ${key}`;
       }
-      const diff = this.compareData(expectedObj[key], actualObj[key], options);
+      const diff = TraceValidator.compareData(expectedObj[key], actualObj[key], options);
       if (diff) {
         return `${key}: ${diff}`;
       }
@@ -284,10 +296,13 @@ export class TraceValidator {
 
     if (differences.length > 0) {
       parts.push(`Found ${differences.length} difference(s)`);
-      const byType = differences.reduce((acc, d) => {
-        acc[d.type] = (acc[d.type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const byType = differences.reduce(
+        (acc, d) => {
+          acc[d.type] = (acc[d.type] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>
+      );
       parts.push(
         Object.entries(byType)
           .map(([type, count]) => `${count} ${type}`)
@@ -308,7 +323,9 @@ export class TraceValidator {
       );
     }
     if (metrics.actionsExecuted.expected !== metrics.actionsExecuted.actual) {
-      metricDiffs.push(`actions: ${metrics.actionsExecuted.expected} → ${metrics.actionsExecuted.actual}`);
+      metricDiffs.push(
+        `actions: ${metrics.actionsExecuted.expected} → ${metrics.actionsExecuted.actual}`
+      );
     }
 
     if (metricDiffs.length > 0) {
@@ -318,4 +335,3 @@ export class TraceValidator {
     return parts.join('. ');
   }
 }
-
