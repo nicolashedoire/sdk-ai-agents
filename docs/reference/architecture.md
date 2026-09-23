@@ -14,14 +14,16 @@ Version 0.2 adds a reasoning layer on top of the governed runtime described belo
 | `OperationPerformer` | `src/cognition/operation-performer.ts` | Dispatches to the thought generator, the information seeker, the prediction tester or the assessor |
 | Patch admission | `src/cognition/patch-admission.ts`, `thought-fields.ts`, `thought-patch.ts` | Single entry of every thought: fields allowed per operation, engine-only fields, decision settlement |
 | Evidence | `src/cognition/observation-records.ts`, `evidence-transitions.ts`, `contradiction-transitions.ts` | Observation provenance, fact revisions, comparisons, test results, contradictions and their resolutions |
-| State view | `src/cognition/mental-state-view.ts` | Compact view of the state for prompts, controllers and datasets: readiness, ranking, experiments already run |
+| State view | `src/cognition/mental-state-view.ts` | Compact view of the state for thought prompts and controller datasets: readiness, ranking, experiments already run |
 | `PredictionTester` | `src/cognition/outcome-evaluator.ts` | Runs your `OutcomeEvaluator` on a pending prediction and records the report |
 | Conclusion guard | `src/cognition/decision-readiness.ts` | Ranking, readiness check, committed / provisional / abstain |
 | `LLMThoughtGenerator` | `src/cognition/llm-thought-generator.ts`, `thought-prompts.ts` | One prompt per operation, strict JSON, Zod validation, one repair |
 | `InformationSeeker` | `src/cognition/information-seeker.ts` | Tool selection with the native reasoning engine, execution through the action engine |
 | Reducer | `src/cognition/mental-state-reducer.ts`, `hypothesis-transitions.ts` | Pure, deterministic application of thought patches with invariants, versioned by `schemaVersion` |
 | Replay | `src/cognition/mental-state-replay.ts` | Mental state rebuild and controller dataset from events |
-| Profiles | `src/cognition/thinker-profile.ts`, `profile-distiller.ts` | Profile schema, rendering, refinement, distillation |
+| Profiles | `src/cognition/thinker-profile.ts`, `profile-distiller.ts`, `profile-learning.ts` | Profile schema, rendering, refinement, distillation |
+| Assessors | `src/cognition/hypothesis-assessor.ts` | `compare` with typed decisions: evidence asked without the thinker, fit asked for proposals only |
+| Recorder & factory | `src/cognition/cognitive-run-recorder.ts`, `create-cognitive-agent.ts` | Event shapes of a cognitive run; assembly of an agent from its configuration and the SDK services |
 
 Around it: `src/decisions` (typed decisions, Jev client, decision service), `src/costs` (pricing and run costs), `src/resilience` (retry policy and retrying provider), `src/incidents` (rules, notifiers, monitored event store) and `src/mcp` (server and client, published as `@sdk-ai-agents/core/mcp`).
 

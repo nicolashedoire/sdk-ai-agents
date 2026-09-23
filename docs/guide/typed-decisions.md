@@ -21,7 +21,7 @@ const sdk = createSDK({
 
 | Option | Default | |
 | --- | --- | --- |
-| `apiKey` | — | Required for `api.typesafe.ai`; optional for a custom `baseUrl` |
+| `apiKey` | — | A TypeSafe key for `api.typesafe.ai`, or an AI Gateway key for the gateway (see below); optional for a keyless self-hosted clone |
 | `baseUrl` | `https://api.typesafe.ai` | Any server exposing `POST /v1/systemone` |
 | `model` | `jev-latest` | Pin a versioned id to freeze behavior |
 | `timeoutMs` | `30000` | Per attempt |

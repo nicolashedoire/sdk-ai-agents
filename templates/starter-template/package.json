@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@sdk-ai-agents/core": "github:nicolashedoire/sdk-ai-agents",
-    "zod": "^3.25.0"
+    "zod": "^3.25.28"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.7.0",
