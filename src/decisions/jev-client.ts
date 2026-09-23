@@ -13,7 +13,10 @@ import { defaultFetch, parseRetryAfter, type FetchLike } from '../utils/http.js'
 export type { FetchLike, HttpResponseLike } from '../utils/http.js';
 
 export interface JevClientConfig {
-  /** TypeSafe API key. Optional only when `baseUrl` points to a self-hosted, keyless clone. */
+  /**
+   * TypeSafe API key, or a Vercel AI Gateway key when `baseUrl` is the gateway's TypeSafe
+   * endpoint. Optional only when `baseUrl` points to a self-hosted, keyless clone.
+   */
   apiKey?: string;
   /** Defaults to `https://api.typesafe.ai`. Any server exposing `POST /v1/systemone` works. */
   baseUrl?: string;
