@@ -16,11 +16,12 @@ export type PricingTable = Record<string, ModelPrice>;
 
 /**
  * Jev bills input tokens only: $0.042 per million (docs.typesafe.ai/models, checked
- * 2026-09-23). LLM prices change often and depend on contracts, so they are left to the
- * configuration instead of being hard-coded.
+ * 2026-09-23), the same through Vercel AI Gateway (`typesafe-ai/jev`). LLM prices change
+ * often and depend on contracts, so they are left to the configuration.
  */
 export const DEFAULT_PRICING: PricingTable = {
   'jev-*': { inputPerMillion: 0.042, outputPerMillion: 0 },
+  'typesafe-ai/jev*': { inputPerMillion: 0.042, outputPerMillion: 0 },
 };
 
 /**

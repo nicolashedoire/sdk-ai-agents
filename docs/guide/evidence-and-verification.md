@@ -70,7 +70,7 @@ A hypothesis states what kind of claim it is, how it was inferred and what it re
 
 ## Predictions and the outcome evaluator
 
-`simulate` deduces **predictions** that could fail: what should be observed (`expected`), which observation would prove the hypothesis wrong (`falsifier`), in which `context`, and the structured `test` parameters an evaluator needs. A prediction is recorded **before** it is tested, and tested once.
+`simulate` deduces **predictions** that could fail: what should be observed (`expected`), which observation would prove the hypothesis wrong (`falsifier`), in which `context`, and the structured `test` parameters an evaluator needs. A prediction is recorded **before** it is tested, and tested once. The model sees the experiments already run and their results (`experiments` in the state view) and is asked not to repeat one, but to choose a test on which the hypotheses in play disagree.
 
 An `OutcomeEvaluator` confronts it with the world — a simulator, a measurement, a test suite, a query:
 
@@ -159,7 +159,7 @@ The run status stays `completed`: an explicit abstention is a valid outcome. A d
 
 ## A budget that is not wasted
 
-A step that changed nothing it was meant to change — no new hypothesis (all proposals refused), nothing newly simulated or critiqued, no comparison recorded — a comparison that skips a hypothesis, and a deferred decision all count as failed attempts of their operation. When `compare_observations`, `hypothesize`, `simulate`, `revise`, `critique`, `compare` or `decide` failed twice in a row, it is no longer offered **until another step brings new evidence** — a step that succeeded, or a tool or test result the engine recorded; what failing steps wrote themselves does not count — so the run moves on instead of repeating itself (`seek_information` has its own limit per unknown, `test_prediction` its test budget).
+A step that changed nothing it was meant to change — no new hypothesis (all proposals refused), nothing newly simulated or critiqued, no comparison recorded — a comparison that skips a hypothesis, and a deferred decision all count as failed attempts of their operation. When `compare_observations`, `hypothesize`, `simulate`, `revise`, `critique`, `seek_information`, `compare` or `decide` failed twice in a row, it is no longer offered **until another step brings new evidence** — a step that succeeded, or a tool or test result the engine recorded; what failing steps wrote themselves does not count — so the run moves on instead of repeating itself. A `seek_information` that brings no observation (no tool fits, or the call fails) counts as such a failure; `test_prediction` is bounded by its test budget.
 
 `limits.maxConsecutiveFailures` counts failures of the model or its tools, including a comparison that still skips a hypothesis after repair. Deferred decisions and steps that changed nothing are recorded as failed steps but never count toward it. Components (thought generator, assessor, evaluator) receive a copy of the state: they cannot alter what is recorded, and an invalid thought from a custom component is recorded as a failed operation instead of stopping the run.
 

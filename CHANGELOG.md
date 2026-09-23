@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Tool parameter schemas sent to LLMs and MCP clients kept only property types: enum values, descriptions, nested objects and array items were lost, so models invented arguments (seen with a real model inventing a metric name). They are now converted with `zod-to-json-schema` (new dependency).
+- A `seek_information` step that brings no observation counts as a failed attempt: after two in a row, the operation waits for new evidence instead of spending the budget on tools that cannot answer.
+- The model sees the experiments already run and their results, and is asked for untested, discriminating tests: with a real model, runs stopped repeating the same experiment.
+- Jev reached through Vercel AI Gateway (`typesafe-ai/jev`) is priced by default; the typed decisions guide and the cognitive example show how to use an AI Gateway key.
 - A 429 meaning the account is out of credit or quota (`insufficient_quota`, `credit_balance_exhausted`, billing limits) is no longer retried: it failed only after useless waits. Found with a real OpenAI key.
 - `LLMProviderError` messages include the vendor's message (`LLM provider error: openai: 429 You have no credits remaining…`), with any API key fragment masked (`redactApiKeys`), and a cognitive run that stops after consecutive failures says what the last one was.
 

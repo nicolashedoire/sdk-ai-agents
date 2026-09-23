@@ -24,6 +24,7 @@
     "src/__tests__/rule-discovery.test.ts",
     "src/__tests__/sdk-cognition.test.ts",
     "src/__tests__/sdk-golden-traces.test.ts",
+    "src/__tests__/zod-to-json-schema.test.ts",
     "examples/cognitive-agent.ts",
     "examples/mcp-server.ts",
     "examples/rule-discovery.ts"

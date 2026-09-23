@@ -117,6 +117,8 @@ describe('run costs', () => {
     const pricing = { ...DEFAULT_PRICING, 'gpt-*': { inputPerMillion: 1, outputPerMillion: 1 }, 'gpt-5*': { inputPerMillion: 2, outputPerMillion: 8 } };
     expect(findModelPrice(pricing, 'gpt-5-mini')).toEqual({ inputPerMillion: 2, outputPerMillion: 8 });
     expect(findModelPrice(pricing, 'claude-x')).toBeUndefined();
+    // Jev reached through Vercel AI Gateway is priced like Jev.
+    expect(findModelPrice(DEFAULT_PRICING, 'typesafe-ai/jev')).toEqual({ inputPerMillion: 0.042, outputPerMillion: 0 });
 
     const report = computeRunCost(
       'run_1',

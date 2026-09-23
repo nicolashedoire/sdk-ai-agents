@@ -134,6 +134,24 @@ describe('attempts that unlock themselves', () => {
     expect(availableOperations(state, context)).not.toContain('critique');
   });
 
+  it('stop seeking information when no tool can answer, until new evidence arrives', () => {
+    let state = think(critiqued(), 'represent', { summary: 'r', addUnknowns: [{ question: 'What would buying cost?' }, { question: 'Which features?' }] }).state;
+    const seeking = { maxHypotheses: 3, canSeekInformation: true };
+    expect(availableOperations(state, seeking)).toContain('seek_information');
+    for (const unknownId of ['U1', 'U2']) {
+      const attempt = think(state, 'seek_information', {
+        summary: `No tool can answer ${unknownId}`,
+        investigatedUnknownId: unknownId,
+        addFailures: [{ description: `No tool selected for ${unknownId}` }],
+      });
+      expect(attempt.noEffect).toBe('seek_information brought no observation and settled no unknown');
+      state = attempt.state;
+    }
+    expect(availableOperations(state, seeking)).not.toContain('seek_information');
+    state = think(state, 'represent', { summary: 'new fact', addFacts: [{ statement: 'A quote arrived: 8k EUR', source: 'input' }] }).state;
+    expect(availableOperations(state, seeking)).toContain('seek_information');
+  });
+
   it('are unlocked by a tool result the engine recorded, even in a failed step', () => {
     let state = critiqued();
     for (let attempt = 0; attempt < 2; attempt++) {

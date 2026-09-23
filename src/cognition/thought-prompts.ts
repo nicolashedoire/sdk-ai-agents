@@ -61,6 +61,7 @@ function operationInstructions(
       return [
         `Simulate the hypotheses that have no simulation yet (${unsimulated.join(', ') || 'none'}): immediate effects first, then indirect and second-order effects, then the outcome and its side effects.`,
         'For rules and explanations, deduce predictions that could fail: what should be observed (expected), which observation would prove the hypothesis wrong (falsifier), in which context, and the structured parameters a test needs (test).',
+        'Choose tests whose outcome is not known yet: never repeat an entry of `experiments`, and prefer a test on which the hypotheses in play disagree.',
       ].join(' ');
     case 'revise':
       return reviseInstructions(state);
@@ -105,6 +106,7 @@ function reviseInstructions(state: MentalState): string {
     `Hypothesis ${target.id} ("${target.statement}") is contradicted by ${target.counterEvidenceRefs.join(', ') || 'a test'}${refuted.length > 0 ? `: ${refuted.join('; ')}` : ''}.`,
     `Compare the counterexample with what supported it (${target.premiseRefs.join(', ') || 'its premises'}) and identify what differs: a missing variable, a narrower scope or a different context.`,
     `Propose a variant with "parentId": "${target.id}" that restricts the scope or adds the variable, and state its "difference". Never restate the original.`,
+    'The variant must agree with every observation so far, confirmations included (see `experiments`); widen the search to conditions not tested yet rather than repeating a known experiment.',
     'Add unknowns for what must be tested next and resolve the contradictions the variant explains, citing the observations.',
   ].join(' ');
 }
