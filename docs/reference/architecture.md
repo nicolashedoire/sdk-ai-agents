@@ -22,8 +22,6 @@ Around it: `src/decisions` (typed decisions, Jev client, decision service), `src
 
 The rest of this page documents the governed runtime (v0.1).
 
-**Date:** 2026-01-06
-
 ## Executive Summary
 
 SDK_AI_Agents follows an event-sourcing architecture with strict separation between reasoning and action. The SDK hides internal complexity behind a simple, intuitive API.
@@ -438,6 +436,3 @@ const result = await agent.run({
 - Cloud event store (S3, etc.)
 - Monitoring dashboard
 
----
-
-_Generated using BMAD Method `document-project` workflow_

@@ -247,9 +247,9 @@ async function main() {
 
   console.log('✨ Complete example finished!');
   console.log('\n📚 For more information:');
-  console.log('   - Documentation: docs/CONCEPTS.md');
-  console.log('   - Quick Start: docs/QUICKSTART.md');
-  console.log('   - Architecture: _bmad-output/planning-artifacts/architecture.md');
+  console.log('   - Documentation: https://nicolashedoire.github.io/sdk-ai-agents/');
+  console.log('   - Concepts: docs/guide/concepts.md');
+  console.log('   - Architecture: docs/reference/architecture.md');
 }
 
 // Execution

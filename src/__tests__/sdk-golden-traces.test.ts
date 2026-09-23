@@ -1,47 +1,28 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { createSDK } from '../sdk.js';
-import { FileEventStore } from '../stores/file-event-store.js';
-import type { SDK } from '../types/sdk.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ScriptedLLMProvider } from './support/scripted-llm-provider.js';
+import { createTestSDK, type TestSDK } from './support/test-sdk.js';
 
 describe('SDK Golden Traces', () => {
-  let sdk: SDK;
-  let eventStore: FileEventStore;
+  let env: TestSDK;
+  let sdk: TestSDK['sdk'];
   let agentId: string;
   let runId: string;
 
   beforeEach(async () => {
-    try {
-      await fs.rm('./test-events-golden', { recursive: true, force: true });
-      await fs.rm('./test-golden-traces', { recursive: true, force: true });
-    } catch {
-      // Ignore
-    }
+    // Offline run, stored in a throwaway directory.
+    env = createTestSDK({}, new ScriptedLLMProvider().always('default', { content: 'Hello!' }));
+    sdk = env.sdk;
 
-    eventStore = new FileEventStore('./test-events-golden');
-    sdk = createSDK({
-      apiKey: 'test-key',
-      eventStore,
-      goldenTracesDir: './test-golden-traces',
-    });
-
-    const agent = sdk.createAgent({
-      id: 'test-agent-golden',
-      name: 'Test Agent',
-      description: 'Test agent for golden traces',
-    });
+    const agent = sdk.createAgent({ name: 'Test Agent', model: 'test-model' });
     agentId = agent.id;
 
     const result = await agent.run({ message: 'Hello' });
+    expect(result.status).toBe('completed');
     runId = result.runId;
   });
 
   afterEach(async () => {
-    try {
-      await fs.rm('./test-events-golden', { recursive: true, force: true });
-      await fs.rm('./test-golden-traces', { recursive: true, force: true });
-    } catch {
-      // Ignore
-    }
+    await env.dispose();
   });
 
   it('should create a golden trace', async () => {

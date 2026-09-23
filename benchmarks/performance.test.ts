@@ -148,7 +148,7 @@ describe('Performance Benchmarks', () => {
 
 describe('Performance Criteria Validation', () => {
   it('should meet MVP performance criteria', () => {
-    // MVP criteria per BMAD:
+    // MVP performance criteria:
     // - SDK overhead: < 10ms per event
     // - Time-to-first-agent: < 30 minutes (measured manually)
     // - Intuitive API: < 10 lines for Quick Start (verified in docs)

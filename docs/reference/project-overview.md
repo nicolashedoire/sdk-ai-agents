@@ -1,6 +1,5 @@
 # Project overview
 
-**Date:** 2026-01-06
 **Type:** Library (TypeScript SDK)
 **Architecture:** Event-Sourcing with Separation of Concerns
 
@@ -143,25 +142,15 @@ npm run dev
 ## Repository Structure
 
 ```
-SDK_AI_Agents/
-├── src/                    # Main source code
-│   ├── agent.ts           # Agent implementation
-│   ├── sdk.ts             # SDK main implementation
-│   ├── engines/           # Core engines (reasoning, action, policy, replay)
-│   ├── stores/            # Event store implementations
-│   ├── providers/        # LLM provider implementations
-│   ├── managers/         # Manager classes (approval, budget, etc.)
-│   ├── registry/         # Registry classes (tool, capability)
-│   ├── types/            # TypeScript type definitions
-│   ├── utils/            # Utility functions
-│   ├── evaluators/       # Evaluator classes (condition)
-│   └── errors/           # Error classes
-├── dist/                  # Compiled output
-├── docs/                  # Documentation
-├── examples/              # Example code
-├── _bmad-output/          # BMAD workflow outputs
-└── demo/                  # Next.js demo application
+sdk-ai-agents/
+├── src/                    # SDK source (cognition, decisions, engines, stores, providers, mcp…)
+├── benchmarks/             # Performance tests
+├── docs/                   # Documentation (VitePress)
+├── examples/               # Runnable examples
+└── templates/              # Starter project
 ```
+
+See [Source tree](../contributing/source-tree) for the detail of `src/`.
 
 ## Documentation Map
 
@@ -172,6 +161,3 @@ For detailed information, see:
 - [Architecture](./architecture) - Detailed architecture
 - [Development guide](../contributing/development) - Development workflow
 
----
-
-_Generated using BMAD Method `document-project` workflow_

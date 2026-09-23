@@ -11,7 +11,6 @@ export default withMermaid(
     base: '/sdk-ai-agents/',
     cleanUrls: true,
     lastUpdated: true,
-    srcExclude: ['project-scan-report.json'],
     head: [
       ['link', { rel: 'icon', type: 'image/svg+xml', href: '/sdk-ai-agents/logo.svg' }],
       ['meta', { name: 'theme-color', content: '#4F46E5' }],
