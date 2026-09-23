@@ -33,7 +33,7 @@ const sdk = createSDK({
 | `jitter` | `true` | Randomizes each wait in [delay/2, delay] |
 | `retryOn` | `isTransientError` | Your own predicate |
 
-Only **transient** errors are retried: 408, 409, 425, 429, 5xx, 529, connection failures and timeouts — including the OpenAI and Anthropic connection errors, recognized by class and by the network code on their `cause`. Authentication, validation and policy errors fail immediately. When the provider sends `retry-after-ms` or `retry-after`, the SDK waits that long instead of its own backoff, up to `maxRetryAfterMs` (60 s by default). When `fallbackProviders` are configured, that bound is lowered to `maxDelayMs`: a provider asking for a long pause is left for the fallback instead of blocking the run. A longer request ends the retries.
+Only **transient** errors are retried: 408, 409, 425, 429, 5xx, 529, connection failures and timeouts — including the OpenAI and Anthropic connection errors, recognized by class and by the network code on their `cause`. Authentication, validation and policy errors fail immediately, and so does a 429 that means the account is out of credit or quota (`insufficient_quota`, `credit_balance_exhausted`…): waiting would not bring credit back. The error message carries the vendor's explanation. When the provider sends `retry-after-ms` or `retry-after`, the SDK waits that long instead of its own backoff, up to `maxRetryAfterMs` (60 s by default). When `fallbackProviders` are configured, that bound is lowered to `maxDelayMs`: a provider asking for a long pause is left for the fallback instead of blocking the run. A longer request ends the retries.
 
 When the SDK policy is active, the OpenAI and Anthropic clients' own retries are disabled — **retries never stack**. Each retry is recorded as a `provider.retry` event with the provider, model, attempt, delay and error. Pass `retry: false` to keep the vendor defaults instead.
 
@@ -57,7 +57,7 @@ Only tool failures are retried — never a policy denial or a validation error. 
 
 ## Typed decisions
 
-The Jev client retries 408, 429, 5xx and 529 responses and network errors, **honoring `retry-after`**, with the SDK retry policy as default (`jev.maxRetries` overrides it).
+The Jev client retries 408, 429, 5xx and 529 responses and network errors, **honoring `retry-after`**, with the SDK retry policy as default (`jev.maxRetries` overrides it). Unlike the LLM providers, it retries every 429, whatever its cause, up to `maxRetries`.
 
 ## Anywhere else
 

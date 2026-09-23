@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- A 429 meaning the account is out of credit or quota (`insufficient_quota`, `credit_balance_exhausted`, billing limits) is no longer retried: it failed only after useless waits. Found with a real OpenAI key.
+- `LLMProviderError` messages include the vendor's message (`LLM provider error: openai: 429 You have no credits remaining…`), with any API key fragment masked (`redactApiKeys`), and a cognitive run that stops after consecutive failures says what the last one was.
+
 ### Added
 - **Evidence loop** (observe → compare → deduce → verify → revise) in cognitive agents, with three new operations:
   - `compare_observations` records similarities, differences, evolutions, incompatibilities and counterexamples;

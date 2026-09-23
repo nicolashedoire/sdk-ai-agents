@@ -219,7 +219,7 @@ describe('cognitive agent', () => {
 
     const result = await agent.think({ problem: PROBLEM });
 
-    expect(result).toMatchObject({ status: 'failed', error: expect.objectContaining({ message: '2 consecutive operations failed' }) });
+    expect(result).toMatchObject({ status: 'failed', error: expect.objectContaining({ message: '2 consecutive operations failed (last: model unavailable)' }) });
     expect((await env.sdk.getTrace(result.runId)).status).toBe('failed');
   });
 

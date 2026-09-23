@@ -68,6 +68,27 @@ describe('retry policy', () => {
     expect(isTransientError(new LLMProviderError('openai', new AuthenticationError(401, {}, 'bad key', {})))).toBe(false);
   });
 
+  it('does not retry an account out of credit, and says so', () => {
+    // What OpenAI returns when the balance is exhausted: a 429 that waiting cannot fix.
+    const message = 'You have no credits remaining. Add credits to continue using the API.';
+    const noCredit = new RateLimitError(429, { code: 'credit_balance_exhausted', type: 'insufficient_quota', message }, message, {});
+    const quota = new RateLimitError(429, { code: 'insufficient_quota', type: 'insufficient_quota', message: 'quota' }, 'quota', {});
+    expect(isTransientError(new LLMProviderError('openai', noCredit))).toBe(false);
+    expect(isTransientError(new LLMProviderError('openai', quota))).toBe(false);
+    expect(new LLMProviderError('openai', noCredit).message).toContain('You have no credits remaining');
+    // A real rate limit is still worth waiting for.
+    const busy = new RateLimitError(429, { code: 'rate_limit_exceeded', type: 'requests', message: 'slow down' }, 'slow down', {});
+    expect(isTransientError(new LLMProviderError('openai', busy))).toBe(true);
+  });
+
+  it('masks API keys the vendor echoes in its error message', () => {
+    const message = 'Incorrect API key provided: sk-proj-abcd****************wxyz. You can find your API key at …';
+    const invalid = new AuthenticationError(401, { message }, message, {});
+    const error = new LLMProviderError('openai', invalid);
+    expect(error.message).toContain('Incorrect API key provided: sk-*** You can find');
+    expect(error.message).not.toContain('wxyz');
+  });
+
   it('waits as long as the provider asks, and gives up when that exceeds the policy', async () => {
     const openaiLimit = new LLMProviderError('openai', new RateLimitError(429, {}, 'slow down', { 'retry-after-ms': '1500' }));
     const anthropicLimit = new Anthropic.RateLimitError(429, {}, 'slow down', new Headers({ 'retry-after': '4' }));
