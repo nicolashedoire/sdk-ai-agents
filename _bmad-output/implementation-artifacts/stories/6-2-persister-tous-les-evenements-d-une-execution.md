@@ -1,4 +1,4 @@
-# Story 6.2: Persister tous les événements d'une exécution
+# Story 6.2: Persist all events of an execution
 
 **Story ID:** 6.2  
 **Epic:** 6 - Event Sourcing & Persistence  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** système,
-**I want** persister tous les événements d'une exécution,
-**So that** l'historique complet est disponible pour replay et audit.
+**As a** system,
+**I want** persist all events of an execution,
+**So that** the complete history is available for replay and audit.
 
 ## Acceptance Criteria
 
-**Given** des événements sont générés pendant une exécution
-**When** un événement est créé
-**Then** l'événement est immédiatement persisté
-**And** la persistance est garantie même en cas d'erreur
-**And** aucun événement n'est perdu
-**And** la persistance est asynchrone pour ne pas bloquer l'exécution
+**Given** events are generated during an execution
+**When** an event is created
+**Then** the event is immediately persisted
+**And** persistence is guaranteed even in the event of an error
+**And** no event is lost
+**And** persistence is asynchronous so as not to block execution
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current state:**
+- Complete implementation in the codebase
+- Functionality tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files concerned:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Functionality implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Functionality validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested

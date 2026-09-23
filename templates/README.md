@@ -1,45 +1,43 @@
-# Templates SDK_AI_Agents
+# SDK_AI_Agents Templates
 
-Ce dossier contient des templates de projet pour démarrer rapidement avec SDK_AI_Agents.
+This folder contains project templates to quickly get started with SDK_AI_Agents.
 
-## Templates Disponibles
+## Available Templates
 
 ### starter-template
 
-Template de base pour créer un nouveau projet utilisant SDK_AI_Agents.
+Base template for starting a new project using SDK_AI_Agents.
 
-**Inclut :**
-- Structure de projet TypeScript complète
-- Configuration Biome (linter/formatter)
-- Configuration Vitest (tests)
-- Exemple d'agent fonctionnel
-- Tests unitaires de base
-- Documentation complète
+**Includes:**
+- Complete TypeScript project structure
+- Biome configuration (linter/formatter)
+- Vitest configuration (tests)
+- Working agent example
+- Basic unit tests
+- Complete documentation
 
-**Utilisation :**
+**Usage:**
 
 ```bash
-cp -r starter-template mon-nouveau-projet
-cd mon-nouveau-projet
+cp -r starter-template my-new-project
+cd my-new-project
 npm install
 cp ENV_TEMPLATE.txt .env
-# Éditez .env et ajoutez votre clé API
+# Edit .env and add your API key
 npm start
 ```
 
-Consultez [starter-template/USAGE.md](./starter-template/USAGE.md) pour plus de détails.
+See [starter-template/USAGE.md](./starter-template/USAGE.md) for more details.
 
-## Créer un Nouveau Template
+## Creating a New Template
 
-Pour créer un nouveau template :
+To create a new template:
 
-1. Créez un nouveau dossier dans `templates/`
-2. Ajoutez la structure de base
-3. Créez un fichier `USAGE.md` avec les instructions
-4. Documentez le template dans ce README
+1. Create a new folder in `templates/`
+2. Add the base structure
+3. Create a `USAGE.md` file with instructions
+4. Document the template in this README
 
 ## Contribution
 
-Les templates sont maintenus avec le SDK principal. Pour proposer un nouveau template ou améliorer un existant, ouvrez une issue ou une pull request.
-
-
+Templates are maintained alongside the main SDK. To propose a new template or improve an existing one, open an issue or a pull request.

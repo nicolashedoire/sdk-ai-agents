@@ -1,4 +1,4 @@
-# Story 1.4: Quick Start - Premier agent fonctionnel en < 30 minutes
+# Story 1.4: Quick Start - First functional agent in < 30 minutes
 
 **Story ID:** 1.4  
 **Epic:** 1 - Quick Start & SDK Foundation  
@@ -7,41 +7,41 @@
 
 ## User Story
 
-**As a** développeur,  
-**I want** créer mon premier agent fonctionnel en moins de 30 minutes,  
-**So that** je peux valider rapidement le concept et la valeur du SDK.
+**As a** developer,  
+**I want** to create my first functional agent in less than 30 minutes,  
+**So that** I can quickly validate the concept and the value of the SDK.
 
 ## Acceptance Criteria
 
-**Given** je suis un développeur nouveau sur le SDK  
-**When** je suis le Quick Start guide  
-**Then** je peux créer un agent fonctionnel en moins de 30 minutes  
-**And** le code nécessaire fait moins de 10 lignes  
-**And** l'agent peut exécuter au moins une action basique  
-**And** je comprends les concepts fondamentaux (agent, tool, run)
+**Given** I am a developer new to the SDK  
+**When** I follow the Quick Start guide  
+**Then** I can create a functional agent in less than 30 minutes  
+**And** the required code is fewer than 10 lines  
+**And** the agent can execute at least one basic action  
+**And** I understand the fundamental concepts (agent, tool, run)
 
 ## Business Value
 
-- **Adoption**: Time-to-value rapide (< 30 min)
-- **Simplicité**: Code minimal (< 10 lignes)
-- **Validation**: Concept validé rapidement
-- **Compréhension**: Concepts fondamentaux clairs
+- **Adoption**: Fast time-to-value (< 30 min)
+- **Simplicity**: Minimal code (< 10 lines)
+- **Validation**: Concept validated quickly
+- **Understanding**: Clear fundamental concepts
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Quick Start guide dans `docs/QUICKSTART.md`
-- Exemple minimal dans `examples/quick-start.ts`
-- Documentation des concepts dans `docs/CONCEPTS.md`
+**Current State:**
+- Quick Start guide in `docs/QUICKSTART.md`
+- Minimal example in `examples/quick-start.ts`
+- Concepts documentation in `docs/CONCEPTS.md`
 
-**Fichiers concernés:**
-- `docs/QUICKSTART.md` - Guide Quick Start
-- `examples/quick-start.ts` - Exemple minimal
-- `docs/CONCEPTS.md` - Concepts fondamentaux
+**Files Involved:**
+- `docs/QUICKSTART.md` - Quick Start guide
+- `examples/quick-start.ts` - Minimal example
+- `docs/CONCEPTS.md` - Fundamental concepts
 
-### Implémentation
+### Implementation
 
 **Quick Start Code:**
 ```typescript
@@ -53,29 +53,29 @@ const result = await agent.run({ input: 'Hello!' });
 ```
 
 **Documentation:**
-- Guide étape par étape
-- Exemples fonctionnels
-- Explication des concepts
+- Step-by-step guide
+- Functional examples
+- Explanation of the concepts
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Simplicité**: Code minimal
-2. **Clarté**: Documentation claire
-3. **Rapidité**: Time-to-value < 30 min
-4. **Compréhension**: Concepts expliqués
+1. **Simplicity**: Minimal code
+2. **Clarity**: Clear documentation
+3. **Speed**: Time-to-value < 30 min
+4. **Understanding**: Concepts explained
 
 ## Testing Requirements
 
-- ✅ Quick Start guide fonctionnel
-- ✅ Exemple exécutable
-- ✅ Code < 10 lignes
-- ✅ Concepts expliqués
+- ✅ Quick Start guide functional
+- ✅ Example executable
+- ✅ Code < 10 lines
+- ✅ Concepts explained
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète dans `docs/QUICKSTART.md` et `examples/quick-start.ts`
+**Implementation:** Complete in `docs/QUICKSTART.md` and `examples/quick-start.ts`
 
 

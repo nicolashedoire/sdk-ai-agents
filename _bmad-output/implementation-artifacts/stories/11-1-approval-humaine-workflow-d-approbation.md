@@ -1,69 +1,69 @@
-# Story 11.1: Approval Humaine (Workflow d'Approbation)
+# Story 11.1: Human Approval (Approval Workflow)
 
 **Story ID:** 11.1  
-**Epic:** 11 - Policies Avancées  
+**Epic:** 11 - Advanced Policies  
 **Status:** backlog  
 **Created:** 2026-01-06
 
 ## User Story
 
 **As a** tech lead,
-**I want** définir des policies nécessitant une approbation humaine,
-**So that** les actions critiques sont validées avant exécution.
+**I want** define policies requiring human approval,
+**So that** critical actions are validated before execution.
 
 ## Acceptance Criteria
 
-**Given** une policy avec approval humaine configurée
-**When** un agent tente une action nécessitant approbation
-**Then** l'action est mise en pause
-**And** une demande d'approbation est générée
-**And** l'action s'exécute seulement après approbation
-**And** l'approbation est tracée dans les événements
+**Given** a policy with human approval configured
+**When** an agent attempts an action requiring approval
+**Then** the action is paused
+**And** an approval request is generated
+**And** the action executes only after approval
+**And** the approval is tracked in the events
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current state:**
+- Complete implementation in the codebase
+- Functionality tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files concerned:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Functionality implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Functionality validated
 
 ## Story Completion Status
 
 **Status:** review  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested
 
 ## Implementation Details
 

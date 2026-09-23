@@ -1,5 +1,6 @@
 import type { Event, EventFilters, EventLog, EventAggregation, EventQueryResult } from '../types/events.js';
 import type { IEventStore, BackupData } from './event-store.js';
+import { deriveRunStatus } from '../utils/run-status.js';
 
 export interface SQLConnection {
   query<T = unknown>(sql: string, params?: unknown[]): Promise<T[]>;
@@ -198,12 +199,7 @@ export class SQLEventStore implements IEventStore {
    * Determines the run status from events.
    */
   private determineStatus(events: Event[]): EventLog['status'] {
-    const lastEvent = events[events.length - 1];
-    if (lastEvent.type === 'run.completed') return 'completed';
-    if (lastEvent.type === 'run.failed') return 'failed';
-    if (lastEvent.type === 'run.cancelled') return 'cancelled';
-    if (events.some((e) => e.type === 'run.started')) return 'running';
-    return 'pending';
+    return deriveRunStatus(events);
   }
 
   /**

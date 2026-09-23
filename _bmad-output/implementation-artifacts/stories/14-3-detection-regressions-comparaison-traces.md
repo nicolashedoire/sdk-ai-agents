@@ -1,4 +1,4 @@
-# Story 14.3: Détection de Régressions par Comparaison de Traces
+# Story 14.3: Regression Detection via Trace Comparison
 
 **Epic:** Epic 14 - Testing & Quality Assurance  
 **Status:** completed  
@@ -7,38 +7,38 @@
 
 ## Description
 
-Permettre à un développeur de détecter automatiquement des régressions en comparant une nouvelle trace avec une golden trace ou une trace de référence.
+Allow a developer to automatically detect regressions by comparing a new trace with a golden trace or a reference trace.
 
-## Contexte
+## Context
 
-La détection de régressions permet d'identifier automatiquement quand le comportement d'un agent change de manière inattendue, ce qui est crucial pour maintenir la qualité et la stabilité.
+Regression detection makes it possible to automatically identify when an agent's behavior changes unexpectedly, which is crucial for maintaining quality and stability.
 
 ## Acceptance Criteria
 
-### AC1: Détecter Régressions Automatiquement
-**Given** une golden trace existe et une nouvelle trace est générée  
-**When** un développeur appelle `sdk.detectRegressions(newRunId, goldenTraceId, options)`  
-**Then** un rapport de régression est retourné avec les différences identifiées et leur sévérité
+### AC1: Automatically Detect Regressions
+**Given** a golden trace exists and a new trace is generated  
+**When** a developer calls `sdk.detectRegressions(newRunId, goldenTraceId, options)`  
+**Then** a regression report is returned with the identified differences and their severity
 
-### AC2: Classification des Régressions
-**Given** des régressions sont détectées  
-**When** le rapport est généré  
-**Then** les régressions sont classifiées par :
-- Sévérité (critical, high, medium, low)
-- Type (comportemental, performance, structurel)
-- Impact (affecte le résultat final, affecte seulement le processus)
+### AC2: Regression Classification
+**Given** regressions are detected  
+**When** the report is generated  
+**Then** the regressions are classified by:
+- Severity (critical, high, medium, low)
+- Type (behavioral, performance, structural)
+- Impact (affects the final result, affects only the process)
 
-### AC3: Seuils de Tolérance
-**Given** une détection de régression est effectuée  
-**When** des seuils sont configurés  
-**Then** seules les régressions dépassant les seuils sont signalées :
-- Différence de durée maximale acceptable
-- Nombre d'événements différents acceptable
-- Types d'événements critiques à surveiller
+### AC3: Tolerance Thresholds
+**Given** a regression detection is performed  
+**When** thresholds are configured  
+**Then** only regressions exceeding the thresholds are reported:
+- Maximum acceptable duration difference
+- Acceptable number of differing events
+- Critical event types to monitor
 
 ## Technical Details
 
-### Types à créer
+### Types to Create
 
 ```typescript
 interface RegressionDetectionOptions {
@@ -86,26 +86,25 @@ interface RegressionReport {
   metrics: {
     durationDiff: number;
     eventCountDiff: number;
-    similarityScore: number; // 0-1, 1 = identique
+    similarityScore: number; // 0-1, 1 = identical
   };
 }
 ```
 
-### Méthodes SDK
+### SDK Methods
 
 - `detectRegressions(newRunId: string, goldenTraceId: string, options?: RegressionDetectionOptions): Promise<RegressionReport>`
 - `getRegressionReport(reportId: string): Promise<RegressionReport>`
 
 ## Tests
 
-- Détecter aucune régression (traces identiques)
-- Détecter régression critique (résultat différent)
-- Détecter régression de performance (durée différente)
-- Respecter les seuils de tolérance
-- Classifier correctement les régressions
+- Detect no regression (identical traces)
+- Detect a critical regression (different result)
+- Detect a performance regression (different duration)
+- Honor tolerance thresholds
+- Correctly classify regressions
 
 ## Dependencies
 
 - Story 14.1: Golden Traces
-- Story 15.1: Comparaison de Deux Exécutions
-
+- Story 15.1: Comparison of Two Executions

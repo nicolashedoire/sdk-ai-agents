@@ -1,125 +1,123 @@
-# 📊 État du Projet SDK AI Agents
+# 📊 SDK AI Agents Project Status
 
-## 🎯 Vue d'Ensemble
+## 🎯 Overview
 
-**SDK AI Agents** est un SDK TypeScript pour créer et gérer des agents IA avec :
-- ✅ **Event Sourcing** natif (toutes les actions sont tracées)
-- ✅ **Replay** des exécutions (rejouer sans recontacter le LLM)
-- ✅ **Policies & Governance** (contrôler les actions des agents)
-- ✅ **Multi-Providers LLM** (OpenAI, Anthropic, fallback)
-- ✅ **Observabilité Cognitive** (graphes de raisonnement, alternatives, patterns)
+**SDK AI Agents** is a TypeScript SDK for building and managing AI agents with:
+- ✅ Native **Event Sourcing** (all actions are traced)
+- ✅ **Replay** of executions (replay without recontacting the LLM)
+- ✅ **Policies & Governance** (control agent actions)
+- ✅ **Multi-Provider LLM** (OpenAI, Anthropic, fallback)
+- ✅ **Cognitive Observability** (reasoning graphs, alternatives, patterns)
 
-## ✅ Ce qui est Terminé (MVP + Phase 2)
+## ✅ What's Done (MVP + Phase 2)
 
-### Phase 1 - MVP (100% complet)
+### Phase 1 - MVP (100% complete)
 - ✅ Quick Start & SDK Foundation
 - ✅ Agent Lifecycle & Execution Management
 - ✅ Tool & Capability Management
 - ✅ Policies & Governance
-- ✅ Runtime Architecture (Séparation Raisonnement/Action)
+- ✅ Runtime Architecture (Reasoning/Action Separation)
 - ✅ Event Sourcing & Persistence
 - ✅ Tracing & Observability
 - ✅ Replay & Debugging
 - ✅ Versioning & Audit
 
-### Phase 2 - Production-Ready (100% complet)
-- ✅ **Epic 10**: Multi-Providers LLM (OpenAI, Anthropic, fallback)
-- ✅ **Epic 11**: Policies Avancées (approval, budgets, conditionnelles, audit)
-- ✅ **Epic 12**: Event Store SQL-Based (PostgreSQL, requêtes avancées, indexation, backup)
-- ✅ **Epic 13**: Observabilité Cognitive (graphes, alternatives, patterns, visualisation)
+### Phase 2 - Production-Ready (100% complete)
+- ✅ **Epic 10**: Multi-Provider LLM (OpenAI, Anthropic, fallback)
+- ✅ **Epic 11**: Advanced Policies (approval, budgets, conditional, audit)
+- ✅ **Epic 12**: SQL-Based Event Store (PostgreSQL, advanced queries, indexing, backup)
+- ✅ **Epic 13**: Cognitive Observability (graphs, alternatives, patterns, visualization)
 
-## 🚧 Ce qu'on est en Train de Faire MAINTENANT
+## 🚧 What We're Working on NOW
 
-### 1. Interface de Démonstration Web (En cours)
+### 1. Web Demo Interface (In Progress)
 
-**Pourquoi ?**
-- Permettre de **visualiser** ce que fait le SDK
-- **Démontrer** les fonctionnalités aux utilisateurs
-- Faciliter le **debugging** et l'**analyse** des exécutions
+**Why?**
+- Enable **visualizing** what the SDK does
+- **Demonstrate** the features to users
+- Make **debugging** and **analyzing** executions easier
 
-**Ce qui a été créé :**
-- ✅ Application **Next.js/React** moderne
-- ✅ 5 sections de visualisation :
-  - 📊 **Traces** : Voir les événements d'une exécution
-  - 🧠 **Graphe de Raisonnement** : Visualiser le processus de décision
-  - 🔄 **Alternatives** : Voir les alternatives envisagées
-  - 📈 **Patterns** : Analyser les patterns sur plusieurs runs
-  - ⚖️ **Comparaison** : Comparer deux exécutions
-- ✅ **API Routes** Next.js pour appeler le SDK côté serveur
-- ✅ **Design moderne** avec Tailwind CSS
-- ✅ **Loading states** et **error handling**
+**What's been created:**
+- ✅ Modern **Next.js/React** application
+- ✅ 5 visualization sections:
+  - 📊 **Traces**: See the events of an execution
+  - 🧠 **Reasoning Graph**: Visualize the decision-making process
+  - 🔄 **Alternatives**: See the alternatives considered
+  - 📈 **Patterns**: Analyze patterns across multiple runs
+  - ⚖️ **Comparison**: Compare two executions
+- ✅ Next.js **API Routes** to call the SDK server-side
+- ✅ **Modern design** with Tailwind CSS
+- ✅ **Loading states** and **error handling**
 
-**Où en sommes-nous ?**
-- ✅ Structure créée
-- ✅ Composants React créés
-- ✅ API routes créées
-- ✅ Build réussi
-- 🟡 **Prêt à être utilisé** (il faut juste démarrer avec `npm run dev`)
+**Where do we stand?**
+- ✅ Structure created
+- ✅ React components created
+- ✅ API routes created
+- ✅ Successful build
+- 🟡 **Ready to use** (just need to start with `npm run dev`)
 
-### 2. Nouvelles Epics (En planification)
+### 2. New Epics (In Planning)
 
 **Epic 14 - Testing & Quality Assurance**
-- Story 14.1 : Golden Traces (tests basés sur traces) ✅ Créée
-- Story 14.2 : Validation comportement via replay ✅ Créée
-- Stories restantes : À créer
+- Story 14.1: Golden Traces (trace-based tests) ✅ Created
+- Story 14.2: Behavior validation via replay ✅ Created
+- Remaining stories: To be created
 
 **Epic 15 - Advanced Observability & Comparison**
-- Story 15.1 : Comparaison de deux exécutions ✅ Créée
-- Stories restantes : À créer
+- Story 15.1: Comparing two executions ✅ Created
+- Remaining stories: To be created
 
-## 📁 Structure du Projet
+## 📁 Project Structure
 
 ```
 SDK_AI_Agents/
-├── src/                    # Code source du SDK
-│   ├── engines/           # Moteurs (reasoning, action, policy, replay)
-│   ├── providers/         # Providers LLM (OpenAI, Anthropic, Fallback)
+├── src/                    # SDK source code
+│   ├── engines/           # Engines (reasoning, action, policy, replay)
+│   ├── providers/         # LLM providers (OpenAI, Anthropic, Fallback)
 │   ├── stores/            # Event stores (File, SQL, PostgreSQL)
 │   ├── managers/          # Managers (Approval, Budget)
-│   ├── utils/             # Utilitaires (graphes, alternatives, patterns)
-│   └── types/             # Types TypeScript
+│   ├── utils/             # Utilities (graphs, alternatives, patterns)
+│   └── types/             # TypeScript types
 │
-├── demo/                   # Interface de démonstration (NOUVEAU)
+├── demo/                   # Demo interface (NEW)
 │   ├── app/               # Next.js App Router
-│   │   ├── api/           # API routes (appellent le SDK)
-│   │   └── page.tsx       # Page principale
-│   ├── components/        # Composants React
-│   └── lib/               # Client SDK (appelle les API routes)
+│   │   ├── api/           # API routes (call the SDK)
+│   │   └── page.tsx       # Main page
+│   ├── components/        # React components
+│   └── lib/               # SDK client (calls the API routes)
 │
-└── _bmad-output/          # Documentation BMAD
+└── _bmad-output/          # BMAD documentation
     └── implementation-artifacts/
-        └── stories/       # Stories d'implémentation
+        └── stories/       # Implementation stories
 ```
 
-## 🎯 Objectif Final
+## 🎯 Final Goal
 
-Créer un **SDK complet et production-ready** pour :
-1. ✅ **Développeurs** : Créer des agents IA facilement avec gouvernance
-2. ✅ **Ops** : Monitorer et déboguer les agents efficacement
-3. ✅ **Business** : Comprendre ce que font les agents et pourquoi
+Build a **complete, production-ready SDK** for:
+1. ✅ **Developers**: Easily build AI agents with governance
+2. ✅ **Ops**: Monitor and debug agents efficiently
+3. ✅ **Business**: Understand what agents do and why
 
-L'interface de démonstration permet de **voir concrètement** toutes ces fonctionnalités en action.
+The demo interface allows **concretely seeing** all these features in action.
 
-## 🚀 Prochaines Étapes
+## 🚀 Next Steps
 
-1. **Tester l'interface de démonstration**
+1. **Test the demo interface**
    ```bash
    cd demo
    npm run dev
    ```
 
-2. **Continuer Epic 14 et 15** (Testing & Advanced Observability)
+2. **Continue Epic 14 and 15** (Testing & Advanced Observability)
 
-3. **Améliorer l'interface** selon les retours
+3. **Improve the interface** based on feedback
 
-## 💡 Pourquoi cette Interface ?
+## 💡 Why This Interface?
 
-Sans interface, le SDK est "invisible" - on ne peut pas voir ce qu'il fait. Avec cette interface :
-- ✅ On peut **visualiser** les traces en temps réel
-- ✅ On peut **comprendre** le raisonnement des agents
-- ✅ On peut **déboguer** plus facilement
-- ✅ On peut **démontrer** la valeur du SDK
+Without an interface, the SDK is "invisible" - you can't see what it's doing. With this interface:
+- ✅ You can **visualize** traces in real time
+- ✅ You can **understand** agent reasoning
+- ✅ You can **debug** more easily
+- ✅ You can **demonstrate** the SDK's value
 
-C'est comme avoir un **dashboard** pour votre SDK !
-
-
+It's like having a **dashboard** for your SDK!

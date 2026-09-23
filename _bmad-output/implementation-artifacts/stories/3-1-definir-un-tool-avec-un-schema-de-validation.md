@@ -1,4 +1,4 @@
-# Story 3.1: Définir un tool avec un schéma de validation
+# Story 3.1: Defining a tool with a validation schema
 
 **Story ID:** 3.1  
 **Epic:** 3 - Tool & Capability Management  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** définir un tool avec un schéma de validation,
-**So that** je peux créer des outils typés et sécurisés pour mes agents.
+**As a** developer,
+**I want** to define a tool with a validation schema,
+**So that** I can create typed and secure tools for my agents.
 
 ## Acceptance Criteria
 
-**Given** je veux créer un nouveau tool
-**When** j'appelle `defineTool({ name: '...', schema: {...}, handler: ... })`
-**Then** un tool est créé avec succès
-**And** le schéma de validation est appliqué aux inputs
-**And** les erreurs de validation sont claires et spécifiques
-**And** le tool est typé avec TypeScript
+**Given** I want to create a new tool
+**When** I call `defineTool({ name: '...', schema: {...}, handler: ... })`
+**Then** a tool is created successfully
+**And** the validation schema is applied to the inputs
+**And** validation errors are clear and specific
+**And** the tool is typed with TypeScript
 
 ## Business Value
 
-- **Sécurité**: Validation des inputs
-- **Type-safety**: TypeScript strict
-- **Clarté**: Erreurs explicites
+- **Security**: Input validation
+- **Type-safety**: Strict TypeScript
+- **Clarity**: Explicit errors
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase MVP
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current State:**
+- Complete implementation in the MVP codebase
+- Feature tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files Involved:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée dans le MVP. Voir les fichiers sources pour les détails d'implémentation.
+Feature implemented and tested in the MVP. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Feature validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète dans le MVP  
-**Notes:** Story MVP complétée et testée
+**Implementation:** Complete in the MVP  
+**Notes:** MVP story completed and tested

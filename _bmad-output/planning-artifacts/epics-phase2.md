@@ -2,270 +2,269 @@
 
 ## Overview
 
-Ce document définit les epics et stories pour Phase 2 - Production-Ready, basé sur le PRD et la rétrospective MVP.
+This document defines the epics and stories for Phase 2 - Production-Ready, based on the PRD and the MVP retrospective.
 
-## Epic 10: Multi-Providers LLM
+## Epic 10: Multi-Provider LLM
 
-Permettre l'utilisation de plusieurs providers LLM (OpenAI, Anthropic, etc.) avec abstraction et fallback.
+Enable the use of multiple LLM providers (OpenAI, Anthropic, etc.) with abstraction and fallback.
 
-**FRs covered:** Extension de FR2, FR25
+**FRs covered:** Extension of FR2, FR25
 
-### Story 10.1: Abstraction du Provider LLM
+### Story 10.1: LLM Provider Abstraction
 
-As a développeur,
-I want utiliser différents providers LLM (OpenAI, Anthropic, etc.),
-So that je peux choisir le meilleur provider pour mon cas d'usage.
-
-**Acceptance Criteria:**
-
-**Given** un SDK avec abstraction LLM
-**When** je crée un agent
-**Then** je peux spécifier le provider LLM (OpenAI, Anthropic, etc.)
-**And** l'API reste identique quel que soit le provider
-**And** le provider est configurable via SDKConfig
-
-### Story 10.2: Support Anthropic Claude
-
-As a développeur,
-I want utiliser Anthropic Claude comme provider LLM,
-So that je peux bénéficier des avantages de Claude.
+As a developer,
+I want to use different LLM providers (OpenAI, Anthropic, etc.),
+So that I can choose the best provider for my use case.
 
 **Acceptance Criteria:**
 
-**Given** Anthropic est configuré comme provider
-**When** je crée un agent avec model "claude-3-opus"
-**Then** le Reasoning Engine utilise l'API Anthropic
-**And** les intentions sont générées correctement
-**And** le format de réponse est compatible
+**Given** an SDK with LLM abstraction
+**When** I create an agent
+**Then** I can specify the LLM provider (OpenAI, Anthropic, etc.)
+**And** the API remains identical regardless of the provider
+**And** the provider is configurable via SDKConfig
 
-### Story 10.3: Fallback entre Providers
+### Story 10.2: Anthropic Claude Support
 
-As a développeur,
-I want configurer un fallback entre providers,
-So que mon agent continue de fonctionner si un provider échoue.
-
-**Acceptance Criteria:**
-
-**Given** plusieurs providers configurés avec fallback
-**When** le provider principal échoue
-**Then** le système bascule automatiquement sur le provider de fallback
-**And** l'exécution continue sans interruption
-**And** l'événement de fallback est tracé
-
-### Story 10.4: Configuration par Provider
-
-As a développeur,
-I want configurer des paramètres spécifiques par provider,
-So que je peux optimiser chaque provider selon ses caractéristiques.
+As a developer,
+I want to use Anthropic Claude as an LLM provider,
+So that I can benefit from Claude's advantages.
 
 **Acceptance Criteria:**
 
-**Given** plusieurs providers configurés
-**When** je configure un agent
-**Then** je peux spécifier des paramètres par provider (temperature, maxTokens, etc.)
-**And** les paramètres sont appliqués correctement
-**And** la configuration est validée
+**Given** Anthropic is configured as a provider
+**When** I create an agent with model "claude-3-opus"
+**Then** the Reasoning Engine uses the Anthropic API
+**And** intentions are generated correctly
+**And** the response format is compatible
 
-## Epic 11: Policies Avancées
+### Story 10.3: Fallback Between Providers
 
-Permettre des policies avancées avec approval humaine, budgets complexes et audit trail.
+As a developer,
+I want to configure a fallback between providers,
+So that my agent keeps working if a provider fails.
 
-**FRs covered:** Extension de FR16-FR24
+**Acceptance Criteria:**
 
-### Story 11.1: Approval Humaine (Workflow d'Approbation)
+**Given** multiple providers configured with fallback
+**When** the primary provider fails
+**Then** the system automatically switches to the fallback provider
+**And** execution continues without interruption
+**And** the fallback event is traced
+
+### Story 10.4: Per-Provider Configuration
+
+As a developer,
+I want to configure provider-specific parameters,
+So that I can optimize each provider according to its characteristics.
+
+**Acceptance Criteria:**
+
+**Given** multiple providers configured
+**When** I configure an agent
+**Then** I can specify parameters per provider (temperature, maxTokens, etc.)
+**And** the parameters are applied correctly
+**And** the configuration is validated
+
+## Epic 11: Advanced Policies
+
+Enable advanced policies with human approval, complex budgets, and an audit trail.
+
+**FRs covered:** Extension of FR16-FR24
+
+### Story 11.1: Human Approval (Approval Workflow)
 
 As a tech lead,
-I want définir des policies nécessitant une approbation humaine,
-So que les actions critiques sont validées avant exécution.
+I want to define policies requiring human approval,
+So that critical actions are validated before execution.
 
 **Acceptance Criteria:**
 
-**Given** une policy avec approval humaine configurée
-**When** un agent tente une action nécessitant approbation
-**Then** l'action est mise en pause
-**And** une demande d'approbation est générée
-**And** l'action s'exécute seulement après approbation
-**And** l'approbation est tracée dans les événements
+**Given** a policy with human approval configured
+**When** an agent attempts an action requiring approval
+**Then** the action is paused
+**And** an approval request is generated
+**And** the action executes only after approval
+**And** the approval is traced in the events
 
-### Story 11.2: Budgets Complexes (par Tool, par Agent, par Période)
+### Story 11.2: Complex Budgets (per Tool, per Agent, per Period)
 
 As a tech lead,
-I want définir des budgets complexes (par tool, par agent, par période),
-So que je peux contrôler finement les coûts et l'utilisation.
+I want to define complex budgets (per tool, per agent, per period),
+So that I can finely control costs and usage.
 
 **Acceptance Criteria:**
 
-**Given** des budgets complexes configurés
-**When** un agent exécute des actions
-**Then** les budgets sont vérifiés (par tool, par agent, par période)
-**And** les violations de budget sont détectées
-**And** les actions sont bloquées si budget dépassé
-**And** les budgets sont tracés et consultables
+**Given** complex budgets configured
+**When** an agent executes actions
+**Then** the budgets are checked (per tool, per agent, per period)
+**And** budget violations are detected
+**And** actions are blocked if the budget is exceeded
+**And** budgets are traced and queryable
 
-### Story 11.3: Policies Conditionnelles
+### Story 11.3: Conditional Policies
 
 As a tech lead,
-I want définir des policies conditionnelles,
-So que les règles peuvent s'adapter au contexte.
+I want to define conditional policies,
+So that rules can adapt to context.
 
 **Acceptance Criteria:**
 
-**Given** une policy conditionnelle configurée
-**When** une action est tentée
-**Then** les conditions sont évaluées
-**And** la policy s'applique seulement si les conditions sont remplies
-**And** les conditions sont tracées dans les événements
+**Given** a conditional policy configured
+**When** an action is attempted
+**Then** the conditions are evaluated
+**And** the policy applies only if the conditions are met
+**And** the conditions are traced in the events
 
-### Story 11.4: Audit Trail des Policies
+### Story 11.4: Policy Audit Trail
 
 As a tech lead,
-I want consulter l'audit trail complet des policies,
-So que je peux comprendre toutes les décisions de gouvernance.
+I want to consult the full audit trail of policies,
+So that I can understand all governance decisions.
 
 **Acceptance Criteria:**
 
-**Given** des policies actives
-**When** des actions sont exécutées
-**Then** chaque vérification de policy est tracée
-**And** l'audit trail est consultable par runId
-**And** l'audit trail inclut les raisons des décisions
+**Given** active policies
+**When** actions are executed
+**Then** each policy check is traced
+**And** the audit trail is queryable by runId
+**And** the audit trail includes the reasons for decisions
 
-## Epic 12: Event Store SQL-Based
+## Epic 12: SQL-Based Event Store
 
-Migrer vers un Event Store SQL-based pour la scalabilité et les requêtes avancées.
+Migrate to a SQL-based Event Store for scalability and advanced queries.
 
-**FRs covered:** Extension de FR55-FR62
+**FRs covered:** Extension of FR55-FR62
 
-### Story 12.1: Interface SQL Event Store
+### Story 12.1: SQL Event Store Interface
 
-As a développeur,
-I want utiliser un Event Store SQL,
-So que je peux scaler et faire des requêtes avancées.
-
-**Acceptance Criteria:**
-
-**Given** une interface SQL Event Store
-**When** je configure le SDK
-**Then** je peux choisir entre FileEventStore et SQLEventStore
-**And** l'interface IEventStore est respectée
-**And** la migration est transparente
-
-### Story 12.2: Migration vers PostgreSQL
-
-As a développeur,
-I want utiliser PostgreSQL comme Event Store,
-So que je peux bénéficier de la scalabilité SQL.
+As a developer,
+I want to use a SQL Event Store,
+So that I can scale and run advanced queries.
 
 **Acceptance Criteria:**
 
-**Given** PostgreSQL est configuré
-**When** le SDK persiste des événements
-**Then** les événements sont stockés dans PostgreSQL
-**And** les performances sont acceptables
-**And** la migration depuis FileEventStore est possible
+**Given** a SQL Event Store interface
+**When** I configure the SDK
+**Then** I can choose between FileEventStore and SQLEventStore
+**And** the IEventStore interface is respected
+**And** the migration is transparent
 
-### Story 12.3: Requêtes Avancées sur Événements
+### Story 12.2: Migration to PostgreSQL
 
-As a développeur,
-I want faire des requêtes avancées sur les événements,
-So que je peux analyser les patterns et tendances.
-
-**Acceptance Criteria:**
-
-**Given** un Event Store SQL
-**When** je fais des requêtes
-**Then** je peux filtrer par type, date, agent, etc.
-**And** je peux agréger les données
-**And** les requêtes sont performantes
-
-### Story 12.4: Indexation pour Performance
-
-As a développeur,
-I want que l'Event Store SQL soit indexé,
-So que les requêtes sont rapides même avec beaucoup de données.
+As a developer,
+I want to use PostgreSQL as the Event Store,
+So that I can benefit from SQL scalability.
 
 **Acceptance Criteria:**
 
-**Given** un Event Store SQL avec indexation
-**When** je fais des requêtes
-**Then** les index sont utilisés efficacement
-**And** les performances sont acceptables
-**And** les index sont maintenus automatiquement
+**Given** PostgreSQL is configured
+**When** the SDK persists events
+**Then** the events are stored in PostgreSQL
+**And** performance is acceptable
+**And** migration from FileEventStore is possible
 
-### Story 12.5: Backup et Restauration
+### Story 12.3: Advanced Queries on Events
+
+As a developer,
+I want to run advanced queries on events,
+So that I can analyze patterns and trends.
+
+**Acceptance Criteria:**
+
+**Given** a SQL Event Store
+**When** I run queries
+**Then** I can filter by type, date, agent, etc.
+**And** I can aggregate the data
+**And** the queries are performant
+
+### Story 12.4: Indexing for Performance
+
+As a developer,
+I want the SQL Event Store to be indexed,
+So that queries are fast even with large amounts of data.
+
+**Acceptance Criteria:**
+
+**Given** a SQL Event Store with indexing
+**When** I run queries
+**Then** indexes are used efficiently
+**And** performance is acceptable
+**And** indexes are maintained automatically
+
+### Story 12.5: Backup and Restore
 
 As a tech lead,
-I want pouvoir faire des backups et restaurations de l'Event Store,
-So que les données sont protégées.
+I want to be able to back up and restore the Event Store,
+So that the data is protected.
 
 **Acceptance Criteria:**
 
-**Given** un Event Store SQL
-**When** je fais un backup
-**Then** tous les événements sont sauvegardés
-**And** la restauration fonctionne correctement
-**And** l'intégrité des données est préservée
+**Given** a SQL Event Store
+**When** I perform a backup
+**Then** all events are saved
+**And** the restore works correctly
+**And** data integrity is preserved
 
-## Epic 13: Observabilité Cognitive
+## Epic 13: Cognitive Observability
 
-Permettre l'observabilité cognitive avec graphe de raisonnement et patterns de décision.
+Enable cognitive observability with a reasoning graph and decision patterns.
 
 **FRs covered:** FR43, FR44, FR45
 
-### Story 13.1: Graphe de Raisonnement Visualisable
+### Story 13.1: Visualizable Reasoning Graph
 
-As a développeur,
-I want visualiser le graphe de raisonnement de l'agent,
-So que je peux comprendre comment l'agent a pensé.
-
-**Acceptance Criteria:**
-
-**Given** une exécution d'agent
-**When** je récupère le graphe de raisonnement
-**Then** je peux voir les étapes de raisonnement
-**And** les connexions entre les décisions sont visibles
-**And** le graphe est exportable (JSON, Graphviz, etc.)
-
-### Story 13.2: Alternatives Envisagées par l'Agent
-
-As a développeur,
-I want voir les alternatives envisagées par l'agent,
-So que je peux comprendre pourquoi certaines options ont été choisies.
+As a developer,
+I want to visualize the agent's reasoning graph,
+So that I can understand how the agent thought.
 
 **Acceptance Criteria:**
 
-**Given** une exécution d'agent
-**When** je consulte les alternatives
-**Then** je peux voir les options considérées
-**And** les raisons du choix sont expliquées
-**And** les alternatives sont tracées dans les événements
+**Given** an agent execution
+**When** I retrieve the reasoning graph
+**Then** I can see the reasoning steps
+**And** the connections between decisions are visible
+**And** the graph is exportable (JSON, Graphviz, etc.)
 
-### Story 13.3: Patterns de Décision sur Plusieurs Runs
+### Story 13.2: Alternatives Considered by the Agent
+
+As a developer,
+I want to see the alternatives considered by the agent,
+So that I can understand why certain options were chosen.
+
+**Acceptance Criteria:**
+
+**Given** an agent execution
+**When** I consult the alternatives
+**Then** I can see the options considered
+**And** the reasons for the choice are explained
+**And** the alternatives are traced in the events
+
+### Story 13.3: Decision Patterns Across Multiple Runs
 
 As a product engineer,
-I want analyser les patterns de décision sur plusieurs runs,
-So que je peux identifier les tendances et améliorer l'agent.
+I want to analyze decision patterns across multiple runs,
+So that I can identify trends and improve the agent.
 
 **Acceptance Criteria:**
 
-**Given** plusieurs runs d'un agent
-**When** j'analyse les patterns
-**Then** je peux voir les décisions récurrentes
-**And** les patterns sont identifiés automatiquement
-**And** les insights sont présentés de manière compréhensible
+**Given** multiple runs of an agent
+**When** I analyze the patterns
+**Then** I can see recurring decisions
+**And** the patterns are identified automatically
+**And** the insights are presented in an understandable way
 
-### Story 13.4: Visualisation des Traces
+### Story 13.4: Trace Visualization
 
-As a développeur,
-I want visualiser les traces de manière interactive,
-So que je peux explorer facilement ce qui s'est passé.
+As a developer,
+I want to visualize traces interactively,
+So that I can easily explore what happened.
 
 **Acceptance Criteria:**
 
-**Given** une trace d'exécution
-**When** je la visualise
-**Then** je peux naviguer dans la timeline
-**And** les événements sont groupés logiquement
-**And** les détails sont accessibles facilement
-
+**Given** an execution trace
+**When** I visualize it
+**Then** I can navigate the timeline
+**And** the events are grouped logically
+**And** the details are easily accessible
 

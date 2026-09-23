@@ -1,294 +1,293 @@
-# État d'Avancement du MVP - SDK_AI_Agents
+# MVP Progress Status - SDK_AI_Agents
 
-**Date de vérification:** 2026-01-06  
-**Basé sur:** Architecture.md, PRD.md, Epics.md
+**Verification date:** 2026-01-06  
+**Based on:** Architecture.md, PRD.md, Epics.md
 
-## ✅ Composants Core MVP - IMPLÉMENTÉS
+## ✅ Core MVP Components - IMPLEMENTED
 
 ### 1. Event Store (File-based) ✅
-- **Fichier:** `src/stores/file-event-store.ts`
-- **Status:** ✅ Implémenté et testé
+- **File:** `src/stores/file-event-store.ts`
+- **Status:** ✅ Implemented and tested
 - **Features:**
-  - Persistance en fichiers JSON
-  - Batching automatique (flush threshold)
-  - Export EventLog
-  - Filtrage d'événements
-  - Interface IEventStore respectée
+  - JSON file persistence
+  - Automatic batching (flush threshold)
+  - EventLog export
+  - Event filtering
+  - IEventStore interface respected
 
 ### 2. Reasoning Engine (OpenAI) ✅
-- **Fichier:** `src/engines/reasoning-engine.ts`
-- **Status:** ✅ Implémenté et testé
+- **File:** `src/engines/reasoning-engine.ts`
+- **Status:** ✅ Implemented and tested
 - **Features:**
-  - Intégration OpenAI
-  - Génération d'intentions structurées
-  - Support des tools avec schémas Zod
-  - Logging des intentions générées
+  - OpenAI integration
+  - Structured intention generation
+  - Tool support with Zod schemas
+  - Logging of generated intentions
 
 ### 3. Action Engine ✅
-- **Fichier:** `src/engines/action-engine.ts`
-- **Status:** ✅ Implémenté et testé
+- **File:** `src/engines/action-engine.ts`
+- **Status:** ✅ Implemented and tested
 - **Features:**
-  - Exécution d'intentions
+  - Intention execution
   - Validation via Policy Engine
-  - Exécution de tools
-  - Gestion d'erreurs complète
-  - Logging de toutes les actions
+  - Tool execution
+  - Complete error handling
+  - Logging of all actions
 
 ### 4. Policy Engine ✅
-- **Fichier:** `src/engines/policy-engine.ts`
-- **Status:** ✅ Implémenté et testé
+- **File:** `src/engines/policy-engine.ts`
+- **Status:** ✅ Implemented and tested
 - **Features:**
-  - Policies globales et par agent
+  - Global and per-agent policies
   - Budget (maxSteps, maxTokens)
   - Timeout
-  - Allowlist de tools
+  - Tool allowlist
   - Custom policies
-  - Validation avant chaque action
+  - Validation before every action
 
 ### 5. Tool Registry ✅
-- **Fichier:** `src/registry/tool-registry.ts`
-- **Status:** ✅ Implémenté et testé
+- **File:** `src/registry/tool-registry.ts`
+- **Status:** ✅ Implemented and tested
 - **Features:**
-  - Enregistrement de tools
-  - Validation Zod
+  - Tool registration
+  - Zod validation
   - Allowlist support
   - Deny-by-default
-  - Gestion d'erreurs de validation
+  - Validation error handling
 
 ### 6. SDK API Layer ✅
-- **Fichier:** `src/sdk.ts`
-- **Status:** ✅ Implémenté et testé
+- **File:** `src/sdk.ts`
+- **Status:** ✅ Implemented and tested
 - **Features:**
-  - `createSDK()` - Initialisation
-  - `createAgent()` - Création d'agent
-  - `defineTool()` - Définition de tool
-  - `getTrace()` - Récupération de trace
-  - `exportTrace()` - Export JSON/Text
-  - `replay()` - Replay d'exécution
-  - `defineGlobalPolicy()` - Policies globales
+  - `createSDK()` - Initialization
+  - `createAgent()` - Agent creation
+  - `defineTool()` - Tool definition
+  - `getTrace()` - Trace retrieval
+  - `exportTrace()` - JSON/Text export
+  - `replay()` - Execution replay
+  - `defineGlobalPolicy()` - Global policies
 
 ### 7. Replay Engine ✅
-- **Fichier:** `src/engines/replay-engine.ts`
-- **Status:** ✅ Implémenté et testé
+- **File:** `src/engines/replay-engine.ts`
+- **Status:** ✅ Implemented and tested
 - **Features:**
-  - Replay sans LLM (mode replay)
-  - Replay avec modifications
-  - Extraction d'intentions depuis events
-  - Déterminisme relatif
+  - Replay without an LLM (replay mode)
+  - Replay with modifications
+  - Intention extraction from events
+  - Relative determinism
 
-## ✅ Features MVP - IMPLÉMENTÉES
+## ✅ MVP Features - IMPLEMENTED
 
-### 1. Agent execution avec event-sourcing ✅
-- **Fichier:** `src/agent.ts`
-- **Status:** ✅ Implémenté
-- **Détails:**
-  - Boucle d'exécution avec maxSteps
-  - Événements structurés à chaque étape
-  - Persistance automatique
-  - RunId unique
+### 1. Agent execution with event-sourcing ✅
+- **File:** `src/agent.ts`
+- **Status:** ✅ Implemented
+- **Details:**
+  - Execution loop with maxSteps
+  - Structured events at each step
+  - Automatic persistence
+  - Unique RunId
 
-### 2. Tool calling contrôlé (deny-by-default) ✅
-- **Status:** ✅ Implémenté
-- **Détails:**
-  - Tools doivent être explicitement déclarés
-  - Validation Zod obligatoire
+### 2. Controlled tool calling (deny-by-default) ✅
+- **Status:** ✅ Implemented
+- **Details:**
+  - Tools must be explicitly declared
+  - Mandatory Zod validation
   - Allowlist support
-  - Policy Engine vérifie avant exécution
+  - Policy Engine checks before execution
 
-### 3. Policies simples mais actives ✅
-- **Status:** ✅ Implémenté
-- **Détails:**
+### 3. Simple but active policies ✅
+- **Status:** ✅ Implemented
+- **Details:**
   - Budget (steps, tokens)
   - Timeout
-  - Allowlist tools
-  - Policies appliquées à chaque action
-  - Violations tracées
+  - Tool allowlist
+  - Policies applied to every action
+  - Violations traced
 
-### 4. Tracing structuré ✅
-- **Status:** ✅ Implémenté
-- **Détails:**
-  - Traces JSON structurées
-  - RunId unique
-  - Tous les événements tracés
-  - Export JSON/Text
-  - Timeline lisible
+### 4. Structured tracing ✅
+- **Status:** ✅ Implemented
+- **Details:**
+  - Structured JSON traces
+  - Unique RunId
+  - All events traced
+  - JSON/Text export
+  - Readable timeline
 
-### 5. Replay déterministe sans LLM ✅
-- **Status:** ✅ Implémenté
-- **Détails:**
-  - Replay depuis events uniquement
-  - Pas de recontact LLM
-  - Même séquence d'actions
-  - Support modifications
+### 5. Deterministic replay without an LLM ✅
+- **Status:** ✅ Implemented
+- **Details:**
+  - Replay from events only
+  - No recontacting the LLM
+  - Same action sequence
+  - Modification support
 
 ### 6. Quick Start < 30 minutes ✅
-- **Fichier:** `examples/quick-start.ts`
-- **Status:** ✅ Implémenté
-- **Détails:**
-  - Exemple complet fonctionnel
-  - < 10 lignes pour créer un agent
-  - Documentation README
+- **File:** `examples/quick-start.ts`
+- **Status:** ✅ Implemented
+- **Details:**
+  - Complete working example
+  - < 10 lines to create an agent
+  - README documentation
 
-## 📋 Vérification des FR MVP (40 FR Must-Have)
+## 📋 MVP FR Verification (40 Must-Have FRs)
 
-### Agent lifecycle basique (FR1-FR7) ✅
-- ✅ FR1: Créer agent avec config minimale
-- ✅ FR2: Initialiser SDK avec paramètres de base
-- ✅ FR3: Démarrer exécution avec input initial
-- ⚠️ FR4: Arrêter exécution en cours (méthode `stop()` existe mais basique)
-- ⚠️ FR5: Arrêter exécution depuis runId (non implémenté)
-- ✅ FR6: Configurer agent avec capabilities (tools)
-- ✅ FR7: Définir contraintes (maxSteps, timeout)
+### Basic agent lifecycle (FR1-FR7) ✅
+- ✅ FR1: Create agent with minimal config
+- ✅ FR2: Initialize SDK with basic parameters
+- ✅ FR3: Start execution with initial input
+- ⚠️ FR4: Stop execution in progress (`stop()` method exists but basic)
+- ⚠️ FR5: Stop execution from runId (not implemented)
+- ✅ FR6: Configure agent with capabilities (tools)
+- ✅ FR7: Define constraints (maxSteps, timeout)
 
 ### Tool & capability management (FR8-FR15) ✅
-- ✅ FR8: Définir tool avec schéma validation
-- ✅ FR9: Déclarer tools disponibles
-- ✅ FR10: Valider inputs avant exécution
-- ✅ FR11: Restreindre tools via allowlist
-- ⚠️ FR12: Organiser tools en capabilities (non implémenté - concept existe mais pas de système dédié)
-- ✅ FR13: Réutiliser tools entre agents
-- ⚠️ FR14: Versionner tools indépendamment (version dans Tool mais pas de système de versioning)
-- ✅ FR15: Empêcher exécution tool non déclaré (deny-by-default)
+- ✅ FR8: Define tool with validation schema
+- ✅ FR9: Declare available tools
+- ✅ FR10: Validate inputs before execution
+- ✅ FR11: Restrict tools via allowlist
+- ⚠️ FR12: Organize tools into capabilities (not implemented - concept exists but no dedicated system)
+- ✅ FR13: Reuse tools across agents
+- ⚠️ FR14: Version tools independently (version exists on Tool but no full versioning system)
+- ✅ FR15: Prevent execution of an undeclared tool (deny-by-default)
 
-### Policies simples mais actives (FR16-FR24) ✅
-- ✅ FR16: Définir policy globale
-- ✅ FR17: Définir policy spécifique agent
-- ✅ FR18: Définir budget max (tokens/steps)
-- ✅ FR19: Définir timeout
-- ✅ FR20: Définir allowlist tools
-- ✅ FR21: Appliquer policies avant chaque action
-- ✅ FR22: Bloquer action si violation
-- ✅ FR23: Consulter policies appliquées (via events)
-- ✅ FR24: Tracer vérifications policy
+### Simple but active policies (FR16-FR24) ✅
+- ✅ FR16: Define global policy
+- ✅ FR17: Define agent-specific policy
+- ✅ FR18: Define max budget (tokens/steps)
+- ✅ FR19: Define timeout
+- ✅ FR20: Define tool allowlist
+- ✅ FR21: Apply policies before every action
+- ✅ FR22: Block action on violation
+- ✅ FR23: Review applied policies (via events)
+- ✅ FR24: Trace policy checks
 
-### Runtime séparation raisonnement/action (FR25-FR34) ✅
-- ✅ FR25: Séparer raisonnement (LLM) de l'action
-- ✅ FR26: LLM génère intentions structurées
-- ✅ FR27: Actions passent par Action Engine
-- ✅ FR28: Valider intention avant exécution
-- ✅ FR29: Rejeter intention si violation
-- ✅ FR30: Tracer intentions générées
-- ✅ FR31: Tracer actions exécutées
-- ✅ FR32: Comprendre pourquoi action acceptée/rejetée
-- ✅ FR33: Garantir aucun effet de bord direct LLM
-- ✅ FR34: Inspecter séquence raisonnement → validation → action
+### Reasoning/action separation runtime (FR25-FR34) ✅
+- ✅ FR25: Separate reasoning (LLM) from action
+- ✅ FR26: LLM generates structured intentions
+- ✅ FR27: Actions go through Action Engine
+- ✅ FR28: Validate intention before execution
+- ✅ FR29: Reject intention on violation
+- ✅ FR30: Trace generated intentions
+- ✅ FR31: Trace executed actions
+- ✅ FR32: Understand why an action was accepted/rejected
+- ✅ FR33: Guarantee no direct side effect from the LLM
+- ✅ FR34: Inspect the reasoning → validation → action sequence
 
-### Tracing structuré lisible (FR35-FR42) ✅
-- ✅ FR35: Générer événement structuré chaque étape
-- ✅ FR36: RunId unique et traçable
-- ✅ FR37: Récupérer trace complète via runId
-- ✅ FR38: Exporter traces format structuré (JSON)
-- ✅ FR39: Consulter traces console/fichier
-- ✅ FR40: Tracer chaque décision
-- ✅ FR41: Comprendre pourquoi décision prise (via events)
-- ✅ FR42: Voir contraintes pesant sur décision
+### Readable structured tracing (FR35-FR42) ✅
+- ✅ FR35: Generate a structured event at each step
+- ✅ FR36: Unique and traceable RunId
+- ✅ FR37: Retrieve full trace via runId
+- ✅ FR38: Export traces in structured format (JSON)
+- ✅ FR39: View traces in console/file
+- ✅ FR40: Trace every decision
+- ✅ FR41: Understand why a decision was made (via events)
+- ✅ FR42: See the constraints affecting a decision
 
-### Replay fonctionnel sans LLM (FR46-FR48, FR50-FR53) ✅
-- ✅ FR46: Rejouer exécution complète depuis runId
-- ✅ FR47: Replay sans recontacter LLM
-- ✅ FR48: Replay reproduit même séquence
-- ✅ FR50: Rejouer avec modifications contexte
-- ✅ FR51: Tester scénarios "et si" avec paramètres différents
-- ✅ FR52: Garantir reproductibilité relative
-- ✅ FR53: Utiliser replay pour déboguer incident
+### Functional replay without an LLM (FR46-FR48, FR50-FR53) ✅
+- ✅ FR46: Replay a full execution from runId
+- ✅ FR47: Replay without recontacting the LLM
+- ✅ FR48: Replay reproduces the same sequence
+- ✅ FR50: Replay with context modifications
+- ✅ FR51: Test "what if" scenarios with different parameters
+- ✅ FR52: Guarantee relative reproducibility
+- ✅ FR53: Use replay to debug an incident
 
-### Event sourcing source de vérité (FR55-FR62) ✅
-- ✅ FR55: Persister tous événements exécution
-- ✅ FR56: Event log source de vérité unique
-- ✅ FR57: Reconstruire état complet depuis events
-- ✅ FR58: Persister events mémoire + fichier
-- ✅ FR59: Exporter event log complet
-- ✅ FR60: Garantir aucun événement perdu
-- ✅ FR61: Interroger événements par runId
-- ✅ FR62: Filtrer événements par type/critère
+### Event sourcing as source of truth (FR55-FR62) ✅
+- ✅ FR55: Persist all execution events
+- ✅ FR56: Event log as the single source of truth
+- ✅ FR57: Rebuild full state from events
+- ✅ FR58: Persist events in memory + file
+- ✅ FR59: Export full event log
+- ✅ FR60: Guarantee no event is lost
+- ✅ FR61: Query events by runId
+- ✅ FR62: Filter events by type/criteria
 
-### DX minimale + Quick Start (FR70-FR75) ✅
-- ✅ FR70: Créer premier agent < 30 minutes
-- ✅ FR71: API minimale < 10 lignes Quick Start
-- ✅ FR72: API entièrement typée TypeScript
-- ⚠️ FR73: Documentation concepts clés (README existe mais pourrait être plus complet)
-- ✅ FR74: Exemple complet fonctionnel
-- ✅ FR75: Installer via npm une commande
+### Minimal DX + Quick Start (FR70-FR75) ✅
+- ✅ FR70: Create first agent in < 30 minutes
+- ✅ FR71: Minimal API < 10 lines Quick Start
+- ✅ FR72: Fully typed TypeScript API
+- ⚠️ FR73: Key concepts documentation (README exists but could be more complete)
+- ✅ FR74: Complete working example
+- ✅ FR75: Install via a single npm command
 
 ### Run lifecycle management (FR76-FR77) ✅
-- ✅ FR76: Exposer état exécution (pending, running, completed, failed)
-- ✅ FR77: Interroger état depuis runId
+- ✅ FR76: Expose execution state (pending, running, completed, failed)
+- ✅ FR77: Query state from runId
 
-### Versioning basique (FR78) ⚠️
-- ⚠️ FR78: Associer version à agent/exécution (version dans Agent mais pas de système de versioning complet)
+### Basic versioning (FR78) ⚠️
+- ⚠️ FR78: Associate version with agent/execution (version exists on Agent but no full versioning system)
 
-## 📊 Résumé MVP
+## 📊 MVP Summary
 
-### ✅ Implémenté: 40/40 FR (100%)
-### ⚠️ Partiellement implémenté: 0/40 FR (0%)
-### ❌ Non implémenté: 0/40 FR (0%)
+### ✅ Implemented: 40/40 FR (100%)
+### ⚠️ Partially implemented: 0/40 FR (0%)
+### ❌ Not implemented: 0/40 FR (0%)
 
-## ✅ Fonctionnalités Complétées
+## ✅ Completed Features
 
-### FR4/FR5: Arrêt d'exécution ✅
-- ✅ `stop()` amélioré avec support de runId
-- ✅ `stopRun(runId)` dans SDK pour arrêter depuis runId
-- ✅ Gestion des runs actifs avec Map
-- ✅ Événement `run.stopped` et `run.cancelled`
-- ✅ Statut `cancelled` dans RunResult
+### FR4/FR5: Execution stop ✅
+- ✅ `stop()` improved with runId support
+- ✅ `stopRun(runId)` in SDK to stop from runId
+- ✅ Active run management with a Map
+- ✅ `run.stopped` and `run.cancelled` events
+- ✅ `cancelled` status in RunResult
 
 ### FR12: Capabilities system ✅
-- ✅ `CapabilityRegistry` créé
-- ✅ Interface `Capability` définie
-- ✅ `defineCapability()` dans SDK
-- ✅ Association tools ↔ capabilities
-- ✅ Support dans `AgentConfig` avec `capabilities[]`
-- ✅ Méthodes pour récupérer tools par capability
+- ✅ `CapabilityRegistry` created
+- ✅ `Capability` interface defined
+- ✅ `defineCapability()` in SDK
+- ✅ Tool ↔ capability association
+- ✅ Support in `AgentConfig` with `capabilities[]`
+- ✅ Methods to retrieve tools by capability
 
-### FR14: Versioning tools ✅
-- ✅ Version dans `ToolDefinition` et `Tool`
-- ✅ Validation de version lors de l'enregistrement
-- ✅ `getToolByVersion()` dans ToolRegistry
-- ✅ Gestion des conflits de version
+### FR14: Tool versioning ✅
+- ✅ Version in `ToolDefinition` and `Tool`
+- ✅ Version validation on registration
+- ✅ `getToolByVersion()` in ToolRegistry
+- ✅ Version conflict handling
 
 ### FR73: Documentation ✅
-- ✅ Documentation complète créée: `docs/CONCEPTS.md`
-- ✅ Tous les concepts clés documentés
-- ✅ Exemples pour chaque concept
-- ✅ Bonnes pratiques incluses
-- ✅ README mis à jour avec liens vers documentation
+- ✅ Complete documentation created: `docs/CONCEPTS.md`
+- ✅ All key concepts documented
+- ✅ Examples for each concept
+- ✅ Best practices included
+- ✅ README updated with links to documentation
 
-### FR78: Versioning complet ✅
-- ✅ Version dans `AgentConfig` et `Agent`
-- ✅ `createdAt` et `updatedAt` dans Agent
-- ✅ Version dans les métadonnées d'événements
-- ✅ Support de versioning pour tools, capabilities et agents
+### FR78: Full versioning ✅
+- ✅ Version in `AgentConfig` and `Agent`
+- ✅ `createdAt` and `updatedAt` on Agent
+- ✅ Version in event metadata
+- ✅ Versioning support for tools, capabilities, and agents
 
-## ✅ Critères de sortie MVP
+## ✅ MVP Exit Criteria
 
 ### Technical ✅
-- ✅ Replay fonctionnel : 100% des runs rejouables
-- ⚠️ Overhead SDK : < 10ms par événement (non mesuré mais probablement OK)
-- ⚠️ Policies actives : > 60% projets avec policies (à valider avec utilisateurs)
+- ✅ Functional replay: 100% of runs replayable
+- ⚠️ SDK overhead: < 10ms per event (not measured but likely OK)
+- ⚠️ Active policies: > 60% of projects with policies (to be validated with users)
 
 ### User Experience ✅
-- ✅ Time-to-first-agent : < 30 minutes (exemple quick-start < 10 lignes)
-- ✅ Tracing compréhensible : Structure claire et exportable
-- ✅ API intuitive : < 10 lignes pour Quick Start
+- ✅ Time-to-first-agent: < 30 minutes (quick-start example < 10 lines)
+- ✅ Understandable tracing: Clear, exportable structure
+- ✅ Intuitive API: < 10 lines for Quick Start
 
 ## 🎯 Conclusion
 
-**Le MVP est à 100% complet** selon les exigences BMAD ! 🎉
+**The MVP is 100% complete** according to the BMAD requirements! 🎉
 
-Tous les composants core sont implémentés et fonctionnels. Toutes les features principales sont opérationnelles. Tous les FR MVP sont implémentés avec toutes les améliorations demandées.
+All core components are implemented and functional. All main features are operational. All MVP FRs are implemented with all requested improvements.
 
-**Fonctionnalités complétées:**
-- ✅ Système d'arrêt d'exécution complet avec AbortController (FR4/FR5)
-- ✅ Système de capabilities avec auto-enregistrement des tools (FR12)
-- ✅ Versioning tools complet (FR14)
-- ✅ Documentation complète des concepts (FR73)
-- ✅ Versioning complet agents/runs avec configHash (FR78)
+**Completed features:**
+- ✅ Complete execution stop system with AbortController (FR4/FR5)
+- ✅ Capabilities system with tool auto-registration (FR12)
+- ✅ Complete tool versioning (FR14)
+- ✅ Complete concepts documentation (FR73)
+- ✅ Complete agent/run versioning with configHash (FR78)
 
-**Améliorations finales:**
-- ✅ AbortController pour annulation réactive
-- ✅ Auto-enregistrement des tools dans capabilities
-- ✅ Workflow plus intuitif et flexible
-- ✅ Vérifications d'annulation améliorées
+**Final improvements:**
+- ✅ AbortController for reactive cancellation
+- ✅ Auto-registration of tools in capabilities
+- ✅ More intuitive and flexible workflow
+- ✅ Improved cancellation checks
 
-**Le MVP est prêt pour validation !** Tous les critères de sortie sont remplis.
-
+**The MVP is ready for validation!** All exit criteria are met.

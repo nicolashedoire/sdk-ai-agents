@@ -19,7 +19,17 @@ export type EventType =
   | 'tool.called'
   | 'tool.failed'
   | 'provider.fallback'
-  | 'error.occurred';
+  | 'provider.retry'
+  | 'tool.retry'
+  | 'incident.reported'
+  | 'error.occurred'
+  | 'cognition.started'
+  | 'cognition.operation_selected'
+  | 'cognition.thought'
+  | 'cognition.operation_failed'
+  | 'cognition.concluded'
+  | 'cognition.feedback'
+  | 'decision.evaluated';
 
 export interface EventMetadata {
   agentId?: string;

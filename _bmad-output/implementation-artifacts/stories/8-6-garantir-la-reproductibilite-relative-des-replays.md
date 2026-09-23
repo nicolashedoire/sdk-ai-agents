@@ -1,4 +1,4 @@
-# Story 8.6: Garantir la reproductibilité relative des replays
+# Story 8.6: Guarantee relative reproducibility of replays
 
 **Story ID:** 8.6  
 **Epic:** 8 - Replay & Debugging  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** système,
-**I want** garantir la reproductibilité relative des replays,
-**So that** les replays sont fiables et prévisibles.
+**As a** system,
+**I want** guarantee relative reproducibility of replays,
+**So that** replays are reliable and predictable.
 
 ## Acceptance Criteria
 
-**Given** un replay est effectué plusieurs fois
-**When** le même replay est exécuté
-**Then** la séquence logique est toujours la même
-**And** les tool calls sont toujours dans le même ordre
-**And** les résultats sont cohérents (si les tools sont déterministes)
-**And** les différences sont uniquement dues aux tools externes non déterministes
+**Given** a replay is performed multiple times
+**When** the same replay is executed
+**Then** the logical sequence is always the same
+**And** the tool calls are always in the same order
+**And** the results are consistent (if the tools are deterministic)
+**And** the differences are due only to non-deterministic external tools
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current state:**
+- Complete implementation in the codebase
+- Functionality tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files concerned:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Functionality implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Functionality validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested

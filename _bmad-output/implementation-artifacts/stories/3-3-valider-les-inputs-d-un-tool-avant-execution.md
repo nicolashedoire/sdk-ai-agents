@@ -1,4 +1,4 @@
-# Story 3.3: Valider les inputs d'un tool avant exécution
+# Story 3.3: Validating a tool's inputs before execution
 
 **Story ID:** 3.3  
 **Epic:** 3 - Tool & Capability Management  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** que les inputs d'un tool soient validés avant exécution,
-**So that** je peux éviter les erreurs et garantir la sécurité.
+**As a** developer,
+**I want** a tool's inputs to be validated before execution,
+**So that** I can avoid errors and guarantee security.
 
 ## Acceptance Criteria
 
-**Given** un tool avec un schéma de validation est défini
-**When** l'agent tente d'appeler le tool avec des inputs
-**Then** les inputs sont validés contre le schéma avant exécution
-**And** une erreur claire est retournée si la validation échoue
-**And** le tool n'est pas exécuté si la validation échoue
-**And** l'erreur est tracée dans les événements
+**Given** a tool with a validation schema is defined
+**When** the agent attempts to call the tool with inputs
+**Then** the inputs are validated against the schema before execution
+**And** a clear error is returned if validation fails
+**And** the tool is not executed if validation fails
+**And** the error is tracked in the events
 
 ## Business Value
 
-- **Sécurité**: Validation avant exécution
-- **Fiabilité**: Erreurs évitées
-- **Traçabilité**: Erreurs tracées
+- **Security**: Validation before execution
+- **Reliability**: Errors avoided
+- **Traceability**: Errors tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase MVP
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current State:**
+- Complete implementation in the MVP codebase
+- Feature tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files Involved:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée dans le MVP. Voir les fichiers sources pour les détails d'implémentation.
+Feature implemented and tested in the MVP. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Feature validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète dans le MVP  
-**Notes:** Story MVP complétée et testée
+**Implementation:** Complete in the MVP  
+**Notes:** MVP story completed and tested

@@ -28,6 +28,8 @@ export class ToolRegistry {
       version: definition.version || '1.0.0',
       capability: definition.capability,
       metadata: definition.metadata,
+      ...(definition.inputJsonSchema ? { inputJsonSchema: definition.inputJsonSchema } : {}),
+      ...(definition.retry ? { retry: definition.retry } : {}),
     };
 
     this.tools.set(definition.name, tool);

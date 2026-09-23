@@ -74,7 +74,7 @@ describe('LLMProvider Interface', () => {
   });
 
   it('should define LLMProvider interface contract', () => {
-    // Test que l'interface peut être implémentée
+    // Checks that the interface can be implemented
     const mockProvider: LLMProvider = {
       async generateCompletion(_request: LLMRequest): Promise<LLMResponse> {
         return {

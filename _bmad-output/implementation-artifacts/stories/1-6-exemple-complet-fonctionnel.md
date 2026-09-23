@@ -1,4 +1,4 @@
-# Story 1.6: Exemple complet fonctionnel
+# Story 1.6: Complete functional example
 
 **Story ID:** 1.6  
 **Epic:** 1 - Quick Start & SDK Foundation  
@@ -7,71 +7,71 @@
 
 ## User Story
 
-**As a** développeur,  
-**I want** un exemple complet fonctionnel fourni par le SDK,  
-**So that** je peux comprendre comment utiliser toutes les fonctionnalités de base.
+**As a** developer,  
+**I want** a complete functional example provided by the SDK,  
+**So that** I can understand how to use all the core features.
 
 ## Acceptance Criteria
 
-**Given** le SDK est installé  
-**When** je consulte l'exemple fourni  
-**Then** l'exemple montre un agent complet avec tool + replay  
-**And** l'exemple est fonctionnel et exécutable  
-**And** l'exemple démontre les concepts fondamentaux  
-**And** l'exemple peut être copié et adapté facilement
+**Given** the SDK is installed  
+**When** I look at the provided example  
+**Then** the example shows a complete agent with tool + replay  
+**And** the example is functional and executable  
+**And** the example demonstrates the fundamental concepts  
+**And** the example can be easily copied and adapted
 
 ## Business Value
 
-- **Apprentissage**: Exemple complet pour comprendre
-- **Référence**: Template pour nouveaux projets
-- **Démonstration**: Toutes les features MVP montrées
-- **Réutilisabilité**: Code copiable et adaptable
+- **Learning**: Complete example for understanding
+- **Reference**: Template for new projects
+- **Demonstration**: All MVP features shown
+- **Reusability**: Copyable and adaptable code
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Exemple complet dans `examples/complete-example.ts`
-- Démontre: agent, tool, capability, replay, trace
-- Fonctionnel et exécutable
-- Commenté et documenté
+**Current State:**
+- Complete example in `examples/complete-example.ts`
+- Demonstrates: agent, tool, capability, replay, trace
+- Functional and executable
+- Commented and documented
 
-**Fichiers concernés:**
-- `examples/complete-example.ts` - Exemple complet
-- `examples/README.md` - Documentation exemples
+**Files Involved:**
+- `examples/complete-example.ts` - Complete example
+- `examples/README.md` - Examples documentation
 
-### Implémentation
+### Implementation
 
-**Exemple Complet Inclut:**
-- Création SDK
-- Création agent
-- Définition tool
-- Définition capability
-- Exécution agent
+**The Complete Example Includes:**
+- SDK creation
+- Agent creation
+- Tool definition
+- Capability definition
+- Agent execution
 - Replay
 - Trace
-- Tous les concepts MVP
+- All MVP concepts
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Complétude**: Toutes features MVP
-2. **Fonctionnalité**: Exécutable
-3. **Clarté**: Bien commenté
-4. **Réutilisabilité**: Adaptable
+1. **Completeness**: All MVP features
+2. **Functionality**: Executable
+3. **Clarity**: Well commented
+4. **Reusability**: Adaptable
 
 ## Testing Requirements
 
-- ✅ Exemple exécutable
-- ✅ Toutes features démontrées
-- ✅ Code fonctionnel
-- ✅ Documentation claire
+- ✅ Example executable
+- ✅ All features demonstrated
+- ✅ Functional code
+- ✅ Clear documentation
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète dans `examples/complete-example.ts`
+**Implementation:** Complete in `examples/complete-example.ts`
 
 

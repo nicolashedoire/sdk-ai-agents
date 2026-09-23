@@ -1,4 +1,4 @@
-# Story 14.1: Golden Traces - Tests Basés sur Traces
+# Story 14.1: Golden Traces - Trace-Based Tests
 
 **Epic:** Epic 14 - Testing & Quality Assurance  
 **Status:** completed  
@@ -7,37 +7,37 @@
 
 ## Description
 
-Permettre à un développeur de créer des tests basés sur des traces (golden traces) pour valider le comportement attendu d'un agent.
+Allow a developer to create trace-based tests (golden traces) to validate an agent's expected behavior.
 
-## Contexte
+## Context
 
-Les golden traces sont des traces d'exécution "référence" qui représentent le comportement attendu d'un agent. Elles permettent de détecter les régressions en comparant de nouvelles exécutions avec ces traces de référence.
+Golden traces are "reference" execution traces that represent an agent's expected behavior. They make it possible to detect regressions by comparing new executions with these reference traces.
 
 ## Acceptance Criteria
 
-### AC1: Créer une Golden Trace
-**Given** un développeur a une trace d'exécution valide  
-**When** il appelle `sdk.createGoldenTrace(runId, name, description)`  
-**Then** une golden trace est créée et stockée avec le runId, le nom, la description et la trace complète
+### AC1: Create a Golden Trace
+**Given** a developer has a valid execution trace  
+**When** they call `sdk.createGoldenTrace(runId, name, description)`  
+**Then** a golden trace is created and stored with the runId, the name, the description and the complete trace
 
-### AC2: Lister les Golden Traces
-**Given** des golden traces existent  
-**When** un développeur appelle `sdk.getGoldenTraces(agentId?)`  
-**Then** la liste des golden traces est retournée, optionnellement filtrée par agentId
+### AC2: List Golden Traces
+**Given** golden traces exist  
+**When** a developer calls `sdk.getGoldenTraces(agentId?)`  
+**Then** the list of golden traces is returned, optionally filtered by agentId
 
-### AC3: Supprimer une Golden Trace
-**Given** une golden trace existe  
-**When** un développeur appelle `sdk.deleteGoldenTrace(goldenTraceId)`  
-**Then** la golden trace est supprimée
+### AC3: Delete a Golden Trace
+**Given** a golden trace exists  
+**When** a developer calls `sdk.deleteGoldenTrace(goldenTraceId)`  
+**Then** the golden trace is deleted
 
-### AC4: Exporter une Golden Trace
-**Given** une golden trace existe  
-**When** un développeur appelle `sdk.exportGoldenTrace(goldenTraceId, format)`  
-**Then** la golden trace est exportée au format JSON ou YAML
+### AC4: Export a Golden Trace
+**Given** a golden trace exists  
+**When** a developer calls `sdk.exportGoldenTrace(goldenTraceId, format)`  
+**Then** the golden trace is exported in JSON or YAML format
 
 ## Technical Details
 
-### Types à créer
+### Types to Create
 
 ```typescript
 interface GoldenTrace {
@@ -58,7 +58,7 @@ interface GoldenTraceConfig {
 }
 ```
 
-### Méthodes SDK
+### SDK Methods
 
 - `createGoldenTrace(runId: string, config: GoldenTraceConfig): Promise<GoldenTrace>`
 - `getGoldenTraces(agentId?: string): Promise<GoldenTrace[]>`
@@ -66,23 +66,22 @@ interface GoldenTraceConfig {
 - `deleteGoldenTrace(goldenTraceId: string): Promise<void>`
 - `exportGoldenTrace(goldenTraceId: string, format?: 'json' | 'yaml'): Promise<string>`
 
-### Stockage
+### Storage
 
-Les golden traces peuvent être stockées dans :
-- Un fichier JSON dans un dossier `golden-traces/`
-- L'Event Store (si SQL) dans une table dédiée
-- Un système de fichiers avec métadonnées
+Golden traces can be stored in:
+- A JSON file in a `golden-traces/` folder
+- The Event Store (if SQL) in a dedicated table
+- A file system with metadata
 
 ## Tests
 
-- Créer une golden trace à partir d'une trace existante
-- Lister les golden traces
-- Supprimer une golden trace
-- Exporter une golden trace
-- Gérer les erreurs (runId invalide, golden trace inexistante)
+- Create a golden trace from an existing trace
+- List golden traces
+- Delete a golden trace
+- Export a golden trace
+- Handle errors (invalid runId, nonexistent golden trace)
 
 ## Dependencies
 
-- Epic 7: Tracing & Observability (traces disponibles)
-- Epic 6: Event Sourcing (récupération des traces)
-
+- Epic 7: Tracing & Observability (traces available)
+- Epic 6: Event Sourcing (trace retrieval)

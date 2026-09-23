@@ -37,6 +37,14 @@ export class AgentImpl {
     private eventStore: IEventStore
   ) {}
 
+  get id(): string {
+    return this.agent.id;
+  }
+
+  get name(): string {
+    return this.agent.name;
+  }
+
   async run(input: RunInput): Promise<RunResult> {
     const runId = generateRunId();
     const abortController = new AbortController();

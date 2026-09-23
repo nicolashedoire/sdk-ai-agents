@@ -1,4 +1,4 @@
-# Story 2.1: Démarrer l'exécution d'un agent avec input initial
+# Story 2.1: Starting the execution of an agent with an initial input
 
 **Story ID:** 2.1  
 **Epic:** 2 - Agent Lifecycle & Execution Management  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** démarrer l'exécution d'un agent avec un input initial,
-**So that** je peux faire exécuter une tâche à mon agent.
+**As a** developer,
+**I want** to start the execution of an agent with an initial input,
+**So that** I can have my agent execute a task.
 
 ## Acceptance Criteria
 
-**Given** un agent est créé et configuré
-**When** j'appelle `agent.run({ input: '...' })`
-**Then** l'exécution démarre avec succès
-**And** un runId unique est généré et retourné
-**And** l'état initial de l'exécution est "pending" puis "running"
-**And** l'input est validé avant le démarrage
+**Given** an agent is created and configured
+**When** I call `agent.run({ input: '...' })`
+**Then** the execution starts successfully
+**And** a unique runId is generated and returned
+**And** the initial execution state is "pending" then "running"
+**And** the input is validated before starting
 
 ## Business Value
 
-- **Exécution**: Démarrage simple et intuitif
-- **Traçabilité**: RunId unique pour suivi
-- **Validation**: Input validé avant exécution
+- **Execution**: Simple and intuitive start
+- **Traceability**: Unique runId for tracking
+- **Validation**: Input validated before execution
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase MVP
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current State:**
+- Complete implementation in the MVP codebase
+- Feature tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files Involved:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée dans le MVP. Voir les fichiers sources pour les détails d'implémentation.
+Feature implemented and tested in the MVP. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Feature validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète dans le MVP  
-**Notes:** Story MVP complétée et testée
+**Implementation:** Complete in the MVP  
+**Notes:** MVP story completed and tested

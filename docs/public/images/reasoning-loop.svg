@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600" role="img" aria-labelledby="title">
+<title id="title">The cognitive loop: represent, hypothesize, simulate, critique, seek information, compare, decide around an explicit mental state</title>
+<defs>
+  <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#4F46E5"/><stop offset="0.55" stop-color="#7C3AED"/><stop offset="1" stop-color="#C026D3"/>
+  </linearGradient>
+  <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#0D9488"/><stop offset="1" stop-color="#0284C7"/>
+  </linearGradient>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0 0 L10 5 L0 10 z" fill="#94A3B8"/>
+  </marker>
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+    <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.25"/>
+  </filter>
+</defs>
+<g font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+<circle cx="300" cy="300" r="222" fill="none" stroke="#94A3B8" stroke-opacity="0.35" stroke-width="2" stroke-dasharray="3 7"/>
+<path d="M364.9 87.7 A222 222 0 0 1 425.5 116.9" fill="none" stroke="#94A3B8" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M506.5 218.4 A222 222 0 0 1 521.4 284.0" fill="none" stroke="#94A3B8" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M492.5 410.5 A222 222 0 0 1 450.6 463.1" fill="none" stroke="#94A3B8" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M333.6 519.4 A222 222 0 0 1 266.4 519.4" fill="none" stroke="#94A3B8" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M149.4 463.1 A222 222 0 0 1 107.5 410.5" fill="none" stroke="#94A3B8" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M78.6 284.0 A222 222 0 0 1 93.5 218.4" fill="none" stroke="#94A3B8" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M174.5 116.9 A222 222 0 0 1 235.1 87.7" fill="none" stroke="#94A3B8" stroke-width="2.2" marker-end="url(#arrow)"/>
+<circle cx="300" cy="300" r="128" fill="url(#brand)" filter="url(#shadow)"/>
+<circle cx="300" cy="300" r="128" fill="none" stroke="#fff" stroke-opacity="0.18" stroke-width="10"/>
+<text x="300" y="262" text-anchor="middle" font-size="12" font-weight="700" letter-spacing="2" fill="#fff" fill-opacity="0.8">EXPLICIT</text>
+<text x="300" y="290" text-anchor="middle" font-size="26" font-weight="800" fill="#fff">Mental state</text>
+<text x="300" y="320" text-anchor="middle" font-size="13.5" fill="#fff" fill-opacity="0.9">facts · assumptions</text>
+<text x="300" y="340" text-anchor="middle" font-size="13.5" fill="#fff" fill-opacity="0.9">unknowns · hypotheses</text>
+<text x="300" y="360" text-anchor="middle" font-size="13.5" fill="#fff" fill-opacity="0.9">contradictions · confidence</text>
+<rect x="236.0" y="57.0" width="128" height="42" rx="21.0" fill="#4F46E5" filter="url(#shadow)"/><text x="300.0" y="83.2" text-anchor="middle" font-size="15" font-weight="600" fill="#fff">Represent</text>
+<rect x="409.6" y="140.6" width="128" height="42" rx="21.0" fill="#7C3AED" filter="url(#shadow)"/><text x="473.6" y="166.8" text-anchor="middle" font-size="15" font-weight="600" fill="#fff">Hypothesize</text>
+<rect x="452.4" y="328.4" width="128" height="42" rx="21.0" fill="#C026D3" filter="url(#shadow)"/><text x="516.4" y="354.6" text-anchor="middle" font-size="15" font-weight="600" fill="#fff">Simulate</text>
+<rect x="332.3" y="479.0" width="128" height="42" rx="21.0" fill="#E11D48" filter="url(#shadow)"/><text x="396.3" y="505.3" text-anchor="middle" font-size="15" font-weight="600" fill="#fff">Critique</text>
+<rect x="139.7" y="479.0" width="128" height="42" rx="21.0" fill="#D97706" filter="url(#shadow)"/><text x="203.7" y="505.3" text-anchor="middle" font-size="15" font-weight="600" fill="#fff">Seek info</text>
+<rect x="19.6" y="328.4" width="128" height="42" rx="21.0" fill="#0D9488" filter="url(#shadow)"/><text x="83.6" y="354.6" text-anchor="middle" font-size="15" font-weight="600" fill="#fff">Compare</text>
+<rect x="62.4" y="140.6" width="128" height="42" rx="21.0" fill="#0284C7" filter="url(#shadow)"/><text x="126.4" y="166.8" text-anchor="middle" font-size="15" font-weight="600" fill="#fff">Decide</text>
+</g>
+</svg>

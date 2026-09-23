@@ -1,4 +1,4 @@
-# Story 1.5: Documentation des concepts clés
+# Story 1.5: Documentation of key concepts
 
 **Story ID:** 1.5  
 **Epic:** 1 - Quick Start & SDK Foundation  
@@ -7,68 +7,68 @@
 
 ## User Story
 
-**As a** développeur,  
-**I want** comprendre les concepts clés via la documentation,  
-**So that** je peux utiliser le SDK efficacement et comprendre le paradigme.
+**As a** developer,  
+**I want** to understand the key concepts through the documentation,  
+**So that** I can use the SDK effectively and understand the paradigm.
 
 ## Acceptance Criteria
 
-**Given** je suis nouveau sur le SDK  
-**When** je consulte la documentation  
-**Then** les concepts clés sont expliqués clairement (agent ≠ LLM, event-sourcing, replay)  
-**And** chaque concept explique le problème qu'il résout  
-**And** la documentation est orientée "mental model" pas "how-to magique"  
-**And** des exemples illustrent chaque concept
+**Given** I am new to the SDK  
+**When** I read the documentation  
+**Then** the key concepts are explained clearly (agent ≠ LLM, event-sourcing, replay)  
+**And** each concept explains the problem it solves  
+**And** the documentation is oriented toward a "mental model", not a "magic how-to"  
+**And** examples illustrate each concept
 
 ## Business Value
 
-- **Compréhension**: Paradigme clair dès le début
-- **Adoption**: Meilleure compréhension = meilleure adoption
-- **Efficacité**: Utilisation correcte du SDK
-- **Mental Model**: Compréhension profonde vs surface
+- **Understanding**: Clear paradigm from the start
+- **Adoption**: Better understanding = better adoption
+- **Efficiency**: Correct use of the SDK
+- **Mental Model**: Deep understanding rather than surface-level
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Documentation concepts dans `docs/CONCEPTS.md`
-- Explication du paradigme agent ≠ LLM
-- Event-sourcing expliqué
-- Replay expliqué
+**Current State:**
+- Concepts documentation in `docs/CONCEPTS.md`
+- Explanation of the agent ≠ LLM paradigm
+- Event-sourcing explained
+- Replay explained
 
-**Fichiers concernés:**
-- `docs/CONCEPTS.md` - Documentation complète des concepts
-- `README.md` - Vue d'ensemble
+**Files Involved:**
+- `docs/CONCEPTS.md` - Complete concepts documentation
+- `README.md` - Overview
 
-### Concepts Clés Documentés
+### Key Concepts Documented
 
-1. **Agent ≠ LLM**: Séparation conceptuelle
-2. **Event-Sourcing**: Source de vérité unique
-3. **Replay**: Rejouabilité sans LLM
-4. **Séparation Raisonnement/Action**: Sécurité by design
-5. **Policies**: Gouvernance native
-6. **Tools**: Contrôle et sécurité
+1. **Agent ≠ LLM**: Conceptual separation
+2. **Event-Sourcing**: Single source of truth
+3. **Replay**: Replayability without the LLM
+4. **Reasoning/Action Separation**: Security by design
+5. **Policies**: Native governance
+6. **Tools**: Control and security
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Mental Model**: Focus sur compréhension
-2. **Problèmes Résolus**: Chaque concept explique pourquoi
-3. **Exemples**: Illustrations concrètes
-4. **Clarté**: Langage accessible
+1. **Mental Model**: Focus on understanding
+2. **Problems Solved**: Each concept explains why
+3. **Examples**: Concrete illustrations
+4. **Clarity**: Accessible language
 
 ## Testing Requirements
 
-- ✅ Concepts expliqués clairement
-- ✅ Problèmes résolus identifiés
-- ✅ Exemples fournis
-- ✅ Mental model établi
+- ✅ Concepts explained clearly
+- ✅ Problems solved identified
+- ✅ Examples provided
+- ✅ Mental model established
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète dans `docs/CONCEPTS.md`
+**Implementation:** Complete in `docs/CONCEPTS.md`
 
 

@@ -1,4 +1,4 @@
-# Story 8.2: Replay fonctionne sans recontacter le LLM (mode replay)
+# Story 8.2: Replay works without contacting the LLM again (replay mode)
 
 **Story ID:** 8.2  
 **Epic:** 8 - Replay & Debugging  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** système,
-**I want** que le replay fonctionne sans recontacter le LLM,
-**So that** le replay est rapide, déterministe et économique.
+**As a** system,
+**I want** replay to work without contacting the LLM again,
+**So that** replay is fast, deterministic, and cost-effective.
 
 ## Acceptance Criteria
 
-**Given** un replay est effectué
-**When** le replay est exécuté
-**Then** aucun appel LLM n'est effectué
-**And** les intentions originales sont réutilisées depuis les événements
-**And** le replay est beaucoup plus rapide que l'exécution originale
-**And** le replay est déterministe (même résultat à chaque fois)
+**Given** a replay is performed
+**When** the replay is executed
+**Then** no LLM call is made
+**And** the original intentions are reused from the events
+**And** the replay is much faster than the original execution
+**And** the replay is deterministic (same result every time)
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current state:**
+- Complete implementation in the codebase
+- Functionality tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files concerned:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Functionality implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Functionality validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested

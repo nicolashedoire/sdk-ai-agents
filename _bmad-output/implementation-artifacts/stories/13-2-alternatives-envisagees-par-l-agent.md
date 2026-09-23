@@ -1,79 +1,79 @@
-# Story 13.2: Alternatives Envisagées par l'Agent
+# Story 13.2: Alternatives Considered by the Agent
 
 **Story ID:** 13.2  
-**Epic:** 13 - Observabilité Cognitive  
+**Epic:** 13 - Cognitive Observability  
 **Status:** review  
 **Created:** 2026-01-06
 
 ## User Story
 
-**As a** développeur,
-**I want** voir les alternatives envisagées par l'agent,
-**So that** je peux comprendre pourquoi certaines options ont été choisies.
+**As a** developer,
+**I want** to see the alternatives considered by the agent,
+**So that** I can understand why certain options were chosen.
 
 ## Acceptance Criteria
 
-**Given** une exécution d'agent
-**When** je consulte les alternatives
-**Then** je peux voir les options considérées
-**And** les raisons du choix sont expliquées
-**And** les alternatives sont tracées dans les événements
+**Given** an agent execution
+**When** I look at the alternatives
+**Then** I can see the options considered
+**And** the reasons for the choice are explained
+**And** the alternatives are traced in the events
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events traced
 
 ## Technical Requirements
 
-### Stack Front-End
+### Front-End Stack
 
-**Technologies requises:**
-- **Storybook 10**: Pour le développement et la documentation des composants UI
-- **Tailwind CSS**: Pour le styling et le design system
-- **shadcn/ui**: Composants UI réutilisables basés sur Radix UI
+**Required technologies:**
+- **Storybook 10**: For UI component development and documentation
+- **Tailwind CSS**: For styling and the design system
+- **shadcn/ui**: Reusable UI components based on Radix UI
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- À implémenter avec composants React/TypeScript
-- Affichage des alternatives envisagées par l'agent
-- Comparaison visuelle des options
+**Current state:**
+- To be implemented with React/TypeScript components
+- Display of alternatives considered by the agent
+- Visual comparison of options
 
-**Fichiers concernés:**
-- Composants React dans `src/components/alternatives-viewer/`
-- Stories Storybook dans `.storybook/`
-- Styles Tailwind CSS
-- Composants shadcn/ui pour l'interface
+**Files concerned:**
+- React components in `src/components/alternatives-viewer/`
+- Storybook stories in `.storybook/`
+- Tailwind CSS styles
+- shadcn/ui components for the interface
 
-### Implémentation
+### Implementation
 
-**Composants à créer:**
-- `AlternativesViewer` - Composant principal
-- `AlternativeCard` - Carte d'alternative
-- `ComparisonView` - Vue de comparaison
-- `ReasoningDisplay` - Affichage du raisonnement
+**Components to create:**
+- `AlternativesViewer` - Main component
+- `AlternativeCard` - Alternative card
+- `ComparisonView` - Comparison view
+- `ReasoningDisplay` - Reasoning display
 
-**Bibliothèques recommandées:**
-- Composants shadcn/ui: Card, Badge, Tabs, etc.
-- Tailwind CSS pour le styling
+**Recommended libraries:**
+- shadcn/ui components: Card, Badge, Tabs, etc.
+- Tailwind CSS for styling
 
 ## Library & Framework Requirements
 
-### Dépendances Front-End Requises
+### Required Front-End Dependencies
 
 **Storybook:**
 - `@storybook/react` v10.x
 - `@storybook/addon-essentials` v10.x
-- `@storybook/addon-interactions` pour tests interactifs
+- `@storybook/addon-interactions` for interactive tests
 
 **Tailwind CSS:**
-- `tailwindcss` dernière version stable
-- Configuration avec thème personnalisé
+- `tailwindcss` latest stable version
+- Configuration with a custom theme
 
 **shadcn/ui:**
-- Composants nécessaires: Card, Badge, Tabs, Accordion, etc.
+- Required components: Card, Badge, Tabs, Accordion, etc.
 
 ### Installation
 
@@ -96,102 +96,102 @@ npx shadcn-ui@latest add card badge tabs accordion
 src/
   components/
     alternatives-viewer/
-      AlternativesViewer.tsx  # Composant principal
-      AlternativeCard.tsx      # Carte d'alternative
-      ComparisonView.tsx       # Vue de comparaison
-      ReasoningDisplay.tsx     # Affichage raisonnement
+      AlternativesViewer.tsx  # Main component
+      AlternativeCard.tsx      # Alternative card
+      ComparisonView.tsx       # Comparison view
+      ReasoningDisplay.tsx     # Reasoning display
       index.ts                 # Exports
-  ui/                         # Composants shadcn/ui
+  ui/                         # shadcn/ui components
     card.tsx
     badge.tsx
     tabs.tsx
     accordion.tsx
     ...
 .storybook/
-  main.ts                     # Configuration Storybook 10
-  preview.ts                  # Configuration preview
+  main.ts                     # Storybook 10 configuration
+  preview.ts                  # Preview configuration
 stories/
-  AlternativesViewer.stories.tsx  # Stories Storybook
+  AlternativesViewer.stories.tsx  # Storybook stories
   AlternativeCard.stories.tsx
   ...
 ```
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events traced
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires des composants React
-- ✅ Tests Storybook avec interactions
-- ✅ Tests d'intégration avec données réelles
-- ✅ Tests d'accessibilité (a11y)
+- ✅ Unit tests for React components
+- ✅ Storybook tests with interactions
+- ✅ Integration tests with real data
+- ✅ Accessibility tests (a11y)
 
 ## Story Completion Status
 
 **Status:** review  
-**Implementation:** Backend complété - Extraction et analyse des alternatives envisagées  
-**Notes:** Partie backend implémentée. La visualisation frontend (React/Storybook) peut être ajoutée séparément.
+**Implementation:** Backend completed - Extraction and analysis of alternatives considered  
+**Notes:** Backend part implemented. Frontend visualization (React/Storybook) can be added separately.
 
 ## Implementation Details (Backend)
 
 ### Components Created
 
 1. **Alternatives Types** (`src/types/alternatives.ts`)
-   - `Alternative`: Représente une alternative envisagée (intention, tool_call, action, decision)
-   - `AlternativesAnalysis`: Analyse complète avec points de décision et statistiques
+   - `Alternative`: Represents an alternative considered (intention, tool_call, action, decision)
+   - `AlternativesAnalysis`: Complete analysis with decision points and statistics
 
 2. **AlternativesExtractor** (`src/utils/alternatives-extractor.ts`)
-   - `extractFromEvents()`: Extrait les alternatives depuis une séquence d'événements
-   - Identifie les tool calls multiples (alternatives)
-   - Détecte les intentions rejetées
-   - Analyse les rejections de policies
-   - Gère les workflows d'approbation (approvals rejetées)
-   - Calcule les statistiques (selected, rejected, considered)
+   - `extractFromEvents()`: Extracts alternatives from a sequence of events
+   - Identifies multiple tool calls (alternatives)
+   - Detects rejected intentions
+   - Analyzes policy rejections
+   - Handles approval workflows (rejected approvals)
+   - Computes statistics (selected, rejected, considered)
 
 3. **SDK Method** (`src/sdk.ts`)
-   - `getAlternatives(runId)`: Récupère l'analyse des alternatives pour un run
+   - `getAlternatives(runId)`: Retrieves the alternatives analysis for a run
 
-### Alternative Types Supported
+### Supported Alternative Types
 
-- **intention**: Intention générée mais non exécutée
-- **tool_call**: Appel d'outil considéré parmi plusieurs options
-- **action**: Action considérée mais non exécutée
-- **decision**: Décision prise (approval, policy rejection)
+- **intention**: Intention generated but not executed
+- **tool_call**: Tool call considered among several options
+- **action**: Action considered but not executed
+- **decision**: Decision made (approval, policy rejection)
 
 ### Alternative Status
 
-- **considered**: Alternative considérée mais pas encore décidée
-- **selected**: Alternative choisie et exécutée
-- **rejected**: Alternative rejetée (policy, approval, etc.)
-- **not_executed**: Alternative considérée mais non exécutée (une autre a été choisie)
+- **considered**: Alternative considered but not yet decided
+- **selected**: Alternative chosen and executed
+- **rejected**: Alternative rejected (policy, approval, etc.)
+- **not_executed**: Alternative considered but not executed (another was chosen)
 
 ### Decision Points
 
-Chaque point de décision contient :
-- **context**: Contexte de la décision (message précédent, etc.)
-- **alternatives**: Liste des alternatives considérées
-- **selectedAlternative**: Alternative choisie (si applicable)
-- **reasoning**: Raisonnement expliquant le choix
+Each decision point contains:
+- **context**: Decision context (preceding message, etc.)
+- **alternatives**: List of alternatives considered
+- **selectedAlternative**: Alternative chosen (if applicable)
+- **reasoning**: Reasoning explaining the choice
 
 ### Tests
 
 - **Unit Tests**: `src/__tests__/alternatives.test.ts` (5 tests, all passing)
-  - Tests pour extraction avec tool calls multiples
-  - Tests pour intentions rejetées
-  - Tests pour rejections de policies
-  - Tests pour workflows d'approbation
-  - Tests pour statistiques
+  - Tests for extraction with multiple tool calls
+  - Tests for rejected intentions
+  - Tests for policy rejections
+  - Tests for approval workflows
+  - Tests for statistics
 
 - **Integration Tests**: `src/__tests__/sdk-alternatives.test.ts` (3 tests, all passing)
-  - Tests pour `getAlternatives()` via SDK
-  - Tests pour intentions rejetées
-  - Tests de gestion d'erreurs
+  - Tests for `getAlternatives()` via SDK
+  - Tests for rejected intentions
+  - Tests for error handling
 
 ### Usage Example
 
@@ -223,8 +223,8 @@ for (const decisionPoint of analysis.decisionPoints) {
 
 ### Next Steps (Frontend)
 
-La partie backend est complète. Pour la visualisation frontend :
-- Utiliser les données JSON de l'analyse des alternatives
-- Créer des composants React pour afficher les alternatives
-- Comparer visuellement les options considérées
-- Intégrer avec Storybook pour la documentation
+The backend part is complete. For frontend visualization:
+- Use the alternatives analysis JSON data
+- Create React components to display the alternatives
+- Visually compare the options considered
+- Integrate with Storybook for documentation

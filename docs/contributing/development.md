@@ -1,4 +1,4 @@
-# SDK_AI_Agents - Development Guide
+# Development guide
 
 **Date:** 2026-01-06
 
@@ -7,13 +7,13 @@
 ### Required
 
 - **Node.js**: 20.0.0+ (LTS)
-- **npm**: Inclus avec Node.js
-- **TypeScript**: 5.3.2+ (installé localement via npm)
+- **npm**: Included with Node.js
+- **TypeScript**: 5.3.2+ (installed locally via npm)
 
 ### Optional
 
-- **PostgreSQL**: 8.11.0+ (pour PostgreSQLEventStore, peer dependency)
-- **Git**: Pour version control
+- **PostgreSQL**: 8.11.0+ (for PostgreSQLEventStore, peer dependency)
+- **Git**: For version control
 
 ## Environment Setup
 
@@ -32,7 +32,7 @@ npm install
 
 ### 3. Configure Environment Variables
 
-Créer un fichier `.env` à la racine (optionnel, pour les exemples) :
+Create a `.env` file at the root (optional, for the examples):
 
 ```bash
 OPENAI_API_KEY=your-openai-api-key
@@ -43,17 +43,17 @@ ANTHROPIC_API_KEY=your-anthropic-api-key
 
 ### Build
 
-Compiler le TypeScript :
+Compile the TypeScript:
 
 ```bash
 npm run build
 ```
 
-Le code compilé sera dans `dist/`.
+The compiled code will be in `dist/`.
 
 ### Watch Mode
 
-Compiler en mode watch (recompilation automatique) :
+Compile in watch mode (automatic recompilation):
 
 ```bash
 npm run dev
@@ -131,7 +131,7 @@ npm run check:fix
 
 ### Adding a New Tool
 
-1. Définir le tool avec `sdk.defineTool()` :
+1. Define the tool with `sdk.defineTool()`:
 
 ```typescript
 const myTool = sdk.defineTool({
@@ -146,7 +146,7 @@ const myTool = sdk.defineTool({
 });
 ```
 
-2. Ajouter le tool à un agent :
+2. Add the tool to an agent:
 
 ```typescript
 const agent = sdk.createAgent({
@@ -158,7 +158,7 @@ const agent = sdk.createAgent({
 
 ### Adding a New Policy
 
-1. Définir la policy :
+1. Define the policy:
 
 ```typescript
 const myPolicy: Policy = {
@@ -173,7 +173,7 @@ const myPolicy: Policy = {
 };
 ```
 
-2. Appliquer la policy :
+2. Apply the policy:
 
 ```typescript
 sdk.defineGlobalPolicy(myPolicy);
@@ -181,7 +181,7 @@ sdk.defineGlobalPolicy(myPolicy);
 
 ### Adding a New Event Store
 
-1. Implémenter `IEventStore` :
+1. Implement `IEventStore`:
 
 ```typescript
 export class MyEventStore implements IEventStore {
@@ -193,11 +193,11 @@ export class MyEventStore implements IEventStore {
     // Implementation
   }
   
-  // ... autres méthodes
+  // ... other methods
 }
 ```
 
-2. Utiliser dans le SDK :
+2. Use it in the SDK:
 
 ```typescript
 const sdk = createSDK({
@@ -208,7 +208,7 @@ const sdk = createSDK({
 
 ### Adding a New LLM Provider
 
-1. Implémenter `LLMProvider` :
+1. Implement `LLMProvider`:
 
 ```typescript
 export class MyProvider implements LLMProvider {
@@ -226,10 +226,10 @@ export class MyProvider implements LLMProvider {
 }
 ```
 
-2. Ajouter au `ProviderFactory` :
+2. Add it to `ProviderFactory`:
 
 ```typescript
-// Dans provider-factory.ts
+// In provider-factory.ts
 case 'my-provider':
   return new MyProvider(config.apiKey, config.defaultModel);
 ```
@@ -238,13 +238,13 @@ case 'my-provider':
 
 ### TypeScript Compilation
 
-Le build utilise le compilateur TypeScript directement :
+The build uses the TypeScript compiler directly:
 
 ```bash
 tsc
 ```
 
-Configuration dans `tsconfig.json` :
+Configuration in `tsconfig.json`:
 - **Target**: ES2022
 - **Module**: ESNext
 - **Module Resolution**: node
@@ -269,15 +269,15 @@ dist/
 
 ### Unit Tests
 
-- Tests unitaires pour chaque module
-- Utilisation de Vitest
-- Mocking des dépendances externes (LLM providers, event stores)
+- Unit tests for each module
+- Uses Vitest
+- Mocking of external dependencies (LLM providers, event stores)
 
 ### Integration Tests
 
-- Tests d'intégration pour les workflows complets
-- Utilisation de mocks pour les providers LLM
-- Tests avec différents event stores
+- Integration tests for complete workflows
+- Uses mocks for LLM providers
+- Tests with different event stores
 
 ### Example Test Structure
 
@@ -297,11 +297,11 @@ describe('MyClass', () => {
 
 ### Source Maps
 
-Les source maps sont générées automatiquement lors du build. Permet de debugger le code TypeScript directement.
+Source maps are generated automatically during the build. They let you debug the TypeScript code directly.
 
 ### VS Code Debugging
 
-Configuration `.vscode/launch.json` :
+`.vscode/launch.json` configuration:
 
 ```json
 {
@@ -323,10 +323,10 @@ Configuration `.vscode/launch.json` :
 
 ### TypeScript Best Practices
 
-- **Strict Mode**: Toujours activé
-- **Type Safety**: Utiliser les types explicites
-- **No `any`**: Éviter `any`, utiliser `unknown` si nécessaire
-- **Interfaces vs Types**: Préférer interfaces pour objets, types pour unions/intersections
+- **Strict Mode**: Always enabled
+- **Type Safety**: Use explicit types
+- **No `any`**: Avoid `any`, use `unknown` if necessary
+- **Interfaces vs Types**: Prefer interfaces for objects, types for unions/intersections
 
 ### Naming Conventions
 
@@ -339,51 +339,51 @@ Configuration `.vscode/launch.json` :
 ### Code Organization
 
 - **One class/interface per file**
-- **Co-located types**: Types dans le même fichier ou `types/`
-- **Barrel exports**: `index.ts` pour exports publics
+- **Co-located types**: Types in the same file or `types/`
+- **Barrel exports**: `index.ts` for public exports
 
 ## Common Issues
 
 ### TypeScript Errors
 
-Si vous avez des erreurs TypeScript :
+If you get TypeScript errors:
 
-1. Vérifier que `tsconfig.json` est correct
-2. Vérifier que toutes les dépendances sont installées
-3. Nettoyer et rebuilder : `npm run clean && npm run build`
+1. Check that `tsconfig.json` is correct
+2. Check that all dependencies are installed
+3. Clean and rebuild: `npm run clean && npm run build`
 
 ### Test Failures
 
-Si les tests échouent :
+If tests fail:
 
-1. Vérifier que les mocks sont corrects
-2. Vérifier que les dépendances sont à jour
-3. Exécuter les tests en mode watch pour voir les erreurs en temps réel
+1. Check that the mocks are correct
+2. Check that dependencies are up to date
+3. Run the tests in watch mode to see errors in real time
 
 ### Build Errors
 
-Si le build échoue :
+If the build fails:
 
-1. Vérifier les erreurs TypeScript : `npm run build`
-2. Vérifier les erreurs de linting : `npm run lint`
-3. Nettoyer le dossier `dist/` : `npm run clean`
+1. Check the TypeScript errors: `npm run build`
+2. Check the linting errors: `npm run lint`
+3. Clean the `dist/` folder: `npm run clean`
 
 ## Release Process
 
 ### Versioning
 
-Le projet utilise le versioning sémantique (SemVer) :
-- **MAJOR**: Changements incompatibles
-- **MINOR**: Nouvelles fonctionnalités compatibles
-- **PATCH**: Corrections de bugs compatibles
+The project uses semantic versioning (SemVer):
+- **MAJOR**: Breaking changes
+- **MINOR**: Backward-compatible new features
+- **PATCH**: Backward-compatible bug fixes
 
 ### Pre-release Checklist
 
-- [ ] Tous les tests passent
-- [ ] Code linté et formaté
-- [ ] Documentation à jour
-- [ ] CHANGELOG.md mis à jour
-- [ ] Version dans `package.json` mise à jour
+- [ ] All tests pass
+- [ ] Code linted and formatted
+- [ ] Documentation up to date
+- [ ] CHANGELOG.md updated
+- [ ] Version in `package.json` updated
 
 ### Build for Release
 
@@ -412,4 +412,14 @@ npm run check
 
 _Generated using BMAD Method `document-project` workflow_
 
+## Documentation site
 
+The documentation is a VitePress site in `docs/`, illustrated with SVGs in `docs/public/images/`.
+
+```bash
+npm run docs:dev      # local preview with hot reload
+npm run docs:build    # static build in docs/.vitepress/dist
+npm run docs:preview  # serve the build
+```
+
+The `Docs` GitHub Actions workflow publishes it to GitHub Pages on every push to `main`.

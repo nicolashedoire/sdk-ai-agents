@@ -11,41 +11,41 @@ author: Nicolashedoire
 
 ## Executive Summary
 
-SDK_AI_Agents résout le problème fondamental du passage de l'IA expérimentale à l'IA opérationnelle. Alors que les équipes savent aujourd'hui faire "parler" une IA, elles ne savent pas faire agir une IA de manière fiable, contrôlée, explicable et sécurisée en production.
+SDK_AI_Agents solves the fundamental problem of moving from experimental AI to operational AI. While teams today know how to make an AI "talk," they don't know how to make an AI act reliably, in a controlled, explainable, and secure way in production.
 
-Le problème n'est pas le LLM, mais l'architecture autour du LLM. Les équipes techniques bricolent des agents fragiles, réinventent leurs propres frameworks, et gèrent la sécurité "à la confiance" avec des logs pauvres et des tests quasi inexistants.
+The problem isn't the LLM, but the architecture around the LLM. Technical teams cobble together fragile agents, reinvent their own frameworks, and handle security "on trust," with poor logs and virtually no tests.
 
-SDK_AI_Agents transforme les agents IA d'outils expérimentaux en systèmes décisionnels gouvernables, explicables et prêts pour la production. Il ne cherche pas à être un meilleur prompt framework ou un wrapper de LLM, mais l'infrastructure de gouvernance des agents IA où l'agent propose et le système décide.
+SDK_AI_Agents transforms AI agents from experimental tools into governable, explainable, production-ready decision-making systems. It doesn't aim to be a better prompt framework or an LLM wrapper, but the governance infrastructure for AI agents where the agent proposes and the system decides.
 
-**Vision en une phrase :** SDK_AI_Agents transforme les agents IA d'outils expérimentaux en systèmes décisionnels gouvernables, explicable et prêts pour la production.
+**Vision in one sentence:** SDK_AI_Agents transforms AI agents from experimental tools into governable, explainable, production-ready decision-making systems.
 
-### Value Proposition Clarifiée
+### Clarified Value Proposition
 
-**SDK_AI_Agents est le seul SDK qui transforme les agents IA en systèmes décisionnels gouvernables avec replay, audit et testabilité natifs.**
+**SDK_AI_Agents is the only SDK that transforms AI agents into governable decision-making systems with native replay, audit, and testability.**
 
-**Différenciation en 3 points mesurables :**
+**Differentiation in 3 measurable points:**
 
-1. **Event-sourcing natif** → Replay/audit en 1 commande (unique sur le marché)
-   - *Métrique :* "Avec SDK_AI_Agents, vous pouvez rejouer n'importe quelle exécution d'agent en 1 commande. Avec LangChain, c'est impossible."
+1. **Native event-sourcing** → Replay/audit in 1 command (unique in the market)
+   - *Metric:* "With SDK_AI_Agents, you can replay any agent execution in 1 command. With LangChain, that's impossible."
 
-2. **Séparation raisonnement/action** → Sécurité par design (pas de "tools libres")
-   - *Métrique :* Le LLM ne provoque jamais d'effet de bord direct. Toutes les actions passent par un Action Engine gouverné.
+2. **Separation of reasoning/action** → Security by design (no "free tools")
+   - *Metric:* The LLM never directly causes a side effect. All actions pass through a governed Action Engine.
 
-3. **Gouvernance intégrée** → Policies, budgets, approbations natifs (pas des plugins)
-   - *Métrique :* Sécurité "deny by default" avec contrats explicites pour chaque capability.
+3. **Built-in governance** → Native policies, budgets, approvals (not plugins)
+   - *Metric:* "Deny by default" security with explicit contracts for each capability.
 
-**Positionnement clair :**
-- ❌ Pas un meilleur LangChain
-- ❌ Pas un wrapper LLM  
-- ✅ L'infrastructure de gouvernance des agents IA
+**Clear positioning:**
+- ❌ Not a better LangChain
+- ❌ Not an LLM wrapper  
+- ✅ The governance infrastructure for AI agents
 
-**Cible initiale :**
-- Équipes qui ont déjà essayé LangChain/Semantic Kernel et ont besoin de gouvernance
-- Entreprises qui ne peuvent pas déployer sans audit/traçabilité
-- Tech leads responsables de la sécurité et des coûts
+**Initial target:**
+- Teams that have already tried LangChain/Semantic Kernel and need governance
+- Enterprises that cannot deploy without audit/traceability
+- Tech leads responsible for security and costs
 
-**Avantage concurrentiel durable :**
-Architecture cohérente pensée ensemble, pas des features ajoutées. Difficile à copier sans refonte complète.
+**Durable competitive advantage:**
+A coherent architecture designed together, not features bolted on. Hard to copy without a complete redesign.
 
 ---
 
@@ -53,1432 +53,1432 @@ Architecture cohérente pensée ensemble, pas des features ajoutées. Difficile 
 
 ### Problem Statement
 
-SDK_AI_Agents résout le problème du passage de l'IA expérimentale à l'IA opérationnelle. Aujourd'hui, les équipes savent faire "parler" une IA, mais elles ne savent pas faire agir une IA de manière fiable, contrôlée, explicable et sécurisée en production.
+SDK_AI_Agents solves the problem of moving from experimental AI to operational AI. Today, teams know how to make an AI "talk," but they don't know how to make an AI act reliably, in a controlled, explainable, and secure way in production.
 
-Le problème n'est pas le LLM. Le problème est l'architecture autour du LLM.
+The problem isn't the LLM. The problem is the architecture around the LLM.
 
-**Qui est le plus impacté aujourd'hui :**
+**Who is most affected today:**
 
-- **Développeurs backend / fullstack** qui bricolent des agents fragiles
-- **Tech leads / architectes** responsables de la fiabilité, de la sécurité et des coûts
-- **Équipes produit** qui veulent des agents utiles, pas imprévisibles
-- **Entreprises** qui ne peuvent pas déployer des agents sans audit, contrôle et traçabilité
+- **Backend / fullstack developers** who cobble together fragile agents
+- **Tech leads / architects** responsible for reliability, security, and costs
+- **Product teams** who want agents that are useful, not unpredictable
+- **Enterprises** that cannot deploy agents without audit, control, and traceability
 
-Ce sont précisément les équipes qui veulent aller plus loin que le PoC, mais qui sont bloquées.
+These are precisely the teams that want to go beyond the PoC, but are stuck.
 
 ### Problem Impact
 
-**Comment les équipes résolvent-elles ce problème aujourd'hui :**
+**How teams solve this problem today:**
 
-- Boucles LLM + tools "maison"
-- Frameworks partiels ou trop génériques
-- Beaucoup de glue code non testable
-- Sécurité gérée "à la confiance"
-- Logs pauvres, décisions opaques
-- Tests quasi inexistants
+- Homegrown LLM + tools loops
+- Partial or overly generic frameworks
+- A lot of untestable glue code
+- Security handled "on trust"
+- Poor logs, opaque decisions
+- Virtually no tests
 
-Chaque équipe réinvente son propre framework d'agents, souvent en production.
+Every team reinvents its own agent framework, often in production.
 
-**Frustrations principales avec les solutions existantes :**
+**Main frustrations with existing solutions:**
 
-- ❌ Impossible de rejouer ou comprendre une décision
-- ❌ Tools dangereux appelés sans garde-fous
-- ❌ Aucun standard pour policies, budgets, approbations
-- ❌ Observabilité limitée à des logs textuels
-- ❌ Tests d'agents quasi impossibles
-- ❌ Coûts IA imprévisibles
-- ❌ Forte dette technique dès le départ
+- ❌ Impossible to replay or understand a decision
+- ❌ Dangerous tools called with no guardrails
+- ❌ No standard for policies, budgets, approvals
+- ❌ Observability limited to text logs
+- ❌ Agent testing is nearly impossible
+- ❌ Unpredictable AI costs
+- ❌ Heavy technical debt from the start
 
-**Que se passe-t-il si ce problème n'est pas résolu :**
+**What happens if this problem isn't solved:**
 
-- Les agents restent cantonnés à des démos ou assistants passifs
-- Les entreprises n'osent pas leur confier des actions réelles
-- Explosion des risques (sécurité, coûts, conformité)
-- Rejet progressif des agents par les équipes techniques
-- Avantage concurrentiel manqué
+- Agents stay confined to demos or passive assistants
+- Enterprises don't dare entrust them with real actions
+- Explosion of risks (security, costs, compliance)
+- Gradual rejection of agents by technical teams
+- Missed competitive advantage
 
-👉 **Sans solution structurante, l'IA autonome restera sous-exploitée.**
+👉 **Without a structuring solution, autonomous AI will remain underused.**
 
 ### Why Existing Solutions Fall Short
 
-Les solutions existantes (LangChain, AutoGPT, Semantic Kernel, etc.) se concentrent sur l'orchestration et le tool calling, mais manquent de gouvernance native, d'observabilité complète et de séparation claire entre raisonnement et action.
+Existing solutions (LangChain, AutoGPT, Semantic Kernel, etc.) focus on orchestration and tool calling, but lack native governance, complete observability, and a clear separation between reasoning and action.
 
-**Gaps identifiés dans l'écosystème actuel :**
+**Gaps identified in the current ecosystem:**
 
-1. **Gouvernance native limitée** - La plupart des frameworks n'ont pas de système de policies intégré
-2. **Observabilité incomplète** - Traçabilité limitée, pas de reasoning graph standard
-3. **Event Sourcing peu utilisé** - Opportunité majeure pour observabilité/audit
-4. **Séparation raisonnement/action** - Peu de frameworks séparent clairement ces responsabilités
-5. **Capability-based security** - Émergent mais pas standard
+1. **Limited native governance** - Most frameworks lack a built-in policy system
+2. **Incomplete observability** - Limited traceability, no standard reasoning graph
+3. **Underused event sourcing** - A major opportunity for observability/audit
+4. **Reasoning/action separation** - Few frameworks clearly separate these responsibilities
+5. **Capability-based security** - Emerging but not standard
 
-Les frameworks existants permettent de créer des agents, mais pas de les gouverner, les auditer ou les tester de manière fiable en production.
+Existing frameworks make it possible to create agents, but not to govern, audit, or reliably test them in production.
 
-**Exemples concrets de gaps :**
-- **LangChain :** Pas de replay natif, pas de séparation raisonnement/action, gouvernance via plugins externes
-- **Semantic Kernel :** Filtres basiques, pas d'event-sourcing, observabilité limitée
-- **AutoGPT/LangGraph :** Focus orchestration, pas de gouvernance native, pas de testabilité structurée
+**Concrete examples of gaps:**
+- **LangChain:** No native replay, no reasoning/action separation, governance via external plugins
+- **Semantic Kernel:** Basic filters, no event-sourcing, limited observability
+- **AutoGPT/LangGraph:** Orchestration-focused, no native governance, no structured testability
 
 ### Proposed Solution
 
-SDK_AI_Agents est une infrastructure de gouvernance des agents IA qui transforme les agents d'outils expérimentaux en systèmes décisionnels gouvernables, explicables et prêts pour la production.
+SDK_AI_Agents is an AI agent governance infrastructure that transforms agents from experimental tools into governable, explainable, production-ready decision-making systems.
 
-**Une solution idéale permettrait de :**
+**An ideal solution would make it possible to:**
 
-- Concevoir un agent comme un système décisionnel, pas un chatbot
-- Séparer strictement le raisonnement de l'action
-- Tracer chaque décision, chaque outil, chaque contrainte
-- Rejouer et auditer n'importe quelle exécution
-- Tester un agent comme on teste un système critique
-- Intégrer tout cela sans complexité excessive pour le développeur
+- Design an agent as a decision-making system, not a chatbot
+- Strictly separate reasoning from action
+- Trace every decision, every tool, every constraint
+- Replay and audit any execution
+- Test an agent the way you test a critical system
+- Integrate all of this without excessive complexity for the developer
 
-**La façon la plus simple de faire une différence significative :**
+**The simplest way to make a meaningful difference:**
 
-👉 **Faire de l'observabilité, du contrôle et du replay des primitives natives, pas des options.**
+👉 **Make observability, control, and replay native primitives, not options.**
 
-Autrement dit :
-- Tout est événement
-- Rien n'est implicite
-- Aucune action n'est "magique"
+In other words:
+- Everything is an event
+- Nothing is implicit
+- No action is "magic"
 
-**Ce qui rend notre approche différente :**
+**What makes our approach different:**
 
-SDK_AI_Agents ne cherche pas à être :
-- Un meilleur prompt framework
-- Un wrapper de LLM
-- Un orchestrateur magique
-- Un meilleur LangChain
+SDK_AI_Agents doesn't aim to be:
+- A better prompt framework
+- An LLM wrapper
+- A magic orchestrator
+- A better LangChain
 
-👉 **Il cherche à être l'infrastructure de gouvernance des agents IA.**
+👉 **It aims to be the governance infrastructure for AI agents.**
 
-**Principe fondamental :** L'agent ne "fait" pas. L'agent propose, le système décide.
+**Fundamental principle:** The agent doesn't "act." The agent proposes, the system decides.
 
-**Approche en deux niveaux :**
-- **Quick Start (10 lignes) :** Pour les cas simples, API minimale et intuitive
-- **Power Features :** Gouvernance avancée pour la production, activable progressivement
+**Two-level approach:**
+- **Quick Start (10 lines):** For simple cases, a minimal and intuitive API
+- **Power Features:** Advanced governance for production, enabled progressively
 
-**Message clé :** "Simple par défaut, puissant quand nécessaire. Vous commencez simple, vous évoluez vers la gouvernance sans réécrire votre code."
+**Key message:** "Simple by default, powerful when needed. You start simple, you evolve toward governance without rewriting your code."
 
 ### Key Differentiators
 
-**Avantages compétitifs clés :**
+**Key competitive advantages:**
 
-1. **Architecture événementielle append-only**
-   - Replay, audit, comparaison de comportements
-   - Traçabilité complète de chaque décision
+1. **Append-only event-driven architecture**
+   - Replay, audit, behavior comparison
+   - Complete traceability of every decision
 
-2. **Séparation raisonnement / action**
-   - Le LLM ne provoque jamais d'effet de bord direct
-   - Reasoning Engine séparé de Action Engine avec gouvernance
+2. **Reasoning / action separation**
+   - The LLM never directly causes a side effect
+   - Reasoning Engine separated from Action Engine, with governance
 
 3. **Capabilities & policies by design**
-   - Sécurité "deny by default"
-   - Contrats explicites avec métadonnées de sécurité
+   - "Deny by default" security
+   - Explicit contracts with security metadata
 
-4. **Observabilité cognitive**
-   - On comprend pourquoi l'agent agit
-   - Graphe de raisonnement, évolution des croyances
+4. **Cognitive observability**
+   - We understand why the agent acts
+   - Reasoning graph, belief evolution
 
-5. **Testabilité native**
-   - Golden traces, mocks tools, deterministic mode
-   - Exécutions comme preuves signables et comparables
+5. **Native testability**
+   - Golden traces, mock tools, deterministic mode
+   - Executions as signable, comparable proofs
 
-6. **DX moderne mais prod-first**
-   - Simple à utiliser, robuste par conception
-   - API TypeScript type-safe, documentation complète
+6. **Modern but production-first DX**
+   - Simple to use, robust by design
+   - Type-safe TypeScript API, complete documentation
 
-**Ce qui est difficile à copier :**
+**What's hard to copy:**
 
-- **Le modèle mental** (agent ≠ chatbot)
-- **Le design event-sourced appliqué aux agents**
-- **L'intégration profonde entre :**
+- **The mental model** (agent ≠ chatbot)
+- **The event-sourced design applied to agents**
+- **The deep integration between:**
   - Runtime
-  - Sécurité
-  - Observabilité
+  - Security
+  - Observability
   - Tests
 
-Le fait que tout soit pensé ensemble, pas ajouté après coup.
+The fact that everything is designed together, not bolted on afterward.
 
-**Ce n'est pas une feature copiée. C'est une architecture globale cohérente.**
+**This isn't a copied feature. It's a coherent, overall architecture.**
 
-**Pourquoi maintenant est le bon moment :**
+**Why now is the right time:**
 
-- Les LLM sont suffisamment puissants pour raisonner
-- Les entreprises veulent passer à l'action, pas juste discuter
-- Les premiers échecs d'agents non maîtrisés créent une prise de conscience
-- Le marché manque encore d'un standard sérieux et structurant
-- La fenêtre est ouverte pour définir la bonne abstraction
+- LLMs are now powerful enough to reason
+- Enterprises want to move to action, not just conversation
+- The first failures of unmanaged agents are creating awareness
+- The market still lacks a serious, structuring standard
+- The window is open to define the right abstraction
 
-👉 **SDK_AI_Agents arrive au moment exact où le besoin d'industrialisation devient critique.**
+👉 **SDK_AI_Agents arrives at the exact moment when the need for industrialization becomes critical.**
 
-### ROI Quantifiable
+### Quantifiable ROI
 
-**Métriques de valeur mesurables :**
+**Measurable value metrics:**
 
-**Temps de développement :**
-- **-60% vs solution maison** - Réutilisation de composants, pas de réinvention
-- **Exemple concret :** Une équipe qui met 3 mois à construire un agent sécurisé peut le faire en 1 mois avec SDK_AI_Agents, avec une meilleure gouvernance
+**Development time:**
+- **-60% vs. in-house solution** - Reuse of components, no reinvention
+- **Concrete example:** A team that takes 3 months to build a secure agent can do it in 1 month with SDK_AI_Agents, with better governance
 
-**Réduction des risques :**
-- **0 incidents de sécurité liés aux tools** - Gouvernance native avec capabilities contrôlées
-- **Audit trail complet** - Traçabilité de chaque décision pour conformité
+**Risk reduction:**
+- **0 security incidents related to tools** - Native governance with controlled capabilities
+- **Complete audit trail** - Traceability of every decision for compliance
 
-**Coûts IA :**
-- **-30% via monitoring et optimisation** - Tracking intégré des tokens et coûts par run
-- **Budgets et alertes** - Contrôle des coûts avant qu'ils n'explosent
+**AI costs:**
+- **-30% via monitoring and optimization** - Built-in tracking of tokens and costs per run
+- **Budgets and alerts** - Cost control before they explode
 
-**Time to production :**
-- **-50%** - Tests natifs, observabilité intégrée, pas de glue code à écrire
-- **Déploiement progressif** - MVP rapide, features avancées ajoutées progressivement
+**Time to production:**
+- **-50%** - Native tests, built-in observability, no glue code to write
+- **Progressive deployment** - Fast MVP, advanced features added incrementally
 
-**Qualité et fiabilité :**
-- **Replay natif** - Debugging en minutes au lieu d'heures
-- **Tests structurés** - Golden traces, mocks tools, deterministic mode
+**Quality and reliability:**
+- **Native replay** - Debugging in minutes instead of hours
+- **Structured tests** - Golden traces, mock tools, deterministic mode
 
-### Stratégie d'Adoption
+### Adoption Strategy
 
-**Réduction de la friction d'adoption :**
+**Reducing adoption friction:**
 
-**1. Adapters pour frameworks existants**
-- Migration progressive depuis LangChain/Semantic Kernel
-- Réutilisation du code existant, pas de réécriture complète
-- Adoption progressive des features de gouvernance
+**1. Adapters for existing frameworks**
+- Gradual migration from LangChain/Semantic Kernel
+- Reuse of existing code, no complete rewrite
+- Progressive adoption of governance features
 
-**2. Quick wins immédiats**
-- Event Store seul apporte de la valeur dès le premier jour
-- Replay/audit disponibles immédiatement
-- Pas besoin d'adopter toutes les features d'un coup
+**2. Immediate quick wins**
+- The Event Store alone delivers value from day one
+- Replay/audit available immediately
+- No need to adopt all features at once
 
-**3. ROI visible rapidement**
-- Replay fonctionnel dès le premier run
-- Audit trail complet automatique
-- Monitoring des coûts intégré
+**3. Fast, visible ROI**
+- Working replay from the very first run
+- Automatic complete audit trail
+- Built-in cost monitoring
 
-**4. Pas de réécriture complète**
-- Adoption progressive des features
-- Commencez par l'Event Store pour le replay
-- Ajoutez les capabilities quand vous êtes prêts
-- Activez la gouvernance avancée selon vos besoins
+**4. No complete rewrite**
+- Progressive adoption of features
+- Start with the Event Store for replay
+- Add capabilities when you're ready
+- Enable advanced governance based on your needs
 
-**Message d'adoption :** "Vous n'avez pas à tout changer. Commencez simple, évoluez progressivement vers la gouvernance complète."
+**Adoption message:** "You don't have to change everything. Start simple, evolve progressively toward complete governance."
 
-### Complexité et Courbe d'Apprentissage
+### Complexity and Learning Curve
 
-**Clarification de la complexité :**
+**Clarifying complexity:**
 
-**API simple ≠ Architecture simple**
-- L'API publique est conçue pour être intuitive (Quick Start en 10 lignes)
-- L'architecture sous-jacente est sophistiquée (event-sourcing, séparation raisonnement/action)
-- La complexité est gérée par le SDK, pas exposée au développeur
+**Simple API ≠ Simple architecture**
+- The public API is designed to be intuitive (10-line Quick Start)
+- The underlying architecture is sophisticated (event-sourcing, reasoning/action separation)
+- Complexity is managed by the SDK, not exposed to the developer
 
-**Courbe d'apprentissage progressive :**
-- **Niveau 1 (Jour 1) :** Quick Start - Créer un agent basique, comprendre les concepts fondamentaux
-- **Niveau 2 (Semaine 1) :** Event Store - Utiliser le replay, comprendre les événements
-- **Niveau 3 (Mois 1) :** Capabilities - Définir des capabilities, comprendre la gouvernance
-- **Niveau 4 (Mois 2+) :** Gouvernance avancée - Policies, budgets, observabilité cognitive
+**Progressive learning curve:**
+- **Level 1 (Day 1):** Quick Start - Create a basic agent, understand the fundamental concepts
+- **Level 2 (Week 1):** Event Store - Use replay, understand events
+- **Level 3 (Month 1):** Capabilities - Define capabilities, understand governance
+- **Level 4 (Month 2+):** Advanced governance - Policies, budgets, cognitive observability
 
-**Documentation et exemples :**
-- Guides progressifs par niveau de complexité
-- Exemples concrets pour chaque concept
-- Tutoriels pas-à-pas pour les cas d'usage courants
+**Documentation and examples:**
+- Progressive guides by complexity level
+- Concrete examples for each concept
+- Step-by-step tutorials for common use cases
 
-**Message clé :** "Vous n'avez pas besoin de comprendre toute l'architecture pour commencer. Apprenez progressivement en fonction de vos besoins."
+**Key message:** "You don't need to understand the whole architecture to get started. Learn progressively based on your needs."
 
-### Performance et Scalabilité
+### Performance and Scalability
 
-**Impact de l'event-sourcing sur la performance :**
+**Impact of event-sourcing on performance:**
 
-**Stratégies d'optimisation :**
-- **Écriture asynchrone** - Les événements sont persistés de manière non-bloquante
-- **Snapshots périodiques** - Réduction du temps de projection d'état
-- **Indexation intelligente** - Accès rapide aux événements pour replay/audit
-- **Compression** - Réduction de l'espace de stockage pour les événements
+**Optimization strategies:**
+- **Asynchronous writes** - Events are persisted in a non-blocking way
+- **Periodic snapshots** - Reduced state projection time
+- **Smart indexing** - Fast access to events for replay/audit
+- **Compression** - Reduced storage footprint for events
 
-**Métriques de performance cibles :**
-- **Latence ajoutée :** < 10ms par événement (écriture asynchrone)
-- **Throughput :** Support de milliers d'exécutions simultanées
-- **Replay :** Replay d'une exécution complète en < 100ms
+**Target performance metrics:**
+- **Added latency:** < 10ms per event (asynchronous writes)
+- **Throughput:** Support for thousands of concurrent executions
+- **Replay:** Complete execution replay in < 100ms
 
-**Benchmarks comparatifs :**
-- Performance vs LangChain (à valider avec prototypes)
-- Impact sur latence end-to-end (à mesurer)
-- Scalabilité horizontale (à tester)
+**Comparative benchmarks:**
+- Performance vs. LangChain (to be validated with prototypes)
+- Impact on end-to-end latency (to be measured)
+- Horizontal scalability (to be tested)
 
-**Trade-offs acceptés :**
-- Légère latence ajoutée pour la traçabilité complète
-- Stockage supplémentaire pour les événements (compensé par la valeur du replay/audit)
-- Complexité opérationnelle accrue (compensée par la gouvernance native)
+**Accepted trade-offs:**
+- Slight added latency for complete traceability
+- Additional storage for events (offset by the value of replay/audit)
+- Increased operational complexity (offset by native governance)
 
-**Message clé :** "La performance est optimisée, mais la gouvernance et la traçabilité sont prioritaires. Pour les cas d'usage haute performance, des optimisations spécifiques sont disponibles."
-
-### Risques et Mitigations
-
-**Risques identifiés et stratégies de mitigation :**
-
-**1. Risque de complexité perçue**
-- **Risque :** Développeurs trouvent le SDK trop complexe malgré l'API simple
-- **Mitigation :** Documentation progressive, exemples concrets, Quick Start très simple
-- **Indicateur :** Temps pour premier agent fonctionnel < 15 minutes
-
-**2. Risque de performance**
-- **Risque :** Event-sourcing ajoute trop de latence pour certains cas d'usage
-- **Mitigation :** Optimisations (asynchrone, snapshots), benchmarks, options de configuration
-- **Indicateur :** Latence ajoutée < 10ms par événement
+**Key message:** "Performance is optimized, but governance and traceability take priority. For high-performance use cases, specific optimizations are available."
+
+### Risks and Mitigations
+
+**Identified risks and mitigation strategies:**
+
+**1. Risk of perceived complexity**
+- **Risk:** Developers find the SDK too complex despite the simple API
+- **Mitigation:** Progressive documentation, concrete examples, a very simple Quick Start
+- **Indicator:** Time to first working agent < 15 minutes
+
+**2. Performance risk**
+- **Risk:** Event-sourcing adds too much latency for certain use cases
+- **Mitigation:** Optimizations (asynchronous, snapshots), benchmarks, configuration options
+- **Indicator:** Added latency < 10ms per event
 
-**3. Risque d'adoption lente**
-- **Risque :** Les équipes préfèrent continuer avec leurs solutions maison
-- **Mitigation :** Adapters pour frameworks existants, ROI visible rapidement, quick wins
-- **Indicateur :** Taux d'adoption progressive > 20% après 3 mois
+**3. Risk of slow adoption**
+- **Risk:** Teams prefer to stick with their in-house solutions
+- **Mitigation:** Adapters for existing frameworks, fast visible ROI, quick wins
+- **Indicator:** Progressive adoption rate > 20% after 3 months
 
-**4. Risque de copie par concurrents**
-- **Risque :** LangChain/Semantic Kernel ajoutent des features similaires
-- **Mitigation :** Vitesse d'exécution, architecture cohérente, communauté, expertise
-- **Indicateur :** Avance technologique maintenue > 6 mois
-
-**5. Risque de ROI non atteint**
-- **Risque :** Métriques annoncées (-60% temps, -30% coûts) non validées
-- **Mitigation :** Validation avec early adopters, métriques réalistes, cas d'usage documentés
-- **Indicateur :** ROI réel mesuré et documenté après 6 mois
-
-**6. Risque de marché immature**
-- **Risque :** Le besoin de gouvernance n'est pas encore assez fort
-- **Mitigation :** Éducation du marché, cas d'usage concrets, partenariats stratégiques
-- **Indicateur :** Nombre d'entreprises intéressées > 50 après 6 mois
-
-**Scénarios d'échec potentiels :**
-- **Scénario 1 :** Adoption trop lente → Pivot vers cible plus spécifique (ex: entreprises réglementées)
-- **Scénario 2 :** Performance insuffisante → Optimisations agressives ou options de configuration
-- **Scénario 3 :** Copie rapide par concurrents → Accélération roadmap, différenciation renforcée
-
-**Plan de contingence :**
-- Monitoring continu des indicateurs de risque
-- Ajustements rapides basés sur feedback utilisateurs
-- Pivot possible vers segments plus spécifiques si nécessaire
-
-### Validation du Besoin
-
-**Preuves du besoin réel :**
-
-**Signaux de marché :**
-- Frustrations exprimées par développeurs sur Twitter/GitHub (à documenter)
-- Questions récurrentes sur gouvernance dans communautés LangChain/Semantic Kernel
-- Demandes d'entreprises pour audit/traçabilité agents IA (à valider)
-
-**Early adopters identifiés :**
-- Entreprises réglementées (finance, santé) nécessitant audit complet
-- Tech leads responsables sécurité cherchant gouvernance native
-- Équipes ayant déjà essayé LangChain et rencontré limites gouvernance
-
-**Validation marché :**
-- **Hypothèse 1 :** Les équipes veulent gouvernance mais ne trouvent pas de solution → À valider via interviews
-- **Hypothèse 2 :** Le besoin devient critique avec adoption croissante agents → À valider via recherche marché
-- **Hypothèse 3 :** Les entreprises sont prêtes à payer pour gouvernance → À valider via pricing tests
-
-**Indicateurs de timing :**
-- Nombre d'incidents sécurité liés agents IA (croissance = besoin croissant)
-- Adoption agents IA en production (croissance = besoin gouvernance)
-- Demandes gouvernance dans communautés (croissance = timing favorable)
-
-**Message clé :** "Le besoin est réel mais doit être validé avec early adopters. La fenêtre d'opportunité est ouverte mais peut se refermer si le marché n'est pas prêt."
-
-### Cible Priorisée et Segmentation
-
-**Cible principale priorisée :**
-
-**Tech Leads / Architectes responsables sécurité** (Cible #1)
-- **Pourquoi prioritaire :** Décideurs techniques, budget, besoin gouvernance fort
-- **Message :** "Gouvernance native pour agents IA en production"
-- **Value prop :** Sécurité par design, audit complet, conformité
-
-**Segments secondaires :**
-
-**Entreprises réglementées** (Cible #2)
-- **Pourquoi :** Besoin audit/traçabilité critique
-- **Message :** "Agents IA certifiables pour finance/santé"
-- **Value prop :** Audit trail complet, conformité, traçabilité
-
-**Développeurs backend expérimentés** (Cible #3)
-- **Pourquoi :** Early adopters, influenceurs techniques
-- **Message :** "SDK moderne pour agents IA production-ready"
-- **Value prop :** DX moderne, type-safety, testabilité
-
-**Équipes produit** (Cible #4 - Support)
-- **Pourquoi :** Utilisateurs finaux, feedback produit
-- **Message :** "Agents IA fiables et prévisibles"
-- **Value prop :** Fiabilité, observabilité, contrôle coûts
-
-**Adaptation du message par segment :**
-- Tech Leads : Focus gouvernance, sécurité, ROI
-- Entreprises réglementées : Focus conformité, audit, traçabilité
-- Développeurs : Focus DX, API, testabilité
-- Équipes produit : Focus fiabilité, coûts, observabilité
-
-**Roadmap par segment :**
-- Phase 1 : Tech Leads (MVP gouvernance)
-- Phase 2 : Entreprises réglementées (features conformité)
-- Phase 3 : Développeurs (DX amélioré)
-- Phase 4 : Équipes produit (observabilité avancée)
-
-### ROI - Sources et Contexte
-
-**Clarification des métriques annoncées :**
-
-**Sources des métriques :**
-- **Estimations basées sur :** Analyse frameworks existants, patterns observés, feedback développeurs
-- **À valider avec :** Early adopters, cas d'usage réels, benchmarks comparatifs
-- **Méthodologie :** Comparaison solution maison vs SDK_AI_Agents sur cas d'usage types
-
-**Contexte des métriques :**
-- **-60% temps développement :** Pour équipes construisant agents sécurisés from scratch
-- **-30% coûts IA :** Avec monitoring intégré et optimisation (cas d'usage avec réutilisation)
-- **-50% time to production :** Avec tests natifs et observabilité intégrée (vs solution maison)
-
-**Métriques réalistes :**
-- **Cas favorable :** Équipe nouvelle, cas d'usage standard → ROI élevé
-- **Cas moyen :** Équipe expérimentée, migration progressive → ROI modéré
-- **Cas défavorable :** Solution maison très optimisée, cas d'usage spécifique → ROI faible
-
-**Validation ROI :**
-- **Phase 1 :** Estimations théoriques (actuel)
-- **Phase 2 :** Validation avec prototypes (MVP)
-- **Phase 3 :** Mesures réelles avec early adopters (6 mois)
-- **Phase 4 :** Cas d'usage documentés avec métriques (12 mois)
-
-**Message clé :** "Les métriques annoncées sont des estimations basées sur l'analyse du marché. La validation réelle avec early adopters permettra d'affiner ces chiffres."
+**4. Risk of being copied by competitors**
+- **Risk:** LangChain/Semantic Kernel add similar features
+- **Mitigation:** Execution speed, coherent architecture, community, expertise
+- **Indicator:** Technological lead maintained > 6 months
+
+**5. Risk of unmet ROI**
+- **Risk:** Announced metrics (-60% time, -30% costs) not validated
+- **Mitigation:** Validation with early adopters, realistic metrics, documented use cases
+- **Indicator:** Real ROI measured and documented after 6 months
+
+**6. Risk of an immature market**
+- **Risk:** The need for governance isn't yet strong enough
+- **Mitigation:** Market education, concrete use cases, strategic partnerships
+- **Indicator:** Number of interested enterprises > 50 after 6 months
+
+**Potential failure scenarios:**
+- **Scenario 1:** Adoption too slow → Pivot toward a more specific target (e.g., regulated enterprises)
+- **Scenario 2:** Insufficient performance → Aggressive optimizations or configuration options
+- **Scenario 3:** Fast copying by competitors → Accelerated roadmap, reinforced differentiation
+
+**Contingency plan:**
+- Continuous monitoring of risk indicators
+- Fast adjustments based on user feedback
+- Possible pivot toward more specific segments if needed
+
+### Validating the Need
+
+**Evidence of real need:**
+
+**Market signals:**
+- Frustrations expressed by developers on Twitter/GitHub (to be documented)
+- Recurring questions about governance in LangChain/Semantic Kernel communities
+- Enterprise requests for AI agent audit/traceability (to be validated)
+
+**Identified early adopters:**
+- Regulated enterprises (finance, healthcare) requiring complete audit
+- Tech leads responsible for security seeking native governance
+- Teams that have already tried LangChain and hit governance limits
+
+**Market validation:**
+- **Hypothesis 1:** Teams want governance but can't find a solution → To be validated via interviews
+- **Hypothesis 2:** The need becomes critical with growing agent adoption → To be validated via market research
+- **Hypothesis 3:** Enterprises are ready to pay for governance → To be validated via pricing tests
+
+**Timing indicators:**
+- Number of security incidents related to AI agents (growth = growing need)
+- AI agent adoption in production (growth = need for governance)
+- Governance requests in communities (growth = favorable timing)
+
+**Key message:** "The need is real but must be validated with early adopters. The window of opportunity is open but could close if the market isn't ready."
+
+### Prioritized Target and Segmentation
+
+**Prioritized primary target:**
+
+**Tech Leads / Architects responsible for security** (Target #1)
+- **Why priority:** Technical decision-makers, budget, strong governance need
+- **Message:** "Native governance for AI agents in production"
+- **Value prop:** Security by design, complete audit, compliance
+
+**Secondary segments:**
+
+**Regulated enterprises** (Target #2)
+- **Why:** Critical audit/traceability need
+- **Message:** "Certifiable AI agents for finance/healthcare"
+- **Value prop:** Complete audit trail, compliance, traceability
+
+**Experienced backend developers** (Target #3)
+- **Why:** Early adopters, technical influencers
+- **Message:** "A modern SDK for production-ready AI agents"
+- **Value prop:** Modern DX, type-safety, testability
+
+**Product teams** (Target #4 - Support)
+- **Why:** End users, product feedback
+- **Message:** "Reliable and predictable AI agents"
+- **Value prop:** Reliability, observability, cost control
+
+**Message adaptation by segment:**
+- Tech Leads: Focus on governance, security, ROI
+- Regulated enterprises: Focus on compliance, audit, traceability
+- Developers: Focus on DX, API, testability
+- Product teams: Focus on reliability, costs, observability
+
+**Roadmap by segment:**
+- Phase 1: Tech Leads (governance MVP)
+- Phase 2: Regulated enterprises (compliance features)
+- Phase 3: Developers (improved DX)
+- Phase 4: Product teams (advanced observability)
+
+### ROI - Sources and Context
+
+**Clarifying the announced metrics:**
+
+**Sources of the metrics:**
+- **Estimates based on:** Analysis of existing frameworks, observed patterns, developer feedback
+- **To be validated with:** Early adopters, real use cases, comparative benchmarks
+- **Methodology:** Comparison of in-house solution vs. SDK_AI_Agents on typical use cases
+
+**Context of the metrics:**
+- **-60% development time:** For teams building secure agents from scratch
+- **-30% AI costs:** With built-in monitoring and optimization (use cases with reuse)
+- **-50% time to production:** With native tests and built-in observability (vs. in-house solution)
+
+**Realistic metrics:**
+- **Favorable case:** New team, standard use case → High ROI
+- **Average case:** Experienced team, gradual migration → Moderate ROI
+- **Unfavorable case:** Highly optimized in-house solution, specific use case → Low ROI
+
+**ROI validation:**
+- **Phase 1:** Theoretical estimates (current)
+- **Phase 2:** Validation with prototypes (MVP)
+- **Phase 3:** Real measurements with early adopters (6 months)
+- **Phase 4:** Documented use cases with metrics (12 months)
+
+**Key message:** "The announced metrics are estimates based on market analysis. Real validation with early adopters will help refine these figures."
 
 ### User Value & Jobs to be Done
 
-**Jobs to be Done principaux identifiés :**
+**Main Jobs to be Done identified:**
 
-**Job #1 : "Je veux déployer un agent en production sans risquer ma carrière"**
-- **Stakeholder :** Tech Lead / Architecte responsable sécurité
-- **Moment critique :** Quand l'agent doit prendre des actions réelles (pas juste répondre)
-- **Valeur SDK_AI_Agents :** Gouvernance native, audit trail complet, sécurité par design
-- **Validation :** Interviews avec tech leads ayant déjà déployé des agents
+**Job #1: "I want to deploy an agent to production without risking my career"**
+- **Stakeholder:** Tech Lead / Architect responsible for security
+- **Critical moment:** When the agent must take real actions (not just respond)
+- **SDK_AI_Agents value:** Native governance, complete audit trail, security by design
+- **Validation:** Interviews with tech leads who have already deployed agents
 
-**Job #2 : "Je veux comprendre pourquoi mon agent a pris cette décision"**
-- **Stakeholder :** Développeur / Équipe produit
-- **Moment critique :** Quand l'agent produit un résultat inattendu ou erroné
-- **Valeur SDK_AI_Agents :** Replay natif, observabilité cognitive, graphe de raisonnement
-- **Validation :** Cas d'usage concrets de debugging agents
+**Job #2: "I want to understand why my agent made that decision"**
+- **Stakeholder:** Developer / Product team
+- **Critical moment:** When the agent produces an unexpected or erroneous result
+- **SDK_AI_Agents value:** Native replay, cognitive observability, reasoning graph
+- **Validation:** Concrete agent debugging use cases
 
-**Job #3 : "Je veux tester mon agent comme je teste mon code"**
-- **Stakeholder :** Développeur responsable qualité
-- **Moment critique :** Quand l'agent doit être déployé en production
-- **Valeur SDK_AI_Agents :** Testabilité native, golden traces, mocks tools
-- **Validation :** Comparaison avec tests agents actuels (quasi inexistants)
+**Job #3: "I want to test my agent the way I test my code"**
+- **Stakeholder:** Developer responsible for quality
+- **Critical moment:** When the agent must be deployed to production
+- **SDK_AI_Agents value:** Native testability, golden traces, mock tools
+- **Validation:** Comparison with current agent tests (virtually nonexistent)
 
-**Moment où le besoin devient critique :**
-- **Phase PoC :** Besoin faible (expérimentation, pas de risque)
-- **Phase Production :** Besoin critique (sécurité, audit, conformité)
-- **Phase Scale :** Besoin très critique (coûts, performance, gouvernance)
+**Moment when the need becomes critical:**
+- **PoC phase:** Low need (experimentation, no risk)
+- **Production phase:** Critical need (security, audit, compliance)
+- **Scale phase:** Very critical need (costs, performance, governance)
 
-**Validation du besoin avec early adopters :**
-- Identifier 3-5 équipes ayant déjà déployé des agents en production
-- Interviews pour comprendre frustrations et besoins non résolus
-- Validation que SDK_AI_Agents résout leurs problèmes spécifiques
+**Validating the need with early adopters:**
+- Identify 3-5 teams that have already deployed agents to production
+- Interviews to understand frustrations and unmet needs
+- Validation that SDK_AI_Agents solves their specific problems
 
 ### Architecture Trade-offs
 
-**Trade-offs explicites :**
+**Explicit trade-offs:**
 
-**Complexité vs Gouvernance**
-- **Choix :** Architecture événementielle complexe pour gouvernance native
-- **Trade-off :** Complexité opérationnelle accrue vs contrôle total
-- **Justification :** La gouvernance est la différenciation clé, la complexité est gérée par le SDK
+**Complexity vs. Governance**
+- **Choice:** Complex event-driven architecture for native governance
+- **Trade-off:** Increased operational complexity vs. total control
+- **Justification:** Governance is the key differentiator, complexity is managed by the SDK
 
-**Performance vs Traçabilité**
-- **Choix :** Event-sourcing avec persistance de tous les événements
-- **Trade-off :** Légère latence ajoutée vs traçabilité complète
-- **Justification :** Replay/audit sont des features différenciantes, performance optimisée mais secondaire
+**Performance vs. Traceability**
+- **Choice:** Event-sourcing with persistence of all events
+- **Trade-off:** Slight added latency vs. complete traceability
+- **Justification:** Replay/audit are differentiating features, performance optimized but secondary
 
-**Simplicité API vs Puissance**
-- **Choix :** API simple mais architecture sophistiquée
-- **Trade-off :** Courbe d'apprentissage vs puissance disponible
-- **Justification :** Quick Start simple, features avancées activables progressivement
+**API Simplicity vs. Power**
+- **Choice:** Simple API but sophisticated architecture
+- **Trade-off:** Learning curve vs. available power
+- **Justification:** Simple Quick Start, advanced features enabled progressively
 
-**Roadmap technique (file → SQL → distribué) :**
+**Technical roadmap (file → SQL → distributed):**
 
-**Phase 1 : File-based Event Store (MVP)**
-- **Pourquoi :** Simplicité, portabilité, quick start
-- **Limitations :** Scalabilité verticale, pas de partage entre instances
-- **Migration :** Interface EventStore abstraite permet migration transparente
+**Phase 1: File-based Event Store (MVP)**
+- **Why:** Simplicity, portability, quick start
+- **Limitations:** Vertical scalability, no sharing between instances
+- **Migration:** Abstract EventStore interface enables transparent migration
 
-**Phase 2 : SQL-based Event Store (Production)**
-- **Pourquoi :** Scalabilité, partage état, queries complexes
-- **Migration :** Export/import depuis file-based, migration progressive
-- **Timing :** Quand besoin de scalabilité horizontale
+**Phase 2: SQL-based Event Store (Production)**
+- **Why:** Scalability, shared state, complex queries
+- **Migration:** Export/import from file-based, progressive migration
+- **Timing:** When horizontal scalability is needed
 
-**Phase 3 : Distributed Event Store (Scale)**
-- **Pourquoi :** Scalabilité horizontale, haute disponibilité
-- **Migration :** Depuis SQL avec réplication progressive
-- **Timing :** Quand besoin de milliers d'exécutions simultanées
+**Phase 3: Distributed Event Store (Scale)**
+- **Why:** Horizontal scalability, high availability
+- **Migration:** From SQL with progressive replication
+- **Timing:** When thousands of concurrent executions are needed
 
-**Stratégie de scalabilité horizontale :**
-- **Court terme :** Scaling vertical (file-based → SQL)
-- **Moyen terme :** Scaling horizontal avec Event Store distribué (Kafka-style)
-- **Long terme :** Architecture microservices avec Event Store distribué
+**Horizontal scalability strategy:**
+- **Short term:** Vertical scaling (file-based → SQL)
+- **Medium term:** Horizontal scaling with distributed Event Store (Kafka-style)
+- **Long term:** Microservices architecture with distributed Event Store
 
-**Benchmarks de performance :**
-- **MVP :** Latence < 100ms pour exécution complète agent
-- **Production :** Support de centaines d'exécutions simultanées
-- **Scale :** Support de milliers d'exécutions simultanées avec Event Store distribué
+**Performance benchmarks:**
+- **MVP:** Latency < 100ms for a complete agent execution
+- **Production:** Support for hundreds of concurrent executions
+- **Scale:** Support for thousands of concurrent executions with a distributed Event Store
 
-### Validation & Preuves
+### Validation & Evidence
 
-**Sources des métriques ROI :**
+**Sources of ROI metrics:**
 
-**Métriques basées sur :**
-- Analyse comparative frameworks existants (LangChain, Semantic Kernel)
-- Patterns observés dans solutions maison (complexité, temps développement)
-- Feedback développeurs sur frustrations actuelles
-- Estimation basée sur réduction glue code et réutilisation composants
+**Metrics based on:**
+- Comparative analysis of existing frameworks (LangChain, Semantic Kernel)
+- Patterns observed in in-house solutions (complexity, development time)
+- Developer feedback on current frustrations
+- Estimate based on glue code reduction and component reuse
 
-**Cas d'usage concrets pour validation :**
+**Concrete use cases for validation:**
 
-**Cas d'usage 1 : Agent support client avec actions**
-- **Problème actuel :** Impossible de rejouer décisions, pas d'audit
-- **Solution SDK_AI_Agents :** Replay natif, audit trail complet
-- **Métrique :** Temps debugging réduit de 4h à 15min (à valider)
+**Use case 1: Customer support agent with actions**
+- **Current problem:** Impossible to replay decisions, no audit
+- **SDK_AI_Agents solution:** Native replay, complete audit trail
+- **Metric:** Debugging time reduced from 4h to 15min (to be validated)
 
-**Cas d'usage 2 : Agent automation interne avec budgets**
-- **Problème actuel :** Coûts IA imprévisibles, pas de contrôle
-- **Solution SDK_AI_Agents :** Monitoring intégré, budgets, alertes
-- **Métrique :** Réduction coûts de 30% via optimisation (à valider)
+**Use case 2: Internal automation agent with budgets**
+- **Current problem:** Unpredictable AI costs, no control
+- **SDK_AI_Agents solution:** Built-in monitoring, budgets, alerts
+- **Metric:** 30% cost reduction via optimization (to be validated)
 
-**Cas d'usage 3 : Agent finance avec conformité**
-- **Problème actuel :** Pas d'audit trail, pas de traçabilité décisions
-- **Solution SDK_AI_Agents :** Event-sourcing natif, traçabilité complète
-- **Métrique :** Conformité réglementaire atteinte (à valider)
+**Use case 3: Finance agent with compliance**
+- **Current problem:** No audit trail, no decision traceability
+- **SDK_AI_Agents solution:** Native event-sourcing, complete traceability
+- **Metric:** Regulatory compliance achieved (to be validated)
 
-**Critères de succès mesurables :**
+**Measurable success criteria:**
 
-**Phase MVP (3 mois) :**
-- 10 équipes utilisent le SDK pour agents production
-- Temps premier agent fonctionnel < 15 minutes
-- 0 incidents sécurité liés gouvernance
+**MVP Phase (3 months):**
+- 10 teams use the SDK for production agents
+- Time to first working agent < 15 minutes
+- 0 governance-related security incidents
 
-**Phase Production (6 mois) :**
-- 50 équipes utilisent le SDK
-- ROI mesuré : -40% temps développement (vs solution maison)
-- Adoption progressive : 30% utilisent Event Store, 20% capabilities, 10% gouvernance avancée
+**Production Phase (6 months):**
+- 50 teams use the SDK
+- ROI measured: -40% development time (vs. in-house solution)
+- Progressive adoption: 30% use the Event Store, 20% capabilities, 10% advanced governance
 
-**Phase Scale (12 mois) :**
-- 200+ équipes utilisent le SDK
-- ROI validé avec cas d'usage documentés
-- Communauté active avec contributions
+**Scale Phase (12 months):**
+- 200+ teams use the SDK
+- ROI validated with documented use cases
+- Active community with contributions
 
-### Developer Experience Détaillée
+### Detailed Developer Experience
 
-**Quick Start < 5 minutes :**
+**Quick Start < 5 minutes:**
 
-**Objectif :** Premier agent fonctionnel en moins de 5 minutes
+**Objective:** First working agent in under 5 minutes
 
-**Étapes Quick Start :**
-1. Installation : `npm install @sdk-ai-agents/core` (30 secondes)
-2. Configuration : API key LLM provider (1 minute)
-3. Création agent : 3 lignes de code (1 minute)
-4. Premier run : `agent.run({ input: "..." })` (30 secondes)
-5. Replay : `sdk.replay(runId)` (30 secondes)
+**Quick Start steps:**
+1. Installation: `npm install @sdk-ai-agents/core` (30 seconds)
+2. Configuration: LLM provider API key (1 minute)
+3. Agent creation: 3 lines of code (1 minute)
+4. First run: `agent.run({ input: "..." })` (30 seconds)
+5. Replay: `sdk.replay(runId)` (30 seconds)
 
-**Total :** < 5 minutes pour agent fonctionnel avec replay
+**Total:** < 5 minutes for a working agent with replay
 
-**Outils développeurs :**
+**Developer tools:**
 
-**CLI pour développement :**
-- `sdk replay <runId>` - Rejouer une exécution
-- `sdk audit <runId>` - Audit trail complet
-- `sdk compare <runId1> <runId2>` - Comparer deux exécutions
-- `sdk visualize <runId>` - Visualiser graphe raisonnement
+**CLI for development:**
+- `sdk replay <runId>` - Replay an execution
+- `sdk audit <runId>` - Complete audit trail
+- `sdk compare <runId1> <runId2>` - Compare two executions
+- `sdk visualize <runId>` - Visualize the reasoning graph
 
-**Visualisation graphe raisonnement :**
-- Interface web pour explorer le graphe de pensée
-- Navigation temporelle (voir évolution croyances)
-- Filtres par type d'événement (reasoning, action, decision)
+**Reasoning graph visualization:**
+- Web interface to explore the thought graph
+- Temporal navigation (see belief evolution)
+- Filters by event type (reasoning, action, decision)
 
-**Debugging intégré :**
-- Breakpoints sur événements spécifiques
-- Inspection état à un moment donné
-- Simulation "et si..." avec modifications
+**Built-in debugging:**
+- Breakpoints on specific events
+- State inspection at a given moment
+- "What if..." simulation with modifications
 
-**Documentation progressive :**
+**Progressive documentation:**
 
-**Niveau 1 : Quick Start**
-- Guide 5 minutes pour premier agent
-- Concepts minimaux nécessaires
-- Exemples concrets simples
+**Level 1: Quick Start**
+- 5-minute guide for the first agent
+- Minimal necessary concepts
+- Simple concrete examples
 
-**Niveau 2 : Concepts fondamentaux**
-- Event-sourcing expliqué simplement
-- Séparation raisonnement/action
-- Capabilities vs tools
+**Level 2: Fundamental concepts**
+- Event-sourcing explained simply
+- Reasoning/action separation
+- Capabilities vs. tools
 
-**Niveau 3 : Features avancées**
-- Gouvernance complète
-- Observabilité cognitive
+**Level 3: Advanced features**
+- Complete governance
+- Cognitive observability
 - Time travel debugging
 
-**Niveau 4 : Architecture approfondie**
-- Design decisions et trade-offs
-- Patterns et best practices
-- Extensibilité et plugins
+**Level 4: In-depth architecture**
+- Design decisions and trade-offs
+- Patterns and best practices
+- Extensibility and plugins
 
-**Support développeur :**
-- Documentation complète avec exemples
-- FAQ basée sur questions réelles
-- Communauté active (Discord/Slack)
-- Issue resolution < 24h pour bugs critiques
+**Developer support:**
+- Complete documentation with examples
+- FAQ based on real questions
+- Active community (Discord/Slack)
+- Issue resolution < 24h for critical bugs
 
-**Message clé :** "Si un développeur rencontre un bug à 2h du matin, il trouve rapidement la solution grâce à la documentation complète et la communauté active."
+**Key message:** "If a developer hits a bug at 2 AM, they quickly find the solution thanks to complete documentation and an active community."
 
 ## Target Users
 
 ### Primary Users
 
-**Qui rencontre réellement le problème :**
+**Who really faces the problem:**
 
-Le problème n'est **pas** vécu par :
-- Les prompt engineers occasionnels
-- Les utilisateurs no-code
-- Les équipes qui font uniquement des chatbots passifs
+The problem is **not** experienced by:
+- Occasional prompt engineers
+- No-code users
+- Teams that only build passive chatbots
 
-👉 **Le problème est vécu par les équipes qui veulent faire agir une IA en production.**
+👉 **The problem is experienced by teams that want to make an AI act in production.**
 
-**Groupes d'utilisateurs principaux :**
+**Main user groups:**
 
-1. **Développeurs backend / fullstack** - Implémentent des fonctionnalités IA dans des applications existantes
-2. **Tech leads / architectes logiciels** - Définissent les standards techniques et garantissent sécurité/fiabilité
-3. **Product engineers orientés plateformes IA** - Conçoivent des features IA complexes à l'interface produit/technique
+1. **Backend / fullstack developers** - Implement AI features in existing applications
+2. **Tech leads / software architects** - Define technical standards and ensure security/reliability
+3. **Product engineers focused on AI platforms** - Design complex AI features at the product/technical interface
 
-**Qui tire le plus de valeur :**
+**Who gets the most value:**
 
-👉 **Le duo développeur backend + tech lead.**
+👉 **The backend developer + tech lead duo.**
 
-- Le développeur gagne en simplicité et sérénité
-- Le tech lead gagne en contrôle et gouvernance
-- C'est ce duo qui justifie l'adoption
+- The developer gains simplicity and peace of mind
+- The tech lead gains control and governance
+- This duo is what justifies adoption
 
-#### Persona 1 : Alex - Développeur Backend Senior
+#### Persona 1: Alex - Senior Backend Developer
 
-**Rôle et contexte :**
-- **Nom :** Alex
-- **Rôle :** Développeur backend senior
-- **Entreprise :** SaaS B2B (20 personnes)
-- **Stack :** Node.js, TypeScript, PostgreSQL, APIs
-- **Équipe :** 3-15 développeurs
-- **Contexte :** Startup ou scale-up tech, forte pression pour livrer vite mais avec de la dette technique
+**Role and context:**
+- **Name:** Alex
+- **Role:** Senior backend developer
+- **Company:** B2B SaaS (20 people)
+- **Stack:** Node.js, TypeScript, PostgreSQL, APIs
+- **Team:** 3-15 developers
+- **Context:** Tech startup or scale-up, strong pressure to ship fast but with technical debt
 
-**Objectif principal :**
-Intégrer un agent qui automatise des actions client dans l'application existante. L'agent doit pouvoir appeler des APIs, modifier des données, déclencher des workflows.
+**Primary goal:**
+Integrate an agent that automates customer actions in the existing application. The agent must be able to call APIs, modify data, trigger workflows.
 
-**Problème vécu aujourd'hui :**
-- Assemble des boucles LLM + tools "à la main"
-- Code fragile, peu testable
-- Difficulté à expliquer pourquoi l'agent agit d'une certaine manière
-- Peur de casser quelque chose en production
+**Problem experienced today:**
+- Assembles LLM + tools loops "by hand"
+- Fragile, barely testable code
+- Difficulty explaining why the agent acts a certain way
+- Fear of breaking something in production
 
-**Frustrations concrètes :**
-- "Je ne sais pas comment tester mon agent"
-- "Si l'agent fait une connerie, je ne peux pas la reproduire"
-- "Je dois gérer sécurité, coûts, logique métier en même temps"
-- "Tout devient vite ingérable"
+**Concrete frustrations:**
+- "I don't know how to test my agent"
+- "If the agent does something stupid, I can't reproduce it"
+- "I have to manage security, costs, and business logic all at once"
+- "It quickly becomes unmanageable"
 
-**Workarounds actuels :**
-- Logs console
-- Flags manuels
-- Désactivation des tools en prod
-- Rejouer "à la main" avec des prompts copiés/collés
+**Current workarounds:**
+- Console logs
+- Manual flags
+- Disabling tools in prod
+- Replaying "by hand" with copy-pasted prompts
 
-**Peurs principales :**
-- Casser la production
-- Créer un agent incontrôlable
-- Perdre la confiance de son tech lead
+**Main fears:**
+- Breaking production
+- Creating an uncontrollable agent
+- Losing his tech lead's trust
 
-**Vision de succès :**
-- Déclarer un agent comme un composant logiciel
-- Avoir des garde-fous par défaut
-- Pouvoir déboguer un agent comme une API
-- Agent en prod avec incidents rares
-- Confiance de son tech lead
+**Vision of success:**
+- Declare an agent as a software component
+- Have guardrails by default
+- Be able to debug an agent like an API
+- Agent in prod with rare incidents
+- His tech lead's trust
 
-**Aha moment :**
-"Je peux enfin comprendre, rejouer et sécuriser le comportement de mon agent sans tout réécrire."
+**Aha moment:**
+"I can finally understand, replay, and secure my agent's behavior without rewriting everything."
 
-**Ce qu'Alex attend de SDK_AI_Agents :**
-- Une API claire et intuitive
-- Des garde-fous automatiques
-- La possibilité de comprendre et rejouer un run
-- Documentation complète et exemples concrets
+**What Alex expects from SDK_AI_Agents:**
+- A clear and intuitive API
+- Automatic guardrails
+- The ability to understand and replay a run
+- Complete documentation and concrete examples
 
-#### Persona 2 : Sarah - Tech Lead / Architecte Logiciel
+#### Persona 2: Sarah - Tech Lead / Software Architect
 
-**Rôle et contexte :**
-- **Nom :** Sarah
-- **Rôle :** Tech Lead / Architecte logiciel
-- **Entreprise :** Scale-up ou entreprise (50-200 personnes)
-- **Équipe :** 10 à 50+ développeurs
-- **Contexte :** Plusieurs projets IA en parallèle, forte contrainte de conformité et de maintenabilité
+**Role and context:**
+- **Name:** Sarah
+- **Role:** Tech Lead / Software Architect
+- **Company:** Scale-up or enterprise (50-200 people)
+- **Team:** 10 to 50+ developers
+- **Context:** Several AI projects in parallel, strong compliance and maintainability constraints
 
-**Objectif principal :**
-Définir les standards techniques pour l'usage des agents IA dans l'organisation. Garantir la sécurité, la fiabilité et le contrôle des coûts. Responsable de ce qui arrive en production.
+**Primary goal:**
+Define technical standards for AI agent usage across the organization. Ensure security, reliability, and cost control. Responsible for what reaches production.
 
-**Problème vécu aujourd'hui :**
-- Chaque dev crée son propre framework d'agent
-- Aucune standardisation
-- Risques majeurs (sécurité, coûts, conformité)
-- Impossible d'auditer un comportement IA
-- Aucune visibilité sur ce que font les agents
+**Problem experienced today:**
+- Every developer creates their own agent framework
+- No standardization
+- Major risks (security, costs, compliance)
+- Impossible to audit an AI behavior
+- No visibility into what agents are doing
 
-**Frustrations concrètes :**
-- "Je n'ai aucune visibilité sur ce que font les agents"
-- "Je ne peux pas valider ce genre de code sereinement"
-- "Les agents sont trop puissants et pas assez contrôlés"
-- "Chaque équipe réinvente la roue"
+**Concrete frustrations:**
+- "I have no visibility into what the agents are doing"
+- "I can't approve this kind of code with confidence"
+- "Agents are too powerful and not controlled enough"
+- "Every team reinvents the wheel"
 
-**Workarounds actuels :**
-- Refus partiel de l'IA autonome
-- Restrictions drastiques des tools
-- Surcouches de validation humaines lourdes
-- Processus d'approbation longs et fastidieux
+**Current workarounds:**
+- Partial refusal of autonomous AI
+- Drastic restriction of tools
+- Heavy human validation overlays
+- Long and tedious approval processes
 
-**Vision de succès :**
-- Un socle commun pour tous les agents
-- Des règles globales applicables à tous
-- Des traces exploitables en cas d'incident
-- Standardisation sans bloquer l'innovation
-- Conformité réglementaire atteinte
+**Vision of success:**
+- A common foundation for all agents
+- Global rules applicable to everyone
+- Actionable traces in case of incident
+- Standardization without blocking innovation
+- Regulatory compliance achieved
 
-**Aha moment :**
-"On peut enfin autoriser des agents autonomes sans mettre l'entreprise en danger."
+**Aha moment:**
+"We can finally authorize autonomous agents without putting the company at risk."
 
-**Ce que Sarah attend de SDK_AI_Agents :**
-- Gouvernance native avec policies centralisées
-- Audit trail complet pour conformité
-- Visibilité sur tous les agents et leurs actions
-- Contrôle des coûts et budgets
-- Standardisation sans complexité excessive
+**What Sarah expects from SDK_AI_Agents:**
+- Native governance with centralized policies
+- Complete audit trail for compliance
+- Visibility into all agents and their actions
+- Cost and budget control
+- Standardization without excessive complexity
 
-#### Persona 3 : Jordan - Product Engineer / Platform Engineer IA
+#### Persona 3: Jordan - Product Engineer / AI Platform Engineer
 
-**Rôle et contexte :**
-- **Nom :** Jordan
-- **Rôle :** Product Engineer / Platform Engineer IA
-- **Entreprise :** Produits SaaS avec forte composante IA
-- **Contexte :** Besoin d'itération rapide + fiabilité, collaboration étroite avec produit et devs
+**Role and context:**
+- **Name:** Jordan
+- **Role:** Product Engineer / AI Platform Engineer
+- **Company:** SaaS products with a strong AI component
+- **Context:** Needs fast iteration + reliability, close collaboration with product and devs
 
-**Objectif principal :**
-Concevoir des features IA complexes. Travailler à l'interface produit/technique. Itérer souvent sur le comportement des agents pour améliorer l'expérience utilisateur.
+**Primary goal:**
+Design complex AI features. Work at the product/technical interface. Iterate frequently on agent behavior to improve the user experience.
 
-**Problème vécu aujourd'hui :**
-- Chaque changement de prompt est risqué
-- Impossible de comparer deux versions d'un agent
-- Pas de cadre clair pour mesurer l'amélioration
-- Difficile d'itérer sans régressions
+**Problem experienced today:**
+- Every prompt change is risky
+- Impossible to compare two versions of an agent
+- No clear framework for measuring improvement
+- Hard to iterate without regressions
 
-**Frustrations concrètes :**
-- "Je ne sais pas si ma modification améliore vraiment l'agent"
-- "Je ne peux pas comparer deux versions facilement"
-- "Chaque changement peut casser quelque chose d'inattendu"
+**Concrete frustrations:**
+- "I don't know if my change actually improves the agent"
+- "I can't easily compare two versions"
+- "Every change can break something unexpectedly"
 
-**Vision de succès :**
-- Comparer deux comportements d'agents
-- Tester des scénarios avant mise en prod
-- Améliorer l'agent sans régression
-- Métriques claires d'amélioration
+**Vision of success:**
+- Compare two agent behaviors
+- Test scenarios before going to prod
+- Improve the agent without regression
+- Clear improvement metrics
 
-**Aha moment :**
-"Je peux faire évoluer l'agent comme une feature produit classique."
+**Aha moment:**
+"I can evolve the agent like a regular product feature."
 
-**Ce que Jordan attend de SDK_AI_Agents :**
-- Comparaison de runs pour mesurer améliorations
-- Tests structurés avant déploiement
-- Observabilité pour comprendre comportement utilisateurs
-- Itération rapide sans risques
+**What Jordan expects from SDK_AI_Agents:**
+- Run comparison to measure improvements
+- Structured tests before deployment
+- Observability to understand user behavior
+- Fast iteration without risk
 
 ### Secondary Users
 
-**Utilisateurs secondaires (influenceurs / bénéficiaires indirects) :**
+**Secondary users (influencers / indirect beneficiaries):**
 
-Ils n'écrivent pas toujours le code, mais pèsent fortement sur les décisions d'adoption.
+They don't always write the code, but they carry significant weight in adoption decisions.
 
-#### Équipes Sécurité / Conformité
+#### Security / Compliance Teams
 
-**Rôle :** Valident la sécurité et la conformité des agents IA avant déploiement
+**Role:** Validate the security and compliance of AI agents before deployment
 
-**Bénéfices de SDK_AI_Agents :**
-- Audit trail complet pour conformité réglementaire
-- Policies centralisées et vérifiables
-- Traçabilité de chaque décision et action
-- Sécurité "deny by default" avec capabilities contrôlées
+**Benefits of SDK_AI_Agents:**
+- Complete audit trail for regulatory compliance
+- Centralized and verifiable policies
+- Traceability of every decision and action
+- "Deny by default" security with controlled capabilities
 
-**Impact :**
-- Ne bloquent plus l'innovation IA grâce à la gouvernance native
-- Peuvent valider et approuver les agents avec confiance
-- Conformité atteinte sans surcouches complexes
+**Impact:**
+- No longer block AI innovation thanks to native governance
+- Can approve agents with confidence
+- Compliance achieved without complex workarounds
 
-**Influence :** Forte - Leur approbation est souvent nécessaire pour déploiement production
+**Influence:** High - Their approval is often required for production deployment
 
-#### Équipes Produit
+#### Product Teams
 
-**Rôle :** Définissent les features et mesurent l'impact utilisateur
+**Role:** Define features and measure user impact
 
-**Bénéfices de SDK_AI_Agents :**
-- Agents fiables et prévisibles
-- Réduction des incidents utilisateurs
-- Observabilité pour comprendre comportement utilisateurs
-- Contrôle des coûts IA
+**Benefits of SDK_AI_Agents:**
+- Reliable and predictable agents
+- Reduction in user incidents
+- Observability to understand user behavior
+- AI cost control
 
-**Impact :**
-- Peuvent enfin faire confiance aux agents pour features critiques
-- Moins d'incidents utilisateurs liés aux agents
-- Meilleure compréhension de l'impact des agents
+**Impact:**
+- Can finally trust agents for critical features
+- Fewer user incidents related to agents
+- Better understanding of agent impact
 
-**Influence :** Modérée - Définissent les besoins mais ne décident pas toujours de l'outil technique
+**Influence:** Moderate - Define needs but don't always decide on the technical tool
 
-#### Équipes Data / ML (en support)
+#### Data / ML Teams (in support)
 
-**Rôle :** Supportent les équipes produit avec expertise ML/IA
+**Role:** Support product teams with ML/AI expertise
 
-**Bénéfices de SDK_AI_Agents :**
-- Framework standardisé pour agents IA
-- Moins de support nécessaire pour intégration
-- Focus sur la valeur métier plutôt que l'infrastructure
+**Benefits of SDK_AI_Agents:**
+- Standardized framework for AI agents
+- Less support needed for integration
+- Focus on business value rather than infrastructure
 
-**Impact :**
-- Moins de temps passé sur infrastructure, plus sur valeur métier
-- Support simplifié grâce à standardisation
+**Impact:**
+- Less time spent on infrastructure, more on business value
+- Simplified support thanks to standardization
 
-**Influence :** Faible - Supportent mais ne décident pas directement
+**Influence:** Low - Support but don't decide directly
 
 ### User Journey
 
-#### Journey 1 : Alex (Développeur) - Premier Agent en Production
+#### Journey 1: Alex (Developer) - First Agent in Production
 
-**Découverte :**
-- **Moment :** Alex cherche une solution pour sécuriser son agent avant mise en prod
-- **Source :** Article technique, recommandation tech lead, recherche GitHub
-- **Besoin :** "Je veux déployer mon agent sans risquer ma carrière"
-- **Émotion :** Inquiétude, besoin de solution
+**Discovery:**
+- **Moment:** Alex is looking for a solution to secure his agent before going to prod
+- **Source:** Technical article, tech lead recommendation, GitHub search
+- **Need:** "I want to deploy my agent without risking my career"
+- **Emotion:** Worry, need for a solution
 
-**Onboarding :**
-- **Moment :** Installation et premier agent fonctionnel
-- **Actions :** `npm install`, Quick Start guide, premier `agent.run()`
-- **Temps :** < 5 minutes pour premier agent fonctionnel
-- **Émotion :** Surprise ("c'est si simple ?"), soulagement
+**Onboarding:**
+- **Moment:** Installation and first working agent
+- **Actions:** `npm install`, Quick Start guide, first `agent.run()`
+- **Time:** < 5 minutes for the first working agent
+- **Emotion:** Surprise ("it's that simple?"), relief
 
-**Core Usage :**
-- **Moment :** Développement quotidien de l'agent
-- **Actions :** Définition capabilities, configuration policies, tests
-- **Fréquence :** Quotidienne pendant développement
-- **Émotion :** Confiance croissante, productivité
+**Core Usage:**
+- **Moment:** Daily agent development
+- **Actions:** Defining capabilities, configuring policies, tests
+- **Frequency:** Daily during development
+- **Emotion:** Growing confidence, productivity
 
-**Success Moment (Aha) :**
-- **Moment :** Premier bug en production, utilisation du replay
-- **Action :** `sdk.replay(runId)` → Compréhension immédiate du problème
-- **Résultat :** Bug résolu en 15 minutes au lieu de 4 heures
-- **Émotion :** Euphorie, confiance totale
+**Success Moment (Aha):**
+- **Moment:** First bug in production, using replay
+- **Action:** `sdk.replay(runId)` → Immediate understanding of the problem
+- **Result:** Bug fixed in 15 minutes instead of 4 hours
+- **Emotion:** Euphoria, total confidence
 
-**Long-term :**
-- **Moment :** Agent en production stable depuis plusieurs semaines
-- **Actions :** Monitoring coûts, audit trail pour conformité, itérations améliorations
-- **Résultat :** Agent fiable, incidents rares, confiance tech lead
-- **Émotion :** Sérénité, fierté
+**Long-term:**
+- **Moment:** Agent stable in production for several weeks
+- **Actions:** Cost monitoring, audit trail for compliance, improvement iterations
+- **Result:** Reliable agent, rare incidents, tech lead trust
+- **Emotion:** Peace of mind, pride
 
-#### Journey 2 : Sarah (Tech Lead) - Standardisation Organisation
+#### Journey 2: Sarah (Tech Lead) - Organizational Standardization
 
-**Découverte :**
-- **Moment :** Sarah cherche à standardiser l'usage des agents IA dans l'organisation
-- **Source :** Besoin interne, recherche solutions gouvernance
-- **Besoin :** "Je veux autoriser les agents sans mettre l'entreprise en danger"
-- **Émotion :** Préoccupation sécurité, besoin de contrôle
+**Discovery:**
+- **Moment:** Sarah wants to standardize AI agent usage across the organization
+- **Source:** Internal need, research into governance solutions
+- **Need:** "I want to authorize agents without putting the company at risk"
+- **Emotion:** Security concern, need for control
 
-**Onboarding :**
-- **Moment :** Évaluation SDK_AI_Agents pour adoption organisation
-- **Actions :** Review architecture, test gouvernance, validation sécurité
-- **Temps :** 1-2 semaines d'évaluation
-- **Émotion :** Prudence, espoir
+**Onboarding:**
+- **Moment:** Evaluating SDK_AI_Agents for organizational adoption
+- **Actions:** Architecture review, governance testing, security validation
+- **Time:** 1-2 weeks of evaluation
+- **Emotion:** Caution, hope
 
-**Core Usage :**
-- **Moment :** Déploiement organisationnel
-- **Actions :** Configuration policies globales, formation équipes, monitoring
-- **Fréquence :** Hebdomadaire pour gouvernance, quotidienne pour monitoring
-- **Émotion :** Contrôle retrouvé, confiance
+**Core Usage:**
+- **Moment:** Organizational deployment
+- **Actions:** Configuring global policies, training teams, monitoring
+- **Frequency:** Weekly for governance, daily for monitoring
+- **Emotion:** Control regained, confidence
 
-**Success Moment (Aha) :**
-- **Moment :** Audit de conformité réussi grâce à audit trail complet
-- **Action :** Export audit trail, démonstration gouvernance
-- **Résultat :** Conformité atteinte sans surcouches complexes
-- **Émotion :** Soulagement, validation
+**Success Moment (Aha):**
+- **Moment:** Successful compliance audit thanks to the complete audit trail
+- **Action:** Export audit trail, demonstrate governance
+- **Result:** Compliance achieved without complex workarounds
+- **Emotion:** Relief, validation
 
-**Long-term :**
-- **Moment :** Standardisation réussie, plusieurs équipes utilisent SDK_AI_Agents
-- **Actions :** Évolution policies, optimisation coûts, formation continue
-- **Résultat :** Innovation IA autorisée avec gouvernance, incidents rares
-- **Émotion :** Satisfaction, fierté organisationnelle
+**Long-term:**
+- **Moment:** Successful standardization, several teams use SDK_AI_Agents
+- **Actions:** Evolving policies, cost optimization, ongoing training
+- **Result:** AI innovation authorized with governance, rare incidents
+- **Emotion:** Satisfaction, organizational pride
 
-#### Journey 3 : Jordan (Product Engineer) - Itération Feature IA
+#### Journey 3: Jordan (Product Engineer) - AI Feature Iteration
 
-**Découverte :**
-- **Moment :** Jordan cherche à améliorer le comportement d'un agent existant
-- **Source :** Besoin d'itération, recherche outils comparaison
-- **Besoi :** "Je veux améliorer l'agent sans régression"
-- **Émotion :** Frustration itération difficile, besoin de confiance
+**Discovery:**
+- **Moment:** Jordan wants to improve an existing agent's behavior
+- **Source:** Need for iteration, research into comparison tools
+- **Need:** "I want to improve the agent without regression"
+- **Emotion:** Frustration with difficult iteration, need for confidence
 
-**Onboarding :**
-- **Moment :** Migration agent existant vers SDK_AI_Agents
-- **Actions :** Adapter code existant, configuration capabilities
-- **Temps :** 1-2 jours pour migration
-- **Émotion :** Appréhension migration, espoir amélioration
+**Onboarding:**
+- **Moment:** Migrating an existing agent to SDK_AI_Agents
+- **Actions:** Adapting existing code, configuring capabilities
+- **Time:** 1-2 days for migration
+- **Emotion:** Apprehension about migration, hope for improvement
 
-**Core Usage :**
-- **Moment :** Itération sur comportement agent
-- **Actions :** Modification prompts, comparaison runs, tests scénarios
-- **Fréquence :** Plusieurs fois par semaine pendant développement feature
-- **Émotion :** Productivité, confiance itération
+**Core Usage:**
+- **Moment:** Iterating on agent behavior
+- **Actions:** Modifying prompts, comparing runs, testing scenarios
+- **Frequency:** Several times a week during feature development
+- **Emotion:** Productivity, confidence in iteration
 
-**Success Moment (Aha) :**
-- **Moment :** Comparaison deux versions agent, mesure amélioration claire
-- **Action :** `sdk.compare(runId1, runId2)` → Métriques amélioration visibles
-- **Résultat :** Amélioration mesurée et validée avant déploiement
-- **Émotion :** Confiance, satisfaction
+**Success Moment (Aha):**
+- **Moment:** Comparing two agent versions, clear measured improvement
+- **Action:** `sdk.compare(runId1, runId2)` → Visible improvement metrics
+- **Result:** Improvement measured and validated before deployment
+- **Emotion:** Confidence, satisfaction
 
-**Long-term :**
-- **Moment :** Feature IA stable et performante
-- **Actions :** Monitoring comportement utilisateurs, optimisations continues
-- **Résultat :** Feature évolue comme feature produit classique, régressions évitées
-- **Émotion :** Sérénité, satisfaction produit
+**Long-term:**
+- **Moment:** Stable and high-performing AI feature
+- **Actions:** Monitoring user behavior, ongoing optimizations
+- **Result:** Feature evolves like a regular product feature, regressions avoided
+- **Emotion:** Peace of mind, product satisfaction
 
-**Conclusion :**
+**Conclusion:**
 
-SDK_AI_Agents s'adresse à des équipes techniques matures, confrontées à la réalité de l'IA en production.
+SDK_AI_Agents is aimed at mature technical teams, facing the reality of AI in production.
 
-**Ce n'est pas un outil pour expérimenter.**
-**C'est un outil pour assumer les conséquences de l'IA autonome.**
+**This is not a tool for experimenting.**
+**It is a tool for owning the consequences of autonomous AI.**
 
 ## Success Metrics
 
-**Principe directeur :**
+**Guiding principle:**
 
-Le succès de SDK_AI_Agents ne se mesure pas au nombre d'agents créés, mais au niveau de confiance que les équipes accordent aux agents en production.
+The success of SDK_AI_Agents is not measured by the number of agents created, but by the level of trust teams place in agents in production.
 
-**Succès = les équipes osent confier de vraies actions à des agents.**
+**Success = teams dare to entrust real actions to agents.**
 
 ### User Success Metrics
 
-#### Résultats Utilisateurs Attendus
+#### Expected User Outcomes
 
-**Alex - Développeur Backend :**
+**Alex - Backend Developer:**
 
-**Résultat recherché :**
-- Construire un agent utile sans créer un monstre incontrôlable
-- Gagner du temps sans perdre le contrôle
+**Desired outcome:**
+- Build a useful agent without creating an uncontrollable monster
+- Save time without losing control
 
-**Comment sait-il que ça fonctionne :**
-- Son agent est en production
-- Il peut comprendre une décision, rejouer un run, corriger sans tout casser
+**How he knows it's working:**
+- His agent is in production
+- He can understand a decision, replay a run, fix without breaking everything
 
-**Moment "aha" :**
-"J'ai reproduit un incident en 30 secondes et compris exactement pourquoi l'agent a fait ça."
+**"Aha" moment:**
+"I reproduced an incident in 30 seconds and understood exactly why the agent did that."
 
-**Métriques de succès pour Alex :**
-- Agent en production stable depuis > 1 semaine
-- Temps de debugging incidents < 5 minutes (vs 4 heures avant)
-- Confiance tech lead obtenue
+**Success metrics for Alex:**
+- Agent stable in production for > 1 week
+- Incident debugging time < 5 minutes (vs. 4 hours before)
+- Tech lead trust achieved
 
-**Sarah - Tech Lead / Architecte :**
+**Sarah - Tech Lead / Architect:**
 
-**Résultat recherché :**
-- Autoriser l'IA autonome sans mettre l'entreprise en risque
-- Standardiser l'usage des agents
+**Desired outcome:**
+- Authorize autonomous AI without putting the company at risk
+- Standardize agent usage
 
-**Comment sait-elle que ça fonctionne :**
-- Tous les agents passent par le même socle
-- Les policies s'appliquent automatiquement
-- Les incidents sont auditables
+**How she knows it's working:**
+- All agents go through the same foundation
+- Policies apply automatically
+- Incidents are auditable
 
-**Moment "aha" :**
-"Je peux valider ce PR d'agent sans stress, car tout est tracé et contrôlé."
+**"Aha" moment:**
+"I can approve this agent PR without stress, because everything is traced and controlled."
 
-**Métriques de succès pour Sarah :**
-- 100% des agents utilisent SDK_AI_Agents (standardisation)
-- 0 incidents non auditables
-- Conformité réglementaire atteinte
+**Success metrics for Sarah:**
+- 100% of agents use SDK_AI_Agents (standardization)
+- 0 non-auditable incidents
+- Regulatory compliance achieved
 
-**Jordan - Product / Platform Engineer :**
+**Jordan - Product / Platform Engineer:**
 
-**Résultat recherché :**
-- Faire évoluer les agents comme un produit
-- Mesurer, comparer, améliorer sans régression
+**Desired outcome:**
+- Evolve agents like a product
+- Measure, compare, improve without regression
 
-**Comment sait-il que ça fonctionne :**
-- Il compare deux versions d'un agent
-- Il teste des scénarios avant mise en prod
+**How he knows it's working:**
+- He compares two versions of an agent
+- He tests scenarios before going to prod
 
-**Moment "aha" :**
-"Je peux améliorer l'agent sans casser ce qui marchait."
+**"Aha" moment:**
+"I can improve the agent without breaking what was working."
 
-**Métriques de succès pour Jordan :**
-- Comparaison de versions fonctionnelle
-- 0 régressions après améliorations
-- Métriques d'amélioration mesurables
+**Success metrics for Jordan:**
+- Working version comparison
+- 0 regressions after improvements
+- Measurable improvement metrics
 
-#### Comportements Indicateurs de Valeur (Leading Indicators)
+#### Value-Indicating Behaviors (Leading Indicators)
 
-Ces comportements montrent que la valeur est réelle, même avant les métriques business.
+These behaviors show that the value is real, even before the business metrics.
 
-**Adoption comportementale clé :**
+**Key behavioral adoption:**
 
-Les utilisateurs :
-- ✅ Activent le tracing avancé
-- ✅ Définissent des policies
-- ✅ Utilisent le replay
-- ✅ Écrivent des tests d'agents
+Users:
+- ✅ Enable advanced tracing
+- ✅ Define policies
+- ✅ Use replay
+- ✅ Write agent tests
 
-👉 **Si ces features sont utilisées volontairement, le produit est utile.**
+👉 **If these features are used voluntarily, the product is useful.**
 
-**Signaux de valeur réelle :**
-- Utilisation volontaire des garde-fous (pas imposée)
-- Adoption progressive des features avancées
-- Partage d'exemples et cas d'usage dans la communauté
-- Contribution à la documentation et améliorations
+**Signals of real value:**
+- Voluntary use of guardrails (not imposed)
+- Progressive adoption of advanced features
+- Sharing examples and use cases within the community
+- Contributing to documentation and improvements
 
-#### Métriques Utilisateur Clés (Product Metrics)
+#### Key User Metrics (Product Metrics)
 
-**Métriques "Time-to-Value" :**
+**"Time-to-Value" metrics:**
 
-| Métrique | Cible | Mesure |
+| Metric | Target | Measurement |
 |----------|-------|--------|
-| Temps pour premier agent fonctionnel | < 30 minutes | Depuis installation jusqu'à premier `agent.run()` réussi |
-| Temps pour premier agent en prod | < 1 journée | Depuis création agent jusqu'à déploiement production |
-| Temps pour comprendre un incident agent | < 5 minutes | Depuis signalement incident jusqu'à compréhension via replay |
-| Temps pour rejouer un run | < 10 secondes | Commande `sdk.replay(runId)` jusqu'à résultat |
+| Time to first working agent | < 30 minutes | From install to first successful `agent.run()` |
+| Time to first agent in prod | < 1 day | From agent creation to production deployment |
+| Time to understand an agent incident | < 5 minutes | From incident report to understanding via replay |
+| Time to replay a run | < 10 seconds | From `sdk.replay(runId)` command to result |
 
-**Métriques d'adoption des fonctionnalités différenciantes :**
+**Adoption metrics for differentiating features:**
 
-| Feature | Signal de succès | Objectif |
+| Feature | Success signal | Goal |
 |---------|------------------|----------|
-| Event tracing | > 70% des agents | Agents avec tracing activé |
-| Policies actives | > 60% des projets | Projets avec au moins une policy définie |
-| Tool scopes / allowlist | > 50% | Agents avec capabilities contrôlées |
-| Replay utilisé | > 40% | Utilisateurs ayant utilisé replay au moins une fois |
-| Tests d'agents (golden traces) | > 30% | Projets avec tests structurés d'agents |
+| Event tracing | > 70% of agents | Agents with tracing enabled |
+| Active policies | > 60% of projects | Projects with at least one policy defined |
+| Tool scopes / allowlist | > 50% | Agents with controlled capabilities |
+| Replay used | > 40% | Users who used replay at least once |
+| Agent tests (golden traces) | > 30% | Projects with structured agent tests |
 
-👉 **Ces chiffres sont volontairement ambitieux : ce sont des features "qui font mal" si inutiles.**
+👉 **These figures are deliberately ambitious: these are features that "hurt" if left unused.**
 
-**Qualité & Fiabilité :**
+**Quality & Reliability:**
 
-| Métrique | Objectif | Mesure |
+| Metric | Goal | Measurement |
 |----------|----------|--------|
-| Incidents agents en prod | ↓ significative | Nombre d'incidents par mois |
-| Incidents non reproductibles | ≈ 0 | Incidents où replay impossible |
-| Rollback / hotfix agents | ↓ | Nombre de rollbacks nécessaires |
-| Désactivation d'agents par peur | ↓ | Agents désactivés par manque de confiance |
+| Agent incidents in prod | Significant ↓ | Number of incidents per month |
+| Non-reproducible incidents | ≈ 0 | Incidents where replay is impossible |
+| Agent rollback / hotfix | ↓ | Number of rollbacks needed |
+| Agent deactivation out of fear | ↓ | Agents disabled due to lack of trust |
 
 ### Business Objectives
 
-#### Succès à 3 Mois (Early Success)
+#### Success at 3 Months (Early Success)
 
-**Objectif :** Valider l'adéquation problème / solution
+**Objective:** Validate problem/solution fit
 
-**Indicateurs clés :**
-- Des équipes utilisent SDK_AI_Agents en production
-- Les utilisateurs parlent du replay, du tracing, des policies
-- Le SDK est perçu comme : "ce qui nous a permis d'oser l'IA autonome"
+**Key indicators:**
+- Teams use SDK_AI_Agents in production
+- Users talk about replay, tracing, policies
+- The SDK is perceived as: "what let us dare to use autonomous AI"
 
-**Métriques :**
-- **Projets actifs** avec agents en prod : > 10 projets
-- **Nombre de runs tracés / replays** : > 1000 runs tracés
-- **Feedback qualitatif fort** : Témoignages utilisateurs, cas d'usage documentés
-- **Adoption volontaire** : > 50% utilisateurs activent features gouvernance
+**Metrics:**
+- **Active projects** with agents in prod: > 10 projects
+- **Number of traced runs / replays**: > 1000 traced runs
+- **Strong qualitative feedback**: User testimonials, documented use cases
+- **Voluntary adoption**: > 50% of users enable governance features
 
-**Critères de succès :**
-- ✅ Validation que le problème est réel et que la solution fonctionne
-- ✅ Early adopters satisfaits et recommandent le SDK
-- ✅ Preuve de valeur mesurable (temps économisé, incidents évités)
+**Success criteria:**
+- ✅ Validation that the problem is real and the solution works
+- ✅ Satisfied early adopters who recommend the SDK
+- ✅ Measurable proof of value (time saved, incidents avoided)
 
-#### Succès à 12 Mois (Traction Réelle)
+#### Success at 12 Months (Real Traction)
 
-**Objectif :** Devenir un standard de facto pour gouvernance agents IA
+**Objective:** Become a de facto standard for AI agent governance
 
-**Indicateurs :**
-- SDK_AI_Agents est le socle commun pour les agents dans les organisations
-- Adoption par des équipes plus structurées (enterprises)
-- Utilisation avancée des garde-fous (policies complexes, budgets, approbations)
-- Cas d'usage critiques (actions réelles, pas du chat)
+**Indicators:**
+- SDK_AI_Agents is the common foundation for agents across organizations
+- Adoption by more structured teams (enterprises)
+- Advanced use of guardrails (complex policies, budgets, approvals)
+- Critical use cases (real actions, not chat)
 
-**Métriques :**
-- **Rétention des équipes** : > 80% équipes continuent après 6 mois
-- **Nombre moyen d'agents par projet** : > 3 agents par projet
-- **Adoption des features avancées** : > 40% utilisent gouvernance avancée
-- **Cas d'usage critiques** : > 20% agents avec actions réelles (pas chat)
+**Metrics:**
+- **Team retention**: > 80% of teams continue after 6 months
+- **Average number of agents per project**: > 3 agents per project
+- **Adoption of advanced features**: > 40% use advanced governance
+- **Critical use cases**: > 20% of agents with real actions (not chat)
 
-**Critères de succès :**
-- ✅ Positionnement comme infrastructure de gouvernance standard
-- ✅ Adoption par entreprises réglementées (finance, santé)
-- ✅ Communauté active avec contributions
+**Success criteria:**
+- ✅ Positioning as the standard governance infrastructure
+- ✅ Adoption by regulated enterprises (finance, healthcare)
+- ✅ Active community with contributions
 
 ### Key Performance Indicators
 
-#### KPIs Stratégiques
+#### Strategic KPIs
 
-**1. Adoption & Croissance**
+**1. Adoption & Growth**
 
-| KPI | Cible 3 mois | Cible 12 mois | Mesure |
+| KPI | 3-month target | 12-month target | Measurement |
 |-----|--------------|---------------|--------|
-| Projets actifs | > 10 | > 100 | Nombre projets avec agents en prod |
-| Utilisateurs actifs | > 50 | > 500 | Utilisateurs ayant créé au moins un agent |
-| Runs tracés | > 1,000 | > 100,000 | Nombre total de runs avec event tracing |
+| Active projects | > 10 | > 100 | Number of projects with agents in prod |
+| Active users | > 50 | > 500 | Users who created at least one agent |
+| Traced runs | > 1,000 | > 100,000 | Total number of runs with event tracing |
 
-**2. Engagement & Valeur**
+**2. Engagement & Value**
 
-| KPI | Cible 3 mois | Cible 12 mois | Mesure |
+| KPI | 3-month target | 12-month target | Measurement |
 |-----|--------------|---------------|--------|
-| Adoption features gouvernance | > 50% | > 70% | % projets avec policies actives |
-| Utilisation replay | > 30% | > 50% | % utilisateurs ayant utilisé replay |
-| Tests d'agents | > 20% | > 40% | % projets avec tests structurés |
+| Governance feature adoption | > 50% | > 70% | % of projects with active policies |
+| Replay usage | > 30% | > 50% | % of users who used replay |
+| Agent tests | > 20% | > 40% | % of projects with structured tests |
 
-**3. Qualité & Fiabilité**
+**3. Quality & Reliability**
 
-| KPI | Cible 3 mois | Cible 12 mois | Mesure |
+| KPI | 3-month target | 12-month target | Measurement |
 |-----|--------------|---------------|--------|
-| Réduction incidents | -30% | -60% | vs baseline avant SDK_AI_Agents |
-| Incidents reproductibles | 100% | 100% | % incidents avec replay possible |
-| Temps debugging | < 10 min | < 5 min | Temps moyen pour comprendre incident |
+| Incident reduction | -30% | -60% | vs. baseline before SDK_AI_Agents |
+| Reproducible incidents | 100% | 100% | % of incidents where replay is possible |
+| Debugging time | < 10 min | < 5 min | Average time to understand an incident |
 
-**4. Impact Business**
+**4. Business Impact**
 
-| KPI | Cible 3 mois | Cible 12 mois | Mesure |
+| KPI | 3-month target | 12-month target | Measurement |
 |-----|--------------|---------------|--------|
-| Temps développement | -40% | -60% | vs solution maison |
-| Coûts IA | -20% | -30% | vs baseline sans monitoring |
-| Time to production | -30% | -50% | vs solution maison |
+| Development time | -40% | -60% | vs. in-house solution |
+| AI costs | -20% | -30% | vs. baseline without monitoring |
+| Time to production | -30% | -50% | vs. in-house solution |
 
-#### KPIs de Validation (Phase MVP)
+#### Validation KPIs (MVP Phase)
 
-**Focus exclusif sur :**
+**Exclusive focus on:**
 
-1. **⏱️ Temps pour premier agent** : < 30 minutes
-2. **🔁 Replay fonctionnel** : 100% des runs rejouables
-3. **📊 Tracing compréhensible** : > 80% utilisateurs comprennent traces
-4. **🔐 Policies simples mais actives** : > 60% projets avec policies
+1. **⏱️ Time to first agent**: < 30 minutes
+2. **🔁 Working replay**: 100% of runs replayable
+3. **📊 Understandable tracing**: > 80% of users understand traces
+4. **🔐 Simple but active policies**: > 60% of projects with policies
 
-👉 **Si ces 4 points fonctionnent, le reste suivra.**
+👉 **If these 4 points work, the rest will follow.**
 
-### Contribution aux Objectifs Stratégiques
+### Contribution to Strategic Objectives
 
-#### Positionnement Marché
+#### Market Positioning
 
-**SDK_AI_Agents se positionne comme :**
-- L'infrastructure de gouvernance des agents IA
-- Pas un outil d'expérimentation, mais un standard sérieux
-- La solution pour équipes techniques matures confrontées à l'IA en production
+**SDK_AI_Agents positions itself as:**
+- The governance infrastructure for AI agents
+- Not an experimentation tool, but a serious standard
+- The solution for mature technical teams facing AI in production
 
-**Avantage concurrentiel mesurable :**
+**Measurable competitive advantage:**
 
-Capacité à :
-- **Auditer** : Audit trail complet pour conformité
-- **Rejouer** : Replay natif en 1 commande
-- **Expliquer** : Observabilité cognitive avec graphe raisonnement
-- **Sécuriser** : Gouvernance native avec policies et capabilities
+Ability to:
+- **Audit**: Complete audit trail for compliance
+- **Replay**: Native replay in 1 command
+- **Explain**: Cognitive observability with a reasoning graph
+- **Secure**: Native governance with policies and capabilities
 
-👉 **Ces dimensions sont très difficiles à copier rapidement.**
+👉 **These dimensions are very hard to copy quickly.**
 
-**Métriques de positionnement :**
-- **Mentions comme standard** : Citations dans articles techniques, conférences
-- **Comparaisons favorables** : "SDK_AI_Agents vs LangChain" avec avantages gouvernance
-- **Adoption par leaders** : Utilisation par entreprises reconnues
+**Positioning metrics:**
+- **Mentions as a standard**: Citations in technical articles, conferences
+- **Favorable comparisons**: "SDK_AI_Agents vs LangChain" with governance advantages
+- **Adoption by leaders**: Use by recognized enterprises
 
-### Priorisation des Métriques
+### Metrics Prioritization
 
 #### Phase 1 - MVP
 
-**Focus exclusif sur :**
-- ⏱️ Temps pour premier agent : < 30 minutes
-- 🔁 Replay fonctionnel : 100% des runs rejouables
-- 📊 Tracing compréhensible : > 80% utilisateurs comprennent traces
-- 🔐 Policies simples mais actives : > 60% projets avec policies
+**Exclusive focus on:**
+- ⏱️ Time to first agent: < 30 minutes
+- 🔁 Working replay: 100% of runs replayable
+- 📊 Understandable tracing: > 80% of users understand traces
+- 🔐 Simple but active policies: > 60% of projects with policies
 
-**Métriques MVP :**
-- 10 projets utilisent SDK_AI_Agents en production
-- Temps moyen premier agent < 30 minutes
-- Replay fonctionne pour 100% des runs
-- > 60% projets activent policies
+**MVP Metrics:**
+- 10 projects use SDK_AI_Agents in production
+- Average time to first agent < 30 minutes
+- Replay works for 100% of runs
+- > 60% of projects enable policies
 
 #### Phase 2 - Adoption
 
-**Focus sur :**
-- Adoption des features de gouvernance
-- Utilisation volontaire des garde-fous
-- Réduction des incidents
-- Expansion vers cas d'usage critiques
+**Focus on:**
+- Adoption of governance features
+- Voluntary use of guardrails
+- Incident reduction
+- Expansion toward critical use cases
 
-**Métriques Adoption :**
-- > 100 projets actifs
-- > 70% adoption features gouvernance
-- -60% réduction incidents
-- > 20% cas d'usage critiques
+**Adoption Metrics:**
+- > 100 active projects
+- > 70% adoption of governance features
+- -60% incident reduction
+- > 20% critical use cases
 
-**Synthèse en une phrase :**
+**One-sentence summary:**
 
-**Le succès de SDK_AI_Agents se mesure à la confiance que les équipes accordent à leurs agents en production.**
+**The success of SDK_AI_Agents is measured by the trust teams place in their agents in production.**
 
 ## MVP Scope
 
-**Principe directeur du MVP :**
+**Guiding principle of the MVP:**
 
-Le MVP doit prouver qu'un agent peut agir en production de manière contrôlée, explicable et rejouable.
+The MVP must prove that an agent can act in production in a controlled, explainable, and replayable way.
 
-**Tout ce qui ne sert pas directement cet objectif sort du MVP.**
+**Anything that doesn't directly serve this objective is out of the MVP.**
 
-**Le problème principal à résoudre (rappel) :**
+**The main problem to solve (reminder):**
 
-👉 Aujourd'hui, les équipes ne peuvent pas faire agir une IA en production sans perdre le contrôle.
+👉 Today, teams cannot make an AI act in production without losing control.
 
-Le MVP doit donc démontrer une seule chose :
+The MVP must therefore demonstrate a single thing:
 
-👉 **"Je peux comprendre, rejouer et sécuriser le comportement de mon agent."**
+👉 **"I can understand, replay, and secure my agent's behavior."**
 
-**Le MVP en une phrase :**
+**The MVP in one sentence:**
 
-Un runtime d'agent événementiel capable d'exécuter des tools de façon contrôlée, avec tracing et replay natifs.
+An event-driven agent runtime capable of executing tools in a controlled way, with native tracing and replay.
 
 ### Core Features
 
-#### 1. Runtime d'Agent Événementiel (CORE)
+#### 1. Event-Driven Agent Runtime (CORE)
 
-**Pourquoi ?**
-C'est la colonne vertébrale. Sans ça, pas de replay, pas d'audit, pas de différenciation.
+**Why?**
+This is the backbone. Without it, there is no replay, no audit, no differentiation.
 
-**Doit absolument fonctionner :**
-- Exécuter un agent via une boucle simple (max steps)
-- Émettre des événements structurés à chaque étape
-- Persister ces événements (au moins in-memory + file)
+**Absolutely must work:**
+- Execute an agent via a simple loop (max steps)
+- Emit structured events at each step
+- Persist these events (at least in-memory + file)
 
-**Si absent → MVP incomplet.**
+**If missing → incomplete MVP.**
 
-**Moment aha :** "Chaque action de l'agent est un événement traçable."
+**Aha moment:** "Every action of the agent is a traceable event."
 
-#### 2. Tool Calling Typé et Contrôlé
+#### 2. Typed and Controlled Tool Calling
 
-**Pourquoi ?**
-C'est là que le danger commence. C'est le cœur du problème utilisateur.
+**Why?**
+This is where the danger begins. This is the core of the user's problem.
 
-**Doit absolument fonctionner :**
-- Définition explicite des tools (`defineTool`)
-- Validation des inputs (Zod / schema)
-- Tool registry avec allowlist
-- Tool call visible dans les events
+**Absolutely must work:**
+- Explicit tool definition (`defineTool`)
+- Input validation (Zod / schema)
+- Tool registry with allowlist
+- Tool call visible in the events
 
-**Moment aha :**
-"L'agent ne peut rien faire que je n'aie explicitement autorisé."
+**Aha moment:**
+"The agent can't do anything I haven't explicitly authorized."
 
-#### 3. Policies Minimales (Sécurité by Design)
+#### 3. Minimal Policies (Security by Design)
 
-**Pourquoi ?**
-Sans policies, ce n'est qu'un framework de plus.
+**Why?**
+Without policies, it's just one more framework.
 
-**Policies MVP obligatoires :**
-- Allowlist tools (deny by default)
-- Budget max (tokens ou steps)
+**Mandatory MVP policies:**
+- Tool allowlist (deny by default)
+- Max budget (tokens or steps)
 - Timeout / max steps
 
-👉 **Pas d'approval humaine encore, mais la structure doit exister.**
+👉 **No human approval yet, but the structure must exist.**
 
-**Moment aha :**
-"Même si l'agent déraille, il est mécaniquement limité."
+**Aha moment:**
+"Even if the agent goes off the rails, it is mechanically limited."
 
-#### 4. Observabilité Native (Tracing First-Class)
+#### 4. Native Observability (Tracing First-Class)
 
-**Pourquoi ?**
-C'est le deuxième pilier avec le tool calling.
+**Why?**
+This is the second pillar alongside tool calling.
 
-**Doit absolument fonctionner :**
-- Traces lisibles (JSON structuré)
-- Chaque run a un `runId`
-- Chaque décision, tool call, erreur est tracée
-- Export possible (console + fichier)
+**Absolutely must work:**
+- Readable traces (structured JSON)
+- Every run has a `runId`
+- Every decision, tool call, error is traced
+- Export possible (console + file)
 
-**Moment aha :**
-"Je comprends exactement ce que l'agent a fait et pourquoi."
+**Aha moment:**
+"I understand exactly what the agent did and why."
 
-#### 5. Replay d'Exécution (Killer Feature MVP)
+#### 5. Execution Replay (MVP Killer Feature)
 
-**Pourquoi ?**
-C'est la feature qui change tout.
+**Why?**
+This is the feature that changes everything.
 
-**Replay MVP =**
-- Rejouer un run à partir des events
-- Sans recontacter le LLM (mode "replay")
-- Même séquence, mêmes tool calls
+**MVP Replay =**
+- Replay a run from its events
+- Without contacting the LLM again ("replay" mode)
+- Same sequence, same tool calls
 
-👉 **Pas besoin d'UI. CLI ou API suffit.**
+👉 **No UI needed. CLI or API is enough.**
 
-**Moment aha ultime :**
-"Je viens de rejouer un incident en 5 secondes."
+**Ultimate aha moment:**
+"I just replayed an incident in 5 seconds."
 
-#### 6. DX Minimale mais Solide
+#### 6. Minimal but Solid DX
 
-**Pourquoi ?**
-Sans DX claire, même un bon core ne sera pas utilisé.
+**Why?**
+Without a clear DX, even a good core won't get used.
 
-**Doit absolument fonctionner :**
-- Quickstart en < 10 lignes
-- 1 exemple complet (agent + tool + replay)
-- API TypeScript claire et typée
-- Documentation essentielle
+**Absolutely must work:**
+- Quickstart in < 10 lines
+- 1 complete example (agent + tool + replay)
+- Clear, typed TypeScript API
+- Essential documentation
 
-**Moment aha :**
-"Je peux créer mon premier agent en moins de 30 minutes."
+**Aha moment:**
+"I can create my first agent in under 30 minutes."
 
-### MVP - Périmètre Fonctionnel Final (Checklist)
+### MVP - Final Functional Scope (Checklist)
 
-**MVP = OUI ✅**
+**MVP = YES ✅**
 
-- ✅ Agent runtime événementiel
-- ✅ Tool calling typé + allowlist
-- ✅ Policies simples (budget, steps, timeout)
-- ✅ Tracing structuré
-- ✅ Replay d'exécution
-- ✅ 1 provider LLM (OpenAI ou Anthropic)
-- ✅ 1 exemple réel complet
-- ✅ Tests basés sur traces
+- ✅ Event-driven agent runtime
+- ✅ Typed tool calling + allowlist
+- ✅ Simple policies (budget, steps, timeout)
+- ✅ Structured tracing
+- ✅ Execution replay
+- ✅ 1 LLM provider (OpenAI or Anthropic)
+- ✅ 1 complete real example
+- ✅ Trace-based tests
 
-**MVP = NON ❌**
+**MVP = NO ❌**
 
-- ❌ Intelligence "magique"
-- ❌ Abstractions prématurées
-- ❌ Features enterprise lourdes
+- ❌ "Magic" intelligence
+- ❌ Premature abstractions
+- ❌ Heavy enterprise features
 
 ### Out of Scope for MVP
 
-**Dire non est stratégique.**
+**Saying no is strategic.**
 
-**Hors MVP explicite (version 2.0+) :**
+**Explicitly out of MVP (version 2.0+):**
 
-- ❌ **Multi-agent orchestration** - Focus sur un agent d'abord
-- ❌ **Mémoire vectorielle / RAG avancé** - Mémoire basique suffit pour MVP
-- ❌ **UI / dashboard web** - CLI et API suffisent pour MVP
-- ❌ **Marketplace de plugins** - Extensibilité basique suffit
-- ❌ **Approval humaine interactive** - Structure existe, pas l'UI
-- ❌ **Fine-tuning / training** - Pas dans le scope MVP
-- ❌ **Optimisation avancée des coûts** - Monitoring basique suffit
-- ❌ **Support multi-langages** - TypeScript uniquement pour MVP (Python plus tard)
+- ❌ **Multi-agent orchestration** - Focus on a single agent first
+- ❌ **Vector memory / advanced RAG** - Basic memory is enough for MVP
+- ❌ **Web UI / dashboard** - CLI and API are enough for MVP
+- ❌ **Plugin marketplace** - Basic extensibility is enough
+- ❌ **Interactive human approval** - Structure exists, not the UI
+- ❌ **Fine-tuning / training** - Not in the MVP scope
+- ❌ **Advanced cost optimization** - Basic monitoring is enough
+- ❌ **Multi-language support** - TypeScript only for MVP (Python later)
 
-👉 **Si on les inclut, on rate le MVP.**
+👉 **Including these would mean missing the MVP.**
 
-**Rationale pour chaque exclusion :**
-- **Multi-agent :** Complexité ajoutée sans valeur MVP immédiate
-- **RAG avancé :** Peut être ajouté via intégrations externes
-- **UI/Dashboard :** CLI et API permettent validation concept
-- **Marketplace :** Extensibilité basique suffit pour MVP
-- **Approval humaine :** Structure existe, UI peut attendre
-- **Fine-tuning :** Hors scope gouvernance
-- **Optimisation coûts :** Monitoring basique valide le concept
-- **Multi-langages :** TypeScript permet validation complète
+**Rationale for each exclusion:**
+- **Multi-agent:** Added complexity without immediate MVP value
+- **Advanced RAG:** Can be added via external integrations
+- **UI/Dashboard:** CLI and API allow concept validation
+- **Marketplace:** Basic extensibility is enough for MVP
+- **Human approval:** Structure exists, UI can wait
+- **Fine-tuning:** Out of governance scope
+- **Cost optimization:** Basic monitoring validates the concept
+- **Multi-language:** TypeScript allows complete validation
 
 ### MVP Success Criteria
 
-**Le "moment aha" du MVP (très important) :**
+**The MVP's "aha moment" (very important):**
 
-Si l'utilisateur ne vit pas au moins un de ces moments, le MVP échoue :
+If the user doesn't experience at least one of these moments, the MVP fails:
 
-- 🔁 **"Je peux rejouer exactement ce qui s'est passé."**
-- 🔍 **"Je comprends pourquoi l'agent a fait ça."**
-- 🔐 **"L'agent ne peut pas faire de dégâts."**
+- 🔁 **"I can replay exactly what happened."**
+- 🔍 **"I understand why the agent did that."**
+- 🔐 **"The agent can't cause damage."**
 
-**Critères de succès MVP :**
+**MVP success criteria:**
 
-**1. Validation technique :**
-- ✅ Runtime événementiel fonctionne
-- ✅ Replay fonctionne pour 100% des runs
-- ✅ Policies bloquent actions non autorisées
-- ✅ Tracing complet et lisible
+**1. Technical validation:**
+- ✅ Event-driven runtime works
+- ✅ Replay works for 100% of runs
+- ✅ Policies block unauthorized actions
+- ✅ Complete and readable tracing
 
-**2. Validation utilisateur :**
-- ✅ Temps premier agent fonctionnel < 30 minutes
-- ✅ Utilisateurs comprennent les traces
-- ✅ Replay utilisé pour debugging incidents
-- ✅ Feedback positif sur contrôle et sécurité
+**2. User validation:**
+- ✅ Time to first working agent < 30 minutes
+- ✅ Users understand the traces
+- ✅ Replay used for incident debugging
+- ✅ Positive feedback on control and security
 
-**3. Validation problème/solution :**
-- ✅ Utilisateurs confirment que le problème est résolu
-- ✅ Agents déployés en production avec confiance
-- ✅ Incidents résolus rapidement grâce au replay
-- ✅ Tech leads approuvent déploiement agents
+**3. Problem/solution validation:**
+- ✅ Users confirm the problem is solved
+- ✅ Agents deployed to production with confidence
+- ✅ Incidents resolved quickly thanks to replay
+- ✅ Tech leads approve agent deployment
 
-**4. Métriques MVP :**
-- ✅ 10 projets utilisent SDK_AI_Agents en production
-- ✅ > 60% projets activent policies
-- ✅ > 40% utilisateurs utilisent replay
-- ✅ Temps debugging incidents < 5 minutes
+**4. MVP metrics:**
+- ✅ 10 projects use SDK_AI_Agents in production
+- ✅ > 60% of projects enable policies
+- ✅ > 40% of users use replay
+- ✅ Incident debugging time < 5 minutes
 
-**Gate de décision pour post-MVP :**
-- Si métriques MVP atteintes → Proceed avec features avancées
-- Si métriques MVP non atteintes → Itérer sur MVP, pas ajouter features
+**Decision gate for post-MVP:**
+- If MVP metrics are met → Proceed with advanced features
+- If MVP metrics are not met → Iterate on the MVP, don't add features
 
 ### Future Vision
 
-**Si le MVP est un succès :**
+**If the MVP is a success:**
 
-SDK_AI_Agents devient progressivement une **plateforme de gouvernance des agents** avec :
+SDK_AI_Agents gradually becomes an **agent governance platform** with:
 
-**Phase 2 - Production-Ready (3-4 mois) :**
-- Policies avancées (approval humaine, budgets complexes)
-- Observabilité cognitive (graphe raisonnement)
-- Capabilities system complet
-- Multi-providers LLM
+**Phase 2 - Production-Ready (3-4 months):**
+- Advanced policies (human approval, complex budgets)
+- Cognitive observability (reasoning graph)
+- Complete capabilities system
+- Multi-provider LLM support
 
-**Phase 3 - Advanced Features (6-12 mois) :**
-- Mémoire causale et temporelle
+**Phase 3 - Advanced Features (6-12 months):**
+- Causal and temporal memory
 - Time travel debugging
 - Multi-agent orchestration
-- Conformité sectorielle (finance, santé)
+- Sector-specific compliance (finance, healthcare)
 
-**Phase 4 - Platform (12-24 mois) :**
-- Marketplace de plugins
-- UI/Dashboard web
-- Support multi-langages (Python)
-- Écosystème et communauté
+**Phase 4 - Platform (12-24 months):**
+- Plugin marketplace
+- Web UI/Dashboard
+- Multi-language support (Python)
+- Ecosystem and community
 
-**Mais tout part du MVP :**
+**But everything starts from the MVP:**
 - Event log + tool control + replay
 
-**Vision à 2-3 ans :**
+**2-3 year vision:**
 
-SDK_AI_Agents devient le **standard de facto pour gouvernance agents IA**, utilisé par :
-- Entreprises réglementées (finance, santé, juridique)
-- Scale-ups tech avec agents critiques
-- Plateformes SaaS intégrant agents IA
+SDK_AI_Agents becomes the **de facto standard for AI agent governance**, used by:
+- Regulated enterprises (finance, healthcare, legal)
+- Tech scale-ups with critical agents
+- SaaS platforms integrating AI agents
 
-**Positionnement :**
-- Infrastructure de gouvernance, pas outil expérimentation
-- Standard sérieux pour production
-- Référence pour audit et conformité
+**Positioning:**
+- Governance infrastructure, not an experimentation tool
+- A serious standard for production
+- A reference for audit and compliance
 
-### Ordre de Construction (Roadmap Technique)
+### Build Order (Technical Roadmap)
 
-**Ordre strict recommandé :**
+**Recommended strict order:**
 
-1. **Modèle d'événements (types TS)** - Fondation
-2. **EventStore + EventBus** - Infrastructure événementielle
-3. **Runtime d'agent minimal** - Exécution basique
-4. **Tool system (defineTool + registry)** - Contrôle outils
-5. **Policies MVP** - Sécurité by design
-6. **Tracing JSON** - Observabilité
+1. **Event model (TS types)** - Foundation
+2. **EventStore + EventBus** - Event-driven infrastructure
+3. **Minimal agent runtime** - Basic execution
+4. **Tool system (defineTool + registry)** - Tool control
+5. **MVP Policies** - Security by design
+6. **JSON Tracing** - Observability
 7. **Replay** - Killer feature
-8. **Exemple + quickstart** - DX et validation
+8. **Example + quickstart** - DX and validation
 
-**Jalons MVP :**
-- **Semaine 1-2 :** Modèle événements + EventStore basique
-- **Semaine 3-4 :** Runtime agent + Tool system
-- **Semaine 5-6 :** Policies + Tracing
-- **Semaine 7-8 :** Replay + Exemple complet
-- **Semaine 9-10 :** Tests, documentation, polish
+**MVP Milestones:**
+- **Weeks 1-2:** Event model + basic EventStore
+- **Weeks 3-4:** Agent runtime + Tool system
+- **Weeks 5-6:** Policies + Tracing
+- **Weeks 7-8:** Replay + Complete example
+- **Weeks 9-10:** Tests, documentation, polish
 
-**Synthèse finale :**
+**Final summary:**
 
-Le MVP de SDK_AI_Agents est un moteur d'agents événementiel capable d'exécuter des actions réelles de façon contrôlée, observable et rejouable.
+The SDK_AI_Agents MVP is an event-driven agent engine capable of executing real actions in a controlled, observable, and replayable way.
 
-**Tout le reste peut attendre.**
+**Everything else can wait.**
 
 ---
 

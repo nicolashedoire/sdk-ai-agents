@@ -1,4 +1,4 @@
-# Story 12.3: Requêtes Avancées sur Événements
+# Story 12.3: Advanced Queries on Events
 
 **Story ID:** 12.3  
 **Epic:** 12 - Event Store SQL-Based  
@@ -7,63 +7,63 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** faire des requêtes avancées sur les événements,
-**So that** je peux analyser les patterns et comportements des agents.
+**As a** developer,
+**I want** to perform advanced queries on events,
+**So that** I can analyze agent patterns and behaviors.
 
 ## Acceptance Criteria
 
-**Given** un Event Store SQL configuré
-**When** je fais des requêtes avancées
-**Then** je peux filtrer par agentId, userId, sessionId
-**And** je peux faire des agrégations (count, groupBy)
-**And** je peux rechercher dans data/metadata (JSON queries)
-**And** les performances sont acceptables
+**Given** a configured SQL Event Store
+**When** I perform advanced queries
+**Then** I can filter by agentId, userId, sessionId
+**And** I can perform aggregations (count, groupBy)
+**And** I can search within data/metadata (JSON queries)
+**And** performance is acceptable
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Feature**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events traced
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current state:**
+- Complete implementation in the codebase
+- Tested and validated functionality
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files concerned:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Feature implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events traced
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Functionality validated
 
 ## Story Completion Status
 
 **Status:** review  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested
 
 ## Implementation Details
 

@@ -1,4 +1,4 @@
-# Story 10.3: Fallback entre Providers
+# Story 10.3: Fallback between Providers
 
 **Story ID:** 10.3  
 **Epic:** 10 - Multi-Providers LLM  
@@ -7,152 +7,152 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** configurer un fallback entre providers,
-**So that** mon agent continue de fonctionner si un provider échoue.
+**As a** developer,
+**I want** configure a fallback between providers,
+**So that** my agent continues to function if a provider fails.
 
 ## Acceptance Criteria
 
-**Given** plusieurs providers configurés avec fallback
-**When** le provider principal échoue
-**Then** le système bascule automatiquement sur le provider de fallback
-**And** l'exécution continue sans interruption
-**And** l'événement de fallback est tracé
+**Given** multiple providers configured with fallback
+**When** the primary provider fails
+**Then** the system automatically switches to the fallback provider
+**And** execution continues without interruption
+**And** the fallback event is tracked
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- `ReasoningEngine` utilise un seul `LLMProvider`
-- Pas de mécanisme de fallback en cas d'échec du provider
-- Erreurs du provider propagées directement
+**Current state:**
+- `ReasoningEngine` uses a single `LLMProvider`
+- No fallback mechanism in case the provider fails
+- Provider errors propagated directly
 
-**Fichiers concernés:**
-- `src/engines/reasoning-engine.ts` - Génération d'intentions
-- `src/providers/` - Providers LLM
-- `src/types/sdk.ts` - Configuration SDK
-- `src/types/events.ts` - Types d'événements
+**Files concerned:**
+- `src/engines/reasoning-engine.ts` - Intention generation
+- `src/providers/` - LLM providers
+- `src/types/sdk.ts` - SDK configuration
+- `src/types/events.ts` - Event types
 
-### Architecture Cible
+### Target Architecture
 
-**Fallback requis:**
-1. **FallbackProvider** - Wrapper qui gère plusieurs providers avec fallback
-2. **Configuration** - Support dans `SDKConfig` pour spécifier fallback providers
-3. **Logging** - Événements de fallback tracés dans EventStore
-4. **Transparence** - L'exécution continue sans interruption pour l'utilisateur
+**Required fallback:**
+1. **FallbackProvider** - Wrapper that manages multiple providers with fallback
+2. **Configuration** - Support in `SDKConfig` to specify fallback providers
+3. **Logging** - Fallback events tracked in EventStore
+4. **Transparency** - Execution continues without interruption for the user
 
-### Implémentation
+### Implementation
 
 **1. FallbackProvider**
-- Wrapper autour de plusieurs `LLMProvider`
-- Essaie le provider principal, puis les fallbacks en ordre
-- Retourne métadonnées sur quel provider a été utilisé
+- Wrapper around multiple `LLMProvider` instances
+- Tries the primary provider, then the fallbacks in order
+- Returns metadata on which provider was used
 
-**2. SDKConfig étendu**
-- Ajout de `fallbackProviders?: Array<{provider, config}>`
-- Permet de configurer plusieurs providers de fallback
+**2. Extended SDKConfig**
+- Added `fallbackProviders?: Array<{provider, config}>`
+- Allows configuring multiple fallback providers
 
 **3. ReasoningEngine**
-- Détecte si le provider est un `FallbackProvider`
-- Logge événement `provider.fallback` quand fallback utilisé
-- Continue l'exécution normalement
+- Detects if the provider is a `FallbackProvider`
+- Logs a `provider.fallback` event when a fallback is used
+- Continues execution normally
 
-**4. Événements**
-- Nouveau type `provider.fallback` dans `EventType`
-- Contient: primaryProvider, usedProvider, attemptedProviders
+**4. Events**
+- New `provider.fallback` type in `EventType`
+- Contains: primaryProvider, usedProvider, attemptedProviders
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-### Tests Unitaires Requis
+### Required Unit Tests
 
 1. **FallbackProvider**
-   - Test création avec primary seulement
-   - Test création avec primary + fallback
-   - Test utilisation primary quand il réussit
-   - Test fallback quand primary échoue
-   - Test essai de tous les providers en ordre
-   - Test échec quand tous les providers échouent
-   - Test métadonnées de fallback
+   - Test creation with primary only
+   - Test creation with primary + fallback
+   - Test using primary when it succeeds
+   - Test fallback when primary fails
+   - Test trying all providers in order
+   - Test failure when all providers fail
+   - Test fallback metadata
 
-### Tests d'Intégration
+### Integration Tests
 
-- Test SDK avec fallback configuré
-- Test utilisation primary provider quand il réussit
-- Test fallback automatique quand primary échoue
-- Test logging événement fallback
-- Test essai de tous les fallbacks en ordre
-- Test échec quand tous les providers échouent
+- Test SDK with fallback configured
+- Test using the primary provider when it succeeds
+- Test automatic fallback when primary fails
+- Test fallback event logging
+- Test trying all fallbacks in order
+- Test failure when all providers fail
 
 ## Tasks/Subtasks
 
-- [x] Créer FallbackProvider wrapper
-- [x] Étendre SDKConfig avec fallbackProviders
-- [x] Modifier SDK.createProvider pour créer FallbackProvider si configuré
-- [x] Ajouter type événement 'provider.fallback'
-- [x] Modifier ReasoningEngine pour détecter FallbackProvider
-- [x] Implémenter logging événements fallback
-- [x] Créer tests unitaires FallbackProvider (16 tests)
-- [x] Créer tests d'intégration SDK avec fallback (6 tests)
+- [x] Create FallbackProvider wrapper
+- [x] Extend SDKConfig with fallbackProviders
+- [x] Modify SDK.createProvider to create FallbackProvider if configured
+- [x] Add 'provider.fallback' event type
+- [x] Modify ReasoningEngine to detect FallbackProvider
+- [x] Implement fallback event logging
+- [x] Create FallbackProvider unit tests (16 tests)
+- [x] Create SDK integration tests with fallback (6 tests)
 
 ## File List
 
-- `src/providers/fallback-provider.ts` - Nouveau (wrapper fallback)
-- `src/providers/index.ts` - Modifié (export FallbackProvider)
-- `src/types/sdk.ts` - Modifié (ajout fallbackProviders)
-- `src/types/events.ts` - Modifié (ajout 'provider.fallback')
-- `src/engines/reasoning-engine.ts` - Modifié (détection fallback + logging)
-- `src/sdk.ts` - Modifié (création FallbackProvider si configuré)
-- `src/__tests__/fallback-provider.test.ts` - Nouveau (16 tests unitaires)
-- `src/__tests__/sdk-fallback.test.ts` - Nouveau (6 tests intégration)
+- `src/providers/fallback-provider.ts` - New (fallback wrapper)
+- `src/providers/index.ts` - Modified (export FallbackProvider)
+- `src/types/sdk.ts` - Modified (added fallbackProviders)
+- `src/types/events.ts` - Modified (added 'provider.fallback')
+- `src/engines/reasoning-engine.ts` - Modified (fallback detection + logging)
+- `src/sdk.ts` - Modified (creation of FallbackProvider if configured)
+- `src/__tests__/fallback-provider.test.ts` - New (16 unit tests)
+- `src/__tests__/sdk-fallback.test.ts` - New (6 integration tests)
 
 ## Dev Agent Record
 
 ### Implementation Plan
 
-1. **FallbackProvider** : Wrapper qui gère plusieurs providers avec logique de fallback
-2. **SDKConfig** : Extension pour supporter fallbackProviders
-3. **SDK** : Modification pour créer FallbackProvider si fallbackProviders configurés
-4. **ReasoningEngine** : Détection FallbackProvider et logging événements fallback
-5. **Tests** : Tests unitaires et intégration complets
+1. **FallbackProvider**: Wrapper that manages multiple providers with fallback logic
+2. **SDKConfig**: Extension to support fallbackProviders
+3. **SDK**: Modification to create FallbackProvider if fallbackProviders are configured
+4. **ReasoningEngine**: FallbackProvider detection and fallback event logging
+5. **Tests**: Complete unit and integration tests
 
 ### Completion Notes
 
-✅ **Story complétée avec succès**
+✅ **Story completed successfully**
 
-**Implémentation:**
-- FallbackProvider créé avec logique de fallback complète
-- SDKConfig étendu pour supporter fallbackProviders
-- SDK modifié pour créer FallbackProvider automatiquement si configuré
-- ReasoningEngine modifié pour détecter FallbackProvider et logger événements
-- Nouveau type événement 'provider.fallback' ajouté
-- Métadonnées de fallback disponibles (usedProvider, wasFallback, attemptedProviders)
+**Implementation:**
+- FallbackProvider created with complete fallback logic
+- SDKConfig extended to support fallbackProviders
+- SDK modified to automatically create FallbackProvider if configured
+- ReasoningEngine modified to detect FallbackProvider and log events
+- New 'provider.fallback' event type added
+- Fallback metadata available (usedProvider, wasFallback, attemptedProviders)
 
 **Tests:**
-- 16 tests unitaires FallbackProvider (tous passent)
-- 6 tests d'intégration SDK avec fallback (tous passent)
-- Couverture complète des cas d'usage
+- 16 FallbackProvider unit tests (all passing)
+- 6 SDK integration tests with fallback (all passing)
+- Complete coverage of use cases
 
-**Critères d'acceptation validés:**
-- ✅ Plusieurs providers configurés avec fallback
-- ✅ Bascule automatique sur fallback si principal échoue
-- ✅ Exécution continue sans interruption
-- ✅ Événements de fallback tracés
+**Validated acceptance criteria:**
+- ✅ Multiple providers configured with fallback
+- ✅ Automatic switch to fallback if primary fails
+- ✅ Execution continues without interruption
+- ✅ Fallback events tracked
 
 ## Senior Developer Review (AI)
 
@@ -163,20 +163,20 @@
 ### Review Summary
 
 **Issues Found:** 0 issues  
-**Files Reviewed:** 8 fichiers modifiés/créés  
-**Tests Status:** Tous les tests passent
+**Files Reviewed:** 8 files modified/created  
+**Tests Status:** All tests pass
 
 ### Review Notes
 
-- ✅ Implémentation complète et correcte
-- ✅ FallbackProvider bien conçu avec métadonnées
-- ✅ Événements de fallback correctement loggés
-- ✅ Tests complets et tous passent
-- ⚠️ Note: Problème identifié dans Story 10.4 concernant la résolution des settings avec FallbackProvider
+- ✅ Complete and correct implementation
+- ✅ FallbackProvider well designed with metadata
+- ✅ Fallback events correctly logged
+- ✅ Complete tests, all passing
+- ⚠️ Note: Issue identified in Story 10.4 regarding settings resolution with FallbackProvider
 
 ## Story Completion Status
 
 **Status:** review  
 **Ready for:** Code review  
-**Dependencies:** Story 10.1 et 10.2 complétées (prérequis créés)  
-**Next Story:** 10.4 - Configuration par Provider
+**Dependencies:** Story 10.1 and 10.2 completed (prerequisites created)  
+**Next Story:** 10.4 - Per-Provider Configuration

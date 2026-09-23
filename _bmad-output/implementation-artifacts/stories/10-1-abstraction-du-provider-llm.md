@@ -1,4 +1,4 @@
-# Story 10.1: Abstraction du Provider LLM
+# Story 10.1: LLM Provider Abstraction
 
 **Story ID:** 10.1  
 **Epic:** 10 - Multi-Providers LLM  
@@ -7,51 +7,51 @@
 
 ## User Story
 
-**As a** développeur,  
-**I want** utiliser différents providers LLM (OpenAI, Anthropic, etc.),  
-**So that** je peux choisir le meilleur provider pour mon cas d'usage.
+**As a** developer,  
+**I want** use different LLM providers (OpenAI, Anthropic, etc.),  
+**So that** I can choose the best provider for my use case.
 
 ## Acceptance Criteria
 
-**Given** un SDK avec abstraction LLM  
-**When** je crée un agent  
-**Then** je peux spécifier le provider LLM (OpenAI, Anthropic, etc.)  
-**And** l'API reste identique quel que soit le provider  
-**And** le provider est configurable via SDKConfig
+**Given** an SDK with LLM abstraction  
+**When** I create an agent  
+**Then** I can specify the LLM provider (OpenAI, Anthropic, etc.)  
+**And** the API remains identical regardless of the provider  
+**And** the provider is configurable via SDKConfig
 
 ## Business Value
 
-- **Flexibilité**: Permet aux développeurs de choisir le meilleur provider selon leurs besoins
-- **Résilience**: Évite la dépendance à un seul provider
-- **Coûts**: Permet d'optimiser les coûts en choisissant le provider le plus adapté
-- **Performance**: Permet de choisir le provider le plus performant pour chaque cas d'usage
+- **Flexibility**: Allows developers to choose the best provider according to their needs
+- **Resilience**: Avoids dependency on a single provider
+- **Cost**: Allows optimizing costs by choosing the most suitable provider
+- **Performance**: Allows choosing the most performant provider for each use case
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- `ReasoningEngine` utilise directement `OpenAI` client
-- Le client OpenAI est instancié dans le constructeur
-- L'API OpenAI est appelée directement dans `callLLM()`
-- Le format de réponse OpenAI est parsé dans `extractMessage()`
+**Current state:**
+- `ReasoningEngine` directly uses the `OpenAI` client
+- The OpenAI client is instantiated in the constructor
+- The OpenAI API is called directly in `callLLM()`
+- The OpenAI response format is parsed in `extractMessage()`
 
-**Fichiers concernés:**
-- `src/engines/reasoning-engine.ts` - Engine actuel avec OpenAI hardcodé
-- `src/types/sdk.ts` - SDKConfig a déjà un champ `provider?: 'openai' | 'anthropic'` mais non utilisé
-- `src/sdk.ts` - Création du ReasoningEngine avec apiKey uniquement
+**Files concerned:**
+- `src/engines/reasoning-engine.ts` - Current engine with OpenAI hardcoded
+- `src/types/sdk.ts` - SDKConfig already has a `provider?: 'openai' | 'anthropic'` field but it is unused
+- `src/sdk.ts` - Creation of the ReasoningEngine with apiKey only
 
-### Architecture Cible
+### Target Architecture
 
-**Abstraction requise:**
-1. **Interface LLMProvider** - Interface commune pour tous les providers
-2. **Implémentations concrètes** - OpenAIProvider, AnthropicProvider
-3. **Factory/Registry** - Création et gestion des providers
-4. **Configuration** - Support dans SDKConfig pour spécifier le provider
+**Required abstraction:**
+1. **LLMProvider Interface** - Common interface for all providers
+2. **Concrete implementations** - OpenAIProvider, AnthropicProvider
+3. **Factory/Registry** - Creation and management of providers
+4. **Configuration** - Support in SDKConfig to specify the provider
 
-**Pattern recommandé:** Strategy Pattern + Factory Pattern
+**Recommended pattern:** Strategy Pattern + Factory Pattern
 
-### Interface LLMProvider
+### LLMProvider Interface
 
 ```typescript
 interface LLMProvider {
@@ -92,60 +92,60 @@ interface LLMResponse {
 }
 ```
 
-### Implémentations Requises
+### Required Implementations
 
-1. **OpenAIProvider** - Wrapper autour du client OpenAI existant
-2. **AnthropicProvider** - Nouvelle implémentation pour Anthropic Claude
-3. **ProviderFactory** - Création des providers selon la configuration
+1. **OpenAIProvider** - Wrapper around the existing OpenAI client
+2. **AnthropicProvider** - New implementation for Anthropic Claude
+3. **ProviderFactory** - Creation of providers according to configuration
 
-### Modifications Requises
+### Required Changes
 
-**1. Créer l'interface LLMProvider**
-- Fichier: `src/providers/llm-provider.ts`
-- Définir les interfaces communes
-- Types pour request/response normalisés
+**1. Create the LLMProvider interface**
+- File: `src/providers/llm-provider.ts`
+- Define the common interfaces
+- Types for normalized request/response
 
-**2. Créer OpenAIProvider**
-- Fichier: `src/providers/openai-provider.ts`
-- Wrapper autour du client OpenAI
-- Adapter les réponses au format LLMResponse
+**2. Create OpenAIProvider**
+- File: `src/providers/openai-provider.ts`
+- Wrapper around the OpenAI client
+- Adapt responses to the LLMResponse format
 
-**3. Créer AnthropicProvider (squelette)**
-- Fichier: `src/providers/anthropic-provider.ts`
-- Implémentation basique (sera complétée dans Story 10.2)
-- Utiliser SDK Anthropic officiel
+**3. Create AnthropicProvider (skeleton)**
+- File: `src/providers/anthropic-provider.ts`
+- Basic implementation (will be completed in Story 10.2)
+- Use the official Anthropic SDK
 
-**4. Créer ProviderFactory**
-- Fichier: `src/providers/provider-factory.ts`
-- Factory pour créer les providers selon config
-- Gestion des clés API par provider
+**4. Create ProviderFactory**
+- File: `src/providers/provider-factory.ts`
+- Factory to create providers according to config
+- Management of API keys per provider
 
-**5. Refactorer ReasoningEngine**
-- Utiliser LLMProvider au lieu de client OpenAI direct
-- Injecter le provider via constructeur
-- Adapter les appels pour utiliser l'interface commune
+**5. Refactor ReasoningEngine**
+- Use LLMProvider instead of a direct OpenAI client
+- Inject the provider via the constructor
+- Adapt calls to use the common interface
 
-**6. Modifier SDK**
-- Utiliser ProviderFactory pour créer le provider
-- Passer le provider au ReasoningEngine
-- Gérer la configuration provider dans SDKConfig
+**6. Modify SDK**
+- Use ProviderFactory to create the provider
+- Pass the provider to the ReasoningEngine
+- Manage the provider configuration in SDKConfig
 
 ### Configuration
 
-**SDKConfig étendu:**
+**Extended SDKConfig:**
 ```typescript
 interface SDKConfig {
-  apiKey: string; // Clé API principale (pour backward compatibility)
+  apiKey: string; // Main API key (for backward compatibility)
   provider?: 'openai' | 'anthropic';
   providerConfig?: {
     openai?: { apiKey?: string };
     anthropic?: { apiKey?: string };
   };
-  // ... autres configs
+  // ... other configs
 }
 ```
 
-**Exemple d'utilisation:**
+**Usage example:**
 ```typescript
 const sdk = createSDK({
   provider: 'anthropic',
@@ -157,47 +157,47 @@ const sdk = createSDK({
 
 ## Architecture Compliance
 
-### Principes à Respecter
+### Principles to Respect
 
-1. **Séparation des responsabilités**: Le ReasoningEngine ne doit pas connaître les détails d'implémentation des providers
-2. **Interface stable**: L'interface LLMProvider doit être stable et extensible
-3. **Backward compatibility**: L'API publique doit rester identique
-4. **Type-safety**: Tous les types doivent être stricts et documentés
-5. **Error handling**: Gestion d'erreurs cohérente entre providers
+1. **Separation of concerns**: The ReasoningEngine must not know the implementation details of the providers
+2. **Stable interface**: The LLMProvider interface must be stable and extensible
+3. **Backward compatibility**: The public API must remain identical
+4. **Type-safety**: All types must be strict and documented
+5. **Error handling**: Consistent error handling across providers
 
-### Patterns à Utiliser
+### Patterns to Use
 
-- **Strategy Pattern**: Pour l'abstraction des providers
-- **Factory Pattern**: Pour la création des providers
-- **Dependency Injection**: Injecter le provider dans ReasoningEngine
+- **Strategy Pattern**: For provider abstraction
+- **Factory Pattern**: For provider creation
+- **Dependency Injection**: Inject the provider into ReasoningEngine
 
-### Fichiers à Créer/Modifier
+### Files to Create/Modify
 
-**Nouveaux fichiers:**
-- `src/providers/llm-provider.ts` - Interfaces communes
-- `src/providers/openai-provider.ts` - Implémentation OpenAI
-- `src/providers/anthropic-provider.ts` - Implémentation Anthropic (squelette)
-- `src/providers/provider-factory.ts` - Factory pour créer providers
+**New files:**
+- `src/providers/llm-provider.ts` - Common interfaces
+- `src/providers/openai-provider.ts` - OpenAI implementation
+- `src/providers/anthropic-provider.ts` - Anthropic implementation (skeleton)
+- `src/providers/provider-factory.ts` - Factory to create providers
 - `src/providers/index.ts` - Exports
 
-**Fichiers à modifier:**
-- `src/engines/reasoning-engine.ts` - Utiliser LLMProvider au lieu de OpenAI direct
-- `src/sdk.ts` - Créer et injecter le provider
-- `src/types/sdk.ts` - Étendre SDKConfig si nécessaire
-- `src/errors/index.ts` - Adapter LLMProviderError si nécessaire
+**Files to modify:**
+- `src/engines/reasoning-engine.ts` - Use LLMProvider instead of direct OpenAI
+- `src/sdk.ts` - Create and inject the provider
+- `src/types/sdk.ts` - Extend SDKConfig if necessary
+- `src/errors/index.ts` - Adapt LLMProviderError if necessary
 
 ## Library & Framework Requirements
 
-### Dépendances Existantes
+### Existing Dependencies
 
-- `openai`: ^4.20.0 (déjà installé)
-- `zod`: ^3.22.4 (pour validation)
+- `openai`: ^4.20.0 (already installed)
+- `zod`: ^3.22.4 (for validation)
 
-### Nouvelles Dépendances Requises
+### New Required Dependencies
 
-- `@anthropic-ai/sdk`: Pour Anthropic Claude (à installer)
-  - Version: Dernière stable
-  - Usage: Client Anthropic officiel
+- `@anthropic-ai/sdk`: For Anthropic Claude (to be installed)
+  - Version: Latest stable
+  - Usage: Official Anthropic client
 
 ### Installation
 
@@ -210,266 +210,266 @@ npm install @anthropic-ai/sdk
 ```
 src/
   providers/
-    index.ts                    # Exports publics
-    llm-provider.ts            # Interfaces communes
-    openai-provider.ts         # Implémentation OpenAI
-    anthropic-provider.ts      # Implémentation Anthropic (squelette)
-    provider-factory.ts        # Factory pour créer providers
+    index.ts                    # Public exports
+    llm-provider.ts            # Common interfaces
+    openai-provider.ts         # OpenAI implementation
+    anthropic-provider.ts      # Anthropic implementation (skeleton)
+    provider-factory.ts        # Factory to create providers
   engines/
-    reasoning-engine.ts        # Modifié pour utiliser LLMProvider
+    reasoning-engine.ts        # Modified to use LLMProvider
   ...
 ```
 
 ## Testing Requirements
 
-### Tests Unitaires Requis
+### Required Unit Tests
 
 1. **LLMProvider Interface**
-   - Test que l'interface est bien définie
-   - Test que les types sont corrects
+   - Test that the interface is well defined
+   - Test that the types are correct
 
 2. **OpenAIProvider**
-   - Test création du provider
-   - Test génération de completion
-   - Test extraction de tool calls
-   - Test gestion d'erreurs
+   - Test provider creation
+   - Test completion generation
+   - Test tool call extraction
+   - Test error handling
 
 3. **ProviderFactory**
-   - Test création OpenAIProvider
-   - Test création AnthropicProvider
-   - Test gestion des clés API
-   - Test provider par défaut
+   - Test OpenAIProvider creation
+   - Test AnthropicProvider creation
+   - Test API key management
+   - Test default provider
 
-4. **ReasoningEngine avec Provider**
-   - Test que ReasoningEngine utilise le provider
-   - Test backward compatibility (OpenAI par défaut)
-   - Test avec différents providers
+4. **ReasoningEngine with Provider**
+   - Test that ReasoningEngine uses the provider
+   - Test backward compatibility (OpenAI by default)
+   - Test with different providers
 
-### Tests d'Intégration
+### Integration Tests
 
-- Test création SDK avec provider spécifié
-- Test création agent avec provider
-- Test génération d'intention avec différents providers
-- Test que l'API reste identique quel que soit le provider
+- Test SDK creation with specified provider
+- Test agent creation with provider
+- Test intention generation with different providers
+- Test that the API remains identical regardless of the provider
 
-### Critères de Test
+### Test Criteria
 
-- ✅ Tous les tests existants passent toujours (backward compatibility)
-- ✅ Nouveaux tests pour l'abstraction
-- ✅ Tests avec API réelle OpenAI (déjà fait)
-- ⚠️ Tests avec API réelle Anthropic (sera fait dans Story 10.2)
+- ✅ All existing tests still pass (backward compatibility)
+- ✅ New tests for the abstraction
+- ✅ Tests with real OpenAI API (already done)
+- ⚠️ Tests with real Anthropic API (will be done in Story 10.2)
 
 ## Previous Story Intelligence
 
-### Stories MVP Pertinentes
+### Relevant MVP Stories
 
-**Story 5.1: Séparation Raisonnement/Action**
-- Le ReasoningEngine est déjà bien isolé
-- L'abstraction provider s'intègre naturellement dans cette architecture
-- Pas de changement nécessaire dans ActionEngine
+**Story 5.1: Reasoning/Action Separation**
+- The ReasoningEngine is already well isolated
+- The provider abstraction integrates naturally into this architecture
+- No change needed in ActionEngine
 
-**Story 7.6: Comprendre pourquoi l'agent a pris une décision**
-- Les événements doivent inclure le provider utilisé
-- La traçabilité doit rester complète avec abstraction
+**Story 7.6: Understand why the agent made a decision**
+- Events must include the provider used
+- Traceability must remain complete with abstraction
 
-### Patterns Établis
+### Established Patterns
 
-- **Error handling**: Utiliser LLMProviderError existant
-- **Event logging**: Continuer à logger les intentions générées
-- **Type-safety**: Utiliser TypeScript strict comme dans tout le codebase
+- **Error handling**: Use the existing LLMProviderError
+- **Event logging**: Continue logging the generated intentions
+- **Type-safety**: Use strict TypeScript as throughout the codebase
 
 ## Git Intelligence
 
-### Patterns de Code Existants
+### Existing Code Patterns
 
-- **Imports**: Utiliser imports ESM (`from './file.js'`)
-- **Exports**: Exporter les interfaces et classes publiques
-- **Error handling**: Utiliser les classes d'erreur existantes
-- **Testing**: Utiliser Vitest avec mêmes patterns que tests existants
+- **Imports**: Use ESM imports (`from './file.js'`)
+- **Exports**: Export public interfaces and classes
+- **Error handling**: Use existing error classes
+- **Testing**: Use Vitest with the same patterns as existing tests
 
 ## Latest Technical Information
 
 ### OpenAI SDK
 
-- Version actuelle: 4.20.0
-- API stable, pas de breaking changes récents
-- Support complet des tool calls
+- Current version: 4.20.0
+- Stable API, no recent breaking changes
+- Full support for tool calls
 
 ### Anthropic SDK
 
-- SDK officiel: `@anthropic-ai/sdk`
-- Version recommandée: Dernière stable
+- Official SDK: `@anthropic-ai/sdk`
+- Recommended version: Latest stable
 - Documentation: https://docs.anthropic.com/claude/reference
-- Support tool use: Oui (depuis Claude 3)
+- Tool use support: Yes (since Claude 3)
 
-### Considérations Techniques
+### Technical Considerations
 
-1. **Format de réponse**: OpenAI et Anthropic ont des formats différents
+1. **Response format**: OpenAI and Anthropic have different formats
    - OpenAI: `message.tool_calls[]`
-   - Anthropic: `content[]` avec type `tool_use`
-   - L'interface LLMResponse doit normaliser ces différences
+   - Anthropic: `content[]` with type `tool_use`
+   - The LLMResponse interface must normalize these differences
 
-2. **Tool calling**: Les deux providers supportent tool calling mais avec formats différents
-   - Normaliser dans l'interface commune
+2. **Tool calling**: Both providers support tool calling but with different formats
+   - Normalize within the common interface
 
-3. **AbortSignal**: Les deux SDKs supportent l'annulation
-   - Vérifier la compatibilité
+3. **AbortSignal**: Both SDKs support cancellation
+   - Verify compatibility
 
 ## Project Context Reference
 
-### Documents Pertinents
+### Relevant Documents
 
-- **PRD**: Section "Phase 2 - Production-Ready" - Multi-providers LLM
-- **Architecture**: Section "Reasoning Engine" - Architecture actuelle
+- **PRD**: Section "Phase 2 - Production-Ready" - Multi-provider LLM
+- **Architecture**: Section "Reasoning Engine" - Current architecture
 - **Epics**: Epic 10 - Multi-Providers LLM
-- **Rétrospective MVP**: Identifie multi-providers comme priorité Phase 2
+- **MVP Retrospective**: Identifies multi-provider support as a Phase 2 priority
 
-### Contraintes du Projet
+### Project Constraints
 
-- **Backward compatibility**: L'API publique ne doit pas changer
-- **Type-safety**: TypeScript strict obligatoire
-- **Performance**: Overhead minimal de l'abstraction
-- **Tests**: Tous les tests existants doivent continuer à passer
+- **Backward compatibility**: The public API must not change
+- **Type-safety**: Strict TypeScript required
+- **Performance**: Minimal abstraction overhead
+- **Tests**: All existing tests must keep passing
 
 ## Implementation Notes
 
-### Étapes d'Implémentation Recommandées
+### Recommended Implementation Steps
 
-1. **Créer l'interface LLMProvider**
-   - Définir les types communs
-   - Documenter l'interface
+1. **Create the LLMProvider interface**
+   - Define the common types
+   - Document the interface
 
-2. **Créer OpenAIProvider**
-   - Wrapper autour du client OpenAI existant
-   - Adapter les réponses au format commun
-   - Tests complets
+2. **Create OpenAIProvider**
+   - Wrapper around the existing OpenAI client
+   - Adapt responses to the common format
+   - Complete tests
 
-3. **Créer ProviderFactory**
-   - Factory pour créer les providers
-   - Gestion de la configuration
+3. **Create ProviderFactory**
+   - Factory to create providers
+   - Configuration management
    - Tests
 
-4. **Refactorer ReasoningEngine**
-   - Remplacer client OpenAI par LLMProvider
-   - Adapter les appels
-   - Tests de régression
+4. **Refactor ReasoningEngine**
+   - Replace the OpenAI client with LLMProvider
+   - Adapt calls
+   - Regression tests
 
-5. **Modifier SDK**
-   - Utiliser ProviderFactory
-   - Gérer la configuration provider
-   - Tests d'intégration
+5. **Modify SDK**
+   - Use ProviderFactory
+   - Manage the provider configuration
+   - Integration tests
 
-6. **Créer AnthropicProvider (squelette)**
-   - Structure de base
-   - Implémentation minimale
-   - Sera complété dans Story 10.2
+6. **Create AnthropicProvider (skeleton)**
+   - Basic structure
+   - Minimal implementation
+   - Will be completed in Story 10.2
 
-### Points d'Attention
+### Points of Attention
 
-1. **Normalisation des réponses**: Les formats OpenAI et Anthropic sont différents, bien normaliser
-2. **Gestion d'erreurs**: Adapter les erreurs des différents providers
-3. **Tests**: S'assurer que tous les tests existants passent
-4. **Documentation**: Documenter l'utilisation de l'abstraction
+1. **Response normalization**: OpenAI and Anthropic formats differ, normalize carefully
+2. **Error handling**: Adapt errors from the different providers
+3. **Tests**: Make sure all existing tests pass
+4. **Documentation**: Document the use of the abstraction
 
 ## Tasks / Subtasks
 
 ### Review Follow-ups (AI)
 
-- [x] [AI-Review][HIGH] Corriger max_tokens hardcodé dans AnthropicProvider [src/providers/anthropic-provider.ts:27]
-- [x] [AI-Review][HIGH] Gérer plusieurs messages système dans convertMessages [src/providers/anthropic-provider.ts:70-72]
-- [x] [AI-Review][HIGH] Concaténer plusieurs blocs text dans convertResponse [src/providers/anthropic-provider.ts:107-109]
-- [x] [AI-Review][MEDIUM] Créer tests unitaires OpenAIProvider [src/__tests__/openai-provider.test.ts]
-- [x] [AI-Review][MEDIUM] Ajouter validation clés API dans constructeurs [src/providers/*.ts]
-- [x] [AI-Review][MEDIUM] Ajouter maxTokens dans LLMRequest interface [src/providers/llm-provider.ts]
-- [x] [AI-Review][LOW] Améliorer messages d'erreur ProviderFactory [src/providers/provider-factory.ts:34]
+- [x] [AI-Review][HIGH] Fix hardcoded max_tokens in AnthropicProvider [src/providers/anthropic-provider.ts:27]
+- [x] [AI-Review][HIGH] Handle multiple system messages in convertMessages [src/providers/anthropic-provider.ts:70-72]
+- [x] [AI-Review][HIGH] Concatenate multiple text blocks in convertResponse [src/providers/anthropic-provider.ts:107-109]
+- [x] [AI-Review][MEDIUM] Create OpenAIProvider unit tests [src/__tests__/openai-provider.test.ts]
+- [x] [AI-Review][MEDIUM] Add API key validation in constructors [src/providers/*.ts]
+- [x] [AI-Review][MEDIUM] Add maxTokens in the LLMRequest interface [src/providers/llm-provider.ts]
+- [x] [AI-Review][LOW] Improve ProviderFactory error messages [src/providers/provider-factory.ts:34]
 
-- [x] Task 1: Créer l'interface LLMProvider (AC: spécifier le provider)
-  - [x] Subtask 1.1: Créer `src/providers/llm-provider.ts` avec interfaces `LLMProvider`, `LLMRequest`, `LLMResponse`
-  - [x] Subtask 1.2: Documenter les interfaces avec JSDoc
-  - [x] Subtask 1.3: Créer tests unitaires pour valider les types
+- [x] Task 1: Create the LLMProvider interface (AC: specify the provider)
+  - [x] Subtask 1.1: Create `src/providers/llm-provider.ts` with the `LLMProvider`, `LLMRequest`, `LLMResponse` interfaces
+  - [x] Subtask 1.2: Document the interfaces with JSDoc
+  - [x] Subtask 1.3: Create unit tests to validate the types
 
-- [x] Task 2: Créer OpenAIProvider (AC: API identique)
-  - [x] Subtask 2.1: Créer `src/providers/openai-provider.ts` implémentant `LLMProvider`
-  - [x] Subtask 2.2: Wrapper autour du client OpenAI existant
-  - [x] Subtask 2.3: Adapter les réponses au format `LLMResponse` normalisé
-  - [x] Subtask 2.4: Gérer `AbortSignal` pour l'annulation
-  - [x] Subtask 2.5: Tests unitaires complets pour OpenAIProvider
+- [x] Task 2: Create OpenAIProvider (AC: identical API)
+  - [x] Subtask 2.1: Create `src/providers/openai-provider.ts` implementing `LLMProvider`
+  - [x] Subtask 2.2: Wrapper around the existing OpenAI client
+  - [x] Subtask 2.3: Adapt responses to the normalized `LLMResponse` format
+  - [x] Subtask 2.4: Handle `AbortSignal` for cancellation
+  - [x] Subtask 2.5: Complete unit tests for OpenAIProvider
 
-- [x] Task 3: Créer AnthropicProvider (squelette) (AC: spécifier le provider)
-  - [x] Subtask 3.1: Installer `@anthropic-ai/sdk`
-  - [x] Subtask 3.2: Créer `src/providers/anthropic-provider.ts` avec structure de base
-  - [x] Subtask 3.3: Implémenter méthodes minimales (complété dans Story 10.2)
-  - [x] Subtask 3.4: Tests de base pour la structure
+- [x] Task 3: Create AnthropicProvider (skeleton) (AC: specify the provider)
+  - [x] Subtask 3.1: Install `@anthropic-ai/sdk`
+  - [x] Subtask 3.2: Create `src/providers/anthropic-provider.ts` with the basic structure
+  - [x] Subtask 3.3: Implement minimal methods (completed in Story 10.2)
+  - [x] Subtask 3.4: Basic tests for the structure
 
-- [x] Task 4: Créer ProviderFactory (AC: configurable via SDKConfig)
-  - [x] Subtask 4.1: Créer `src/providers/provider-factory.ts`
-  - [x] Subtask 4.2: Implémenter création de providers selon configuration
-  - [x] Subtask 4.3: Gérer les clés API par provider
-  - [x] Subtask 4.4: Provider par défaut (OpenAI si non spécifié)
-  - [x] Subtask 4.5: Tests unitaires pour ProviderFactory
+- [x] Task 4: Create ProviderFactory (AC: configurable via SDKConfig)
+  - [x] Subtask 4.1: Create `src/providers/provider-factory.ts`
+  - [x] Subtask 4.2: Implement provider creation according to configuration
+  - [x] Subtask 4.3: Manage API keys per provider
+  - [x] Subtask 4.4: Default provider (OpenAI if unspecified)
+  - [x] Subtask 4.5: Unit tests for ProviderFactory
 
-- [x] Task 5: Refactorer ReasoningEngine (AC: API identique)
-  - [x] Subtask 5.1: Modifier constructeur pour accepter `LLMProvider` au lieu de `apiKey`
-  - [x] Subtask 5.2: Remplacer `callLLM()` pour utiliser `provider.generateCompletion()`
-  - [x] Subtask 5.3: Adapter `extractMessage()` pour utiliser `LLMResponse`
-  - [x] Subtask 5.4: Maintenir backward compatibility
-  - [x] Subtask 5.5: Tests de régression pour ReasoningEngine
+- [x] Task 5: Refactor ReasoningEngine (AC: identical API)
+  - [x] Subtask 5.1: Modify the constructor to accept `LLMProvider` instead of `apiKey`
+  - [x] Subtask 5.2: Replace `callLLM()` to use `provider.generateCompletion()`
+  - [x] Subtask 5.3: Adapt `extractMessage()` to use `LLMResponse`
+  - [x] Subtask 5.4: Maintain backward compatibility
+  - [x] Subtask 5.5: Regression tests for ReasoningEngine
 
-- [x] Task 6: Modifier SDK pour utiliser ProviderFactory (AC: configurable via SDKConfig)
-  - [x] Subtask 6.1: Étendre `SDKConfig` avec `provider` et `providerConfig` si nécessaire
-  - [x] Subtask 6.2: Modifier `SDKImpl` constructor pour utiliser `ProviderFactory`
-  - [x] Subtask 6.3: Créer provider et l'injecter dans `ReasoningEngine`
-  - [x] Subtask 6.4: Gérer backward compatibility (apiKey seul = OpenAI par défaut)
-  - [x] Subtask 6.5: Tests d'intégration SDK avec différents providers
+- [x] Task 6: Modify SDK to use ProviderFactory (AC: configurable via SDKConfig)
+  - [x] Subtask 6.1: Extend `SDKConfig` with `provider` and `providerConfig` if necessary
+  - [x] Subtask 6.2: Modify the `SDKImpl` constructor to use `ProviderFactory`
+  - [x] Subtask 6.3: Create the provider and inject it into `ReasoningEngine`
+  - [x] Subtask 6.4: Manage backward compatibility (apiKey alone = OpenAI by default)
+  - [x] Subtask 6.5: SDK integration tests with different providers
 
-- [x] Task 7: Créer exports et index (AC: API identique)
-  - [x] Subtask 7.1: Créer `src/providers/index.ts` avec exports publics
-  - [x] Subtask 7.2: Mettre à jour `src/index.ts` si nécessaire
-  - [x] Subtask 7.3: Vérifier que tous les exports sont corrects
+- [x] Task 7: Create exports and index (AC: identical API)
+  - [x] Subtask 7.1: Create `src/providers/index.ts` with public exports
+  - [x] Subtask 7.2: Update `src/index.ts` if necessary
+  - [x] Subtask 7.3: Verify that all exports are correct
 
-- [x] Task 8: Tests finaux et validation (AC: tous)
-  - [x] Subtask 8.1: Exécuter tous les tests existants (vérifier backward compatibility)
-  - [x] Subtask 8.2: Tests d'intégration end-to-end avec provider OpenAI
-  - [x] Subtask 8.3: Tests d'intégration end-to-end avec provider Anthropic
-  - [x] Subtask 8.4: Vérifier que l'API publique reste identique
-  - [x] Subtask 8.5: Vérifier tous les critères d'acceptation
+- [x] Task 8: Final tests and validation (AC: all)
+  - [x] Subtask 8.1: Run all existing tests (verify backward compatibility)
+  - [x] Subtask 8.2: End-to-end integration tests with OpenAI provider
+  - [x] Subtask 8.3: End-to-end integration tests with Anthropic provider
+  - [x] Subtask 8.4: Verify that the public API remains identical
+  - [x] Subtask 8.5: Verify all acceptance criteria
 
 ## Dev Notes
 
 ### Architecture Patterns
 
-- **Strategy Pattern**: `LLMProvider` interface avec implémentations concrètes
-- **Factory Pattern**: `ProviderFactory` pour création selon configuration
-- **Dependency Injection**: Provider injecté dans `ReasoningEngine`
+- **Strategy Pattern**: `LLMProvider` interface with concrete implementations
+- **Factory Pattern**: `ProviderFactory` for creation according to configuration
+- **Dependency Injection**: Provider injected into `ReasoningEngine`
 
-### Fichiers à Créer
+### Files to Create
 
-- `src/providers/llm-provider.ts` - Interfaces communes
-- `src/providers/openai-provider.ts` - Implémentation OpenAI
-- `src/providers/anthropic-provider.ts` - Implémentation Anthropic (squelette)
+- `src/providers/llm-provider.ts` - Common interfaces
+- `src/providers/openai-provider.ts` - OpenAI implementation
+- `src/providers/anthropic-provider.ts` - Anthropic implementation (skeleton)
 - `src/providers/provider-factory.ts` - Factory
 - `src/providers/index.ts` - Exports
 
-### Fichiers à Modifier
+### Files to Modify
 
-- `src/engines/reasoning-engine.ts` - Utiliser LLMProvider
-- `src/sdk.ts` - Créer et injecter provider
-- `src/types/sdk.ts` - Étendre SDKConfig si nécessaire
+- `src/engines/reasoning-engine.ts` - Use LLMProvider
+- `src/sdk.ts` - Create and inject the provider
+- `src/types/sdk.ts` - Extend SDKConfig if necessary
 
-### Tests Requis
+### Required Tests
 
-- Tests unitaires pour chaque provider
-- Tests unitaires pour ProviderFactory
-- Tests de régression pour ReasoningEngine
-- Tests d'intégration SDK
-- Vérification backward compatibility
+- Unit tests for each provider
+- Unit tests for ProviderFactory
+- Regression tests for ReasoningEngine
+- SDK integration tests
+- Backward compatibility verification
 
-### Points d'Attention
+### Points of Attention
 
-1. Normalisation des formats de réponse (OpenAI vs Anthropic)
-2. Gestion d'erreurs cohérente
-3. Backward compatibility obligatoire
-4. Performance (overhead minimal)
+1. Normalization of response formats (OpenAI vs Anthropic)
+2. Consistent error handling
+3. Backward compatibility mandatory
+4. Performance (minimal overhead)
 
 ## Dev Agent Record
 
@@ -479,13 +479,13 @@ Claude Sonnet 4.5
 
 ### Implementation Plan
 
-1. Créer l'interface LLMProvider avec types normalisés
-2. Implémenter OpenAIProvider comme wrapper
-3. Créer squelette AnthropicProvider
-4. Créer ProviderFactory
-5. Refactorer ReasoningEngine pour utiliser LLMProvider
-6. Modifier SDK pour utiliser ProviderFactory
-7. Tests complets et validation
+1. Create the LLMProvider interface with normalized types
+2. Implement OpenAIProvider as a wrapper
+3. Create AnthropicProvider skeleton
+4. Create ProviderFactory
+5. Refactor ReasoningEngine to use LLMProvider
+6. Modify SDK to use ProviderFactory
+7. Complete tests and validation
 
 ### Debug Log References
 
@@ -505,29 +505,29 @@ Claude Sonnet 4.5
 
 **Issues Found:** 2 issues (2 MEDIUM)  
 **Files Reviewed:** 15 files  
-**Tests Status:** Tests passent mais problèmes architecturaux identifiés
+**Tests Status:** Tests pass but architectural issues identified
 
 ### Action Items
 
-#### 🟡 MEDIUM Priority - ✅ CORRIGÉ
+#### 🟡 MEDIUM Priority - ✅ FIXED
 
-1. **[MEDIUM] ReasoningEngine model hardcodé dans SDK** [src/sdk.ts:58] ✅ CORRIGÉ
-   - Problème: `ReasoningEngine` créé avec modèle 'gpt-4' hardcodé pour tous les agents
-   - Impact: Tous les agents partagent le même modèle par défaut, même si config.model est différent
-   - Solution appliquée: ReasoningEngine créé par agent avec le modèle de l'agent (config.model)
+1. **[MEDIUM] Hardcoded ReasoningEngine model in SDK** [src/sdk.ts:58] ✅ FIXED
+   - Problem: `ReasoningEngine` created with the model hardcoded to 'gpt-4' for all agents
+   - Impact: All agents share the same default model, even if config.model differs
+   - Solution applied: ReasoningEngine created per agent with the agent's model (config.model)
 
-2. **[MEDIUM] ReasoningEngine partagé entre agents** [src/sdk.ts:45,161-167] ✅ CORRIGÉ
-   - Problème: Un seul ReasoningEngine partagé pour tous les agents
-   - Impact: Problèmes potentiels si agents ont des modèles différents
-   - Solution appliquée: ReasoningEngine créé par agent pour meilleure isolation. Provider reste partagé (stateless, OK)
+2. **[MEDIUM] ReasoningEngine shared between agents** [src/sdk.ts:45,161-167] ✅ FIXED
+   - Problem: A single ReasoningEngine shared across all agents
+   - Impact: Potential issues if agents have different models
+   - Solution applied: ReasoningEngine created per agent for better isolation. The provider remains shared (stateless, OK)
 
 ### Review Notes
 
-- ✅ Implémentation complète et fonctionnelle
-- ✅ Tous les problèmes HIGH/MEDIUM précédents corrigés
-- ✅ Tests complets et tous passent
-- ✅ Architecture améliorée: ReasoningEngine créé par agent pour meilleure isolation
-- ✅ ReasoningEngine expose getProviderName() et getPrimaryProviderName()
+- ✅ Complete and functional implementation
+- ✅ All previous HIGH/MEDIUM issues fixed
+- ✅ Complete tests, all passing
+- ✅ Improved architecture: ReasoningEngine created per agent for better isolation
+- ✅ ReasoningEngine exposes getProviderName() and getPrimaryProviderName()
 
 ## Change Log
 
@@ -539,131 +539,130 @@ Claude Sonnet 4.5
 
 **Issues Found:** 8 issues (3 HIGH, 4 MEDIUM, 1 LOW)  
 **Files Reviewed:** 15 files  
-**Tests Status:** Tests passent mais couverture incomplète
+**Tests Status:** Tests pass but coverage is incomplete
 
 ### Action Items
 
 #### 🔴 HIGH Priority
 
-1. **[HIGH] AnthropicProvider - max_tokens hardcodé** [src/providers/anthropic-provider.ts:27]
-   - Problème: `max_tokens: 4096` est hardcodé, non configurable
-   - Impact: Impossible de contrôler la longueur de réponse
-   - Solution: Ajouter `maxTokens?` dans `LLMRequest` interface ou utiliser constante configurable
+1. **[HIGH] AnthropicProvider - hardcoded max_tokens** [src/providers/anthropic-provider.ts:27]
+   - Problem: `max_tokens: 4096` is hardcoded, not configurable
+   - Impact: Impossible to control response length
+   - Solution: Add `maxTokens?` in the `LLMRequest` interface or use a configurable constant
 
-2. **[HIGH] AnthropicProvider - Plusieurs messages système non gérés** [src/providers/anthropic-provider.ts:70-72]
-   - Problème: `convertMessages()` ne prend que le dernier message système
-   - Impact: Perte d'informations si plusieurs messages système sont fournis
-   - Solution: Concaténer tous les messages système avec `\n\n` ou prendre le premier
+2. **[HIGH] AnthropicProvider - Multiple system messages not handled** [src/providers/anthropic-provider.ts:70-72]
+   - Problem: `convertMessages()` only takes the last system message
+   - Impact: Loss of information if several system messages are provided
+   - Solution: Concatenate all system messages with `\n\n` or take the first one
 
-3. **[HIGH] AnthropicProvider - Plusieurs blocs text non concaténés** [src/providers/anthropic-provider.ts:107-109]
-   - Problème: `convertResponse()` ne prend que le dernier bloc text
-   - Impact: Perte de contenu si plusieurs blocs text sont présents dans la réponse
-   - Solution: Concaténer tous les blocs text avec `\n\n`
+3. **[HIGH] AnthropicProvider - Multiple text blocks not concatenated** [src/providers/anthropic-provider.ts:107-109]
+   - Problem: `convertResponse()` only takes the last text block
+   - Impact: Loss of content if several text blocks are present in the response
+   - Solution: Concatenate all text blocks with `\n\n`
 
 #### 🟡 MEDIUM Priority
 
-4. **[MEDIUM] Tests unitaires OpenAIProvider manquants** [Story 10.1 Task 2.5]
-   - Problème: Story prétend avoir des tests unitaires pour OpenAIProvider mais aucun fichier dédié trouvé
-   - Impact: Couverture de tests incomplète
-   - Solution: Créer `src/__tests__/openai-provider.test.ts` avec tests complets
+4. **[MEDIUM] Missing OpenAIProvider unit tests** [Story 10.1 Task 2.5]
+   - Problem: The story claims to have unit tests for OpenAIProvider but no dedicated file was found
+   - Impact: Incomplete test coverage
+   - Solution: Create `src/__tests__/openai-provider.test.ts` with complete tests
 
-5. **[MEDIUM] Validation des clés API manquante** [src/providers/openai-provider.ts:9, anthropic-provider.ts:14]
-   - Problème: Aucune validation des clés API vides ou invalides dans les constructeurs
-   - Impact: Erreurs tardives au runtime au lieu d'erreurs précoces
-   - Solution: Valider `apiKey` dans les constructeurs (throw si vide/undefined)
+5. **[MEDIUM] Missing API key validation** [src/providers/openai-provider.ts:9, anthropic-provider.ts:14]
+   - Problem: No validation of empty or invalid API keys in the constructors
+   - Impact: Late runtime errors instead of early errors
+   - Solution: Validate `apiKey` in the constructors (throw if empty/undefined)
 
-6. **[MEDIUM] max_tokens non standardisé dans interface** [src/providers/llm-provider.ts:11-36]
-   - Problème: `LLMRequest` n'a pas de champ `maxTokens`, mais Anthropic l'utilise hardcodé
-   - Impact: Incohérence entre providers, pas de contrôle utilisateur
-   - Solution: Ajouter `maxTokens?: number` dans `LLMRequest` interface
+6. **[MEDIUM] max_tokens not standardized in the interface** [src/providers/llm-provider.ts:11-36]
+   - Problem: `LLMRequest` has no `maxTokens` field, but Anthropic uses it hardcoded
+   - Impact: Inconsistency between providers, no user control
+   - Solution: Add `maxTokens?: number` in the `LLMRequest` interface
 
 #### 🟢 LOW Priority
 
-7. **[LOW] ProviderFactory - Gestion d'erreurs améliorable** [src/providers/provider-factory.ts:34]
-   - Problème: Message d'erreur générique pour modèle non reconnu
-   - Impact: Moins d'aide au débogage
-   - Solution: Message d'erreur plus descriptif avec suggestions de modèles supportés
+7. **[LOW] ProviderFactory - Error handling could be improved** [src/providers/provider-factory.ts:34]
+   - Problem: Generic error message for an unrecognized model
+   - Impact: Less help for debugging
+   - Solution: More descriptive error message with suggestions of supported models
 
 ### Review Notes
 
-- ✅ Architecture bien conçue avec abstraction propre
-- ✅ Tests d'intégration complets et fonctionnels
-- ✅ Backward compatibility maintenue
-- ⚠️ Quelques problèmes de gestion de cas limites (messages multiples, blocs text)
-- ⚠️ Couverture de tests incomplète pour OpenAIProvider
-- ⚠️ Validation d'entrée insuffisante
+- ✅ Well-designed architecture with a clean abstraction
+- ✅ Complete and functional integration tests
+- ✅ Backward compatibility maintained
+- ⚠️ A few edge-case handling issues (multiple messages, text blocks)
+- ⚠️ Incomplete test coverage for OpenAIProvider
+- ⚠️ Insufficient input validation
 
 ### Recommendations
 
-1. Corriger les problèmes HIGH avant de marquer comme "done"
-2. Ajouter tests unitaires OpenAIProvider pour compléter la couverture
-3. Améliorer la gestion des cas limites (messages multiples, blocs text)
-4. Ajouter validation des entrées dans les constructeurs
+1. Fix the HIGH issues before marking as "done"
+2. Add OpenAIProvider unit tests to complete coverage
+3. Improve edge-case handling (multiple messages, text blocks)
+4. Add input validation in the constructors
 
 ## Story Completion Status
 
 **Status:** review  
 **Ready for:** Final code review  
-**Next Story:** 10.2 - Support Anthropic Claude (complétée)
+**Next Story:** 10.2 - Anthropic Claude Support (completed)
 
 ---
 
 ## File List
 
-- `src/providers/llm-provider.ts` - Nouveau (interfaces communes)
-- `src/providers/openai-provider.ts` - Nouveau (implémentation OpenAI)
-- `src/providers/anthropic-provider.ts` - Nouveau (implémentation Anthropic)
-- `src/providers/provider-factory.ts` - Nouveau (factory pour créer providers)
-- `src/providers/index.ts` - Nouveau (exports publics)
-- `src/engines/reasoning-engine.ts` - Modifié (utilise LLMProvider)
-- `src/agent.ts` - Modifié (passe modèle dans ReasoningContext)
-- `src/sdk.ts` - Modifié (crée provider via ProviderFactory)
-- `src/types/sdk.ts` - Modifié (ajout providerConfig)
-- `src/__tests__/providers/llm-provider.test.ts` - Nouveau (tests interfaces)
-- `src/__tests__/anthropic-provider.test.ts` - Nouveau (tests AnthropicProvider)
-- `src/__tests__/anthropic-integration.test.ts` - Nouveau (tests intégration)
-- `src/__tests__/sdk-anthropic.test.ts` - Nouveau (tests SDK)
-- `src/__tests__/agent.test.ts` - Modifié (utilise OpenAIProvider)
-- `package.json` - Modifié (ajout @anthropic-ai/sdk)
+- `src/providers/llm-provider.ts` - New (common interfaces)
+- `src/providers/openai-provider.ts` - New (OpenAI implementation)
+- `src/providers/anthropic-provider.ts` - New (Anthropic implementation)
+- `src/providers/provider-factory.ts` - New (factory to create providers)
+- `src/providers/index.ts` - New (public exports)
+- `src/engines/reasoning-engine.ts` - Modified (uses LLMProvider)
+- `src/agent.ts` - Modified (passes model in ReasoningContext)
+- `src/sdk.ts` - Modified (creates provider via ProviderFactory)
+- `src/types/sdk.ts` - Modified (added providerConfig)
+- `src/__tests__/providers/llm-provider.test.ts` - New (interface tests)
+- `src/__tests__/anthropic-provider.test.ts` - New (AnthropicProvider tests)
+- `src/__tests__/anthropic-integration.test.ts` - New (integration tests)
+- `src/__tests__/sdk-anthropic.test.ts` - New (SDK tests)
+- `src/__tests__/agent.test.ts` - Modified (uses OpenAIProvider)
+- `package.json` - Modified (added @anthropic-ai/sdk)
 
 ## Dev Agent Record
 
 ### Implementation Plan
 
-1. **Interface LLMProvider** : Créée avec LLMRequest et LLMResponse normalisés
-2. **OpenAIProvider** : Wrapper complet autour du client OpenAI
-3. **AnthropicProvider** : Implémentation complète (fait dans Story 10.2)
-4. **ProviderFactory** : Factory pour créer providers selon configuration
-5. **ReasoningEngine** : Refactorisé pour utiliser LLMProvider
-6. **SDK** : Modifié pour créer provider via ProviderFactory
-7. **Tests** : Tests complets pour tous les composants
+1. **LLMProvider Interface**: Created with normalized LLMRequest and LLMResponse
+2. **OpenAIProvider**: Complete wrapper around the OpenAI client
+3. **AnthropicProvider**: Complete implementation (done in Story 10.2)
+4. **ProviderFactory**: Factory to create providers according to configuration
+5. **ReasoningEngine**: Refactored to use LLMProvider
+6. **SDK**: Modified to create the provider via ProviderFactory
+7. **Tests**: Complete tests for all components
 
 ### Completion Notes
 
-✅ **Story complétée avec succès**
+✅ **Story completed successfully**
 
-**Implémentation:**
-- Interface LLMProvider créée avec types normalisés
-- OpenAIProvider implémenté comme wrapper autour du client OpenAI
-- AnthropicProvider implémenté complètement (fait dans Story 10.2)
-- ProviderFactory créé pour gérer la création de providers
-- ReasoningEngine refactorisé pour utiliser LLMProvider au lieu du client OpenAI direct
-- SDK modifié pour créer le provider approprié selon la configuration
-- Backward compatibility maintenue (apiKey seul = OpenAI par défaut)
+**Implementation:**
+- LLMProvider interface created with normalized types
+- OpenAIProvider implemented as a wrapper around the OpenAI client
+- AnthropicProvider fully implemented (done in Story 10.2)
+- ProviderFactory created to manage provider creation
+- ReasoningEngine refactored to use LLMProvider instead of the direct OpenAI client
+- SDK modified to create the appropriate provider according to configuration
+- Backward compatibility maintained (apiKey alone = OpenAI by default)
 
 **Tests:**
-- Tests unitaires pour LLMProvider interfaces
-- Tests unitaires pour OpenAIProvider
-- Tests unitaires pour AnthropicProvider (14 tests)
-- Tests d'intégration ReasoningEngine (6 tests)
-- Tests end-to-end SDK (5 tests)
-- Tests existants corrigés et tous passent
+- Unit tests for LLMProvider interfaces
+- Unit tests for OpenAIProvider
+- Unit tests for AnthropicProvider (14 tests)
+- ReasoningEngine integration tests (6 tests)
+- SDK end-to-end tests (5 tests)
+- Existing tests fixed and all passing
 
-**Critères d'acceptation validés:**
-- ✅ Provider LLM spécifiable (OpenAI, Anthropic)
-- ✅ API identique quel que soit le provider
+**Validated acceptance criteria:**
+- ✅ LLM provider specifiable (OpenAI, Anthropic)
+- ✅ Identical API regardless of the provider
 - ✅ Provider configurable via SDKConfig
-- ✅ Backward compatibility maintenue
+- ✅ Backward compatibility maintained
 
-**Note:** Cette story crée l'abstraction de base. L'implémentation complète d'Anthropic a été faite dans Story 10.2.
-
+**Note:** This story creates the base abstraction. The full Anthropic implementation was done in Story 10.2.

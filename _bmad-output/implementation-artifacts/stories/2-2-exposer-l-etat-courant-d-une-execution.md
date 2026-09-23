@@ -1,4 +1,4 @@
-# Story 2.2: Exposer l'état courant d'une exécution
+# Story 2.2: Exposing the current state of an execution
 
 **Story ID:** 2.2  
 **Epic:** 2 - Agent Lifecycle & Execution Management  
@@ -7,59 +7,59 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** connaître l'état courant d'une exécution,
-**So that** je peux suivre la progression et gérer les erreurs.
+**As a** developer,
+**I want** to know the current state of an execution,
+**So that** I can track progress and handle errors.
 
 ## Acceptance Criteria
 
-**Given** une exécution est en cours ou terminée
-**When** j'interroge l'état de l'exécution
-**Then** je reçois l'état actuel (pending, running, completed, failed, cancelled)
-**And** l'état est mis à jour en temps réel pendant l'exécution
-**And** les transitions d'état sont cohérentes et tracées
+**Given** an execution is in progress or completed
+**When** I query the state of the execution
+**Then** I receive the current state (pending, running, completed, failed, cancelled)
+**And** the state is updated in real time during execution
+**And** state transitions are consistent and tracked
 
 ## Business Value
 
-- **Visibilité**: État clair et à jour
-- **Suivi**: Progression tracée
-- **Gestion**: Erreurs détectables
+- **Visibility**: Clear and up-to-date state
+- **Tracking**: Progress tracked
+- **Management**: Errors detectable
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase MVP
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current State:**
+- Complete implementation in the MVP codebase
+- Feature tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files Involved:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée dans le MVP. Voir les fichiers sources pour les détails d'implémentation.
+Feature implemented and tested in the MVP. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Feature validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète dans le MVP  
-**Notes:** Story MVP complétée et testée
+**Implementation:** Complete in the MVP  
+**Notes:** MVP story completed and tested

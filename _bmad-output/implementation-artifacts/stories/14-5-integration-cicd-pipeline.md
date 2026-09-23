@@ -1,4 +1,4 @@
-# Story 14.5: Intégration Tests dans Pipeline CI/CD
+# Story 14.5: Test Integration into CI/CD Pipeline
 
 **Epic:** Epic 14 - Testing & Quality Assurance  
 **Status:** completed  
@@ -7,39 +7,39 @@
 
 ## Description
 
-Permettre d'intégrer les tests basés sur traces dans un pipeline CI/CD pour valider automatiquement le comportement des agents à chaque changement.
+Allow trace-based tests to be integrated into a CI/CD pipeline to automatically validate agent behavior on every change.
 
-## Contexte
+## Context
 
-L'intégration CI/CD permet d'automatiser la validation du comportement des agents, garantissant que les modifications ne cassent pas le comportement attendu.
+CI/CD integration makes it possible to automate the validation of agent behavior, ensuring that changes do not break the expected behavior.
 
 ## Acceptance Criteria
 
-### AC1: Exporter Résultats pour CI/CD
-**Given** des tests de régression sont exécutés  
-**When** un développeur appelle `sdk.exportTestResults(format, options)`  
-**Then** les résultats sont exportés dans un format compatible CI/CD (JUnit XML, JSON, etc.)
+### AC1: Export Results for CI/CD
+**Given** regression tests are executed  
+**When** a developer calls `sdk.exportTestResults(format, options)`  
+**Then** the results are exported in a CI/CD-compatible format (JUnit XML, JSON, etc.)
 
-### AC2: Code de Sortie Approprié
-**Given** des tests sont exécutés  
-**When** le processus se termine  
-**Then** le code de sortie reflète le résultat :
-- 0 si tous les tests passent
-- 1 si des régressions sont détectées
-- 2 si des erreurs sont survenues
+### AC2: Appropriate Exit Code
+**Given** tests are executed  
+**When** the process ends  
+**Then** the exit code reflects the result:
+- 0 if all tests pass
+- 1 if regressions are detected
+- 2 if errors occurred
 
-### AC3: Format JUnit XML
-**Given** des tests sont exécutés  
-**When** le format JUnit est demandé  
-**Then** un fichier XML compatible JUnit est généré avec :
-- Informations sur chaque test
-- Durée d'exécution
-- Messages d'erreur pour les échecs
-- Métriques globales
+### AC3: JUnit XML Format
+**Given** tests are executed  
+**When** the JUnit format is requested  
+**Then** a JUnit-compatible XML file is generated with:
+- Information about each test
+- Execution duration
+- Error messages for failures
+- Global metrics
 
 ## Technical Details
 
-### Types à créer
+### Types to Create
 
 ```typescript
 interface TestResultsExportOptions {
@@ -69,12 +69,12 @@ interface JUnitTestSuite {
 }
 ```
 
-### Méthodes SDK
+### SDK Methods
 
 - `exportTestResults(results: RegressionTestSuiteResult, format: 'junit' | 'json' | 'json-summary', options?: TestResultsExportOptions): Promise<string>`
 - `runRegressionTestsForCI(agentId: string, options?: RegressionTestOptions & { exitCode?: boolean }): Promise<{ results: RegressionTestSuiteResult; exitCode: number }>`
 
-### Format JUnit XML
+### JUnit XML Format
 
 ```xml
 <testsuites>
@@ -91,12 +91,11 @@ interface JUnitTestSuite {
 
 ## Tests
 
-- Exporter en format JUnit XML
-- Exporter en format JSON
-- Générer code de sortie correct
-- Intégrer dans un script CI/CD exemple
+- Export in JUnit XML format
+- Export in JSON format
+- Generate the correct exit code
+- Integrate into an example CI/CD script
 
 ## Dependencies
 
-- Story 14.4: Tests de Non-Régression
-
+- Story 14.4: Non-Regression Tests

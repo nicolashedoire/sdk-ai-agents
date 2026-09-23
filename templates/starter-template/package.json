@@ -29,8 +29,8 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@sdk-ai-agents/core": "^0.1.0",
-    "zod": "^3.22.4"
+    "@sdk-ai-agents/core": "github:nicolashedoire/sdk-ai-agents",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.7.0",
@@ -41,5 +41,3 @@
     "vitest": "^1.0.4"
   }
 }
-
-

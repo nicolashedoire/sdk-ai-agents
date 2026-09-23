@@ -1,4 +1,4 @@
-# Story 9.1: Associer une version (ou hash de configuration) à un agent
+# Story 9.1: Associate a version (or configuration hash) with an agent
 
 **Story ID:** 9.1  
 **Epic:** 9 - Versioning & Audit  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** associer une version (ou hash de configuration) à un agent,
-**So that** je peux tracker les différentes versions de mes agents.
+**As a** developer,
+**I want** associate a version (or configuration hash) with an agent,
+**So that** I can track the different versions of my agents.
 
 ## Acceptance Criteria
 
-**Given** un agent est créé ou modifié
-**When** je configure l'agent
-**Then** une version (ou hash de configuration) est automatiquement générée
-**And** la version est basée sur la configuration complète de l'agent
-**And** la version est unique pour chaque configuration unique
-**And** la version est traçable et consultable
+**Given** an agent is created or modified
+**When** I configure the agent
+**Then** a version (or configuration hash) is automatically generated
+**And** the version is based on the agent's complete configuration
+**And** the version is unique for each unique configuration
+**And** the version is traceable and queryable
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current state:**
+- Complete implementation in the codebase
+- Functionality tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files concerned:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Functionality implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Functionality validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested

@@ -1,4 +1,4 @@
-# Story 15.1: Comparaison de Deux Exécutions
+# Story 15.1: Comparison of Two Executions
 
 **Epic:** Epic 15 - Advanced Observability & Comparison  
 **Status:** completed  
@@ -7,41 +7,41 @@
 
 ## Description
 
-Permettre à un développeur de comparer deux exécutions pour identifier les différences et comprendre les variations de comportement.
+Allow a developer to compare two executions in order to identify differences and understand behavioral variations.
 
-## Contexte
+## Context
 
-La comparaison d'exécutions permet d'analyser les différences entre deux runs, que ce soit pour comprendre des variations, détecter des régressions ou analyser l'impact de changements.
+Comparing executions makes it possible to analyze the differences between two runs, whether to understand variations, detect regressions, or analyze the impact of changes.
 
 ## Acceptance Criteria
 
-### AC1: Comparer Deux Runs
-**Given** deux runIds valides  
-**When** un développeur appelle `sdk.compareRuns(runId1, runId2, options)`  
-**Then** une comparaison détaillée est retournée avec les différences identifiées
+### AC1: Compare Two Runs
+**Given** two valid runIds  
+**When** a developer calls `sdk.compareRuns(runId1, runId2, options)`  
+**Then** a detailed comparison is returned with the identified differences
 
-### AC2: Rapport de Comparaison
-**Given** une comparaison est effectuée  
-**When** le rapport est généré  
-**Then** il contient :
-- Les métriques comparatives (durée, événements, intentions, actions, tools)
-- Les différences d'événements (ajoutés, supprimés, modifiés)
-- Les différences de séquence (ordre des événements)
-- Les différences de données (valeurs dans les événements)
-- Un résumé des différences principales
+### AC2: Comparison Report
+**Given** a comparison is performed  
+**When** the report is generated  
+**Then** it contains:
+- The comparative metrics (duration, events, intentions, actions, tools)
+- The event differences (added, removed, modified)
+- The sequence differences (event order)
+- The data differences (values within events)
+- A summary of the main differences
 
-### AC3: Options de Comparaison
-**Given** une comparaison est effectuée  
-**When** des options sont fournies  
-**Then** la comparaison peut :
-- Ignorer certains types d'événements
-- Comparer uniquement la structure
-- Focus sur certains aspects (intentions, actions, tools)
-- Inclure/exclure les métadonnées
+### AC3: Comparison Options
+**Given** a comparison is performed  
+**When** options are provided  
+**Then** the comparison can:
+- Ignore certain event types
+- Compare only the structure
+- Focus on certain aspects (intentions, actions, tools)
+- Include/exclude metadata
 
 ## Technical Details
 
-### Types à créer
+### Types to Create
 
 ```typescript
 interface ComparisonOptions {
@@ -81,31 +81,30 @@ interface ComparisonDifference {
 }
 ```
 
-### Méthodes SDK
+### SDK Methods
 
 - `compareRuns(runId1: string, runId2: string, options?: ComparisonOptions): Promise<RunComparison>`
 - `getComparisonReport(comparison: RunComparison, format?: 'json' | 'html' | 'text'): Promise<string>`
 
-### Algorithme de Comparaison
+### Comparison Algorithm
 
-1. Charger les deux traces
-2. Comparer les métriques globales
-3. Comparer les événements dans l'ordre
-4. Identifier les différences (ajout, suppression, modification)
-5. Analyser les différences de séquence
-6. Comparer les données des événements similaires
-7. Calculer la sévérité des différences
-8. Générer le résumé
+1. Load the two traces
+2. Compare the global metrics
+3. Compare the events in order
+4. Identify the differences (addition, removal, modification)
+5. Analyze the sequence differences
+6. Compare the data of similar events
+7. Calculate the severity of the differences
+8. Generate the summary
 
 ## Tests
 
-- Comparer deux runs identiques (aucune différence)
-- Comparer deux runs avec différences
-- Comparer avec options (ignore certains types)
-- Gérer les erreurs (runId invalide)
+- Compare two identical runs (no difference)
+- Compare two runs with differences
+- Compare with options (ignore certain types)
+- Handle errors (invalid runId)
 
 ## Dependencies
 
-- Epic 7: Tracing & Observability (récupération des traces)
-- Epic 6: Event Sourcing (accès aux événements)
-
+- Epic 7: Tracing & Observability (trace retrieval)
+- Epic 6: Event Sourcing (access to events)

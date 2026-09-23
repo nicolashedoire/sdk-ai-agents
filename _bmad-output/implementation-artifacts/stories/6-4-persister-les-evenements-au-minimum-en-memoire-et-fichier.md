@@ -1,4 +1,4 @@
-# Story 6.4: Persister les événements au minimum en mémoire et fichier
+# Story 6.4: Persist events at minimum in memory and to a file
 
 **Story ID:** 6.4  
 **Epic:** 6 - Event Sourcing & Persistence  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** système,
-**I want** persister les événements au minimum en mémoire et fichier,
-**So that** la persistance est simple et fiable pour le MVP.
+**As a** system,
+**I want** persist events at minimum in memory and to a file,
+**So that** persistence is simple and reliable for the MVP.
 
 ## Acceptance Criteria
 
-**Given** des événements sont générés
-**When** les événements sont persistés
-**Then** les événements sont stockés en mémoire pendant l'exécution
-**And** les événements sont écrits dans un fichier (JSON ou format structuré)
-**And** le fichier est organisé par runId
-**And** la persistance fichier est fiable même en cas de crash
+**Given** events are generated
+**When** the events are persisted
+**Then** the events are stored in memory during execution
+**And** the events are written to a file (JSON or structured format)
+**And** the file is organized by runId
+**And** file persistence is reliable even in the event of a crash
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current state:**
+- Complete implementation in the codebase
+- Functionality tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files concerned:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Functionality implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Functionality validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested

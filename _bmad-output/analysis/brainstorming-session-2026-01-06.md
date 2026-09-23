@@ -3,11 +3,11 @@ stepsCompleted: [1, 2, 3, 4]
 session_active: false
 workflow_completed: true
 inputDocuments: []
-session_topic: 'Architecture globale du SDK + design de l''API (DX) - Focus sur tool calling + observabilité'
-session_goals: 'Concepts d''architecture différenciants, fonctionnalités innovantes, solutions techniques, amélioration DX'
+session_topic: 'Overall SDK architecture + API design (DX) - Focus on tool calling + observability'
+session_goals: 'Differentiating architecture concepts, innovative features, technical solutions, DX improvement'
 selected_approach: 'progressive-flow'
 techniques_used: ['what-if-scenarios', 'first-principles-thinking', 'morphological-analysis', 'solution-matrix', 'scamper-method', 'trait-transfer', 'decision-tree-mapping', 'constraint-mapping']
-ideas_generated: ['Architecture événementielle append-only avec EventStore pour replay/audit/tests']
+ideas_generated: ['Append-only event-driven architecture with EventStore for replay/audit/tests']
 context_file: ''
 ---
 
@@ -18,790 +18,790 @@ context_file: ''
 
 ## Session Overview
 
-**Topic:** Architecture globale du SDK + design de l'API (DX) - Focus sur tool calling + observabilité
+**Topic:** Overall SDK architecture + API design (DX) - Focus on tool calling + observability
 
 **Goals:** 
-- Concepts d'architecture différenciants (structure modulaire core + plugins, event-bus unifié, runtime extensible)
-- Fonctionnalités différenciantes (tool calling typé + validation + scopes, tracing natif first-class, replay d'exécution)
-- Solutions à des défis techniques (sécurité/approval gates, testabilité/mocks/deterministic mode, budgets + retries)
-- Approches pour améliorer l'expérience développeur (Quickstart 10 lignes, API moderne TS ergonomique, patterns batteries-included mais remplaçables)
+- Differentiating architecture concepts (modular core + plugins structure, unified event-bus, extensible runtime)
+- Differentiating features (typed tool calling + validation + scopes, first-class native tracing, execution replay)
+- Solutions to technical challenges (security/approval gates, testability/mocks/deterministic mode, budgets + retries)
+- Approaches to improving developer experience (10-line Quickstart, modern ergonomic TS API, batteries-included but replaceable patterns)
 
 ### Context Guidance
 
-**Projet:** SDK_AI_Agents - SDK backend Node.js/TypeScript pour agents IA autonomes en production
+**Project:** SDK_AI_Agents - Node.js/TypeScript backend SDK for autonomous AI agents in production
 
-**Focus technique:**
-- Tool calling + observabilité comme piliers conditionnant sécurité, mémoire, evals, prod readiness
-- Architecture modulaire "core + plugins" propre
-- Event-bus unifié pour observabilité et testabilité
-- Runtime d'agent extensible (planning, policies, HITL)
-- API publique minimaliste mais "prod-first"
+**Technical focus:**
+- Tool calling + observability as pillars conditioning security, memory, evals, prod readiness
+- Clean modular "core + plugins" architecture
+- Unified event-bus for observability and testability
+- Extensible agent runtime (planning, policies, HITL)
+- Minimalist but "prod-first" public API
 
-**Idée initiale capturée:**
-- Architecture événementielle append-only : tout événement agent → projection d'état
-- Avantages : debug + replay + audit + tests naturels
-- Modules : core/runtime, core/events, tools, providers, policies, tracing, memory
-- API proposée avec createSDK, defineTools, createAgent, policyEngine
+**Initial idea captured:**
+- Append-only event-driven architecture: every agent event → state projection
+- Advantages: debugging + replay + audit + tests come naturally
+- Modules: core/runtime, core/events, tools, providers, policies, tracing, memory
+- Proposed API with createSDK, defineTools, createAgent, policyEngine
 
 ### Session Setup
 
-**Paramètres de session confirmés:**
-- Focus sur architecture et API design
-- Priorité sur tool calling et observabilité
-- Recherche de concepts différenciants et solutions techniques innovantes
+**Confirmed session parameters:**
+- Focus on architecture and API design
+- Priority on tool calling and observability
+- Search for differentiating concepts and innovative technical solutions
 
 ## Technique Execution Results
 
-### Phase 1: Exploration Expansive
+### Phase 1: Expansive Exploration
 
-**Techniques utilisées:** What If Scenarios + First Principles Thinking
+**Techniques used:** What If Scenarios + First Principles Thinking
 
-**Approche:** Exploration sans contraintes - penser comme architectes de plateforme, pas devs pressés
+**Approach:** Unconstrained exploration - thinking like platform architects, not developers in a hurry
 
-#### Vision "Ressources Illimitées"
+#### "Unlimited Resources" Vision
 
-**Concept central:** SDK_AI_Agents devient une **plateforme de gouvernance de l'intelligence artificielle appliquée**, pas un outil pour "faire parler une IA", mais un système pour faire agir une intelligence de manière responsable, compréhensible et maîtrisée.
+**Central concept:** SDK_AI_Agents becomes an **applied artificial intelligence governance platform**, not a tool to "make an AI talk," but a system to make an intelligence act responsibly, understandably, and under control.
 
-**Idées générées:**
+**Ideas generated:**
 
-1. **Système d'exploitation pour agents**
-   - Le SDK n'est qu'une surface d'entrée vers quelque chose de plus profond
-   - Chaque agent traçable, explicable, rejouable, gouvernable comme une transaction bancaire
+1. **Operating system for agents**
+   - The SDK is merely an entry surface into something deeper
+   - Every agent traceable, explainable, replayable, governable like a bank transaction
 
-2. **Séparation radicale raisonnement/action**
-   - Abandon de la "boucle agent naïve" (prompt → LLM → tool → LLM)
-   - Nouveau modèle: Perception → Hypothèses → Intentions → Contraintes → Décision → Effets → Conséquences
-   - Le LLM ne fait jamais d'effet de bord, produit seulement: hypothèses, plans, intentions structurées
-   - L'exécution réelle passe par un **Action Engine** gouverné par: policies, budgets, approbations, règles métier, conformité légale
-   - ➡️ Le LLM n'est plus dangereux par nature
+2. **Radical separation of reasoning/action**
+   - Abandoning the "naive agent loop" (prompt → LLM → tool → LLM)
+   - New model: Perception → Hypotheses → Intentions → Constraints → Decision → Effects → Consequences
+   - The LLM never produces side effects, it only produces: hypotheses, plans, structured intentions
+   - The actual execution goes through an **Action Engine** governed by: policies, budgets, approvals, business rules, legal compliance
+   - ➡️ The LLM is no longer inherently dangerous
 
-3. **Capabilities au lieu de tools**
-   - Suppression de la notion de "tool libre"
-   - Chaque tool devient une **capacité (capability-based system)** avec:
-     - Contrat
-     - Coût
-     - Risque
-     - Exigences légales
-     - Niveau de confiance
-   - Un agent n'"appelle" pas un tool, il demande une capacité
+3. **Capabilities instead of tools**
+   - Removal of the notion of a "free tool"
+   - Each tool becomes a **capability (capability-based system)** with:
+     - Contract
+     - Cost
+     - Risk
+     - Legal requirements
+     - Confidence level
+   - An agent doesn't "call" a tool, it requests a capability
 
-4. **Mémoire vivante**
-   - Pas juste short-term/long-term/vector store
-   - Mais: mémoire temporelle, mémoire causale, mémoire contextuelle, mémoire contradictoire (ce que l'agent croyait avant)
-   - ➡️ On peut voir l'évolution de ses croyances
+4. **Living memory**
+   - Not just short-term/long-term/vector store
+   - But: temporal memory, causal memory, contextual memory, contradictory memory (what the agent believed before)
+   - ➡️ We can see the evolution of its beliefs
 
-5. **Exécutions comme preuves**
-   - Un run devient un artefact signable, archivable, comparable
-   - On peut dire: "montre-moi tous les runs où l'agent a pris cette décision"
-   - "compare le comportement avant/après ce changement de policy"
+5. **Executions as evidence**
+   - A run becomes a signable, archivable, comparable artifact
+   - We can say: "show me every run where the agent made this decision"
+   - "compare behavior before/after this policy change"
 
-6. **Time travel debugging réel**
-   - Pas juste replay, mais simulation: "si je change cette policy, que va-t-il se passer?"
-   - Remonter à l'instant où une croyance a changé
-   - Comparer des branches de décision
+6. **Real time-travel debugging**
+   - Not just replay, but simulation: "if I change this policy, what will happen?"
+   - Go back to the exact moment a belief changed
+   - Compare decision branches
 
-7. **Agents hybrides**
-   - Brancher plusieurs intelligences (LLM, règles, heuristiques, systèmes symboliques) dans un même agent
-   - Orchestration via un "Meta-Reasoner"
+7. **Hybrid agents**
+   - Connect several intelligences (LLM, rules, heuristics, symbolic systems) within a single agent
+   - Orchestration via a "Meta-Reasoner"
 
-8. **Observabilité cognitive**
-   - Observer la pensée de l'agent comme un graphe vivant
-   - Ce qu'il pensait, pas juste ce qu'il a fait
-   - Agents audit-proof: prouver pourquoi il a fait quelque chose, avec quelles données, sous quelles règles
+8. **Cognitive observability**
+   - Observe the agent's thinking as a living graph
+   - What it thought, not just what it did
+   - Audit-proof agents: prove why it did something, with which data, under which rules
 
-9. **Auto-analyse et auto-amélioration**
-   - Le SDK capable de s'auto-analyser, s'auto-noter, s'auto-améliorer
-   - Auto-évolution contrôlée (suggestions d'amélioration, jamais automatiques)
+9. **Self-analysis and self-improvement**
+   - The SDK capable of self-analyzing, self-scoring, self-improving
+   - Controlled self-evolution (improvement suggestions, never automatic)
 
-10. **Structure minimale fondamentale (First Principles)**
-    - Event Store (tout est événement)
-    - State Projection Engine (l'état est calculé, pas stocké)
-    - Policy Engine (décide ce qui est autorisé)
-    - Action Engine (exécute de manière sécurisée)
-    - Reasoning Engine (génère des hypothèses/intentions)
+10. **Fundamental minimal structure (First Principles)**
+    - Event Store (everything is an event)
+    - State Projection Engine (state is computed, not stored)
+    - Policy Engine (decides what is allowed)
+    - Action Engine (executes securely)
+    - Reasoning Engine (generates hypotheses/intentions)
 
-**Contraintes supprimées:**
-- ❌ "Il faut shipper vite"
-- ❌ "Il faut rester simple"
-- ❌ "Il faut que ce soit familier"
-- ❌ "Il faut suivre les patterns existants"
-- ❌ "Le LLM décide de tout"
+**Constraints removed:**
+- ❌ "We must ship fast"
+- ❌ "It has to stay simple"
+- ❌ "It has to be familiar"
+- ❌ "We must follow existing patterns"
+- ❌ "The LLM decides everything"
 
-**Possibilités ouvertes:**
-- 🔮 Time travel debugging réel
-- 🧪 Simulation d'agents avant déploiement (sandbox du futur)
-- 🧠 Comparaison de raisonnements entre versions
-- 🛡️ Agents certifiables (finance, santé, juridique)
-- 🧩 Agents hybrides (LLM + règles + graphes + statistiques)
-- 📊 Observabilité cognitive
-- 🧬 Auto-évolution contrôlée
+**Possibilities opened up:**
+- 🔮 Real time-travel debugging
+- 🧪 Agent simulation before deployment (sandbox of the future)
+- 🧠 Comparison of reasoning between versions
+- 🛡️ Certifiable agents (finance, healthcare, legal)
+- 🧩 Hybrid agents (LLM + rules + graphs + statistics)
+- 📊 Cognitive observability
+- 🧬 Controlled self-evolution
 
-**Breakthrough créatif:** Transformation du paradigme d'un SDK "wrapper LLM" vers un "système d'exploitation pour agents" avec gouvernance native, séparation raisonnement/action, et observabilité cognitive complète.
+**Creative breakthrough:** Transformation of the paradigm from an "LLM wrapper" SDK toward an "operating system for agents" with native governance, reasoning/action separation, and full cognitive observability.
 
 ### Phase 2: Pattern Recognition
 
-**Techniques utilisées:** Morphological Analysis + Solution Matrix
+**Techniques used:** Morphological Analysis + Solution Matrix
 
-**Approche:** Analyse systématique des paramètres architecturaux et identification des combinaisons optimales
+**Approach:** Systematic analysis of architectural parameters and identification of optimal combinations
 
-#### Analyse Morphologique - Paramètres Architecturaux
+#### Morphological Analysis - Architectural Parameters
 
-**Paramètres identifiés et options:**
+**Parameters identified and options:**
 
-1. **Modèle d'exécution**
-   - Pipeline séquentiel (Perception → Hypothèses → Intentions → Décision → Action) ✓
-   - Event-driven pur
-   - Hybride (multi-intelligences)
+1. **Execution model**
+   - Sequential pipeline (Perception → Hypotheses → Intentions → Decision → Action) ✓
+   - Pure event-driven
+   - Hybrid (multi-intelligence)
 
-2. **Séparation des responsabilités**
-   - Raisonnement vs Action (strict) ✓
-   - Raisonnement + Action (couplé)
-   - Raisonnement → Validation → Action (3 étapes)
+2. **Separation of responsibilities**
+   - Reasoning vs. Action (strict) ✓
+   - Reasoning + Action (coupled)
+   - Reasoning → Validation → Action (3 steps)
 
-3. **Modèle de capabilities**
-   - Capability-based (contrat, coût, risque, confiance) ✓
-   - Tool-based classique
-   - Permission-based (style Unix)
+3. **Capabilities model**
+   - Capability-based (contract, cost, risk, confidence) ✓
+   - Classic tool-based
+   - Permission-based (Unix style)
    - Hybrid (capabilities + permissions)
 
-4. **Système de mémoire**
-   - Mémoire vivante (temporelle, causale, contradictoire) ✓
-   - Mémoire classique (short/long-term + vector)
-   - Event-sourced uniquement
-   - Hybride (events + projections)
+4. **Memory system**
+   - Living memory (temporal, causal, contradictory) ✓
+   - Classic memory (short/long-term + vector)
+   - Event-sourced only
+   - Hybrid (events + projections)
 
-5. **Observabilité**
-   - Observabilité cognitive (graphe de pensée) ✓
-   - Observabilité d'exécution (traces classiques)
-   - Observabilité hybride (pensée + exécution)
-   - Observabilité minimale (logs basiques)
+5. **Observability**
+   - Cognitive observability (thought graph) ✓
+   - Execution observability (classic traces)
+   - Hybrid observability (thought + execution)
+   - Minimal observability (basic logs)
 
-6. **Gouvernance**
-   - Policy Engine centralisé ✓
-   - Policies distribuées
-   - Approbation humaine obligatoire
-   - Auto-gouvernance avec override
+6. **Governance**
+   - Centralized Policy Engine ✓
+   - Distributed policies
+   - Mandatory human approval
+   - Self-governance with override
 
-7. **Testabilité**
-   - Exécutions comme preuves (signables, comparables) ✓
-   - Tests classiques (mocks, fixtures)
+7. **Testability**
+   - Executions as evidence (signable, comparable) ✓
+   - Classic tests (mocks, fixtures)
    - Golden traces
-   - Simulation temporelle
+   - Temporal simulation
 
-#### Solution Matrix - Combinaisons Prometteuses
+#### Solution Matrix - Promising Combinations
 
-**Variables clés:**
-- A. Modèle d'exécution (Pipeline séquentiel vs Event-driven)
-- B. Séparation raisonnement/action (Strict vs Couplé)
-- C. Capabilities (Capability-based vs Tool-based)
-- D. Mémoire (Vivante vs Classique)
-- E. Observabilité (Cognitive vs Exécution)
+**Key variables:**
+- A. Execution model (Sequential pipeline vs. Event-driven)
+- B. Reasoning/action separation (Strict vs. Coupled)
+- C. Capabilities (Capability-based vs. Tool-based)
+- D. Memory (Living vs. Classic)
+- E. Observability (Cognitive vs. Execution)
 
-**Combinaisons identifiées:**
+**Combinations identified:**
 
-**Combinaison 1: "Gouvernance Maximale"**
-- Pipeline séquentiel + Séparation stricte + Capability-based + Mémoire vivante + Observabilité cognitive
-- Avantages: Contrôle total, audit complet, sécurité maximale
-- Cas d'usage: Finance, santé, juridique
-- Complexité: Élevée
+**Combination 1: "Maximum Governance"**
+- Sequential pipeline + Strict separation + Capability-based + Living memory + Cognitive observability
+- Advantages: Total control, complete audit, maximum security
+- Use cases: Finance, healthcare, legal
+- Complexity: High
 
-**Combinaison 2: "Prod-Ready Pragmatique"**
-- Pipeline séquentiel + Séparation stricte + Capability-based + Mémoire classique + Observabilité hybride
-- Avantages: Équilibre sécurité/pragmatisme, plus simple à implémenter
-- Cas d'usage: Production générale
-- Complexité: Moyenne
+**Combination 2: "Pragmatic Prod-Ready"**
+- Sequential pipeline + Strict separation + Capability-based + Classic memory + Hybrid observability
+- Advantages: Security/pragmatism balance, simpler to implement
+- Use cases: General production
+- Complexity: Medium
 
-**Combinaison 3: "Event-Driven Pur"**
-- Event-driven + Séparation stricte + Capability-based + Event-sourced + Observabilité cognitive
-- Avantages: Replay naturel, time travel debugging, scalabilité
-- Cas d'usage: Systèmes distribués, debugging avancé
-- Complexité: Élevée
+**Combination 3: "Pure Event-Driven"**
+- Event-driven + Strict separation + Capability-based + Event-sourced + Cognitive observability
+- Advantages: Natural replay, time-travel debugging, scalability
+- Use cases: Distributed systems, advanced debugging
+- Complexity: High
 
-#### Patterns Émergents Identifiés
+#### Identified Emerging Patterns
 
-**Pattern 1: "Séparation des préoccupations radicale"**
-- Raisonnement ≠ Action
-- LLM = générateur d'intentions, pas exécuteur
-- Action Engine = exécuteur gouverné
-- Importance: Sécurité native, contrôle, auditabilité
+**Pattern 1: "Radical separation of concerns"**
+- Reasoning ≠ Action
+- LLM = intention generator, not executor
+- Action Engine = governed executor
+- Importance: Native security, control, auditability
 
-**Pattern 2: "Event-sourcing comme fondation"**
-- Tout est événement append-only
-- État = projection calculée
-- Importance: Replay, audit, debugging temporel, comparaison
+**Pattern 2: "Event-sourcing as foundation"**
+- Everything is an append-only event
+- State = computed projection
+- Importance: Replay, audit, temporal debugging, comparison
 
-**Pattern 3: "Capabilities comme abstraction de sécurité"**
-- Tools → Capabilities (avec métadonnées de sécurité)
-- Contrat explicite (coût, risque, confiance)
-- Importance: Gouvernance native, sécurité par design
+**Pattern 3: "Capabilities as a security abstraction"**
+- Tools → Capabilities (with security metadata)
+- Explicit contract (cost, risk, confidence)
+- Importance: Native governance, security by design
 
-**Pattern 4: "Observabilité cognitive"**
-- Observer la pensée, pas juste l'exécution
-- Graphe de raisonnement
-- Évolution des croyances
-- Importance: Debugging, conformité, amélioration continue
+**Pattern 4: "Cognitive observability"**
+- Observe thinking, not just execution
+- Reasoning graph
+- Belief evolution
+- Importance: Debugging, compliance, continuous improvement
 
-**Pattern 5: "Gouvernance native"**
-- Policy Engine centralisé
-- Approbations, budgets, contraintes
-- Importance: Contrôle en production, conformité
+**Pattern 5: "Native governance"**
+- Centralized Policy Engine
+- Approvals, budgets, constraints
+- Importance: Production control, compliance
 
-#### Priorisation - Concepts Prioritaires
+#### Prioritization - Priority Concepts
 
-**Top 3 concepts à développer:**
+**Top 3 concepts to develop:**
 
-1. **Architecture événementielle + séparation raisonnement/action**
-   - Pourquoi prioritaire: Fondation pour tout le reste
-   - Impact: Élevé (sécurité, observabilité, testabilité)
-   - Faisabilité: Moyenne (complexe mais réalisable)
+1. **Event-driven architecture + reasoning/action separation**
+   - Why priority: Foundation for everything else
+   - Impact: High (security, observability, testability)
+   - Feasibility: Medium (complex but achievable)
 
-2. **Système de capabilities avec métadonnées de sécurité**
-   - Pourquoi prioritaire: Différenciation claire vs autres SDKs
-   - Impact: Élevé (sécurité, gouvernance)
-   - Faisabilité: Moyenne (nécessite design soigné)
+2. **Capability system with security metadata**
+   - Why priority: Clear differentiation vs. other SDKs
+   - Impact: High (security, governance)
+   - Feasibility: Medium (requires careful design)
 
-3. **Observabilité cognitive (graphe de raisonnement)**
-   - Pourquoi prioritaire: Valeur unique pour debugging/conformité
-   - Impact: Moyen-Élevé (très utile mais moins critique)
-   - Faisabilité: Complexe (nécessite instrumentation LLM)
+3. **Cognitive observability (reasoning graph)**
+   - Why priority: Unique value for debugging/compliance
+   - Impact: Medium-High (very useful but less critical)
+   - Feasibility: Complex (requires LLM instrumentation)
 
 ### Phase 3: Idea Development
 
-**Techniques utilisées:** SCAMPER Method + Trait Transfer
+**Techniques used:** SCAMPER Method + Trait Transfer
 
-**Approche:** Raffinement méthodique des concepts prioritaires avec amélioration systématique et transfert de traits réussis
+**Approach:** Methodical refinement of priority concepts through systematic improvement and transfer of successful traits
 
-#### SCAMPER Analysis - Architecture Événementielle
+#### SCAMPER Analysis - Event-Driven Architecture
 
 **S - Substitute:**
-- Event Store centralisé → Event Store distribué avec réplication
-- Un seul Reasoning Engine → Multi Reasoning Engines (LLM, règles, graphes)
-- Action Engine synchrone → Action Engine asynchrone avec file d'attente
+- Centralized Event Store → Distributed Event Store with replication
+- A single Reasoning Engine → Multiple Reasoning Engines (LLM, rules, graphs)
+- Synchronous Action Engine → Asynchronous Action Engine with a queue
 
 **C - Combine:**
 - Event Store + State Projection Engine = Event-sourced State Machine
-- Reasoning Engine + Policy Engine = Reasoning gouverné
-- Action Engine + Observabilité = Action Engine avec tracing natif
+- Reasoning Engine + Policy Engine = Governed reasoning
+- Action Engine + Observability = Action Engine with native tracing
 
 **A - Adapt:**
-- Patterns de bases de données événementielles (EventStore, Marten)
-- Patterns de CQRS (Command Query Responsibility Segregation)
-- Patterns de workflow engines (temporalité, états, transitions)
+- Event-sourced database patterns (EventStore, Marten)
+- CQRS patterns (Command Query Responsibility Segregation)
+- Workflow engine patterns (temporality, states, transitions)
 
 **M - Modify:**
-- Pipeline avec "checkpoints" (sauvegarde d'état intermédiaire)
-- Event Store avec support de "branches" (scénarios alternatifs)
-- Séparation pour "intentions partielles" (intentions multi-actions)
+- Pipeline with "checkpoints" (intermediate state saving)
+- Event Store with "branch" support (alternative scenarios)
+- Separation for "partial intentions" (multi-action intentions)
 
 **P - Put to other uses:**
-- Simulation de scénarios (et si...)
-- Formation d'agents (rejouer des runs réussis)
-- Conformité réglementaire (audit trail complet)
-- Debugging collaboratif (partager des runs pour analyse)
+- Scenario simulation (what if...)
+- Agent training (replaying successful runs)
+- Regulatory compliance (complete audit trail)
+- Collaborative debugging (sharing runs for analysis)
 
 **E - Eliminate:**
-- Stockage d'état persistant (tout vient des événements)
-- Callbacks complexes (remplacer par événements)
-- Sauvegarde manuelle (tout automatiquement persisté)
+- Persistent state storage (everything comes from events)
+- Complex callbacks (replaced by events)
+- Manual saving (everything automatically persisted)
 
 **R - Reverse:**
-- Action → Raisonnement (exécution puis explication)
-- État → Événements (reconstruction d'événements depuis l'état)
+- Action → Reasoning (execution then explanation)
+- State → Events (reconstructing events from state)
 
-#### SCAMPER Analysis - Système de Capabilities
+#### SCAMPER Analysis - Capability System
 
 **S - Substitute:**
-- "Tool" par "Capability"
-- "Permissions simples" par "Contrat de sécurité complet"
+- "Tool" with "Capability"
+- "Simple permissions" with "Full security contract"
 
 **C - Combine:**
 - Capabilities + Policies = "Policy-aware capabilities"
 - Capabilities + Budgets = "Budget-aware capabilities"
-- Capabilities + Approbations = "Approval-gated capabilities"
+- Capabilities + Approvals = "Approval-gated capabilities"
 
 **A - Adapt:**
-- Modèle Unix permissions (read/write/execute) → (read/write/dangerous)
-- Modèle OAuth scopes → scopes de capabilities
-- Modèle Kubernetes RBAC → RBAC pour agents
+- Unix permissions model (read/write/execute) → (read/write/dangerous)
+- OAuth scopes model → capability scopes
+- Kubernetes RBAC model → RBAC for agents
 
 **M - Modify:**
-- Support "capability composition" (une capability utilise d'autres)
-- Support "capability versioning" (évolution dans le temps)
-- Support "capability dependencies" (dépendances entre capabilities)
+- Support "capability composition" (a capability uses others)
+- Support "capability versioning" (evolution over time)
+- Support "capability dependencies" (dependencies between capabilities)
 
 **P - Put to other uses:**
-- Facturation (coût par capability)
-- Conformité (traçabilité des capabilities utilisées)
-- Apprentissage (identifier les capabilities les plus utiles)
+- Billing (cost per capability)
+- Compliance (traceability of capabilities used)
+- Learning (identifying the most useful capabilities)
 
 **E - Eliminate:**
-- Appel de tools sans vérification de capability
-- "Tools globaux" (tout passe par le système de capabilities)
+- Tool calls without capability verification
+- "Global tools" (everything goes through the capability system)
 
 **R - Reverse:**
-- "Capability propose ses services" (service discovery) au lieu de "demander une capability"
+- "Capability offers its services" (service discovery) instead of "requesting a capability"
 
-#### Trait Transfer - Solutions Réussies
+#### Trait Transfer - Successful Solutions
 
 **1. Redux (State Management)**
-- Traits: Actions immutables, reducer pur, time travel debugging
-- Transfer: Événements immutables, State Projection Engine = reducer, time travel natif
+- Traits: Immutable actions, pure reducer, time-travel debugging
+- Transfer: Immutable events, State Projection Engine = reducer, native time travel
 
 **2. Kubernetes (Orchestration)**
-- Traits: Déclaratif, extensible (CRDs), observabilité native
-- Transfer: Déclaration d'agents YAML/JSON, extensibilité plugins, observabilité intégrée
+- Traits: Declarative, extensible (CRDs), native observability
+- Transfer: YAML/JSON agent declaration, plugin extensibility, built-in observability
 
 **3. GraphQL (API Design)**
 - Traits: Type-safe, composable, introspection
-- Transfer: API TypeScript strict, composition de capabilities, introspection agents
+- Transfer: Strict TypeScript API, capability composition, agent introspection
 
 **4. React (UI Framework)**
-- Traits: Composants réutilisables, hooks, état dérivé
-- Transfer: Agents comme composants, "hooks" pour extension, état dérivé depuis événements
+- Traits: Reusable components, hooks, derived state
+- Transfer: Agents as components, "hooks" for extension, state derived from events
 
 **5. Docker (Containerization)**
-- Traits: Isolation, portabilité, layers
-- Transfer: Isolation agents (sandbox), portabilité, layers de capabilities
+- Traits: Isolation, portability, layers
+- Transfer: Agent isolation (sandbox), portability, capability layers
 
 **6. Git (Version Control)**
-- Traits: Historique complet, branches, merge
-- Transfer: Historique runs complet, branches de raisonnement, merge de politiques
+- Traits: Complete history, branches, merge
+- Transfer: Complete run history, reasoning branches, policy merging
 
-#### Développements Approfondis
+#### In-Depth Developments
 
-**Architecture Événementielle:**
-- Event Store distribué avec snapshots pour performance
-- Support de branches (scénarios alternatifs)
-- Checkpoints pour sauvegarde d'état intermédiaire
-- Patterns CQRS adaptés pour séparation commande/query
-- Solutions: Snapshots périodiques, Event Store distribué (Kafka-style), indexation pour queries
+**Event-Driven Architecture:**
+- Distributed Event Store with snapshots for performance
+- Branch support (alternative scenarios)
+- Checkpoints for intermediate state saving
+- Adapted CQRS patterns for command/query separation
+- Solutions: Periodic snapshots, distributed Event Store (Kafka-style), indexing for queries
 
-**Système de Capabilities:**
-- Capability Registry avec découverte et introspection
-- Composition de capabilities (pipelines)
-- Versioning sémantique avec migration
-- Policy-aware capabilities (vérification intégrée)
-- Solutions: Registry centralisé, Capability Pipeline, versioning sémantique
+**Capability System:**
+- Capability Registry with discovery and introspection
+- Capability composition (pipelines)
+- Semantic versioning with migration
+- Policy-aware capabilities (built-in verification)
+- Solutions: Centralized registry, Capability Pipeline, semantic versioning
 
-**Observabilité Cognitive:**
-- Instrumentation LLM avec hooks
-- Graphe de raisonnement (nœuds + edges)
-- Stockage dans Event Store comme événements
-- Visualisation du graphe de pensée
-- Solutions: Wrapper LLM avec hooks, structure graphe, événements ReasoningEvent/DecisionEvent
+**Cognitive Observability:**
+- LLM instrumentation with hooks
+- Reasoning graph (nodes + edges)
+- Storage in Event Store as events
+- Thought graph visualization
+- Solutions: LLM wrapper with hooks, graph structure, ReasoningEvent/DecisionEvent events
 
 ### Phase 4: Action Planning
 
-**Techniques utilisées:** Decision Tree Mapping + Constraint Mapping
+**Techniques used:** Decision Tree Mapping + Constraint Mapping
 
-**Approche:** Création de plans d'implémentation concrets avec identification des contraintes et chemins de décision
+**Approach:** Creation of concrete implementation plans with identification of constraints and decision paths
 
-#### Decision Tree - Architecture de Base
+#### Decision Tree - Base Architecture
 
-**Chemin recommandé: Event Store d'abord**
+**Recommended path: Event Store first**
 
-**Option A: Event Store d'abord** ✓
-- Backend file-based (MVP) → Simple, portable
-- Backend Database (production) → SQLite/PostgreSQL
-- Event Store distribué (scale) → Kafka-style
+**Option A: Event Store first** ✓
+- File-based backend (MVP) → Simple, portable
+- Database backend (production) → SQLite/PostgreSQL
+- Distributed Event Store (scale) → Kafka-style
 
-**Option B: Capabilities d'abord**
+**Option B: Capabilities first**
 - Simple Registry (MVP) → Quick start
-- Full Registry (production) → Découverte, composition, versioning
+- Full Registry (production) → Discovery, composition, versioning
 
-**Option C: Séparation raisonnement/action d'abord**
-- Action Engine simple (MVP) → Concept validé
-- Action Engine complet (production) → Policy Engine, budgets, approbations
+**Option C: Reasoning/action separation first**
+- Simple Action Engine (MVP) → Concept validated
+- Full Action Engine (production) → Policy Engine, budgets, approvals
 
-**Ordre d'implémentation recommandé:**
-1. Event Store (fondation)
-2. Séparation raisonnement/action (sécurité)
-3. Capabilities (gouvernance)
-4. Observabilité cognitive (différenciation)
+**Recommended implementation order:**
+1. Event Store (foundation)
+2. Reasoning/action separation (security)
+3. Capabilities (governance)
+4. Cognitive observability (differentiation)
 
 #### Constraint Mapping
 
-**Contraintes réelles (à respecter):**
-- Techniques: Node.js/TypeScript, performance < 100ms, compatibilité LLM providers
-- Sécurité: Pas d'exécution code arbitraire, validation capabilities, audit trail complet
-- Production: API stable, gestion erreurs robuste, observabilité intégrée
+**Real constraints (to respect):**
+- Technical: Node.js/TypeScript, performance < 100ms, LLM provider compatibility
+- Security: No arbitrary code execution, capability validation, complete audit trail
+- Production: Stable API, robust error handling, built-in observability
 
-**Contraintes imaginaires (à éliminer):**
-- ❌ "Il faut que ce soit simple" → Complexité justifiée si valeur ajoutée
-- ❌ "Il faut suivre les patterns existants" → Innovation requise
-- ❌ "Il faut shipper vite" → Qualité > vitesse
-- ❌ "Il faut que ce soit familier" → Nouveaux patterns acceptables
+**Imaginary constraints (to eliminate):**
+- ❌ "It has to be simple" → Complexity justified if it adds value
+- ❌ "We must follow existing patterns" → Innovation required
+- ❌ "We must ship fast" → Quality > speed
+- ❌ "It has to be familiar" → New patterns are acceptable
 
-**Chemins autour des contraintes:**
-- Performance: Snapshots + projection incrémentale
-- Compatibilité LLM: Wrapper/Adapter pattern
-- Sécurité: Sandbox Action Engine, validation stricte
-- Stabilité API: Versioning sémantique, deprecation progressive
+**Paths around the constraints:**
+- Performance: Snapshots + incremental projection
+- LLM compatibility: Wrapper/Adapter pattern
+- Security: Action Engine sandbox, strict validation
+- API stability: Semantic versioning, progressive deprecation
 
-#### Plan d'Implémentation par Phases
+#### Phased Implementation Plan
 
-**Phase 1: MVP (2-3 mois) - Fondations**
+**Phase 1: MVP (2-3 months) - Foundations**
 
-**Objectifs:**
-- Event Store fonctionnel (file-based)
-- Séparation raisonnement/action basique
-- API minimale mais type-safe
+**Objectives:**
+- Functional Event Store (file-based)
+- Basic reasoning/action separation
+- Minimal but type-safe API
 
-**Livrables:**
+**Deliverables:**
 1. Event Store Core
-   - Interface EventStore
-   - Implémentation file-based
-   - Types d'événements (AgentEvent, ActionEvent, ReasoningEvent)
-   - Projection d'état simple
+   - EventStore interface
+   - File-based implementation
+   - Event types (AgentEvent, ActionEvent, ReasoningEvent)
+   - Simple state projection
 
-2. Séparation Raisonnement/Action
-   - Reasoning Engine (wrapper LLM)
-   - Action Engine basique
+2. Reasoning/Action Separation
+   - Reasoning Engine (LLM wrapper)
+   - Basic Action Engine
    - Pipeline: Input → Reasoning → Action → Output
 
-3. API Publique Minimale
-   - `createSDK()` - Initialisation
-   - `createAgent()` - Création d'agent
-   - `agent.run()` - Exécution
-   - Types TypeScript stricts
+3. Minimal Public API
+   - `createSDK()` - Initialization
+   - `createAgent()` - Agent creation
+   - `agent.run()` - Execution
+   - Strict TypeScript types
 
-**Métriques de succès:**
-- ✅ Agent créé et exécuté
-- ✅ Événements persistés
-- ✅ Replay fonctionne (basique)
-- ✅ API type-safe
+**Success metrics:**
+- ✅ Agent created and executed
+- ✅ Events persisted
+- ✅ Replay works (basic)
+- ✅ Type-safe API
 
-**Risques:** Complexité Event Store, performance projection
-**Mitigation:** Prototype rapide, benchmarks précoces
+**Risks:** Event Store complexity, projection performance
+**Mitigation:** Rapid prototype, early benchmarks
 
-**Phase 2: Production-Ready (3-4 mois) - Gouvernance**
+**Phase 2: Production-Ready (3-4 months) - Governance**
 
-**Objectifs:**
-- Système de capabilities complet
-- Policy Engine fonctionnel
-- Observabilité de base
+**Objectives:**
+- Complete capability system
+- Functional Policy Engine
+- Basic observability
 
-**Livrables:**
+**Deliverables:**
 1. Capability System
    - Capability Registry
-   - Définition avec métadonnées
-   - Validation avant exécution
-   - Composition de capabilities
+   - Definition with metadata
+   - Pre-execution validation
+   - Capability composition
 
 2. Policy Engine
-   - Définition de policies
-   - Vérification avant action
-   - Budgets (tokens, coûts)
-   - Approbations (HITL)
+   - Policy definition
+   - Pre-action verification
+   - Budgets (tokens, costs)
+   - Approvals (HITL)
 
-3. Observabilité de Base
-   - Tracing événements
-   - Métriques (coûts, latence)
-   - Logs structurés
-   - Export traces
+3. Basic Observability
+   - Event tracing
+   - Metrics (costs, latency)
+   - Structured logs
+   - Trace export
 
-**Métriques de succès:**
-- ✅ Capabilities validées avant exécution
-- ✅ Policies bloquent actions non autorisées
-- ✅ Traces complètes et exploitables
-- ✅ Coûts trackés
+**Success metrics:**
+- ✅ Capabilities validated before execution
+- ✅ Policies block unauthorized actions
+- ✅ Complete and usable traces
+- ✅ Costs tracked
 
-**Risques:** Performance Policy Engine, complexité composition
-**Mitigation:** Tests de charge, documentation
+**Risks:** Policy Engine performance, composition complexity
+**Mitigation:** Load testing, documentation
 
-**Phase 3: Avancé (4-6 mois) - Observabilité Cognitive**
+**Phase 3: Advanced (4-6 months) - Cognitive Observability**
 
-**Objectifs:**
-- Observabilité cognitive complète
-- Time travel debugging
-- Mémoire vivante
+**Objectives:**
+- Complete cognitive observability
+- Time-travel debugging
+- Living memory
 
-**Livrables:**
-1. Observabilité Cognitive
-   - Instrumentation LLM complète
-   - Graphe de raisonnement
-   - Visualisation graphe
-   - Évolution croyances
+**Deliverables:**
+1. Cognitive Observability
+   - Complete LLM instrumentation
+   - Reasoning graph
+   - Graph visualization
+   - Belief evolution
 
 2. Time Travel Debugging
-   - Replay avec modifications
-   - Branches scénarios
-   - Comparaison runs
-   - Simulation "et si..."
+   - Replay with modifications
+   - Scenario branches
+   - Run comparison
+   - "What if..." simulation
 
-3. Mémoire Vivante
-   - Mémoire temporelle
-   - Mémoire causale
-   - Mémoire contradictoire
-   - Évolution croyances
+3. Living Memory
+   - Temporal memory
+   - Causal memory
+   - Contradictory memory
+   - Belief evolution
 
-**Métriques de succès:**
-- ✅ Graphe raisonnement complet
-- ✅ Time travel debugging fonctionne
-- ✅ Mémoire vivante capture évolution
-- ✅ Comparaisons runs possibles
+**Success metrics:**
+- ✅ Complete reasoning graph
+- ✅ Time-travel debugging works
+- ✅ Living memory captures evolution
+- ✅ Run comparisons possible
 
-**Risques:** Complexité instrumentation LLM, performance graphe
-**Mitigation:** Prototypes incrémentaux, optimisation progressive
+**Risks:** LLM instrumentation complexity, graph performance
+**Mitigation:** Incremental prototypes, progressive optimization
 
-#### Ressources Nécessaires
+#### Required Resources
 
-**Équipe:**
-- 1-2 développeurs backend TypeScript
-- 1 architecte (part-time)
-- 1 expert sécurité (consultant)
+**Team:**
+- 1-2 TypeScript backend developers
+- 1 architect (part-time)
+- 1 security expert (consultant)
 
 **Technologies:**
 - TypeScript 5.x
 - Node.js 20+
-- Event Store backend (file → DB → distribué)
+- Event Store backend (file → DB → distributed)
 - LLM providers (OpenAI, Anthropic)
 
-**Outils:**
+**Tools:**
 - Testing: Jest/Vitest
 - Linting: ESLint + TypeScript strict
 - Documentation: TypeDoc
 - CI/CD: GitHub Actions
 
-#### Prochaines Étapes Immédiates (Semaine 1-2)
+#### Immediate Next Steps (Week 1-2)
 
-1. **Setup du projet**
-   - Structure dossiers
-   - Configuration TypeScript strict
-   - Setup tests
-   - CI/CD basique
+1. **Project setup**
+   - Folder structure
+   - Strict TypeScript configuration
+   - Test setup
+   - Basic CI/CD
 
-2. **Prototype Event Store**
-   - Interface EventStore
-   - Implémentation file-based simple
-   - Tests unitaires
+2. **Event Store prototype**
+   - EventStore interface
+   - Simple file-based implementation
+   - Unit tests
 
-3. **Design API publique**
-   - Types TypeScript
-   - Signatures fonctions
+3. **Public API design**
+   - TypeScript types
+   - Function signatures
    - Documentation
 
-4. **Spike séparation raisonnement/action**
+4. **Reasoning/action separation spike**
    - Proof of concept
-   - Validation concept
+   - Concept validation
    - Documentation
 
-#### Timeline Résumé
+#### Timeline Summary
 
 ```
-Mois 1-3:   Phase 1 - MVP (Fondations)
-Mois 4-7:   Phase 2 - Production-Ready (Gouvernance)
-Mois 8-13:  Phase 3 - Avancé (Observabilité cognitive)
+Months 1-3:   Phase 1 - MVP (Foundations)
+Months 4-7:   Phase 2 - Production-Ready (Governance)
+Months 8-13:  Phase 3 - Advanced (Cognitive observability)
 ```
 
-**Jalons critiques:**
-- Mois 3: MVP fonctionnel avec Event Store + séparation basique
-- Mois 7: Production-ready avec capabilities + policies
-- Mois 13: Observabilité cognitive complète
+**Critical milestones:**
+- Month 3: Functional MVP with Event Store + basic separation
+- Month 7: Production-ready with capabilities + policies
+- Month 13: Complete cognitive observability
 
 ## Idea Organization and Prioritization
 
 ### Thematic Organization
 
 **Session Achievement Summary:**
-- **Total Ideas Generated:** 30+ idées majeures à travers 4 phases créatives
+- **Total Ideas Generated:** 30+ major ideas across 4 creative phases
 - **Creative Techniques Used:** What If Scenarios, First Principles Thinking, Morphological Analysis, Solution Matrix, SCAMPER Method, Trait Transfer, Decision Tree Mapping, Constraint Mapping
-- **Session Focus:** Architecture globale du SDK + design de l'API (DX) avec focus sur tool calling + observabilité
+- **Session Focus:** Overall SDK architecture + API design (DX) with a focus on tool calling + observability
 
-#### Theme 1: Architecture Fondamentale - Event-Sourcing et Séparation
+#### Theme 1: Fundamental Architecture - Event-Sourcing and Separation
 
-**Focus:** Fondations architecturales pour gouvernance et sécurité native
+**Focus:** Architectural foundations for native governance and security
 
-**Idées dans ce cluster:**
-- Architecture événementielle append-only (Event Store comme fondation)
-- Séparation radicale raisonnement/action (LLM ≠ Action Engine)
-- Pipeline séquentiel (Perception → Hypothèses → Intentions → Décision → Action)
-- State Projection Engine (état calculé depuis événements)
-- Event-sourced State Machine (combinaison Event Store + Projection)
+**Ideas in this cluster:**
+- Append-only event-driven architecture (Event Store as foundation)
+- Radical separation of reasoning/action (LLM ≠ Action Engine)
+- Sequential pipeline (Perception → Hypotheses → Intentions → Decision → Action)
+- State Projection Engine (state computed from events)
+- Event-sourced State Machine (combination of Event Store + Projection)
 
-**Pattern Insight:** Tout est événement, l'état est dérivé. Cette approche permet replay, audit, debugging temporel et comparaison naturels.
+**Pattern Insight:** Everything is an event, state is derived. This approach naturally enables replay, audit, temporal debugging, and comparison.
 
-**Développements:**
-- Event Store distribué avec snapshots pour performance
-- Support de branches (scénarios alternatifs)
-- Checkpoints pour sauvegarde d'état intermédiaire
-- Patterns CQRS adaptés
+**Developments:**
+- Distributed Event Store with snapshots for performance
+- Branch support (alternative scenarios)
+- Checkpoints for intermediate state saving
+- Adapted CQRS patterns
 
-#### Theme 2: Gouvernance et Sécurité - Capabilities et Policies
+#### Theme 2: Governance and Security - Capabilities and Policies
 
-**Focus:** Système de gouvernance native pour contrôle et conformité
+**Focus:** Native governance system for control and compliance
 
-**Idées dans ce cluster:**
-- Capability-based system (au lieu de tools libres)
-- Contrat de sécurité complet (coût, risque, confiance, exigences légales)
-- Policy Engine centralisé (vérification avant action)
-- Budgets et approbations (HITL)
-- Capability Registry avec découverte et introspection
-- Composition de capabilities (pipelines)
-- Versioning sémantique des capabilities
+**Ideas in this cluster:**
+- Capability-based system (instead of free tools)
+- Full security contract (cost, risk, confidence, legal requirements)
+- Centralized Policy Engine (pre-action verification)
+- Budgets and approvals (HITL)
+- Capability Registry with discovery and introspection
+- Capability composition (pipelines)
+- Semantic versioning of capabilities
 
-**Pattern Insight:** Les capabilities sont des abstractions de sécurité avec métadonnées complètes. Chaque action doit être validée avant exécution.
+**Pattern Insight:** Capabilities are security abstractions with complete metadata. Every action must be validated before execution.
 
-**Développements:**
-- Policy-aware capabilities (vérification intégrée)
-- Budget-aware capabilities (gestion des coûts)
-- Approval-gated capabilities (approbation humaine)
-- Capability dependencies (dépendances entre capabilities)
+**Developments:**
+- Policy-aware capabilities (built-in verification)
+- Budget-aware capabilities (cost management)
+- Approval-gated capabilities (human approval)
+- Capability dependencies (dependencies between capabilities)
 
-#### Theme 3: Observabilité Cognitive - Graphe de Raisonnement
+#### Theme 3: Cognitive Observability - Reasoning Graph
 
-**Focus:** Observer la pensée de l'agent, pas juste l'exécution
+**Focus:** Observing the agent's thinking, not just its execution
 
-**Idées dans ce cluster:**
-- Observabilité cognitive (graphe de pensée)
-- Instrumentation LLM complète (capture du raisonnement)
-- Évolution des croyances (mémoire contradictoire)
-- Time travel debugging réel (pas juste replay)
-- Simulation "et si..." (branches de scénarios)
-- Comparaison de runs (avant/après changements)
+**Ideas in this cluster:**
+- Cognitive observability (thought graph)
+- Complete LLM instrumentation (capturing reasoning)
+- Belief evolution (contradictory memory)
+- Real time-travel debugging (not just replay)
+- "What if..." simulation (scenario branches)
+- Run comparison (before/after changes)
 
-**Pattern Insight:** L'observabilité cognitive permet de comprendre pourquoi un agent a pris une décision, pas juste ce qu'il a fait. Essentiel pour debugging et conformité.
+**Pattern Insight:** Cognitive observability makes it possible to understand why an agent made a decision, not just what it did. Essential for debugging and compliance.
 
-**Développements:**
-- Wrapper LLM avec hooks d'observabilité
-- Structure de données graphe (nœuds + edges)
-- Stockage comme événements (ReasoningEvent, DecisionEvent)
-- Visualisation du graphe de pensée
+**Developments:**
+- LLM wrapper with observability hooks
+- Graph data structure (nodes + edges)
+- Storage as events (ReasoningEvent, DecisionEvent)
+- Thought graph visualization
 
-#### Theme 4: Mémoire Vivante - Évolution Temporelle
+#### Theme 4: Living Memory - Temporal Evolution
 
-**Focus:** Mémoire qui capture l'évolution, pas juste le stockage
+**Focus:** Memory that captures evolution, not just storage
 
-**Idées dans ce cluster:**
-- Mémoire temporelle (évolution dans le temps)
-- Mémoire causale (relations de cause à effet)
-- Mémoire contradictoire (ce que l'agent croyait avant)
-- Mémoire contextuelle (contexte des décisions)
-- Évolution des croyances (tracking des changements)
+**Ideas in this cluster:**
+- Temporal memory (evolution over time)
+- Causal memory (cause-and-effect relationships)
+- Contradictory memory (what the agent believed before)
+- Contextual memory (context of decisions)
+- Belief evolution (tracking changes)
 
-**Pattern Insight:** La mémoire n'est pas juste un stockage, mais un système qui capture l'évolution des croyances et permet de comprendre les changements.
+**Pattern Insight:** Memory is not just storage, but a system that captures the evolution of beliefs and enables understanding of changes.
 
-**Développements:**
-- Système de versions de croyances avec timestamps
-- Tracking des moments de changement de croyance
-- Reconstruction de l'état mental à un moment donné
+**Developments:**
+- Belief versioning system with timestamps
+- Tracking of belief-change moments
+- Reconstruction of mental state at a given point in time
 
-#### Theme 5: Agents Hybrides - Multi-Intelligences
+#### Theme 5: Hybrid Agents - Multi-Intelligence
 
-**Focus:** Orchestration de différentes formes d'intelligence
+**Focus:** Orchestration of different forms of intelligence
 
-**Idées dans ce cluster:**
-- Agents hybrides (LLM + règles + graphes + statistiques)
-- Multi Reasoning Engines (plusieurs systèmes de raisonnement)
-- Meta-Reasoner (orchestration des intelligences)
-- Sélection dynamique de l'intelligence appropriée
+**Ideas in this cluster:**
+- Hybrid agents (LLM + rules + graphs + statistics)
+- Multiple Reasoning Engines (several reasoning systems)
+- Meta-Reasoner (orchestration of intelligences)
+- Dynamic selection of the appropriate intelligence
 
-**Pattern Insight:** Différentes formes d'intelligence ont différentes forces. Les combiner permet des agents plus robustes et fiables.
+**Pattern Insight:** Different forms of intelligence have different strengths. Combining them enables more robust and reliable agents.
 
-**Développements:**
-- Architecture modulaire pour différents reasoning engines
-- Système de sélection basé sur le contexte
-- Composition de différentes intelligences
+**Developments:**
+- Modular architecture for different reasoning engines
+- Context-based selection system
+- Composition of different intelligences
 
-#### Theme 6: Trait Transfer - Patterns de Frameworks Réussis
+#### Theme 6: Trait Transfer - Patterns from Successful Frameworks
 
-**Focus:** Adapter les meilleures pratiques d'autres domaines
+**Focus:** Adapting best practices from other domains
 
-**Idées transférées:**
-- **Redux:** Actions immutables, reducer pur, time travel debugging
-- **Kubernetes:** Déclaratif, extensible (CRDs), observabilité native
+**Ideas transferred:**
+- **Redux:** Immutable actions, pure reducer, time-travel debugging
+- **Kubernetes:** Declarative, extensible (CRDs), native observability
 - **GraphQL:** Type-safe, composable, introspection
-- **React:** Composants réutilisables, hooks, état dérivé
-- **Docker:** Isolation, portabilité, layers
-- **Git:** Historique complet, branches, merge
+- **React:** Reusable components, hooks, derived state
+- **Docker:** Isolation, portability, layers
+- **Git:** Complete history, branches, merge
 
-**Pattern Insight:** Les frameworks réussis ont des patterns éprouvés qui peuvent être adaptés au domaine des agents IA.
+**Pattern Insight:** Successful frameworks have proven patterns that can be adapted to the AI agent domain.
 
 ### Breakthrough Concepts
 
-**1. Système d'exploitation pour agents**
-- Transformation du paradigme d'un SDK "wrapper LLM" vers une plateforme de gouvernance complète
-- Impact: Différenciation majeure vs autres SDKs
+**1. Operating system for agents**
+- Transformation of the paradigm from an "LLM wrapper" SDK to a complete governance platform
+- Impact: Major differentiation vs. other SDKs
 
-**2. Séparation raisonnement/action radicale**
-- Le LLM ne fait jamais d'effet de bord, seulement des intentions
-- L'Action Engine gouverné exécute de manière sécurisée
-- Impact: Sécurité native, contrôle total
+**2. Radical reasoning/action separation**
+- The LLM never produces side effects, only intentions
+- The governed Action Engine executes securely
+- Impact: Native security, total control
 
-**3. Exécutions comme preuves**
-- Chaque run est un artefact signable, archivable, comparable
-- Permet audit, conformité, comparaison
-- Impact: Certifiabilité pour domaines réglementés
+**3. Executions as evidence**
+- Every run is a signable, archivable, comparable artifact
+- Enables audit, compliance, comparison
+- Impact: Certifiability for regulated domains
 
-**4. Time travel debugging réel**
-- Pas juste replay, mais simulation et branches
-- Impact: Debugging révolutionnaire pour agents IA
+**4. Real time-travel debugging**
+- Not just replay, but simulation and branches
+- Impact: Revolutionary debugging for AI agents
 
 ### Prioritization Results
 
-**Top 3 Concepts Prioritaires:**
+**Top 3 Priority Concepts:**
 
-**1. Architecture événementielle + séparation raisonnement/action**
-- **Impact:** Élevé (fondation pour tout le reste)
-- **Faisabilité:** Moyenne (complexe mais réalisable)
-- **Différenciation:** Très élevée
-- **Priorité:** CRITIQUE - Fondation de tout
+**1. Event-driven architecture + reasoning/action separation**
+- **Impact:** High (foundation for everything else)
+- **Feasibility:** Medium (complex but achievable)
+- **Differentiation:** Very high
+- **Priority:** CRITICAL - Foundation of everything
 
-**2. Système de capabilities avec métadonnées de sécurité**
-- **Impact:** Élevé (sécurité, gouvernance)
-- **Faisabilité:** Moyenne (nécessite design soigné)
-- **Différenciation:** Élevée
-- **Priorité:** HAUTE - Différenciation claire
+**2. Capability system with security metadata**
+- **Impact:** High (security, governance)
+- **Feasibility:** Medium (requires careful design)
+- **Differentiation:** High
+- **Priority:** HIGH - Clear differentiation
 
-**3. Observabilité cognitive (graphe de raisonnement)**
-- **Impact:** Moyen-Élevé (très utile mais moins critique)
-- **Faisabilité:** Complexe (nécessite instrumentation LLM)
-- **Différenciation:** Très élevée
-- **Priorité:** MOYENNE-HAUTE - Valeur unique
+**3. Cognitive observability (reasoning graph)**
+- **Impact:** Medium-High (very useful but less critical)
+- **Feasibility:** Complex (requires LLM instrumentation)
+- **Differentiation:** Very high
+- **Priority:** MEDIUM-HIGH - Unique value
 
-**Quick Wins (implémentation rapide):**
-- Event Store file-based (MVP)
-- API publique minimale type-safe
-- Séparation raisonnement/action basique
+**Quick Wins (fast implementation):**
+- File-based Event Store (MVP)
+- Minimal type-safe public API
+- Basic reasoning/action separation
 
 **Long-term Breakthroughs:**
-- Observabilité cognitive complète
-- Mémoire vivante avec évolution
-- Agents hybrides multi-intelligences
+- Complete cognitive observability
+- Living memory with evolution
+- Multi-intelligence hybrid agents
 
 ### Action Planning
 
-**Plan d'implémentation 3 phases:**
+**3-phase implementation plan:**
 
-**Phase 1: MVP (2-3 mois) - Fondations**
+**Phase 1: MVP (2-3 months) - Foundations**
 - Event Store Core (file-based)
-- Séparation raisonnement/action basique
-- API publique minimale type-safe
-- **Jalon:** MVP fonctionnel avec replay basique
+- Basic reasoning/action separation
+- Minimal type-safe public API
+- **Milestone:** Functional MVP with basic replay
 
-**Phase 2: Production-Ready (3-4 mois) - Gouvernance**
-- Système de capabilities complet
-- Policy Engine fonctionnel
-- Observabilité de base
-- **Jalon:** Production-ready avec sécurité native
+**Phase 2: Production-Ready (3-4 months) - Governance**
+- Complete capability system
+- Functional Policy Engine
+- Basic observability
+- **Milestone:** Production-ready with native security
 
-**Phase 3: Avancé (4-6 mois) - Observabilité Cognitive**
-- Observabilité cognitive complète
-- Time travel debugging
-- Mémoire vivante
-- **Jalon:** Observabilité cognitive complète
+**Phase 3: Advanced (4-6 months) - Cognitive Observability**
+- Complete cognitive observability
+- Time-travel debugging
+- Living memory
+- **Milestone:** Complete cognitive observability
 
-**Prochaines étapes immédiates (Semaine 1-2):**
-1. Setup du projet (structure, TypeScript strict, tests, CI/CD)
-2. Prototype Event Store (interface + implémentation file-based)
-3. Design API publique (types, signatures, documentation)
-4. Spike séparation raisonnement/action (POC, validation)
+**Immediate next steps (Week 1-2):**
+1. Project setup (structure, strict TypeScript, tests, CI/CD)
+2. Event Store prototype (interface + file-based implementation)
+3. Public API design (types, signatures, documentation)
+4. Reasoning/action separation spike (POC, validation)
 
-#### Diagramme d'Architecture - Phase 1 MVP
+#### Architecture Diagram - Phase 1 MVP
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    API PUBLIQUE (TypeScript)                    │
+│                    PUBLIC API (TypeScript)                      │
 │                                                                 │
 │  createSDK() → SDK Instance                                     │
 │  createAgent() → Agent Instance                                 │
@@ -827,27 +827,27 @@ Mois 8-13:  Phase 3 - Avancé (Observabilité cognitive)
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │              REASONING ENGINE                            │  │
 │  │                                                           │  │
-│  │  • Wrapper LLM Provider (OpenAI, Anthropic, etc.)       │  │
-│  │  • Génère: Hypothèses, Plans, Intentions structurées    │  │
-│  │  • Ne fait JAMAIS d'effet de bord                        │  │
-│  │  • Émet: ReasoningEvent, HypothesisEvent, PlanEvent     │  │
+│  │  • LLM Provider wrapper (OpenAI, Anthropic, etc.)        │  │
+│  │  • Generates: Hypotheses, plans, structured intentions   │  │
+│  │  • NEVER produces side effects                            │  │
+│  │  • Emits: ReasoningEvent, HypothesisEvent, PlanEvent     │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │              ACTION ENGINE                                │  │
 │  │                                                           │  │
-│  │  • Reçoit: Intentions depuis Reasoning Engine            │  │
-│  │  • Exécute: Actions de manière sécurisée                 │  │
-│  │  • Émet: ActionEvent, ResultEvent                        │  │
-│  │  • MVP: Pas de Policy Engine (ajouté en Phase 2)         │  │
+│  │  • Receives: Intentions from the Reasoning Engine         │  │
+│  │  • Executes: Actions securely                             │  │
+│  │  • Emits: ActionEvent, ResultEvent                        │  │
+│  │  • MVP: No Policy Engine (added in Phase 2)               │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │              EVENT BUS                                    │  │
 │  │                                                           │  │
-│  │  • Collecte tous les événements (in-memory)              │  │
-│  │  • Types: AgentEvent, ReasoningEvent, ActionEvent        │  │
-│  │  • Route vers Event Store pour persistance               │  │
+│  │  • Collects all events (in-memory)                        │  │
+│  │  • Types: AgentEvent, ReasoningEvent, ActionEvent         │  │
+│  │  • Routes to Event Store for persistence                  │  │
 │  └──────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -859,23 +859,23 @@ Mois 8-13:  Phase 3 - Avancé (Observabilité cognitive)
 │  │              PERSISTENCE LAYER                           │  │
 │  │                                                           │  │
 │  │  • Interface: EventStore                                  │  │
-│  │  • Implémentation: File-based (JSON Lines)              │  │
-│  │  • Opérations: append(), getEvents(), replay()           │  │
+│  │  • Implementation: File-based (JSON Lines)                │  │
+│  │  • Operations: append(), getEvents(), replay()            │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │              STATE PROJECTION ENGINE                     │  │
 │  │                                                           │  │
-│  │  • Lit événements depuis Event Store                    │  │
-│  │  • Calcule état actuel (projection)                     │  │
-│  │  • MVP: Projection simple (pas de snapshots)            │  │
+│  │  • Reads events from the Event Store                      │  │
+│  │  • Computes current state (projection)                    │  │
+│  │  • MVP: Simple projection (no snapshots)                  │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │              REPLAY ENGINE                                │  │
 │  │                                                           │  │
-│  │  • Rejoue événements depuis Event Store                  │  │
-│  │  • MVP: Replay basique (pas de modifications)            │  │
+│  │  • Replays events from the Event Store                    │  │
+│  │  • MVP: Basic replay (no modifications)                   │  │
 │  └──────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -890,7 +890,7 @@ Mois 8-13:  Phase 3 - Avancé (Observabilité cognitive)
                     └─────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│                    FLUX D'EXÉCUTION                             │
+│                    EXECUTION FLOW                                │
 │                                                                 │
 │  1. User: agent.run({ input: "..." })                         │
 │     │                                                           │
@@ -898,93 +898,92 @@ Mois 8-13:  Phase 3 - Avancé (Observabilité cognitive)
 │  2. Pipeline: Input → Reasoning Engine                          │
 │     │                                                           │
 │     ▼                                                           │
-│  3. Reasoning Engine: Génère intentions                        │
-│     │  • Émet ReasoningEvent                                   │
-│     │  • Émet HypothesisEvent                                 │
-│     │  • Émet PlanEvent                                        │
+│  3. Reasoning Engine: Generates intentions                     │
+│     │  • Emits ReasoningEvent                                  │
+│     │  • Emits HypothesisEvent                                 │
+│     │  • Emits PlanEvent                                        │
 │     │                                                           │
 │     ▼                                                           │
-│  4. Action Engine: Exécute intentions                          │
-│     │  • Émet ActionEvent                                      │
-│     │  • Émet ResultEvent                                      │
+│  4. Action Engine: Executes intentions                          │
+│     │  • Emits ActionEvent                                      │
+│     │  • Emits ResultEvent                                      │
 │     │                                                           │
 │     ▼                                                           │
-│  5. Event Bus: Collecte tous les événements                    │
+│  5. Event Bus: Collects all events                              │
 │     │                                                           │
 │     ▼                                                           │
-│  6. Event Store: Persiste événements (append-only)            │
+│  6. Event Store: Persists events (append-only)                  │
 │     │                                                           │
 │     ▼                                                           │
-│  7. Return: Run Result avec output                             │
+│  7. Return: Run Result with output                              │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│                    TYPES D'ÉVÉNEMENTS (MVP)                    │
+│                    EVENT TYPES (MVP)                             │
 │                                                                 │
-│  • AgentEvent: Création/démarrage d'agent                      │
-│  • ReasoningEvent: Début/fin de raisonnement                   │
-│  • HypothesisEvent: Hypothèse générée                          │
-│  • PlanEvent: Plan d'action généré                              │
-│  • IntentionEvent: Intention structurée                        │
-│  • ActionEvent: Action exécutée                                 │
-│  • ResultEvent: Résultat d'action                               │
-│  • ErrorEvent: Erreur survenue                                  │
+│  • AgentEvent: Agent creation/start                             │
+│  • ReasoningEvent: Reasoning start/end                          │
+│  • HypothesisEvent: Hypothesis generated                        │
+│  • PlanEvent: Action plan generated                              │
+│  • IntentionEvent: Structured intention                          │
+│  • ActionEvent: Action executed                                  │
+│  • ResultEvent: Action result                                    │
+│  • ErrorEvent: Error occurred                                    │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Légende:**
-- **Flèches solides (│, ─, └, ┌, ┐, ┘):** Flux de données principal
-- **Flèches pointant vers le bas (▼):** Direction du flux
-- **Boîtes:** Composants architecturaux
-- **Sections:** Groupes logiques de composants
+**Legend:**
+- **Solid lines (│, ─, └, ┌, ┐, ┘):** Main data flow
+- **Downward arrows (▼):** Flow direction
+- **Boxes:** Architectural components
+- **Sections:** Logical groups of components
 
-**Points clés de l'architecture Phase 1:**
-1. **Séparation claire:** Reasoning Engine ≠ Action Engine
-2. **Event-driven:** Tous les événements passent par Event Bus
-3. **Persistance:** Event Store file-based (simple mais fonctionnel)
-4. **Replay:** Possible grâce à Event Store
-5. **API minimale:** 3 fonctions principales seulement
-6. **Type-safe:** TypeScript strict partout
+**Key points of the Phase 1 architecture:**
+1. **Clear separation:** Reasoning Engine ≠ Action Engine
+2. **Event-driven:** All events pass through the Event Bus
+3. **Persistence:** File-based Event Store (simple but functional)
+4. **Replay:** Possible thanks to the Event Store
+5. **Minimal API:** Only 3 main functions
+6. **Type-safe:** Strict TypeScript everywhere
 
 ### Session Summary and Insights
 
 **Key Achievements:**
 
-- **Vision transformée:** Passage d'un SDK wrapper vers une plateforme de gouvernance complète
-- **Architecture définie:** Event-sourcing + séparation raisonnement/action comme fondation
-- **Différenciation identifiée:** Capabilities, observabilité cognitive, gouvernance native
-- **Plan d'action concret:** 3 phases avec jalons et métriques de succès
-- **30+ idées organisées** en 6 thèmes cohérents
+- **Vision transformed:** Shift from a wrapper SDK to a complete governance platform
+- **Architecture defined:** Event-sourcing + reasoning/action separation as the foundation
+- **Differentiation identified:** Capabilities, cognitive observability, native governance
+- **Concrete action plan:** 3 phases with milestones and success metrics
+- **30+ ideas organized** into 6 coherent themes
 
 **Creative Breakthroughs:**
 
-- **Système d'exploitation pour agents:** Concept radical qui change le paradigme
-- **Séparation raisonnement/action:** Sécurité native par design
-- **Exécutions comme preuves:** Certifiabilité pour domaines réglementés
-- **Time travel debugging:** Innovation majeure pour debugging agents
+- **Operating system for agents:** Radical concept that changes the paradigm
+- **Reasoning/action separation:** Native security by design
+- **Executions as evidence:** Certifiability for regulated domains
+- **Time-travel debugging:** Major innovation for agent debugging
 
 **Session Reflections:**
 
-- **Approche progressive efficace:** Exploration expansive → Patterns → Développement → Action
-- **Techniques complémentaires:** What If + First Principles pour vision, SCAMPER + Trait Transfer pour développement
-- **Focus maintenu:** Architecture et DX comme objectifs centraux
-- **Pragmatisme équilibré:** Vision ambitieuse avec plan d'implémentation réaliste
+- **Effective progressive approach:** Expansive exploration → Patterns → Development → Action
+- **Complementary techniques:** What If + First Principles for vision, SCAMPER + Trait Transfer for development
+- **Focus maintained:** Architecture and DX as central objectives
+- **Balanced pragmatism:** Ambitious vision with a realistic implementation plan
 
 **What Makes This Session Valuable:**
 
-- Exploration systématique sans contraintes initiales
-- Organisation méthodique en thèmes cohérents
-- Priorisation stratégique basée sur impact et faisabilité
-- Plan d'action concret avec jalons et métriques
-- Documentation complète pour référence future
+- Systematic exploration without initial constraints
+- Methodical organization into coherent themes
+- Strategic prioritization based on impact and feasibility
+- Concrete action plan with milestones and metrics
+- Complete documentation for future reference
 
 **Next Steps:**
 
-1. **Review** ce document de session brainstorming
-2. **Begin** avec setup projet et prototype Event Store (semaine 1-2)
-3. **Share** la vision "système d'exploitation pour agents" avec stakeholders
-4. **Schedule** sessions de design détaillé pour chaque phase
-5. **Iterate** sur le plan d'implémentation au fur et à mesure des découvertes
-
+1. **Review** this brainstorming session document
+2. **Begin** with project setup and Event Store prototype (week 1-2)
+3. **Share** the "operating system for agents" vision with stakeholders
+4. **Schedule** detailed design sessions for each phase
+5. **Iterate** on the implementation plan as discoveries are made

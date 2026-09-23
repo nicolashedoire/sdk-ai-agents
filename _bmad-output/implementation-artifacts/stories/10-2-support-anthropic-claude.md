@@ -1,4 +1,4 @@
-# Story 10.2: Support Anthropic Claude
+# Story 10.2: Anthropic Claude Support
 
 **Story ID:** 10.2  
 **Epic:** 10 - Multi-Providers LLM  
@@ -7,82 +7,82 @@
 
 ## User Story
 
-**As a** développeur,  
-**I want** utiliser Anthropic Claude comme provider LLM,  
-**So that** je peux bénéficier des avantages de Claude.
+**As a** developer,  
+**I want** use Anthropic Claude as an LLM provider,  
+**So that** I can benefit from Claude's advantages.
 
 ## Acceptance Criteria
 
-**Given** Anthropic est configuré comme provider  
-**When** je crée un agent avec model "claude-3-opus"  
-**Then** le Reasoning Engine utilise l'API Anthropic  
-**And** les intentions sont générées correctement  
-**And** le format de réponse est compatible  
-**And** les tool calls fonctionnent correctement  
-**And** les erreurs sont gérées proprement
+**Given** Anthropic is configured as provider  
+**When** I create an agent with model "claude-3-opus"  
+**Then** the Reasoning Engine uses the Anthropic API  
+**And** intentions are generated correctly  
+**And** the response format is compatible  
+**And** tool calls work correctly  
+**And** errors are handled cleanly
 
 ## Business Value
 
-- **Choix du provider**: Permet aux développeurs d'utiliser Claude selon leurs préférences
-- **Avantages spécifiques Claude**: Meilleure compréhension de contexte, meilleure sécurité
-- **Résilience**: Réduit la dépendance à un seul provider
-- **Performance**: Permet de choisir le meilleur provider pour chaque cas d'usage
+- **Provider choice**: Allows developers to use Claude according to their preferences
+- **Claude-specific advantages**: Better context understanding, better security
+- **Resilience**: Reduces dependency on a single provider
+- **Performance**: Allows choosing the best provider for each use case
 
 ## Technical Requirements
 
-### Dépendance de Story 10.1
+### Dependency on Story 10.1
 
-**Prérequis:**
-- Story 10.1 doit être complétée (abstraction LLMProvider créée)
-- Interface `LLMProvider` doit être définie
-- `ProviderFactory` doit être implémenté
-- `AnthropicProvider` doit exister en squelette
+**Prerequisites:**
+- Story 10.1 must be completed (LLMProvider abstraction created)
+- The `LLMProvider` interface must be defined
+- `ProviderFactory` must be implemented
+- `AnthropicProvider` must exist as a skeleton
 
-### Architecture Actuelle (après Story 10.1)
+### Current Architecture (after Story 10.1)
 
-**État attendu après Story 10.1:**
-- Interface `LLMProvider` définie dans `src/providers/llm-provider.ts`
-- `OpenAIProvider` implémenté et testé
-- `AnthropicProvider` existe en squelette (structure de base)
-- `ProviderFactory` peut créer les providers
-- `ReasoningEngine` utilise `LLMProvider` au lieu de client OpenAI direct
+**Expected state after Story 10.1:**
+- `LLMProvider` interface defined in `src/providers/llm-provider.ts`
+- `OpenAIProvider` implemented and tested
+- `AnthropicProvider` exists as a skeleton (basic structure)
+- `ProviderFactory` can create providers
+- `ReasoningEngine` uses `LLMProvider` instead of a direct OpenAI client
 
-**Fichiers concernés:**
-- `src/providers/anthropic-provider.ts` - À compléter
-- `src/providers/provider-factory.ts` - Vérifier la création Anthropic
-- `src/types/sdk.ts` - Configuration Anthropic
-- `src/errors/index.ts` - Gestion d'erreurs Anthropic
+**Files concerned:**
+- `src/providers/anthropic-provider.ts` - To complete
+- `src/providers/provider-factory.ts` - Verify Anthropic creation
+- `src/types/sdk.ts` - Anthropic configuration
+- `src/errors/index.ts` - Anthropic error handling
 
-### Différences Clés OpenAI vs Anthropic
+### Key Differences OpenAI vs Anthropic
 
-**1. Format de Messages:**
-- **OpenAI**: `messages[]` avec `role: 'system' | 'user' | 'assistant'`
-- **Anthropic**: `messages[]` avec `role: 'user' | 'assistant'` (pas de système séparé)
-  - Le système est passé via paramètre `system` séparé
+**1. Message Format:**
+- **OpenAI**: `messages[]` with `role: 'system' | 'user' | 'assistant'`
+- **Anthropic**: `messages[]` with `role: 'user' | 'assistant'` (no separate system role)
+  - The system prompt is passed via a separate `system` parameter
 
 **2. Tool Calling:**
-- **OpenAI**: `tools[]` avec `tool_choice`, réponse dans `message.tool_calls[]`
-- **Anthropic**: `tools[]` avec `tool_choice`, réponse dans `content[]` avec type `tool_use`
+- **OpenAI**: `tools[]` with `tool_choice`, response in `message.tool_calls[]`
+- **Anthropic**: `tools[]` with `tool_choice`, response in `content[]` with type `tool_use`
 
-**3. Format de Réponse:**
-- **OpenAI**: `message.content` (string) ou `message.tool_calls[]`
-- **Anthropic**: `content[]` (array) avec objets `{type: 'text', text: '...'}` ou `{type: 'tool_use', ...}`
+**3. Response Format:**
+- **OpenAI**: `message.content` (string) or `message.tool_calls[]`
+- **Anthropic**: `content[]` (array) with objects `{type: 'text', text: '...'}` or `{type: 'tool_use', ...}`
 
-**4. Modèles:**
+**4. Models:**
 - **OpenAI**: `gpt-4`, `gpt-4-turbo`, `gpt-3.5-turbo`, etc.
 - **Anthropic**: `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku`, `claude-3-5-sonnet`, etc.
 
-**5. Paramètres:**
+**5. Parameters:**
 - **OpenAI**: `temperature`, `max_tokens`, `top_p`, etc.
-- **Anthropic**: `temperature`, `max_tokens`, `top_p`, `top_k`, etc. (similaires mais noms peuvent différer)
+- **Anthropic**: `temperature`, `max_tokens`, `top_p`, `top_k`, etc. (similar but names may differ)
 
-**6. Gestion d'Erreurs:**
-- **OpenAI**: Exceptions avec codes HTTP
-- **Anthropic**: Exceptions avec codes HTTP similaires mais messages différents
+**6. Error Handling:**
+- **OpenAI**: Exceptions with HTTP codes
+- **Anthropic**: Exceptions with similar HTTP codes but different messages
 
-### Implémentation AnthropicProvider
+### AnthropicProvider Implementation
 
-**Structure requise:**
+**Required structure:**
 
 ```typescript
 import Anthropic from '@anthropic-ai/sdk';
@@ -98,10 +98,10 @@ export class AnthropicProvider implements LLMProvider {
   }
 
   async generateCompletion(request: LLMRequest): Promise<LLMResponse> {
-    // Conversion des messages OpenAI → Anthropic
-    // Gestion du system prompt
-    // Appel API Anthropic
-    // Conversion de la réponse Anthropic → LLMResponse
+    // Convert messages from OpenAI → Anthropic format
+    // Handle the system prompt
+    // Call the Anthropic API
+    // Convert the Anthropic response → LLMResponse
   }
 
   supportsModel(model: string): boolean {
@@ -114,56 +114,56 @@ export class AnthropicProvider implements LLMProvider {
 }
 ```
 
-### Conversions Requises
+### Required Conversions
 
-**1. Conversion Messages:**
+**1. Message Conversion:**
 ```typescript
 // OpenAI format → Anthropic format
 function convertMessages(messages: OpenAI.Message[]): {
   system?: string;
   messages: Anthropic.Message[];
 } {
-  // Extraire le message système
-  // Convertir les autres messages
-  // Gérer le format Anthropic (pas de role 'system' dans messages[])
+  // Extract the system message
+  // Convert the other messages
+  // Handle the Anthropic format (no 'system' role within messages[])
 }
 ```
 
-**2. Conversion Tools:**
+**2. Tool Conversion:**
 ```typescript
 // OpenAI tools → Anthropic tools
 function convertTools(tools: OpenAI.Tool[]): Anthropic.Tool[] {
-  // Format similaire mais vérifier les différences
-  // Anthropic utilise 'name' au lieu de 'function.name'
+  // Similar format but check the differences
+  // Anthropic uses 'name' instead of 'function.name'
 }
 ```
 
-**3. Conversion Réponse:**
+**3. Response Conversion:**
 ```typescript
 // Anthropic response → LLMResponse
 function convertResponse(response: Anthropic.Message): LLMResponse {
-  // Extraire le texte depuis content[]
-  // Extraire les tool calls depuis content[] avec type 'tool_use'
-  // Normaliser le format
+  // Extract the text from content[]
+  // Extract tool calls from content[] with type 'tool_use'
+  // Normalize the format
 }
 ```
 
-### Modèles Anthropic Supportés
+### Supported Anthropic Models
 
-**Modèles recommandés:**
-- `claude-3-5-sonnet-20241022` - Meilleur équilibre (recommandé)
-- `claude-3-opus-20240229` - Plus puissant
-- `claude-3-sonnet-20240229` - Équilibre
-- `claude-3-haiku-20240307` - Plus rapide
+**Recommended models:**
+- `claude-3-5-sonnet-20241022` - Best balance (recommended)
+- `claude-3-opus-20240229` - Most powerful
+- `claude-3-sonnet-20240229` - Balanced
+- `claude-3-haiku-20240307` - Fastest
 
 **Validation:**
-- Vérifier que le modèle commence par `claude-`
-- Valider le format exact du nom du modèle
-- Gérer les erreurs si modèle invalide
+- Check that the model starts with `claude-`
+- Validate the exact format of the model name
+- Handle errors if the model is invalid
 
 ### Configuration
 
-**SDKConfig étendu:**
+**Extended SDKConfig:**
 ```typescript
 interface SDKConfig {
   provider?: 'openai' | 'anthropic';
@@ -175,7 +175,7 @@ interface SDKConfig {
 }
 ```
 
-**Exemple d'utilisation:**
+**Usage example:**
 ```typescript
 const sdk = createSDK({
   provider: 'anthropic',
@@ -189,46 +189,46 @@ const sdk = createSDK({
 
 const agent = sdk.createAgent({
   name: 'Claude Agent',
-  model: 'claude-3-opus-20240229', // Override du modèle par défaut
+  model: 'claude-3-opus-20240229', // Override of the default model
   // ...
 });
 ```
 
 ## Architecture Compliance
 
-### Principes à Respecter
+### Principles to Respect
 
-1. **Normalisation**: L'interface LLMProvider doit masquer les différences entre providers
-2. **Type-safety**: Tous les types doivent être stricts
-3. **Error handling**: Gestion d'erreurs cohérente avec OpenAIProvider
-4. **Performance**: Pas de surcharge inutile dans les conversions
-5. **Backward compatibility**: L'API publique reste identique
+1. **Normalization**: The LLMProvider interface must hide the differences between providers
+2. **Type-safety**: All types must be strict
+3. **Error handling**: Error handling consistent with OpenAIProvider
+4. **Performance**: No unnecessary overhead in the conversions
+5. **Backward compatibility**: The public API remains identical
 
-### Patterns à Utiliser
+### Patterns to Use
 
-- **Adapter Pattern**: Adapter l'API Anthropic à l'interface LLMProvider
-- **Normalization**: Normaliser les formats de réponse
-- **Error Mapping**: Mapper les erreurs Anthropic vers LLMProviderError
+- **Adapter Pattern**: Adapt the Anthropic API to the LLMProvider interface
+- **Normalization**: Normalize response formats
+- **Error Mapping**: Map Anthropic errors to LLMProviderError
 
-### Fichiers à Créer/Modifier
+### Files to Create/Modify
 
-**Fichiers à modifier:**
-- `src/providers/anthropic-provider.ts` - Compléter l'implémentation
-- `src/providers/provider-factory.ts` - Vérifier création AnthropicProvider
-- `src/errors/index.ts` - Adapter LLMProviderError si nécessaire
-- `src/types/sdk.ts` - Configuration Anthropic si nécessaire
+**Files to modify:**
+- `src/providers/anthropic-provider.ts` - Complete the implementation
+- `src/providers/provider-factory.ts` - Verify AnthropicProvider creation
+- `src/errors/index.ts` - Adapt LLMProviderError if necessary
+- `src/types/sdk.ts` - Anthropic configuration if necessary
 
-**Tests à créer:**
-- `src/__tests__/anthropic-provider.test.ts` - Tests complets
-- Tests d'intégration avec API réelle Anthropic
+**Tests to create:**
+- `src/__tests__/anthropic-provider.test.ts` - Complete tests
+- Integration tests with the real Anthropic API
 
 ## Library & Framework Requirements
 
-### Dépendances Requises
+### Required Dependencies
 
-**Déjà installé (Story 10.1):**
-- `@anthropic-ai/sdk` - SDK officiel Anthropic
-  - Version: Dernière stable (v0.27.x ou supérieur)
+**Already installed (Story 10.1):**
+- `@anthropic-ai/sdk` - Official Anthropic SDK
+  - Version: Latest stable (v0.27.x or higher)
   - Documentation: https://docs.anthropic.com/claude/reference
 
 ### Installation
@@ -237,289 +237,289 @@ const agent = sdk.createAgent({
 npm install @anthropic-ai/sdk
 ```
 
-**Note:** Cette dépendance devrait déjà être installée dans Story 10.1.
+**Note:** This dependency should already be installed from Story 10.1.
 
-### Versions et Compatibilité
+### Versions and Compatibility
 
-- **Node.js**: 18+ (compatible avec notre stack)
+- **Node.js**: 18+ (compatible with our stack)
 - **TypeScript**: 5.x (compatible)
-- **SDK Anthropic**: Vérifier la dernière version stable
+- **Anthropic SDK**: Verify the latest stable version
 
 ## File Structure Requirements
 
 ```
 src/
   providers/
-    anthropic-provider.ts      # Implémentation complète Anthropic
-    llm-provider.ts            # Interface (créée Story 10.1)
-    openai-provider.ts         # Implémentation OpenAI (Story 10.1)
+    anthropic-provider.ts      # Complete Anthropic implementation
+    llm-provider.ts            # Interface (created in Story 10.1)
+    openai-provider.ts         # OpenAI implementation (Story 10.1)
     provider-factory.ts        # Factory (Story 10.1)
     index.ts                   # Exports
   __tests__/
-    anthropic-provider.test.ts # Tests AnthropicProvider
+    anthropic-provider.test.ts # AnthropicProvider tests
   ...
 ```
 
 ## Testing Requirements
 
-### Tests Unitaires Requis
+### Required Unit Tests
 
-1. **AnthropicProvider - Création**
-   - Test création avec API key
-   - Test modèle par défaut
-   - Test modèle personnalisé
+1. **AnthropicProvider - Creation**
+   - Test creation with API key
+   - Test default model
+   - Test custom model
 
-2. **AnthropicProvider - Conversion Messages**
-   - Test conversion messages OpenAI → Anthropic
-   - Test extraction message système
-   - Test gestion messages multiples
-   - Test gestion conversation history
+2. **AnthropicProvider - Message Conversion**
+   - Test message conversion OpenAI → Anthropic
+   - Test system message extraction
+   - Test handling of multiple messages
+   - Test conversation history handling
 
-3. **AnthropicProvider - Conversion Tools**
-   - Test conversion tools OpenAI → Anthropic
-   - Test format des paramètres
+3. **AnthropicProvider - Tool Conversion**
+   - Test tool conversion OpenAI → Anthropic
+   - Test parameter format
    - Test tool_choice
 
-4. **AnthropicProvider - Conversion Réponse**
-   - Test extraction texte depuis content[]
-   - Test extraction tool calls depuis content[]
-   - Test normalisation format LLMResponse
-   - Test gestion usage tokens
+4. **AnthropicProvider - Response Conversion**
+   - Test text extraction from content[]
+   - Test tool call extraction from content[]
+   - Test LLMResponse format normalization
+   - Test token usage handling
 
 5. **AnthropicProvider - Tool Calls**
-   - Test génération tool call
+   - Test tool call generation
    - Test multiple tool calls
-   - Test format arguments
+   - Test argument format
 
-6. **AnthropicProvider - Gestion d'Erreurs**
-   - Test erreurs API Anthropic
-   - Test erreurs réseau
-   - Test erreurs authentification
-   - Test erreurs modèle invalide
-   - Test mapping vers LLMProviderError
+6. **AnthropicProvider - Error Handling**
+   - Test Anthropic API errors
+   - Test network errors
+   - Test authentication errors
+   - Test invalid model errors
+   - Test mapping to LLMProviderError
 
-7. **AnthropicProvider - Modèles**
-   - Test supportsModel() avec différents modèles
-   - Test validation modèles Claude
-   - Test modèles invalides
+7. **AnthropicProvider - Models**
+   - Test supportsModel() with different models
+   - Test validation of Claude models
+   - Test invalid models
 
-### Tests d'Intégration
+### Integration Tests
 
-1. **SDK avec Anthropic**
-   - Test création SDK avec provider Anthropic
-   - Test création agent avec modèle Claude
-   - Test génération intention avec Claude
-   - Test tool calls avec Claude
-   - Test que l'API reste identique
+1. **SDK with Anthropic**
+   - Test SDK creation with the Anthropic provider
+   - Test agent creation with a Claude model
+   - Test intention generation with Claude
+   - Test tool calls with Claude
+   - Test that the API remains identical
 
 2. **End-to-End**
-   - Test agent complet avec Anthropic
-   - Test génération intention
-   - Test exécution tool call
+   - Test a complete agent with Anthropic
+   - Test intention generation
+   - Test tool call execution
    - Test final answer
-   - Test événements générés
+   - Test generated events
 
-3. **Tests avec API Réelle**
-   - Test avec vraie API Anthropic (nécessite API key)
-   - Test différents modèles Claude
-   - Test tool calling réel
-   - Test gestion erreurs réelles
+3. **Tests with Real API**
+   - Test with the real Anthropic API (requires API key)
+   - Test different Claude models
+   - Test real tool calling
+   - Test real error handling
 
-### Critères de Test
+### Test Criteria
 
-- ✅ Tous les tests unitaires passent
-- ✅ Tests d'intégration passent
-- ✅ Tests avec API réelle Anthropic (si API key disponible)
-- ✅ Format de réponse compatible avec ReasoningEngine
-- ✅ Tool calls fonctionnent correctement
-- ✅ Gestion d'erreurs cohérente avec OpenAIProvider
+- ✅ All unit tests pass
+- ✅ Integration tests pass
+- ✅ Tests with the real Anthropic API (if API key available)
+- ✅ Response format compatible with ReasoningEngine
+- ✅ Tool calls work correctly
+- ✅ Error handling consistent with OpenAIProvider
 
 ## Previous Story Intelligence
 
-### Story 10.1: Abstraction du Provider LLM
+### Story 10.1: LLM Provider Abstraction
 
-**Apprentissages:**
-- Interface LLMProvider doit être stable et bien définie
-- Normalisation des formats est critique
-- Tests doivent couvrir tous les cas de conversion
-- Gestion d'erreurs doit être cohérente
+**Lessons learned:**
+- The LLMProvider interface must be stable and well defined
+- Format normalization is critical
+- Tests must cover all conversion cases
+- Error handling must be consistent
 
-**Fichiers créés Story 10.1:**
-- `src/providers/llm-provider.ts` - Interface commune
-- `src/providers/openai-provider.ts` - Implémentation OpenAI
-- `src/providers/anthropic-provider.ts` - Squelette (à compléter)
+**Files created in Story 10.1:**
+- `src/providers/llm-provider.ts` - Common interface
+- `src/providers/openai-provider.ts` - OpenAI implementation
+- `src/providers/anthropic-provider.ts` - Skeleton (to complete)
 - `src/providers/provider-factory.ts` - Factory
 
-**Patterns établis:**
-- Utiliser l'interface LLMProvider
-- Normaliser les formats de réponse
-- Gérer les erreurs avec LLMProviderError
-- Tests avec mocks et API réelle
+**Established patterns:**
+- Use the LLMProvider interface
+- Normalize response formats
+- Handle errors with LLMProviderError
+- Tests with mocks and the real API
 
-### Stories MVP Pertinentes
+### Relevant MVP Stories
 
-**Story 5.1: Séparation Raisonnement/Action**
-- Le ReasoningEngine utilise déjà LLMProvider (Story 10.1)
-- Pas de changement nécessaire dans ActionEngine
-- Les intentions générées doivent rester compatibles
+**Story 5.1: Reasoning/Action Separation**
+- The ReasoningEngine already uses LLMProvider (Story 10.1)
+- No change needed in ActionEngine
+- Generated intentions must remain compatible
 
-**Story 7.6: Comprendre pourquoi l'agent a pris une décision**
-- Les événements doivent inclure le provider utilisé
-- La traçabilité doit rester complète avec Anthropic
+**Story 7.6: Understand why the agent made a decision**
+- Events must include the provider used
+- Traceability must remain complete with Anthropic
 
 ## Git Intelligence
 
-### Patterns de Code Existants
+### Existing Code Patterns
 
-- **Imports**: Utiliser imports ESM (`from './file.js'`)
-- **Exports**: Exporter les classes publiques
-- **Error handling**: Utiliser LLMProviderError
-- **Testing**: Utiliser Vitest avec mêmes patterns
-- **Type-safety**: TypeScript strict
+- **Imports**: Use ESM imports (`from './file.js'`)
+- **Exports**: Export public classes
+- **Error handling**: Use LLMProviderError
+- **Testing**: Use Vitest with the same patterns
+- **Type-safety**: Strict TypeScript
 
-### Commits Récents Pertinents
+### Relevant Recent Commits
 
-- Story 10.1: Création abstraction LLMProvider
-- Patterns établis pour providers
+- Story 10.1: Creation of the LLMProvider abstraction
+- Established patterns for providers
 
 ## Latest Technical Information
 
 ### Anthropic SDK (@anthropic-ai/sdk)
 
-**Version actuelle:** 0.27.x (vérifier dernière version)
+**Current version:** 0.27.x (check latest version)
 
 **Documentation:**
 - API Reference: https://docs.anthropic.com/claude/reference
-- SDK TypeScript: https://github.com/anthropics/anthropic-sdk-typescript
+- TypeScript SDK: https://github.com/anthropics/anthropic-sdk-typescript
 
-**Caractéristiques clés:**
-- Support complet tool use (depuis Claude 3)
-- Format messages avec `system` séparé
-- Format réponse avec `content[]` array
-- Support `max_tokens`, `temperature`, `top_p`, `top_k`
+**Key characteristics:**
+- Full tool use support (since Claude 3)
+- Message format with a separate `system` field
+- Response format with a `content[]` array
+- Support for `max_tokens`, `temperature`, `top_p`, `top_k`
 
 **Tool Use:**
-- Format: `content[]` avec objets `{type: 'tool_use', id: '...', name: '...', input: {...}}`
-- Tool choice: `'auto'`, `'any'`, ou `{type: 'tool', name: '...'}`
-- Réponse: `content[]` avec `{type: 'text', text: '...'}` ou `{type: 'tool_use', ...}`
+- Format: `content[]` with objects `{type: 'tool_use', id: '...', name: '...', input: {...}}`
+- Tool choice: `'auto'`, `'any'`, or `{type: 'tool', name: '...'}`
+- Response: `content[]` with `{type: 'text', text: '...'}` or `{type: 'tool_use', ...}`
 
 **Messages:**
-- Format: `messages[]` avec `role: 'user' | 'assistant'`
-- System prompt: Paramètre `system` séparé (string)
-- Pas de `role: 'system'` dans `messages[]`
+- Format: `messages[]` with `role: 'user' | 'assistant'`
+- System prompt: Separate `system` parameter (string)
+- No `role: 'system'` within `messages[]`
 
-**Modèles disponibles:**
-- `claude-3-5-sonnet-20241022` - Dernière version Sonnet (recommandé)
-- `claude-3-opus-20240229` - Plus puissant
-- `claude-3-sonnet-20240229` - Équilibre
-- `claude-3-haiku-20240307` - Plus rapide
+**Available models:**
+- `claude-3-5-sonnet-20241022` - Latest Sonnet version (recommended)
+- `claude-3-opus-20240229` - Most powerful
+- `claude-3-sonnet-20240229` - Balanced
+- `claude-3-haiku-20240307` - Fastest
 
-### Considérations Techniques
+### Technical Considerations
 
-1. **Conversion Messages:**
-   - Extraire `role: 'system'` des messages OpenAI
-   - Le passer comme paramètre `system` séparé
-   - Convertir les autres messages au format Anthropic
+1. **Message Conversion:**
+   - Extract `role: 'system'` from OpenAI messages
+   - Pass it as a separate `system` parameter
+   - Convert the other messages to the Anthropic format
 
-2. **Conversion Tools:**
-   - Format similaire mais vérifier les différences exactes
-   - Anthropic utilise `name` directement dans l'objet tool
-   - Vérifier le format des paramètres
+2. **Tool Conversion:**
+   - Similar format but check the exact differences
+   - Anthropic uses `name` directly in the tool object
+   - Check the parameter format
 
-3. **Conversion Réponse:**
-   - `content[]` est un array, pas une string
-   - Extraire le texte depuis `content[]` avec `type: 'text'`
-   - Extraire tool calls depuis `content[]` avec `type: 'tool_use'`
-   - Normaliser vers `LLMResponse`
+3. **Response Conversion:**
+   - `content[]` is an array, not a string
+   - Extract the text from `content[]` with `type: 'text'`
+   - Extract tool calls from `content[]` with `type: 'tool_use'`
+   - Normalize to `LLMResponse`
 
-4. **Gestion d'Erreurs:**
-   - Anthropic utilise des codes HTTP similaires
-   - Messages d'erreur peuvent différer
-   - Mapper vers LLMProviderError avec provider='anthropic'
+4. **Error Handling:**
+   - Anthropic uses similar HTTP codes
+   - Error messages may differ
+   - Map to LLMProviderError with provider='anthropic'
 
 5. **AbortSignal:**
-   - Vérifier support dans SDK Anthropic
-   - Implémenter si nécessaire
+   - Check support in the Anthropic SDK
+   - Implement if necessary
 
 ## Project Context Reference
 
-### Documents Pertinents
+### Relevant Documents
 
-- **PRD**: Section "Phase 2 - Production-Ready" - Multi-providers LLM
-- **Architecture**: Section "Reasoning Engine" - Architecture avec abstraction
+- **PRD**: Section "Phase 2 - Production-Ready" - Multi-provider LLM
+- **Architecture**: Section "Reasoning Engine" - Architecture with abstraction
 - **Epics**: Epic 10 - Multi-Providers LLM, Story 10.2
-- **Story 10.1**: Abstraction du Provider LLM (prérequis)
+- **Story 10.1**: LLM Provider Abstraction (prerequisite)
 
-### Contraintes du Projet
+### Project Constraints
 
-- **Backward compatibility**: L'API publique ne doit pas changer
-- **Type-safety**: TypeScript strict obligatoire
-- **Performance**: Conversions efficaces
-- **Tests**: Tests complets avec mocks et API réelle
-- **Format compatible**: Les intentions générées doivent être compatibles
+- **Backward compatibility**: The public API must not change
+- **Type-safety**: Strict TypeScript required
+- **Performance**: Efficient conversions
+- **Tests**: Complete tests with mocks and the real API
+- **Compatible format**: Generated intentions must be compatible
 
 ## Implementation Notes
 
-### Étapes d'Implémentation Recommandées
+### Recommended Implementation Steps
 
-1. **Installer/Valider SDK Anthropic**
-   - Vérifier installation `@anthropic-ai/sdk`
-   - Vérifier version et compatibilité
+1. **Install/Validate the Anthropic SDK**
+   - Verify installation of `@anthropic-ai/sdk`
+   - Verify version and compatibility
 
-2. **Implémenter Conversion Messages**
-   - Fonction `convertMessages()` OpenAI → Anthropic
-   - Extraire message système
-   - Convertir messages restants
-   - Tests unitaires complets
+2. **Implement Message Conversion**
+   - `convertMessages()` function OpenAI → Anthropic
+   - Extract system message
+   - Convert remaining messages
+   - Complete unit tests
 
-3. **Implémenter Conversion Tools**
-   - Fonction `convertTools()` OpenAI → Anthropic
-   - Vérifier format exact
-   - Tests unitaires
+3. **Implement Tool Conversion**
+   - `convertTools()` function OpenAI → Anthropic
+   - Check the exact format
+   - Unit tests
 
-4. **Implémenter Conversion Réponse**
-   - Fonction `convertResponse()` Anthropic → LLMResponse
-   - Extraire texte depuis content[]
-   - Extraire tool calls depuis content[]
-   - Normaliser format
-   - Tests unitaires complets
+4. **Implement Response Conversion**
+   - `convertResponse()` function Anthropic → LLMResponse
+   - Extract text from content[]
+   - Extract tool calls from content[]
+   - Normalize the format
+   - Complete unit tests
 
-5. **Compléter AnthropicProvider**
-   - Implémenter `generateCompletion()`
-   - Utiliser les fonctions de conversion
-   - Gérer les erreurs
-   - Implémenter `supportsModel()`
-   - Tests unitaires
+5. **Complete AnthropicProvider**
+   - Implement `generateCompletion()`
+   - Use the conversion functions
+   - Handle errors
+   - Implement `supportsModel()`
+   - Unit tests
 
-6. **Tests d'Intégration**
-   - Tests avec ReasoningEngine
-   - Tests end-to-end
-   - Tests avec API réelle (si disponible)
+6. **Integration Tests**
+   - Tests with ReasoningEngine
+   - End-to-end tests
+   - Tests with the real API (if available)
 
 7. **Documentation**
-   - Documenter l'utilisation
-   - Exemples avec Anthropic
-   - Notes sur différences avec OpenAI
+   - Document usage
+   - Examples with Anthropic
+   - Notes on differences from OpenAI
 
-### Points d'Attention
+### Points of Attention
 
-1. **Format Messages**: Bien gérer l'extraction du système prompt
-2. **Format Réponse**: `content[]` est un array, bien parser
-3. **Tool Calls**: Format différent, bien normaliser
-4. **Gestion d'Erreurs**: Mapper correctement vers LLMProviderError
-5. **Tests**: Tester avec API réelle si possible
-6. **Performance**: Conversions efficaces, pas de surcharge
+1. **Message Format**: Handle the system prompt extraction carefully
+2. **Response Format**: `content[]` is an array, parse it carefully
+3. **Tool Calls**: Different format, normalize carefully
+4. **Error Handling**: Map correctly to LLMProviderError
+5. **Tests**: Test with the real API if possible
+6. **Performance**: Efficient conversions, no overhead
 
-### Cas Limites à Tester
+### Edge Cases to Test
 
-1. **Messages vides**
-2. **Pas de message système**
-3. **Plusieurs messages système** (ne devrait pas arriver mais gérer)
-4. **Tool calls multiples**
-5. **Réponse mixte** (texte + tool calls)
-6. **Erreurs API** (rate limit, auth, etc.)
-7. **Modèles invalides**
-8. **AbortSignal** pendant appel API
+1. **Empty messages**
+2. **No system message**
+3. **Multiple system messages** (should not happen but handle it)
+4. **Multiple tool calls**
+5. **Mixed response** (text + tool calls)
+6. **API errors** (rate limit, auth, etc.)
+7. **Invalid models**
+8. **AbortSignal** during the API call
 
 ## Senior Developer Review (AI) - Final Review
 
@@ -529,104 +529,103 @@ src/
 
 ### Review Summary
 
-**Issues Found:** 0 issues (tous corrigés)  
-**Files Reviewed:** 8 fichiers modifiés/créés  
-**Tests Status:** Tous les tests passent
+**Issues Found:** 0 issues (all fixed)  
+**Files Reviewed:** 8 files modified/created  
+**Tests Status:** All tests pass
 
 ### Review Notes
 
-- ✅ Implémentation AnthropicProvider complète et correcte après corrections
-- ✅ Conversions messages/tools/réponse bien implémentées
-- ✅ Tests complets et tous passent
-- ✅ Problèmes HIGH/MEDIUM identifiés précédemment ont été corrigés
+- ✅ AnthropicProvider implementation complete and correct after fixes
+- ✅ Message/tool/response conversions well implemented
+- ✅ Complete tests, all passing
+- ✅ Previously identified HIGH/MEDIUM issues have been fixed
 - ✅ max_tokens configurable via LLMRequest.maxTokens
-- ✅ Messages système multiples concaténés correctement
-- ✅ Blocs text multiples concaténés correctement
-- ✅ Validation des clés API ajoutée
+- ✅ Multiple system messages concatenated correctly
+- ✅ Multiple text blocks concatenated correctly
+- ✅ API key validation added
 
 ## Tasks/Subtasks
 
 ### Review Follow-ups (AI)
 
-- [x] [AI-Review][HIGH] Corriger max_tokens hardcodé dans AnthropicProvider [src/providers/anthropic-provider.ts:27]
-- [x] [AI-Review][HIGH] Gérer plusieurs messages système dans convertMessages [src/providers/anthropic-provider.ts:70-72]
-- [x] [AI-Review][HIGH] Concaténer plusieurs blocs text dans convertResponse [src/providers/anthropic-provider.ts:107-109]
-- [x] [AI-Review][MEDIUM] Ajouter validation clé API dans AnthropicProvider [src/providers/anthropic-provider.ts:14]
-- [x] [AI-Review][MEDIUM] Ajouter maxTokens dans LLMRequest interface [src/providers/llm-provider.ts]
+- [x] [AI-Review][HIGH] Fix hardcoded max_tokens in AnthropicProvider [src/providers/anthropic-provider.ts:27]
+- [x] [AI-Review][HIGH] Handle multiple system messages in convertMessages [src/providers/anthropic-provider.ts:70-72]
+- [x] [AI-Review][HIGH] Concatenate multiple text blocks in convertResponse [src/providers/anthropic-provider.ts:107-109]
+- [x] [AI-Review][MEDIUM] Add API key validation in AnthropicProvider [src/providers/anthropic-provider.ts:14]
+- [x] [AI-Review][MEDIUM] Add maxTokens in the LLMRequest interface [src/providers/llm-provider.ts]
 
-- [x] Installer SDK Anthropic (@anthropic-ai/sdk)
+- [x] Install Anthropic SDK (@anthropic-ai/sdk)
 
 ---
 
 ## Tasks/Subtasks
 
-- [x] Installer SDK Anthropic (@anthropic-ai/sdk)
-- [x] Créer OpenAIProvider (prérequis Story 10.1)
-- [x] Créer ProviderFactory (prérequis Story 10.1)
-- [x] Refactoriser ReasoningEngine pour utiliser LLMProvider
-- [x] Implémenter AnthropicProvider avec conversions messages
-- [x] Implémenter conversions tools
-- [x] Implémenter conversions réponses
-- [x] Gérer les erreurs Anthropic
-- [x] Mettre à jour SDK pour créer provider Anthropic
-- [x] Créer tests unitaires AnthropicProvider (14 tests)
-- [x] Créer tests d'intégration avec ReasoningEngine (6 tests)
-- [x] Créer tests end-to-end avec SDK (5 tests)
-- [x] Corriger tests existants pour utiliser LLMProvider
+- [x] Install Anthropic SDK (@anthropic-ai/sdk)
+- [x] Create OpenAIProvider (prerequisite from Story 10.1)
+- [x] Create ProviderFactory (prerequisite from Story 10.1)
+- [x] Refactor ReasoningEngine to use LLMProvider
+- [x] Implement AnthropicProvider with message conversions
+- [x] Implement tool conversions
+- [x] Implement response conversions
+- [x] Handle Anthropic errors
+- [x] Update SDK to create the Anthropic provider
+- [x] Create AnthropicProvider unit tests (14 tests)
+- [x] Create integration tests with ReasoningEngine (6 tests)
+- [x] Create end-to-end tests with SDK (5 tests)
+- [x] Fix existing tests to use LLMProvider
 
 ## File List
 
-- `src/providers/openai-provider.ts` - Nouveau
-- `src/providers/anthropic-provider.ts` - Nouveau
-- `src/providers/provider-factory.ts` - Nouveau
-- `src/providers/index.ts` - Nouveau
-- `src/engines/reasoning-engine.ts` - Modifié (utilise LLMProvider)
-- `src/agent.ts` - Modifié (passe modèle dans ReasoningContext)
-- `src/sdk.ts` - Modifié (crée provider approprié)
-- `src/types/sdk.ts` - Modifié (ajout providerConfig)
-- `src/__tests__/anthropic-provider.test.ts` - Nouveau (14 tests)
-- `src/__tests__/anthropic-integration.test.ts` - Nouveau (6 tests)
-- `src/__tests__/sdk-anthropic.test.ts` - Nouveau (5 tests)
-- `src/__tests__/agent.test.ts` - Modifié (utilise OpenAIProvider)
-- `package.json` - Modifié (ajout @anthropic-ai/sdk)
+- `src/providers/openai-provider.ts` - New
+- `src/providers/anthropic-provider.ts` - New
+- `src/providers/provider-factory.ts` - New
+- `src/providers/index.ts` - New
+- `src/engines/reasoning-engine.ts` - Modified (uses LLMProvider)
+- `src/agent.ts` - Modified (passes model in ReasoningContext)
+- `src/sdk.ts` - Modified (creates the appropriate provider)
+- `src/types/sdk.ts` - Modified (added providerConfig)
+- `src/__tests__/anthropic-provider.test.ts` - New (14 tests)
+- `src/__tests__/anthropic-integration.test.ts` - New (6 tests)
+- `src/__tests__/sdk-anthropic.test.ts` - New (5 tests)
+- `src/__tests__/agent.test.ts` - Modified (uses OpenAIProvider)
+- `package.json` - Modified (added @anthropic-ai/sdk)
 
 ## Dev Agent Record
 
 ### Implementation Plan
 
-1. **Prérequis Story 10.1** : Création d'OpenAIProvider et ProviderFactory nécessaires pour l'abstraction LLM
-2. **AnthropicProvider** : Implémentation complète avec conversions messages/tools/réponse
-3. **Intégration** : Refactorisation de ReasoningEngine pour utiliser LLMProvider
-4. **SDK** : Mise à jour pour créer le provider approprié selon la configuration
-5. **Tests** : Tests unitaires, intégration et end-to-end complets
+1. **Story 10.1 Prerequisite**: Creation of OpenAIProvider and ProviderFactory required for the LLM abstraction
+2. **AnthropicProvider**: Complete implementation with message/tool/response conversions
+3. **Integration**: Refactoring of ReasoningEngine to use LLMProvider
+4. **SDK**: Update to create the appropriate provider according to configuration
+5. **Tests**: Complete unit, integration, and end-to-end tests
 
 ### Completion Notes
 
-✅ **Story complétée avec succès**
+✅ **Story completed successfully**
 
-**Implémentation:**
-- AnthropicProvider implémenté avec toutes les conversions nécessaires
-- Support complet des modèles Claude (claude-3-opus, claude-3-sonnet, claude-3-haiku, claude-3-5-sonnet)
-- Conversions messages OpenAI → Anthropic (extraction système prompt)
-- Conversions tools avec format Anthropic (input_schema)
-- Conversions réponses Anthropic → LLMResponse (content[], tool_use)
-- Gestion d'erreurs complète avec LLMProviderError
-- Support AbortSignal pour annulation
+**Implementation:**
+- AnthropicProvider implemented with all necessary conversions
+- Full support for Claude models (claude-3-opus, claude-3-sonnet, claude-3-haiku, claude-3-5-sonnet)
+- Message conversions OpenAI → Anthropic (system prompt extraction)
+- Tool conversions with the Anthropic format (input_schema)
+- Response conversions Anthropic → LLMResponse (content[], tool_use)
+- Complete error handling with LLMProviderError
+- AbortSignal support for cancellation
 
 **Tests:**
-- 14 tests unitaires AnthropicProvider (tous passent)
-- 6 tests d'intégration ReasoningEngine (tous passent)
-- 5 tests end-to-end SDK (tous passent)
-- Tests existants corrigés pour utiliser LLMProvider
+- 14 AnthropicProvider unit tests (all passing)
+- 6 ReasoningEngine integration tests (all passing)
+- 5 SDK end-to-end tests (all passing)
+- Existing tests fixed to use LLMProvider
 
-**Critères d'acceptation validés:**
-- ✅ Anthropic configuré comme provider
-- ✅ Agent créé avec modèle Claude fonctionne
-- ✅ Reasoning Engine utilise API Anthropic
-- ✅ Intentions générées correctement
-- ✅ Format de réponse compatible
-- ✅ Tool calls fonctionnent correctement
-- ✅ Erreurs gérées proprement
+**Validated acceptance criteria:**
+- ✅ Anthropic configured as provider
+- ✅ Agent created with a Claude model works
+- ✅ Reasoning Engine uses the Anthropic API
+- ✅ Intentions generated correctly
+- ✅ Response format compatible
+- ✅ Tool calls work correctly
+- ✅ Errors handled cleanly
 
-**Note:** Cette story complète l'implémentation d'Anthropic Claude. Le fallback entre providers sera implémenté dans Story 10.3.
-
+**Note:** This story completes the Anthropic Claude implementation. Fallback between providers will be implemented in Story 10.3.

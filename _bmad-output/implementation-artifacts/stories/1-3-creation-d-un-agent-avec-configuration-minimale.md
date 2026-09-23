@@ -1,4 +1,4 @@
-# Story 1.3: Création d'un agent avec configuration minimale
+# Story 1.3: Creating an agent with a minimal configuration
 
 **Story ID:** 1.3  
 **Epic:** 1 - Quick Start & SDK Foundation  
@@ -7,48 +7,48 @@
 
 ## User Story
 
-**As a** développeur,  
-**I want** créer un agent avec une configuration minimale,  
-**So that** je peux avoir un agent fonctionnel rapidement.
+**As a** developer,  
+**I want** to create an agent with a minimal configuration,  
+**So that** I can have a functional agent quickly.
 
 ## Acceptance Criteria
 
-**Given** une instance SDK est initialisée  
-**When** j'appelle `sdk.createAgent({ name: '...', model: '...' })`  
-**Then** un agent est créé avec succès  
-**And** l'agent a une configuration par défaut valide  
-**And** l'API est intuitive et nécessite moins de 5 paramètres obligatoires  
-**And** les erreurs de validation sont claires
+**Given** an SDK instance is initialized  
+**When** I call `sdk.createAgent({ name: '...', model: '...' })`  
+**Then** an agent is created successfully  
+**And** the agent has a valid default configuration  
+**And** the API is intuitive and requires fewer than 5 mandatory parameters  
+**And** validation errors are clear
 
 ## Business Value
 
-- **Simplicité**: Configuration minimale (name + model)
-- **Rapidité**: Agent fonctionnel en quelques lignes
-- **Intuitivité**: API claire et prévisible
-- **Validation**: Erreurs claires si configuration invalide
+- **Simplicity**: Minimal configuration (name + model)
+- **Speed**: Functional agent in a few lines
+- **Intuitiveness**: Clear and predictable API
+- **Validation**: Clear errors if configuration is invalid
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- `createAgent()` méthode dans `SDKImpl`
-- `AgentConfig` interface dans `src/types/agent.ts`
-- `AgentImpl` classe dans `src/agent.ts`
-- Validation et création automatique d'ID
+**Current State:**
+- `createAgent()` method in `SDKImpl`
+- `AgentConfig` interface in `src/types/agent.ts`
+- `AgentImpl` class in `src/agent.ts`
+- Automatic validation and ID creation
 
-**Fichiers concernés:**
-- `src/sdk.ts` - Méthode `createAgent()`
-- `src/types/agent.ts` - Interface `AgentConfig`
-- `src/agent.ts` - Classe `AgentImpl`
+**Files Involved:**
+- `src/sdk.ts` - `createAgent()` method
+- `src/types/agent.ts` - `AgentConfig` interface
+- `src/agent.ts` - `AgentImpl` class
 
-### Implémentation
+### Implementation
 
-**Configuration Minimale:**
+**Minimal Configuration:**
 ```typescript
 interface AgentConfig {
-  name: string;      // Requis
-  model: string;     // Requis
+  name: string;      // Required
+  model: string;     // Required
   systemPrompt?: string;
   maxSteps?: number;
   timeout?: number;
@@ -58,31 +58,31 @@ interface AgentConfig {
 }
 ```
 
-**Création Automatique:**
-- ID unique (UUID)
+**Automatic Creation:**
+- Unique ID (UUID)
 - Timestamps (createdAt, updatedAt)
-- ConfigHash pour versioning
-- Valeurs par défaut
+- ConfigHash for versioning
+- Default values
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Simplicité**: 2 paramètres obligatoires seulement
-2. **Type-safety**: TypeScript strict
-3. **Defaults**: Valeurs par défaut intelligentes
-4. **Validation**: Erreurs claires
+1. **Simplicity**: Only 2 mandatory parameters
+2. **Type-safety**: Strict TypeScript
+3. **Defaults**: Sensible default values
+4. **Validation**: Clear errors
 
 ## Testing Requirements
 
-- ✅ Agent créé avec name + model
-- ✅ ID unique généré
-- ✅ Configuration par défaut appliquée
-- ✅ Erreur si paramètres manquants
+- ✅ Agent created with name + model
+- ✅ Unique ID generated
+- ✅ Default configuration applied
+- ✅ Error if parameters are missing
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète dans `src/sdk.ts` et `src/agent.ts`
+**Implementation:** Complete in `src/sdk.ts` and `src/agent.ts`
 
 

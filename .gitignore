@@ -18,3 +18,7 @@ coverage/
 
 # Auto Claude data directory
 .auto-claude/
+
+# VitePress
+docs/.vitepress/dist/
+docs/.vitepress/cache/

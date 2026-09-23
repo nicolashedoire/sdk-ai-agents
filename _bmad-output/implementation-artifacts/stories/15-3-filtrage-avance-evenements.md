@@ -1,4 +1,4 @@
-# Story 15.3: Filtrage Avancé d'Événements
+# Story 15.3: Advanced Event Filtering
 
 **Epic:** Epic 15 - Advanced Observability & Comparison  
 **Status:** completed  
@@ -7,44 +7,44 @@
 
 ## Description
 
-Permettre à un développeur de filtrer les événements par critères avancés pour analyser des aspects spécifiques du comportement d'un agent.
+Allow a developer to filter events by advanced criteria in order to analyze specific aspects of an agent's behavior.
 
-## Contexte
+## Context
 
-Le filtrage avancé permet d'extraire des sous-ensembles d'événements selon des critères complexes, facilitant l'analyse ciblée du comportement.
+Advanced filtering makes it possible to extract subsets of events according to complex criteria, facilitating targeted analysis of behavior.
 
 ## Acceptance Criteria
 
-### AC1: Filtrage par Critères Complexes
-**Given** des événements existent  
-**When** un développeur appelle `sdk.queryEvents(filters)` avec des critères avancés  
-**Then** les événements correspondants sont retournés
+### AC1: Filtering by Complex Criteria
+**Given** events exist  
+**When** a developer calls `sdk.queryEvents(filters)` with advanced criteria  
+**Then** the matching events are returned
 
-### AC2: Opérateurs de Filtrage
-**Given** un filtrage est effectué  
-**When** des opérateurs sont utilisés  
-**Then** les opérateurs suivants sont supportés :
-- Comparaisons (eq, ne, gt, gte, lt, lte)
-- Recherche (contains, startsWith, endsWith)
-- Logique (and, or, not)
+### AC2: Filtering Operators
+**Given** filtering is performed  
+**When** operators are used  
+**Then** the following operators are supported:
+- Comparisons (eq, ne, gt, gte, lt, lte)
+- Search (contains, startsWith, endsWith)
+- Logic (and, or, not)
 - Existence (exists, notExists)
 - Regex (matches)
 
-### AC3: Filtrage sur Données et Métadonnées
-**Given** des événements avec données et métadonnées existent  
-**When** un filtrage est effectué  
-**Then** le filtrage peut porter sur :
-- Champs dans `data` (chemins JSON)
-- Champs dans `metadata` (agentId, userId, sessionId, etc.)
-- Combinaisons de champs
+### AC3: Filtering on Data and Metadata
+**Given** events with data and metadata exist  
+**When** filtering is performed  
+**Then** filtering can apply to:
+- Fields in `data` (JSON paths)
+- Fields in `metadata` (agentId, userId, sessionId, etc.)
+- Combinations of fields
 
 ## Technical Details
 
-### Types à créer
+### Types to Create
 
 ```typescript
 interface AdvancedEventFilter {
-  // Filtres existants (déjà dans EventFilters)
+  // Existing filters (already in EventFilters)
   type?: EventType | EventType[];
   since?: number;
   until?: number;
@@ -53,7 +53,7 @@ interface AdvancedEventFilter {
   userId?: string;
   sessionId?: string;
   
-  // Nouveaux filtres avancés
+  // New advanced filters
   dataFilters?: Array<{
     path: string; // JSON path, e.g., "tool.name" or "intention.type"
     operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'startsWith' | 'endsWith' | 'exists' | 'notExists' | 'matches';
@@ -65,8 +65,8 @@ interface AdvancedEventFilter {
     operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists' | 'notExists';
     value?: unknown;
   }>;
-  logic?: 'and' | 'or'; // Comment combiner les filtres
-  not?: boolean; // Inverser le résultat
+  logic?: 'and' | 'or'; // How to combine the filters
+  not?: boolean; // Invert the result
 }
 
 interface EventQueryResult {
@@ -78,16 +78,16 @@ interface EventQueryResult {
 }
 ```
 
-### Méthodes SDK
+### SDK Methods
 
 - `queryEvents(filters: AdvancedEventFilter): Promise<EventQueryResult>`
 - `countEvents(filters: AdvancedEventFilter): Promise<number>`
 - `getEventStatistics(filters: AdvancedEventFilter): Promise<{ total: number; byType: Record<EventType, number>; byAgent: Record<string, number> }>`
 
-### Exemples d'utilisation
+### Usage Examples
 
 ```typescript
-// Trouver tous les tool calls qui ont échoué
+// Find all tool calls that failed
 const failedTools = await sdk.queryEvents({
   type: 'tool.failed',
   dataFilters: [{
@@ -97,7 +97,7 @@ const failedTools = await sdk.queryEvents({
   }]
 });
 
-// Trouver les intentions générées pour un outil spécifique
+// Find intentions generated for a specific tool
 const intentions = await sdk.queryEvents({
   type: 'intention.generated',
   dataFilters: [{
@@ -109,15 +109,14 @@ const intentions = await sdk.queryEvents({
 
 ## Tests
 
-- Filtrer par chemin JSON dans data
-- Filtrer par métadonnées
-- Combiner plusieurs filtres avec AND/OR
-- Utiliser des opérateurs complexes (regex, contains)
-- Compter les événements filtrés
-- Obtenir des statistiques
+- Filter by JSON path in data
+- Filter by metadata
+- Combine several filters with AND/OR
+- Use complex operators (regex, contains)
+- Count filtered events
+- Obtain statistics
 
 ## Dependencies
 
-- Epic 12: Event Store SQL-Based (requêtes avancées déjà implémentées)
-- Story 12.3: Requêtes Avancées sur Événements
-
+- Epic 12: Event Store SQL-Based (advanced queries already implemented)
+- Story 12.3: Advanced Event Queries
