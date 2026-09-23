@@ -21,7 +21,8 @@ export type DecisionBlocker =
   | { kind: 'stale_assessment'; hypothesisId: string }
   | { kind: 'contradiction'; contradictionId: string; description: string }
   | { kind: 'untested_prediction'; predictionId: string; expected: string }
-  | { kind: 'low_support'; hypothesisId: string; support: number; threshold: number };
+  | { kind: 'low_support'; hypothesisId: string; support: number; threshold: number }
+  | { kind: 'low_fit'; hypothesisId: string; fit: number; threshold: number; supportFloor: number };
 
 export interface DecisionReadiness {
   hypothesisId?: string;
@@ -113,9 +114,18 @@ export function assessReadiness(state: MentalState, hypothesisId: string): Decis
       }
     }
   }
-  const threshold = state.commitRules.decisionThreshold;
-  if (hypothesis.support < threshold) {
+  // A claim about the world needs strong evidence. A choice of action may also be committed
+  // when the thinker clearly prefers it and the evidence does not speak against it.
+  const { decisionThreshold: threshold, minProposalSupport: floor } = state.commitRules;
+  const fit = hypothesis.kind === 'proposal' ? hypothesis.preferenceFit : undefined;
+  const byEvidence = hypothesis.support >= threshold;
+  const byPreference =
+    floor !== undefined && fit !== undefined && fit >= threshold && hypothesis.support >= floor;
+  if (!byEvidence && !byPreference) {
     blockers.push({ kind: 'low_support', hypothesisId, support: hypothesis.support, threshold });
+    if (floor !== undefined && fit !== undefined) {
+      blockers.push({ kind: 'low_fit', hypothesisId, fit, threshold, supportFloor: floor });
+    }
   }
   return { hypothesisId, ready: blockers.length === 0, blockers };
 }
@@ -167,6 +177,8 @@ export function describeBlocker(blocker: DecisionBlocker): string {
       return `contradiction ${blocker.contradictionId} is unresolved: ${blocker.description}`;
     case 'untested_prediction':
       return `prediction ${blocker.predictionId} is untested: ${blocker.expected}`;
+    case 'low_fit':
+      return `${blocker.hypothesisId} is not clearly the thinker's choice either: it would need a fit of ${blocker.threshold} (it has ${blocker.fit}) and evidence support of ${blocker.supportFloor}`;
     case 'low_support':
       return `${blocker.hypothesisId} has evidence support ${blocker.support}, below ${blocker.threshold}`;
   }

@@ -140,6 +140,7 @@ sdk.createCognitiveAgent({
     maxConsecutiveFailures: 3, // then the run fails (and alerts you, if incidents are on)
     maxPredictionTests: 4,     // calls to the outcome evaluator per run
     preferenceWeight: 0.4,     // weight of the thinker's preferences when ranking proposals
+    minProposalSupport: 0.35,  // evidence a clearly preferred choice of action needs to be committed
   },
   evaluator: myBench,          // optional OutcomeEvaluator, enables test_prediction
 });

@@ -206,6 +206,12 @@ export interface CommitRules {
   maxPredictionTests: number;
   /** Weight of the thinker's preferences when ranking proposals (never for rules or explanations). */
   preferenceWeight: number;
+  /**
+   * When set, a proposal (a choice of action) the thinker clearly prefers — `preferenceFit` at
+   * least `decisionThreshold` — may be committed with evidence support down to this floor.
+   * Absent from runs recorded before the rule existed, which keep the evidence-only rule.
+   */
+  minProposalSupport?: number;
 }
 
 export const DEFAULT_COMMIT_RULES: CommitRules = {

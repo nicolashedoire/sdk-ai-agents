@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The conclusion guard can commit a **choice of action** the thinker clearly prefers (`preferenceFit` ≥ `decisionThreshold`) when its evidence support reaches `limits.minProposalSupport` (0.35): with a real thinker profile, questions such as "would you take this job?" always ended in an abstention because they have little evidence to weigh. Claims about the world (rules, explanations) still need evidence support ≥ `decisionThreshold`. The rule is recorded in `cognition.started` (`commitRules.minProposalSupport`); runs recorded before keep the evidence-only rule.
+
 ### Fixed
 - Tool parameter schemas sent to LLMs and MCP clients kept only property types: enum values, descriptions, nested objects and array items were lost, so models invented arguments (seen with a real model inventing a metric name). They are now converted with `zod-to-json-schema` (new dependency).
 - `seek_information` no longer spends two attempts on a question no available tool can answer: the unknown is dropped at once with the reason, so the other open questions get their turn. A step that brings no observation is recorded as failed.

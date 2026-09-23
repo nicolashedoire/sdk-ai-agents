@@ -165,6 +165,7 @@ export class CognitiveAgent {
       decisionThreshold: limits.decisionThreshold,
       maxPredictionTests: this.deps.evaluator ? limits.maxPredictionTests : 0,
       preferenceWeight: limits.preferenceWeight,
+      minProposalSupport: limits.minProposalSupport,
     };
     let state = createMentalState(problem, input.context, { observations, commitRules });
     try {

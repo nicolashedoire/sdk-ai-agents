@@ -323,6 +323,28 @@ describe('conclusion guard', () => {
     });
   });
 
+  it('commits a choice the thinker clearly prefers on plausible evidence, never a claim', () => {
+    const judged = (kind: 'proposal' | 'rule', support: number, options: Parameters<typeof createMentalState>[2]) => {
+      let state = createMentalState('Take the bank job?', undefined, options);
+      state = think(state, 'represent', { summary: 'r', addFacts: [{ statement: 'The job is stable', source: 'input' }] }).state;
+      state = think(state, 'hypothesize', { summary: 'h', addHypotheses: [{ statement: 'Decline the offer', kind }] }).state;
+      state = think(state, 'critique', { summary: 'c', critiques: [{ hypothesisId: 'H1', objection: 'Lower salary elsewhere', severity: 'minor' }] }).state;
+      return think(state, 'compare', { summary: 'judged', hypothesisUpdates: [{ hypothesisId: 'H1', support, preferenceFit: 0.9 }] }).state;
+    };
+    const withRule = { commitRules: { minProposalSupport: 0.35 } };
+
+    expect(assessReadiness(judged('proposal', 0.44, withRule), 'H1').ready).toBe(true);
+    // The same numbers never make a claim about the world credible.
+    expect(assessReadiness(judged('rule', 0.44, withRule), 'H1').ready).toBe(false);
+    // Preference does not override evidence that speaks against the choice.
+    expect(assessReadiness(judged('proposal', 0.3, withRule), 'H1').blockers).toEqual([
+      { kind: 'low_support', hypothesisId: 'H1', support: 0.3, threshold: 0.75 },
+      { kind: 'low_fit', hypothesisId: 'H1', fit: 0.9, threshold: 0.75, supportFloor: 0.35 },
+    ]);
+    // Runs recorded before the rule existed keep the evidence-only rule.
+    expect(assessReadiness(judged('proposal', 0.44, {}), 'H1').ready).toBe(false);
+  });
+
   it('commits when the readiness check passes', () => {
     const state = examinedState();
     const settled = settleDecision(state, { hypothesisId: 'H1', answer: 'Choose A', rationale: 'r', confidence: 0.7, nextActions: [] }, false);

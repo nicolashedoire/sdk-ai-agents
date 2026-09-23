@@ -138,7 +138,9 @@ An answer may be **committed** only when its hypothesis:
 - was assessed since the evidence last changed;
 - is not concerned by an unresolved contradiction (one naming nothing concerns everything);
 - has no untested prediction while the test budget allows testing it;
-- has an evidence `support` of at least `limits.decisionThreshold`.
+- has an evidence `support` of at least `limits.decisionThreshold` — or, for a **proposal** (a choice of action), is clearly the thinker's choice (`preferenceFit` of at least `limits.decisionThreshold`) while its evidence support reaches `limits.minProposalSupport` (0.35 by default).
+
+The second path exists because a question like *"would you take this job?"* has little evidence to weigh: it is decided by the thinker's priorities, provided the facts do not speak against the choice. Rules and explanations never take it — preferences never make a claim true.
 
 `decide` is offered only when a hypothesis passes. A decision that selects another hypothesis, or none, is **deferred** while the budget lasts; a deferral counts as a failed attempt, and `decide` is not offered after two in a row. On the last step, or when nothing else is possible, the engine still asks for a decision, and settles it:
 

@@ -23,6 +23,11 @@ export interface CognitiveLimits {
   maxPredictionTests: number;
   /** Weight of the thinker's preferences when ranking proposals, in [0, 1]. */
   preferenceWeight: number;
+  /**
+   * Evidence support a proposal needs when the thinker clearly prefers it (fit at least
+   * `decisionThreshold`). Claims about the world always need `decisionThreshold`.
+   */
+  minProposalSupport: number;
 }
 
 const MAX_TIMER_MS = 2_147_483_647;
@@ -37,6 +42,7 @@ export const cognitiveLimitsSchema = z.object({
   maxConsecutiveFailures: z.number().int().min(1),
   maxPredictionTests: z.number().int().min(0),
   preferenceWeight: z.number().min(0).max(1),
+  minProposalSupport: z.number().min(0).max(1),
 }) satisfies z.ZodType<CognitiveLimits>;
 
 export const DEFAULT_COGNITIVE_LIMITS: CognitiveLimits = {
@@ -48,6 +54,7 @@ export const DEFAULT_COGNITIVE_LIMITS: CognitiveLimits = {
   maxConsecutiveFailures: 3,
   maxPredictionTests: 4,
   preferenceWeight: 0.4,
+  minProposalSupport: 0.35,
 };
 
 export interface OperationSelection {
