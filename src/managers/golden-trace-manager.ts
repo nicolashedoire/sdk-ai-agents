@@ -148,11 +148,9 @@ export class GoldenTraceManager {
       return 'null';
     }
     if (typeof obj === 'string') {
-      const escaped = obj.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
-      if (obj.includes(':') || obj.includes('-') || obj.trim() !== obj || obj === '') {
-        return `"${escaped}"`;
-      }
-      return obj;
+      // Always quoted: an unquoted "true", "null" or "123" would be read back as another type.
+      // A JSON string literal is a valid YAML double-quoted scalar.
+      return JSON.stringify(obj);
     }
     if (typeof obj === 'number' || typeof obj === 'boolean') {
       return String(obj);

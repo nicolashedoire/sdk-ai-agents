@@ -135,18 +135,20 @@ export class TraceValidator {
       }
     }
 
-    if (!options.compareStructureOnly) {
-      const dataDiff = TraceValidator.compareData(expected.data, actual.data, options);
-      if (dataDiff) {
-        return {
-          type: 'event_modified',
-          eventId: expected.id,
-          eventType: expected.type,
-          expected,
-          actual,
-          details: `Data mismatch: ${dataDiff}`,
-        };
-      }
+    // In structure-only mode, value differences are still reported (and yield a `partial`
+    // status) so that a run whose values changed never passes as identical.
+    const dataDiff = TraceValidator.compareData(expected.data, actual.data, options);
+    if (dataDiff) {
+      return {
+        type: 'event_modified',
+        eventId: expected.id,
+        eventType: expected.type,
+        expected,
+        actual,
+        details: options.compareStructureOnly
+          ? `Data differs (structure-only comparison): ${dataDiff}`
+          : `Data mismatch: ${dataDiff}`,
+      };
     }
 
     return null;

@@ -108,9 +108,7 @@ export interface SDK {
   stopRun(runId: string): Promise<void>;
   approveAction(approvalId: string, approvedBy: string, reason?: string): void;
   rejectAction(approvalId: string, rejectedBy: string, reason?: string): void;
-  getPendingApprovals(
-    runId?: string
-  ): Array<{
+  getPendingApprovals(runId?: string): Array<{
     id: string;
     runId: string;
     agentId: string;
@@ -132,9 +130,7 @@ export interface SDK {
     toolCallsCount: number;
     lastUpdated: number;
   }>;
-  getPolicyAuditTrail(
-    runId: string
-  ): Array<{
+  getPolicyAuditTrail(runId: string): Array<{
     id: string;
     runId: string;
     agentId: string;
@@ -1208,17 +1204,24 @@ export function createSDK(config: SDKConfig): SDK {
   return new SDKImpl(config);
 }
 
-// Module-level SDK instance for convenience functions
-let moduleSDK: SDKImpl | null = null;
-
+/**
+ * Builds a tool without registering it anywhere. The SDK registers it when an agent that
+ * uses it is created (`sdk.createAgent({ tools })`), so the same definition can be shared by
+ * several SDK instances. Use `sdk.defineTool` to register a tool immediately.
+ */
 export function defineTool<Schema extends z.ZodSchema>(definition: ToolDefinition<Schema>): Tool {
-  if (!moduleSDK) {
-    // Create a temporary SDK instance for module-level functions
-    // This is a convenience function, so we use a dummy key
-    // The provider won't actually be used for defineTool
-    moduleSDK = new SDKImpl({ apiKey: 'dummy-key-for-module-functions' });
-  }
-  return moduleSDK.defineTool(definition);
+  return {
+    id: uuidv4(),
+    name: definition.name,
+    description: definition.description,
+    schema: definition.schema,
+    handler: definition.handler,
+    version: definition.version || '1.0.0',
+    ...(definition.capability ? { capability: definition.capability } : {}),
+    ...(definition.metadata ? { metadata: definition.metadata } : {}),
+    ...(definition.inputJsonSchema ? { inputJsonSchema: definition.inputJsonSchema } : {}),
+    ...(definition.retry ? { retry: definition.retry } : {}),
+  };
 }
 
 /** The vendor's message, not the generic "LLM provider error" of the wrapper. */

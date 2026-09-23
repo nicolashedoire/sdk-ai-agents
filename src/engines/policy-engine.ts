@@ -13,6 +13,18 @@ import type { IEventStore } from '../stores/event-store.js';
 import { ConditionEvaluator } from '../evaluators/condition-evaluator.js';
 import { generateEventId } from '../utils/id.js';
 
+/**
+ * Rule conditions that name a built-in check rather than a field to evaluate. They must not
+ * go through the generic condition evaluator, which would read them as missing fields.
+ */
+const BUILT_IN_CONDITIONS = new Set([
+  'maxSteps',
+  'maxTokens',
+  'budgetLimit',
+  'maxDuration',
+  'allowedTools',
+]);
+
 export class PolicyEngine {
   private globalPolicies: Map<string, Policy> = new Map();
   private agentPolicies: Map<string, Map<string, Policy>> = new Map();
@@ -145,11 +157,7 @@ export class PolicyEngine {
           conditionResult = this.conditionEvaluator.evaluate(conditionExpr, intention, context);
           evaluatedConditions.push({ condition: conditionExpr, result: conditionResult });
         }
-      } else if (
-        rule.condition !== 'allowedTools' &&
-        rule.condition !== 'maxSteps' &&
-        rule.condition !== 'maxTokens'
-      ) {
+      } else if (!BUILT_IN_CONDITIONS.has(rule.condition)) {
         // Simple string condition (skip built-in conditions)
         conditionResult = this.conditionEvaluator.evaluate(rule.condition, intention, context);
         evaluatedConditions.push({ condition: rule.condition, result: conditionResult });
@@ -262,8 +270,8 @@ export class PolicyEngine {
           return false;
         }
       }
-    } else {
-      // Simple string condition
+    } else if (!BUILT_IN_CONDITIONS.has(rule.condition)) {
+      // Simple string condition (built-in rules are checked by their policy type)
       if (!this.conditionEvaluator.evaluate(rule.condition, intention, context)) {
         return false;
       }
@@ -333,6 +341,9 @@ export class PolicyEngine {
       } else if (typeof rule.condition !== 'string') {
         // ConditionExpression object
         return this.conditionEvaluator.evaluate(rule.condition, intention, context);
+      } else if (BUILT_IN_CONDITIONS.has(rule.condition)) {
+        // Built-in rules (maxSteps, allowedTools...) always apply; their policy type checks them.
+        return true;
       } else {
         // Simple string condition
         return this.conditionEvaluator.evaluate(rule.condition, intention, context);
