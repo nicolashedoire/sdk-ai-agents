@@ -56,6 +56,14 @@ const TRANSIENT_CODES = new Set([
   'UND_ERR_SOCKET',
 ]);
 
+/** Codes of an exhausted account: waiting does not bring credit back. */
+const EXHAUSTED_ACCOUNT_CODES = new Set([
+  'insufficient_quota',
+  'credit_balance_exhausted',
+  'billing_hard_limit_reached',
+  'billing_not_active',
+]);
+
 const CONNECTION_ERROR_CLASSES = new Set([
   'APIConnectionError',
   'APIConnectionTimeoutError',
@@ -64,7 +72,8 @@ const CONNECTION_ERROR_CLASSES = new Set([
 
 /**
  * True for errors a retry can fix: rate limits, overloads, server errors, timeouts and
- * network failures. Authentication, validation and policy errors are never retried.
+ * network failures. Authentication, validation and policy errors are never retried, nor is
+ * an account out of credit or quota (a 429 that waiting cannot fix).
  *
  * Vendor SDK errors are recognized by class name (their `name` property is a plain
  * `Error`) and by the network code carried on `cause`.
@@ -74,11 +83,18 @@ export function isTransientError(error: unknown): boolean {
     return true;
   }
   for (const candidate of errorChain(error)) {
+    const code = readString(candidate, 'code');
+    const type = readString(candidate, 'type');
+    if (
+      (code && EXHAUSTED_ACCOUNT_CODES.has(code)) ||
+      (type && EXHAUSTED_ACCOUNT_CODES.has(type))
+    ) {
+      return false;
+    }
     const status = readNumber(candidate, 'status') ?? readNumber(candidate, 'statusCode');
     if (status !== undefined) {
       return TRANSIENT_STATUSES.has(status);
     }
-    const code = readString(candidate, 'code');
     if (code && TRANSIENT_CODES.has(code)) {
       return true;
     }

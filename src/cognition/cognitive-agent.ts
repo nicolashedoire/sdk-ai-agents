@@ -73,6 +73,8 @@ interface RunContext {
   timedOut: boolean;
   toolCalls: number;
   consecutiveFailures: number;
+  /** Reason of the last failed operation, reported when the run gives up. */
+  lastFailure?: string;
   /** Profile snapshot: feedback given during the run applies to the next one. */
   profile: ThinkerProfile;
   recorder: CognitiveRunRecorder;
@@ -226,7 +228,9 @@ export class CognitiveAgent {
           };
         }
         if (run.consecutiveFailures >= limits.maxConsecutiveFailures) {
-          throw new Error(`${run.consecutiveFailures} consecutive operations failed`);
+          throw new Error(
+            `${run.consecutiveFailures} consecutive operations failed (last: ${run.lastFailure ?? 'unknown'})`
+          );
         }
       }
       throw new Error(`No decision reached within ${limits.maxSteps} steps`);
@@ -312,6 +316,7 @@ export class CognitiveAgent {
     // failed attempt of that operation (see `recentFailures`), never as a reason to abort.
     if (thought.failed && !thought.deferred) {
       run.consecutiveFailures++;
+      run.lastFailure = failure;
     } else if (!failure) {
       run.consecutiveFailures = 0;
     }
