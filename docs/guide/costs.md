@@ -22,7 +22,7 @@ const cost = await sdk.getRunCost(runId);
 
 ## Prices
 
-LLM prices change often and depend on your contract, so they are **configuration, not code**. Only prices verified against vendor documentation ship as defaults — today, Jev ($0.042 per million input tokens, output free, checked on 2026-09-23).
+LLM prices change often and depend on your contract, so they are **configuration, not code**. Only prices verified against vendor documentation ship as defaults — today, Jev ($0.042 per million input tokens, output free, checked on 2026-09-23), both under its TypeSafe ids (`jev-*`) and through Vercel AI Gateway (`typesafe-ai/jev`).
 
 ```ts
 const sdk = createSDK({

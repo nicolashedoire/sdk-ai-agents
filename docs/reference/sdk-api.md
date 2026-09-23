@@ -15,7 +15,7 @@ const sdk = createSDK(config);
 | `fallbackProviders` | `Array<{ provider, config? }>` | Tried in order when the primary fails |
 | `llmProvider` | `LLMProvider` | Your own provider (local model, gateway, test double) |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM retry policy, per provider, before fallback |
-| `jev` | `JevClientConfig` | Enables TypeSafe Jev for typed decisions |
+| `jev` | `JevClientConfig` | Enables TypeSafe Jev for typed decisions — directly, or through [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) with `baseUrl` and `model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | Any typed-decision backend (takes precedence over `jev`) |
 | `pricing` | `PricingTable` | USD per million tokens, merged over defaults |
 | `incidents` | `IncidentMonitorOptions` | Notifiers, rules, severity threshold, throttling |

@@ -13,7 +13,8 @@ Version 0.2 adds a reasoning layer on top of the governed runtime described belo
 | Controllers | `src/cognition/cognitive-controller.ts`, `typed-decision-controller.ts` | Heuristic and Jev-backed choice of the next operation |
 | `OperationPerformer` | `src/cognition/operation-performer.ts` | Dispatches to the thought generator, the information seeker, the prediction tester or the assessor |
 | Patch admission | `src/cognition/patch-admission.ts`, `thought-fields.ts`, `thought-patch.ts` | Single entry of every thought: fields allowed per operation, engine-only fields, decision settlement |
-| Evidence | `src/cognition/observation-records.ts`, `evidence-transitions.ts` | Observation provenance, fact revisions, comparisons, test results, contradictions |
+| Evidence | `src/cognition/observation-records.ts`, `evidence-transitions.ts`, `contradiction-transitions.ts` | Observation provenance, fact revisions, comparisons, test results, contradictions and their resolutions |
+| State view | `src/cognition/mental-state-view.ts` | Compact view of the state for prompts, controllers and datasets: readiness, ranking, experiments already run |
 | `PredictionTester` | `src/cognition/outcome-evaluator.ts` | Runs your `OutcomeEvaluator` on a pending prediction and records the report |
 | Conclusion guard | `src/cognition/decision-readiness.ts` | Ranking, readiness check, committed / provisional / abstain |
 | `LLMThoughtGenerator` | `src/cognition/llm-thought-generator.ts`, `thought-prompts.ts` | One prompt per operation, strict JSON, Zod validation, one repair |

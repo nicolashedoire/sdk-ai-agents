@@ -19,8 +19,8 @@ node dist/examples/quick-start.js
 
 | Script | What it shows |
 | --- | --- |
-| `npm run example:cognitive` | A cognitive agent with a governed tool, typed decisions (with a TypeSafe key), costs and incident alerts |
-| `npm run example:rules` | The evidence loop: a rule induced from measurements, predictions tested on a simulated bench, a refuted rule revised |
+| `npm run example:cognitive` | A cognitive agent with a governed tool, costs and incident alerts; typed decisions with `TYPESAFE_API_KEY`, or Jev through Vercel AI Gateway with `AI_GATEWAY_API_KEY` |
+| `npm run example:rules` | The evidence loop: a rule induced from measurements, predictions tested on a simulated bench, a refuted rule revised (`MODEL=gpt-4o` to try a stronger model) |
 | `npm run example:mcp` | Governed tools exposed as an MCP server over stdio |
 
 ## What the Example Does

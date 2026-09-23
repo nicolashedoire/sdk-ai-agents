@@ -33,6 +33,8 @@ console.log(state.hypotheses);              // every option considered, simulate
 console.log(await sdk.getRunCost(runId));   // what it cost, per model
 ```
 
+No TypeSafe account? Jev is also served by Vercel AI Gateway with the same API: pass your gateway key with `baseUrl: 'https://ai-gateway.vercel.sh/typesafe'` and `model: 'typesafe-ai/jev'` ([details](https://nicolashedoire.github.io/sdk-ai-agents/guide/typed-decisions#through-vercel-ai-gateway)).
+
 ## Agents that think before they act
 
 <img src="docs/public/images/reasoning-loop.svg" alt="The cognitive loop" align="right" width="340" />

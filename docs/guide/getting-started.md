@@ -86,7 +86,7 @@ const replay = await sdk.replay(result.runId);              // re-run the action
 
 ## 5. Add typed decisions (optional)
 
-With a [TypeSafe](https://docs.typesafe.ai) key, the agent's controller and hypothesis comparison use Jev, and you get `sdk.decisions`:
+With a [TypeSafe](https://docs.typesafe.ai) key — or a Vercel AI Gateway key, see [Jev through AI Gateway](./typed-decisions#through-vercel-ai-gateway) — the agent's controller and hypothesis comparison use Jev, and you get `sdk.decisions`:
 
 ```ts
 const sdk = createSDK({
