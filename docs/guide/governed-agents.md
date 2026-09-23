@@ -335,7 +335,7 @@ See [`examples/complete-example.ts`](https://github.com/nicolashedoire/sdk-ai-ag
 
 - 📚 [Core concepts](./concepts) - Understand the architecture
 - 🏗️ [Architecture](../reference/architecture) - Technical details
-- 📋 [PRD](https://github.com/nicolashedoire/sdk-ai-agents/blob/main/_bmad-output/planning-artifacts/prd.md) - Full requirements
+- 📖 [SDK API](../reference/sdk-api) - Every option and method
 
 ## Support
 

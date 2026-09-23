@@ -1,112 +1,39 @@
 # Source tree
 
-**Date:** 2026-01-06
-
 ## Overview
 
-SDK_AI_Agents is organized into a clear modular structure with separation of responsibilities. The main source code is located in `src/` with subfolders for each functional domain.
+The SDK is organized into a clear modular structure with separation of responsibilities. The main source code is located in `src/` with subfolders for each functional domain.
 
 ## Complete Directory Structure
 
 ```
-SDK_AI_Agents/
-├── src/                          # Main source code
-│   ├── agent.ts                 # Agent implementation (AgentImpl)
-│   ├── sdk.ts                   # SDK main implementation (SDKImpl)
-│   ├── index.ts                 # Public API exports
-│   ├── engines/                 # Core engines
-│   │   ├── reasoning-engine.ts  # Generates intentions from the LLM
-│   │   ├── action-engine.ts     # Executes intentions after validation
-│   │   ├── policy-engine.ts    # Validates intentions against policies
-│   │   └── replay-engine.ts    # Replays executions from events
-│   ├── stores/                  # Event store implementations
-│   │   ├── event-store.ts      # IEventStore interface
-│   │   ├── file-event-store.ts # File-based implementation
-│   │   ├── sql-event-store.ts  # Generic SQL implementation
-│   │   ├── sqlite-event-store.ts # SQLite implementation
-│   │   └── postgresql-event-store.ts # PostgreSQL implementation
-│   ├── providers/               # LLM provider implementations
-│   │   ├── llm-provider.ts     # LLMProvider interface
-│   │   ├── openai-provider.ts  # OpenAI implementation
-│   │   ├── anthropic-provider.ts # Anthropic implementation
-│   │   ├── fallback-provider.ts # Provider with automatic fallback
-│   │   ├── provider-factory.ts # Factory for creating providers
-│   │   └── index.ts            # Provider exports
-│   ├── managers/                # Manager classes
-│   │   ├── approval-manager.ts # Human approval management
-│   │   ├── budget-tracker.ts   # Budget and usage tracking
-│   │   ├── golden-trace-manager.ts # Golden trace management
-│   │   ├── regression-test-manager.ts # Regression test suite management
-│   │   ├── assertion-manager.ts # Assertion management
-│   │   └── impact-analysis-manager.ts # Impact analysis management
-│   ├── registry/                # Registry classes
-│   │   ├── tool-registry.ts    # Available tool management
-│   │   └── capability-registry.ts # Capability management
-│   ├── types/                   # TypeScript type definitions
-│   │   ├── index.ts            # Type exports
-│   │   ├── agent.ts            # Agent types
-│   │   ├── tool.ts             # Tool types
-│   │   ├── policy.ts           # Policy types
-│   │   ├── events.ts           # Event types
-│   │   ├── run.ts              # Run types
-│   │   ├── sdk.ts              # SDK types
-│   │   ├── reasoning-graph.ts  # Reasoning Graph types
-│   │   ├── alternatives.ts     # Alternatives types
-│   │   ├── decision-patterns.ts # Decision Patterns types
-│   │   ├── trace-visualization.ts # Trace Visualization types
-│   │   ├── golden-trace.ts     # Golden Trace types
-│   │   ├── validation.ts      # Validation types
-│   │   ├── regression.ts      # Regression types
-│   │   ├── regression-test.ts # Regression Test types
-│   │   ├── assertion.ts       # Assertion types
-│   │   ├── comparison.ts      # Comparison types
-│   │   ├── impact-analysis.ts # Impact Analysis types
-│   │   ├── advanced-event-filter.ts # Advanced Filtering types
-│   │   ├── test-results-export.ts # Test Results Export types
-│   │   └── audit.ts            # Audit types
-│   ├── utils/                   # Utility functions
-│   │   ├── constants.ts        # Constants
-│   │   ├── id.ts              # ID generation
-│   │   ├── zod-to-json-schema.ts # Zod → JSON Schema conversion
-│   │   ├── reasoning-graph-builder.ts # Reasoning graph construction
-│   │   ├── reasoning-graph-export.ts # Reasoning graph export
-│   │   ├── alternatives-extractor.ts # Alternatives extraction
-│   │   ├── pattern-analyzer.ts # Decision pattern analysis
-│   │   ├── trace-visualizer.ts # Trace visualization
-│   │   ├── trace-validator.ts  # Trace validation
-│   │   ├── regression-detector.ts # Regression detection
-│   │   ├── regression-test-runner.ts # Regression test execution
-│   │   ├── test-results-exporter.ts # Test result export
-│   │   ├── assertion-evaluator.ts # Assertion evaluation
-│   │   ├── run-comparator.ts   # Run comparison
-│   │   ├── comparison-report-generator.ts # Comparison report generation
-│   │   ├── impact-analyzer.ts  # Impact analysis
-│   │   └── advanced-event-filter.ts # Advanced event filtering
-│   ├── evaluators/              # Evaluator classes
-│   │   └── condition-evaluator.ts # Policy condition evaluation
-│   ├── errors/                  # Error classes
-│   │   └── index.ts            # Error exports
-│   └── __tests__/               # Unit tests
-│       ├── *.test.ts           # Tests per module
-│       └── providers/          # Provider tests
-├── dist/                        # Compiled output (TypeScript → JavaScript)
-├── docs/                        # Documentation
-│   ├── CONCEPTS.md             # Key concepts
-│   ├── QUICKSTART.md           # Quick start guide
-│   └── ...                     # Generated documentation
-├── examples/                    # Example code
-│   ├── quick-start.ts          # Minimal example
-│   ├── complete-example.ts     # Complete example
-│   └── test-api.ts            # API tests
-├── demo/                        # Next.js demo application
-│   ├── app/                    # Next.js app directory
-│   ├── components/             # React components
-│   └── lib/                    # SDK client
-├── _bmad-output/                # BMAD workflow outputs
-│   ├── planning-artifacts/     # Planning artifacts
-│   └── implementation-artifacts/ # Implementation artifacts
-└── templates/                   # Templates
-    └── starter-template/       # Starter template
+sdk-ai-agents/
+├── src/
+│   ├── sdk.ts                  # createSDK and the SDK facade
+│   ├── agent.ts                # Governed agent (run loop)
+│   ├── index.ts                # Public exports
+│   ├── mcp.ts                  # Entry point of @sdk-ai-agents/core/mcp
+│   ├── cognition/              # Cognitive agents: mental state, operations, controllers, profiles
+│   ├── decisions/              # Typed decisions (Jev client, DecisionService)
+│   ├── engines/                # Reasoning, action, policy and replay engines
+│   ├── stores/                 # Event stores (file, SQLite, PostgreSQL)
+│   ├── providers/              # LLM providers (OpenAI, Anthropic, fallback)
+│   ├── managers/               # Approvals, budgets, golden traces, regressions
+│   ├── registry/               # Tool and capability registries
+│   ├── costs/                  # Pricing tables and run costs
+│   ├── resilience/             # Retry policy and retrying provider
+│   ├── incidents/              # Incident detection and notifiers
+│   ├── mcp/                    # MCP server and client
+│   ├── evaluators/             # Policy condition evaluation
+│   ├── errors/                 # Error classes
+│   ├── types/                  # Shared type definitions
+│   ├── utils/                  # Helpers (ids, HTTP, trace analysis)
+│   └── __tests__/              # Vitest suites and their in-memory test doubles (support/)
+├── benchmarks/                 # Performance tests
+├── docs/                       # This documentation (VitePress)
+├── examples/                   # Runnable examples
+├── templates/starter-template/ # Starter project using the SDK
+└── .github/workflows/          # CI and documentation deployment
 ```
 
 ## Critical Directories
@@ -289,6 +216,3 @@ SDK_AI_Agents/
 - Source maps generated for debugging
 - TypeScript declarations (`.d.ts`) generated
 
----
-
-_Generated using BMAD Method `document-project` workflow_

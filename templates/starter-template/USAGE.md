@@ -77,8 +77,8 @@ starter-template/
 ## Documentation
 
 See the full SDK documentation:
-- [Quick Start Guide](../../docs/QUICKSTART.md)
-- [Key Concepts](../../docs/CONCEPTS.md)
+- [Getting started](https://nicolashedoire.github.io/sdk-ai-agents/guide/getting-started)
+- [Core concepts](https://nicolashedoire.github.io/sdk-ai-agents/guide/concepts)
 
 ## Notes
 

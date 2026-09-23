@@ -38,9 +38,9 @@ npm run dev
 
 ## 📚 Documentation
 
-- [Quick Start Guide](https://github.com/nicolashedoire/SDK_AI_Agents/blob/main/docs/QUICKSTART.md)
-- [Key Concepts](https://github.com/nicolashedoire/SDK_AI_Agents/blob/main/docs/CONCEPTS.md)
-- [Full Documentation](https://github.com/nicolashedoire/SDK_AI_Agents)
+- [Getting started](https://nicolashedoire.github.io/sdk-ai-agents/guide/getting-started)
+- [Core concepts](https://nicolashedoire.github.io/sdk-ai-agents/guide/concepts)
+- [Full documentation](https://nicolashedoire.github.io/sdk-ai-agents/)
 
 ## 🛠️ Available Scripts
 
@@ -82,12 +82,12 @@ npm run dev
 ## 📖 Examples
 
 Check out the examples in the SDK_AI_Agents repository:
-- [Quick Start Example](https://github.com/nicolashedoire/SDK_AI_Agents/blob/main/examples/quick-start.ts)
-- [Complete Example](https://github.com/nicolashedoire/SDK_AI_Agents/blob/main/examples/complete-example.ts)
+- [Quick Start Example](https://github.com/nicolashedoire/sdk-ai-agents/blob/main/examples/quick-start.ts)
+- [Complete Example](https://github.com/nicolashedoire/sdk-ai-agents/blob/main/examples/complete-example.ts)
 
 ## 🤝 Contribution
 
-This project uses SDK_AI_Agents. To contribute to the SDK, see the [contribution guide](https://github.com/nicolashedoire/SDK_AI_Agents/blob/main/CONTRIBUTING.md).
+This project uses SDK_AI_Agents. To contribute to the SDK, see the [contribution guide](https://github.com/nicolashedoire/sdk-ai-agents/blob/main/CONTRIBUTING.md).
 
 ## 📄 License
 

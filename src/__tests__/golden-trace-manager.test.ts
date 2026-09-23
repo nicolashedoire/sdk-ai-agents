@@ -1,28 +1,22 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { GoldenTraceManager } from '../managers/golden-trace-manager.js';
 import type { Trace } from '../types/sdk.js';
 
 describe('GoldenTraceManager', () => {
-  const testDir = './test-golden-traces';
+  // A private directory per test: test files run in parallel and must not share folders.
+  let testDir: string;
   let manager: GoldenTraceManager;
 
   beforeEach(async () => {
-    try {
-      await fs.rm(testDir, { recursive: true, force: true });
-    } catch {
-      // Ignore
-    }
+    testDir = await fs.mkdtemp(join(tmpdir(), 'golden-traces-'));
     manager = new GoldenTraceManager(testDir);
   });
 
   afterEach(async () => {
-    try {
-      await fs.rm(testDir, { recursive: true, force: true });
-    } catch {
-      // Ignore
-    }
+    await fs.rm(testDir, { recursive: true, force: true });
   });
 
   const createSampleTrace = (runId: string, agentId: string): Trace => ({

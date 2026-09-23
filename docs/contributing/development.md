@@ -1,7 +1,5 @@
 # Development guide
 
-**Date:** 2026-01-06
-
 ## Prerequisites
 
 ### Required
@@ -20,8 +18,8 @@
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/nicolashedoire/SDK_AI_Agents.git
-cd SDK_AI_Agents
+git clone https://github.com/nicolashedoire/sdk-ai-agents.git
+cd sdk-ai-agents
 ```
 
 ### 2. Install Dependencies
@@ -407,10 +405,6 @@ npm run check
 - **Examples**: `examples/`
 - **Type Definitions**: `src/types/`
 - **Tests**: `src/__tests__/`
-
----
-
-_Generated using BMAD Method `document-project` workflow_
 
 ## Documentation site
 
