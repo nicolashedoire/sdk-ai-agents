@@ -52,8 +52,9 @@ export class RegressionTestManager {
   }
 
   async getTestSuite(suiteId: string): Promise<RegressionTestSuite | null> {
-    if (this.testSuitesCache.has(suiteId)) {
-      return this.testSuitesCache.get(suiteId)!;
+    const cached = this.testSuitesCache.get(suiteId);
+    if (cached) {
+      return cached;
     }
 
     await this.ensureTestSuitesDir();
@@ -115,5 +116,3 @@ export class RegressionTestManager {
     }
   }
 }
-
-

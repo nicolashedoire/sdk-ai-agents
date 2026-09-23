@@ -1,6 +1,11 @@
 export interface DecisionPattern {
   id: string;
-  type: 'tool_choice' | 'policy_violation' | 'approval_request' | 'intention_type' | 'rejection_reason';
+  type:
+    | 'tool_choice'
+    | 'policy_violation'
+    | 'approval_request'
+    | 'intention_type'
+    | 'rejection_reason';
   pattern: string;
   description: string;
   frequency: number;
@@ -45,5 +50,3 @@ export interface DecisionPatternAnalysis {
     averagePatternFrequency: number;
   };
 }
-
-

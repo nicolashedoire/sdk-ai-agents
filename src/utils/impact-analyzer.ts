@@ -1,6 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Trace } from '../types/sdk.js';
-import type { ImpactAnalysisOptions, ImpactAnalysis, ImpactMetric } from '../types/impact-analysis.js';
+import type {
+  ImpactAnalysisOptions,
+  ImpactAnalysis,
+  ImpactMetric,
+} from '../types/impact-analysis.js';
 
 export class ImpactAnalyzer {
   static analyze(
@@ -8,11 +12,11 @@ export class ImpactAnalyzer {
     afterTraces: Trace[],
     options: ImpactAnalysisOptions = {}
   ): ImpactAnalysis {
-    const metrics = this.calculateMetrics(beforeTraces, afterTraces, options);
-    const behaviorChanges = this.identifyBehaviorChanges(beforeTraces, afterTraces);
-    const impact = this.assessImpact(metrics, behaviorChanges);
+    const metrics = ImpactAnalyzer.calculateMetrics(beforeTraces, afterTraces, options);
+    const behaviorChanges = ImpactAnalyzer.identifyBehaviorChanges(beforeTraces, afterTraces);
+    const impact = ImpactAnalyzer.assessImpact(metrics, behaviorChanges);
     const recommendations = options.includeRecommendations
-      ? this.generateRecommendations(metrics, behaviorChanges, impact)
+      ? ImpactAnalyzer.generateRecommendations(metrics, behaviorChanges, impact)
       : undefined;
 
     return {
@@ -36,19 +40,19 @@ export class ImpactAnalyzer {
     const metrics: ImpactMetric[] = [];
 
     if (requestedMetrics.includes('duration')) {
-      metrics.push(this.calculateDurationMetric(beforeTraces, afterTraces));
+      metrics.push(ImpactAnalyzer.calculateDurationMetric(beforeTraces, afterTraces));
     }
 
     if (requestedMetrics.includes('cost')) {
-      metrics.push(this.calculateCostMetric(beforeTraces, afterTraces));
+      metrics.push(ImpactAnalyzer.calculateCostMetric(beforeTraces, afterTraces));
     }
 
     if (requestedMetrics.includes('quality')) {
-      metrics.push(this.calculateQualityMetric(beforeTraces, afterTraces));
+      metrics.push(ImpactAnalyzer.calculateQualityMetric(beforeTraces, afterTraces));
     }
 
     if (requestedMetrics.includes('success_rate')) {
-      metrics.push(this.calculateSuccessRateMetric(beforeTraces, afterTraces));
+      metrics.push(ImpactAnalyzer.calculateSuccessRateMetric(beforeTraces, afterTraces));
     }
 
     return metrics;
@@ -61,33 +65,31 @@ export class ImpactAnalyzer {
     const beforeValues = beforeTraces.map((t) => t.summary.duration);
     const afterValues = afterTraces.map((t) => t.summary.duration);
 
-    return this.createMetric('duration', beforeValues, afterValues, 'ms');
+    return ImpactAnalyzer.createMetric('duration', beforeValues, afterValues, 'ms');
   }
 
-  private static calculateCostMetric(
-    beforeTraces: Trace[],
-    afterTraces: Trace[]
-  ): ImpactMetric {
+  private static calculateCostMetric(beforeTraces: Trace[], afterTraces: Trace[]): ImpactMetric {
     const beforeValues = beforeTraces.map((t) => t.summary.toolsCalled * 0.01);
     const afterValues = afterTraces.map((t) => t.summary.toolsCalled * 0.01);
 
-    return this.createMetric('cost', beforeValues, afterValues, 'tokens');
+    return ImpactAnalyzer.createMetric('cost', beforeValues, afterValues, 'tokens');
   }
 
-  private static calculateQualityMetric(
-    beforeTraces: Trace[],
-    afterTraces: Trace[]
-  ): ImpactMetric {
+  private static calculateQualityMetric(beforeTraces: Trace[], afterTraces: Trace[]): ImpactMetric {
     const beforeValues = beforeTraces.map((t) => {
-      const failed = t.events.filter((e) => e.type === 'action.failed' || e.type === 'tool.failed').length;
+      const failed = t.events.filter(
+        (e) => e.type === 'action.failed' || e.type === 'tool.failed'
+      ).length;
       return 1 - failed / Math.max(t.summary.totalEvents, 1);
     });
     const afterValues = afterTraces.map((t) => {
-      const failed = t.events.filter((e) => e.type === 'action.failed' || e.type === 'tool.failed').length;
+      const failed = t.events.filter(
+        (e) => e.type === 'action.failed' || e.type === 'tool.failed'
+      ).length;
       return 1 - failed / Math.max(t.summary.totalEvents, 1);
     });
 
-    return this.createMetric('quality', beforeValues, afterValues, 'score');
+    return ImpactAnalyzer.createMetric('quality', beforeValues, afterValues, 'score');
   }
 
   private static calculateSuccessRateMetric(
@@ -97,7 +99,7 @@ export class ImpactAnalyzer {
     const beforeValues = beforeTraces.map((t) => (t.status === 'completed' ? 1 : 0));
     const afterValues = afterTraces.map((t) => (t.status === 'completed' ? 1 : 0));
 
-    return this.createMetric('success_rate', beforeValues, afterValues, 'rate');
+    return ImpactAnalyzer.createMetric('success_rate', beforeValues, afterValues, 'rate');
   }
 
   private static createMetric(
@@ -106,8 +108,8 @@ export class ImpactAnalyzer {
     afterValues: number[],
     unit: string
   ): ImpactMetric {
-    const beforeAvg = this.average(beforeValues);
-    const afterAvg = this.average(afterValues);
+    const beforeAvg = ImpactAnalyzer.average(beforeValues);
+    const afterAvg = ImpactAnalyzer.average(afterValues);
     const absoluteChange = afterAvg - beforeAvg;
     const percentageChange = beforeAvg !== 0 ? (absoluteChange / beforeAvg) * 100 : 0;
 
@@ -148,8 +150,12 @@ export class ImpactAnalyzer {
   ): ImpactAnalysis['behaviorChanges'] {
     const changes: ImpactAnalysis['behaviorChanges'] = [];
 
-    const beforeAvgIntentions = this.average(beforeTraces.map((t) => t.summary.intentionsGenerated));
-    const afterAvgIntentions = this.average(afterTraces.map((t) => t.summary.intentionsGenerated));
+    const beforeAvgIntentions = ImpactAnalyzer.average(
+      beforeTraces.map((t) => t.summary.intentionsGenerated)
+    );
+    const afterAvgIntentions = ImpactAnalyzer.average(
+      afterTraces.map((t) => t.summary.intentionsGenerated)
+    );
     if (Math.abs(afterAvgIntentions - beforeAvgIntentions) > 0.5) {
       changes.push({
         type: 'intentions',
@@ -160,8 +166,12 @@ export class ImpactAnalyzer {
       });
     }
 
-    const beforeAvgActions = this.average(beforeTraces.map((t) => t.summary.actionsExecuted));
-    const afterAvgActions = this.average(afterTraces.map((t) => t.summary.actionsExecuted));
+    const beforeAvgActions = ImpactAnalyzer.average(
+      beforeTraces.map((t) => t.summary.actionsExecuted)
+    );
+    const afterAvgActions = ImpactAnalyzer.average(
+      afterTraces.map((t) => t.summary.actionsExecuted)
+    );
     if (Math.abs(afterAvgActions - beforeAvgActions) > 0.5) {
       changes.push({
         type: 'actions',
@@ -222,7 +232,7 @@ export class ImpactAnalyzer {
     const total = positiveCount + negativeCount + neutralCount;
     const confidence = total > 0 ? Math.max(positiveCount, negativeCount) / total : 0.5;
 
-    const summary = this.generateImpactSummary(metrics, behaviorChanges, overall);
+    const summary = ImpactAnalyzer.generateImpactSummary(metrics, behaviorChanges, overall);
 
     return {
       overall,
@@ -236,22 +246,20 @@ export class ImpactAnalyzer {
     behaviorChanges: ImpactAnalysis['behaviorChanges'],
     overall: 'positive' | 'negative' | 'neutral'
   ): string {
-    const significantMetrics = metrics.filter(
-      (m) => Math.abs(m.change.percentage) > 5
-    );
+    const significantMetrics = metrics.filter((m) => Math.abs(m.change.percentage) > 5);
 
     if (significantMetrics.length === 0 && behaviorChanges.length === 0) {
       return 'No significant changes detected.';
     }
 
     const metricSummary = significantMetrics
-      .map((m) => `${m.name}: ${m.change.percentage > 0 ? '+' : ''}${m.change.percentage.toFixed(1)}%`)
+      .map(
+        (m) => `${m.name}: ${m.change.percentage > 0 ? '+' : ''}${m.change.percentage.toFixed(1)}%`
+      )
       .join(', ');
 
     const changeSummary =
-      behaviorChanges.length > 0
-        ? ` ${behaviorChanges.length} behavior change(s) detected.`
-        : '';
+      behaviorChanges.length > 0 ? ` ${behaviorChanges.length} behavior change(s) detected.` : '';
 
     return `Overall impact is ${overall}. Key changes: ${metricSummary}.${changeSummary}`;
   }
@@ -306,4 +314,3 @@ export class ImpactAnalyzer {
     return values.reduce((sum, v) => sum + v, 0) / values.length;
   }
 }
-

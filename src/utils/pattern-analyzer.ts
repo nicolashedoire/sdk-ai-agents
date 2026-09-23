@@ -1,5 +1,9 @@
 import type { Event } from '../types/events.js';
-import type { DecisionPatternAnalysis, DecisionPattern, PatternInsight } from '../types/decision-patterns.js';
+import type {
+  DecisionPatternAnalysis,
+  DecisionPattern,
+  PatternInsight,
+} from '../types/decision-patterns.js';
 import { AlternativesExtractor } from './alternatives-extractor.js';
 
 export interface PatternAnalysisOptions {
@@ -20,7 +24,7 @@ export class PatternAnalyzer {
     options: PatternAnalysisOptions = {}
   ): DecisionPatternAnalysis {
     if (runs.length === 0) {
-      return this.createEmptyAnalysis(options);
+      return PatternAnalyzer.createEmptyAnalysis(options);
     }
 
     const patterns: DecisionPattern[] = [];
@@ -40,19 +44,43 @@ export class PatternAnalyzer {
       const alternativesAnalysis = AlternativesExtractor.extractFromEvents(runId, events);
 
       // Analyze tool choices
-      this.analyzeToolChoices(runId, events, patternMap, firstTimestamp, lastTimestamp);
+      PatternAnalyzer.analyzeToolChoices(runId, events, patternMap, firstTimestamp, lastTimestamp);
 
       // Analyze policy violations
-      this.analyzePolicyViolations(runId, events, patternMap, firstTimestamp, lastTimestamp);
+      PatternAnalyzer.analyzePolicyViolations(
+        runId,
+        events,
+        patternMap,
+        firstTimestamp,
+        lastTimestamp
+      );
 
       // Analyze approval requests
-      this.analyzeApprovalRequests(runId, events, patternMap, firstTimestamp, lastTimestamp);
+      PatternAnalyzer.analyzeApprovalRequests(
+        runId,
+        events,
+        patternMap,
+        firstTimestamp,
+        lastTimestamp
+      );
 
       // Analyze intention types
-      this.analyzeIntentionTypes(runId, events, patternMap, firstTimestamp, lastTimestamp);
+      PatternAnalyzer.analyzeIntentionTypes(
+        runId,
+        events,
+        patternMap,
+        firstTimestamp,
+        lastTimestamp
+      );
 
       // Analyze rejection reasons
-      this.analyzeRejectionReasons(runId, alternativesAnalysis, patternMap, firstTimestamp, lastTimestamp);
+      PatternAnalyzer.analyzeRejectionReasons(
+        runId,
+        alternativesAnalysis,
+        patternMap,
+        firstTimestamp,
+        lastTimestamp
+      );
     }
 
     // Convert map to array and calculate percentages
@@ -65,18 +93,17 @@ export class PatternAnalyzer {
 
     // Filter by minimum frequency if specified
     const minFreq = options.minFrequency;
-    const filteredPatterns = minFreq !== undefined
-      ? patterns.filter((p) => p.frequency >= minFreq)
-      : patterns;
+    const filteredPatterns =
+      minFreq !== undefined ? patterns.filter((p) => p.frequency >= minFreq) : patterns;
 
     // Calculate trends
-    this.calculateTrends(filteredPatterns, runs);
+    PatternAnalyzer.calculateTrends(filteredPatterns, runs);
 
     // Generate insights
-    const insights = this.generateInsights(filteredPatterns);
+    const insights = PatternAnalyzer.generateInsights(filteredPatterns);
 
     // Calculate summary
-    const summary = this.calculateSummary(filteredPatterns);
+    const summary = PatternAnalyzer.calculateSummary(filteredPatterns);
 
     const timeRange = {
       start: Math.min(...allTimestamps),
@@ -102,15 +129,18 @@ export class PatternAnalyzer {
     firstTimestamp: number,
     lastTimestamp: number
   ): void {
-    const toolCalls = events.filter((e) => e.type === 'tool.called' || e.type === 'action.executed');
-    
+    const toolCalls = events.filter(
+      (e) => e.type === 'tool.called' || e.type === 'action.executed'
+    );
+
     for (const event of toolCalls) {
-      const toolName = (event.data.toolName as string) || 
-                      (event.data.intention as { toolName?: string })?.toolName;
-      
+      const toolName =
+        (event.data.toolName as string) ||
+        (event.data.intention as { toolName?: string })?.toolName;
+
       if (toolName) {
         const patternKey = `tool_choice:${toolName}`;
-        this.updatePattern(
+        PatternAnalyzer.updatePattern(
           patternMap,
           patternKey,
           {
@@ -134,8 +164,10 @@ export class PatternAnalyzer {
     firstTimestamp: number,
     lastTimestamp: number
   ): void {
-    const policyChecks = events.filter((e) => e.type === 'policy.checked' || e.type === 'policy.violated');
-    
+    const policyChecks = events.filter(
+      (e) => e.type === 'policy.checked' || e.type === 'policy.violated'
+    );
+
     for (const event of policyChecks) {
       const policyData = event.data as {
         rule?: string;
@@ -145,7 +177,7 @@ export class PatternAnalyzer {
 
       if (!policyData.allowed && policyData.rule) {
         const patternKey = `policy_violation:${policyData.rule}`;
-        this.updatePattern(
+        PatternAnalyzer.updatePattern(
           patternMap,
           patternKey,
           {
@@ -170,10 +202,10 @@ export class PatternAnalyzer {
     lastTimestamp: number
   ): void {
     const approvalRequests = events.filter((e) => e.type === 'approval.requested');
-    
+
     if (approvalRequests.length > 0) {
       const patternKey = 'approval_request:general';
-      this.updatePattern(
+      PatternAnalyzer.updatePattern(
         patternMap,
         patternKey,
         {
@@ -196,14 +228,15 @@ export class PatternAnalyzer {
     lastTimestamp: number
   ): void {
     const intentions = events.filter((e) => e.type === 'intention.generated');
-    
+
     for (const event of intentions) {
-      const intentionData = (event.data.intention as { type?: string }) || 
-                            this.extractIntentionType(event.data);
-      
+      const intentionData =
+        (event.data.intention as { type?: string }) ||
+        PatternAnalyzer.extractIntentionType(event.data);
+
       if (intentionData?.type) {
         const patternKey = `intention_type:${intentionData.type}`;
-        this.updatePattern(
+        PatternAnalyzer.updatePattern(
           patternMap,
           patternKey,
           {
@@ -231,7 +264,7 @@ export class PatternAnalyzer {
       for (const alternative of decisionPoint.alternatives) {
         if (alternative.status === 'rejected' && alternative.reason) {
           const patternKey = `rejection_reason:${alternative.reason}`;
-          this.updatePattern(
+          PatternAnalyzer.updatePattern(
             patternMap,
             patternKey,
             {
@@ -263,7 +296,7 @@ export class PatternAnalyzer {
     lastTimestamp: number
   ): void {
     const existing = patternMap.get(key);
-    
+
     if (existing) {
       existing.frequency += 1;
       if (!existing.runs.includes(runId)) {
@@ -300,7 +333,10 @@ export class PatternAnalyzer {
     return null;
   }
 
-  private static calculateTrends(patterns: DecisionPattern[], runs: Array<{ runId: string; events: Event[] }>): void {
+  private static calculateTrends(
+    patterns: DecisionPattern[],
+    runs: Array<{ runId: string; events: Event[] }>
+  ): void {
     // Group runs by time periods (e.g., first half vs second half)
     const sortedRuns = [...runs].sort((a, b) => {
       const aTime = a.events[0]?.timestamp || 0;
@@ -370,7 +406,9 @@ export class PatternAnalyzer {
     }
 
     // High frequency policy violations
-    const policyViolations = patterns.filter((p) => p.type === 'policy_violation' && p.percentage > 20);
+    const policyViolations = patterns.filter(
+      (p) => p.type === 'policy_violation' && p.percentage > 20
+    );
     for (const pattern of policyViolations) {
       insights.push({
         id: `insight-policy-violation-${pattern.id}`,
@@ -384,7 +422,9 @@ export class PatternAnalyzer {
     }
 
     // High frequency approval requests
-    const approvalRequests = patterns.filter((p) => p.type === 'approval_request' && p.percentage > 30);
+    const approvalRequests = patterns.filter(
+      (p) => p.type === 'approval_request' && p.percentage > 30
+    );
     for (const pattern of approvalRequests) {
       insights.push({
         id: `insight-approval-requests-${pattern.id}`,
@@ -437,4 +477,3 @@ export class PatternAnalyzer {
     };
   }
 }
-

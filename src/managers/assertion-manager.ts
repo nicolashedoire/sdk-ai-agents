@@ -52,8 +52,9 @@ export class AssertionManager {
   }
 
   async getAssertion(assertionId: string): Promise<Assertion | null> {
-    if (this.assertionsCache.has(assertionId)) {
-      return this.assertionsCache.get(assertionId)!;
+    const cached = this.assertionsCache.get(assertionId);
+    if (cached) {
+      return cached;
     }
 
     await this.ensureAssertionsDir();
@@ -121,5 +122,3 @@ export class AssertionManager {
     }
   }
 }
-
-

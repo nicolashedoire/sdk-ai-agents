@@ -9,17 +9,20 @@ export class AlternativesExtractor {
   static extractFromEvents(runId: string, events: Event[]): AlternativesAnalysis {
     const decisionPoints: AlternativesAnalysis['decisionPoints'] = [];
     const alternatives: Alternative[] = [];
-    
+
     // Sort events by timestamp
     const sortedEvents = [...events].sort((a, b) => a.timestamp - b.timestamp);
 
     // Track intentions and their outcomes
-    const intentionMap = new Map<string, {
-      intention: Event;
-      executed?: Event;
-      rejected?: Event;
-      alternatives?: Event[];
-    }>();
+    const intentionMap = new Map<
+      string,
+      {
+        intention: Event;
+        executed?: Event;
+        rejected?: Event;
+        alternatives?: Event[];
+      }
+    >();
 
     // First pass: collect all intentions and their outcomes
     for (const event of sortedEvents) {
@@ -32,9 +35,10 @@ export class AlternativesExtractor {
           entry.rejected = event;
         }
       } else if (event.type === 'action.executed' || event.type === 'action.executing') {
-        const intentionId = (event.data.intentionId as string) || 
-                           (event.data.intention as { id?: string })?.id ||
-                           this.findRelatedIntentionId(event, sortedEvents);
+        const intentionId =
+          (event.data.intentionId as string) ||
+          (event.data.intention as { id?: string })?.id ||
+          AlternativesExtractor.findRelatedIntentionId(event, sortedEvents);
         if (intentionId) {
           const entry = intentionMap.get(intentionId);
           if (entry) {
@@ -50,8 +54,10 @@ export class AlternativesExtractor {
     for (const event of sortedEvents) {
       // Check for multiple tool calls in a single intention (alternatives)
       if (event.type === 'intention.generated') {
-        const toolCalls = event.data.toolCalls as Array<{ function?: { name?: string; arguments?: string } }> | undefined;
-        
+        const toolCalls = event.data.toolCalls as
+          | Array<{ function?: { name?: string; arguments?: string } }>
+          | undefined;
+
         if (toolCalls && toolCalls.length > 1) {
           // Multiple tool calls = alternatives
           const altAlternatives: Alternative[] = toolCalls.map((tc, index) => ({
@@ -62,7 +68,7 @@ export class AlternativesExtractor {
             data: {
               toolCall: {
                 name: tc.function?.name || 'unknown',
-                parameters: this.parseToolCallArguments(tc.function?.arguments),
+                parameters: AlternativesExtractor.parseToolCallArguments(tc.function?.arguments),
               },
             },
             status: 'considered',
@@ -70,7 +76,7 @@ export class AlternativesExtractor {
           }));
 
           // Find which one was actually executed
-          const executedTool = this.findExecutedTool(event, sortedEvents);
+          const executedTool = AlternativesExtractor.findExecutedTool(event, sortedEvents);
           if (executedTool) {
             const selectedIndex = toolCalls.findIndex(
               (tc) => tc.function?.name === executedTool.toolName
@@ -89,26 +95,28 @@ export class AlternativesExtractor {
           currentDecisionPoint = {
             id: `decision-${event.id}`,
             timestamp: event.timestamp,
-            context: this.getEventContext(event, sortedEvents),
+            context: AlternativesExtractor.getEventContext(event, sortedEvents),
             alternatives: altAlternatives,
             selectedAlternative: altAlternatives.find((a) => a.status === 'selected'),
-            reasoning: (event.data.message as string) || event.data.reasoning as string || undefined,
+            reasoning:
+              (event.data.message as string) || (event.data.reasoning as string) || undefined,
           };
           decisionPoints.push(currentDecisionPoint);
           alternatives.push(...altAlternatives);
         } else {
           // Single intention - check if it was executed or rejected
           const entry = intentionMap.get(event.id);
-          const intentionData = (event.data.intention as {
-            type?: string;
-            toolName?: string;
-            reasoning?: string;
-          }) || this.extractIntentionFromData(event.data);
+          const intentionData =
+            (event.data.intention as {
+              type?: string;
+              toolName?: string;
+              reasoning?: string;
+            }) || AlternativesExtractor.extractIntentionFromData(event.data);
 
           const alt: Alternative = {
             id: `alt-${event.id}`,
             type: 'intention',
-            description: this.getIntentionDescription(intentionData),
+            description: AlternativesExtractor.getIntentionDescription(intentionData),
             timestamp: event.timestamp,
             data: {
               intention: {
@@ -129,7 +137,7 @@ export class AlternativesExtractor {
             currentDecisionPoint = {
               id: `decision-${event.id}`,
               timestamp: event.timestamp,
-              context: this.getEventContext(event, sortedEvents),
+              context: AlternativesExtractor.getEventContext(event, sortedEvents),
               alternatives: [alt],
               selectedAlternative: entry?.executed ? alt : undefined,
               reasoning: alt.data?.intention?.reasoning,
@@ -150,7 +158,7 @@ export class AlternativesExtractor {
 
         if (!policyData.allowed && !policyData.requiresApproval) {
           // Policy rejected - this represents a rejected alternative
-          const relatedIntention = this.findRelatedIntention(event, sortedEvents);
+          const relatedIntention = AlternativesExtractor.findRelatedIntention(event, sortedEvents);
           if (relatedIntention) {
             const alt: Alternative = {
               id: `alt-policy-${event.id}`,
@@ -177,7 +185,7 @@ export class AlternativesExtractor {
               currentDecisionPoint = {
                 id: `decision-policy-${event.id}`,
                 timestamp: event.timestamp,
-                context: this.getEventContext(event, sortedEvents),
+                context: AlternativesExtractor.getEventContext(event, sortedEvents),
                 alternatives: [alt],
                 reasoning: policyData.reason,
               };
@@ -211,7 +219,7 @@ export class AlternativesExtractor {
         const relatedDecisionPoint = decisionPoints.find(
           (dp) => Math.abs(dp.timestamp - event.timestamp) < 1000
         );
-        
+
         if (relatedDecisionPoint) {
           relatedDecisionPoint.alternatives.push(alt);
         } else {
@@ -219,7 +227,7 @@ export class AlternativesExtractor {
           currentDecisionPoint = {
             id: `decision-approval-${event.id}`,
             timestamp: event.timestamp,
-            context: this.getEventContext(event, sortedEvents),
+            context: AlternativesExtractor.getEventContext(event, sortedEvents),
             alternatives: [alt],
             reasoning: event.data.reason as string,
           };
@@ -274,21 +282,23 @@ export class AlternativesExtractor {
     return null;
   }
 
-  private static getIntentionDescription(intention: {
-    type?: string;
-    toolName?: string;
-    reasoning?: string;
-  } | null): string {
+  private static getIntentionDescription(
+    intention: {
+      type?: string;
+      toolName?: string;
+      reasoning?: string;
+    } | null
+  ): string {
     if (!intention) return 'Unknown intention';
-    
+
     if (intention.type === 'tool_call' && intention.toolName) {
       return `Call tool: ${intention.toolName}`;
     }
-    
+
     if (intention.type === 'final_answer') {
       return 'Final answer';
     }
-    
+
     return `Intention: ${intention.type || 'unknown'}`;
   }
 
@@ -301,7 +311,10 @@ export class AlternativesExtractor {
     }
   }
 
-  private static findExecutedTool(intentionEvent: Event, events: Event[]): {
+  private static findExecutedTool(
+    intentionEvent: Event,
+    events: Event[]
+  ): {
     toolName?: string;
   } | null {
     // Find the action.executed event that corresponds to this intention
@@ -313,8 +326,9 @@ export class AlternativesExtractor {
         event.timestamp > intentionTimestamp &&
         event.timestamp < intentionTimestamp + 5000 // Within 5 seconds
       ) {
-        const toolName = (event.data.toolName as string) || 
-                        (event.data.intention as { toolName?: string })?.toolName;
+        const toolName =
+          (event.data.toolName as string) ||
+          (event.data.intention as { toolName?: string })?.toolName;
         if (toolName) {
           return { toolName };
         }
@@ -327,7 +341,7 @@ export class AlternativesExtractor {
   private static findRelatedIntention(policyEvent: Event, events: Event[]): Event | null {
     // Find the intention that was checked by this policy
     const policyTimestamp = policyEvent.timestamp;
-    
+
     // Look for intention.generated events just before this policy check
     for (let i = events.length - 1; i >= 0; i--) {
       const event = events[i];
@@ -344,7 +358,7 @@ export class AlternativesExtractor {
   }
 
   private static findRelatedIntentionId(actionEvent: Event, events: Event[]): string | null {
-    const relatedIntention = this.findRelatedIntention(actionEvent, events);
+    const relatedIntention = AlternativesExtractor.findRelatedIntention(actionEvent, events);
     return relatedIntention?.id || null;
   }
 
@@ -364,4 +378,3 @@ export class AlternativesExtractor {
     return 'Unknown context';
   }
 }
-

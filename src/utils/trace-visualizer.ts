@@ -1,5 +1,9 @@
 import type { Event } from '../types/events.js';
-import type { TraceVisualization, EventGroup, EventGroupType } from '../types/trace-visualization.js';
+import type {
+  TraceVisualization,
+  EventGroup,
+  EventGroupType,
+} from '../types/trace-visualization.js';
 import { generateEventId } from './id.js';
 
 export class TraceVisualizer {
@@ -14,14 +18,14 @@ export class TraceVisualizer {
     events: Event[];
   }): TraceVisualization {
     const sortedEvents = [...trace.events].sort((a, b) => a.timestamp - b.timestamp);
-    
+
     if (sortedEvents.length === 0) {
-      return this.createEmptyVisualization(trace);
+      return TraceVisualizer.createEmptyVisualization(trace);
     }
 
-    const groups = this.groupEvents(sortedEvents);
-    const flatTimeline = this.buildFlatTimeline(sortedEvents, groups);
-    const summary = this.buildSummary(sortedEvents, groups);
+    const groups = TraceVisualizer.groupEvents(sortedEvents);
+    const flatTimeline = TraceVisualizer.buildFlatTimeline(sortedEvents, groups);
+    const summary = TraceVisualizer.buildSummary(sortedEvents, groups);
 
     const timeRange = {
       start: sortedEvents[0].timestamp,
@@ -46,9 +50,13 @@ export class TraceVisualizer {
 
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
-      const groupType = this.determineGroupType(event, events, i);
+      const groupType = TraceVisualizer.determineGroupType(event, events, i);
 
-      if (!currentGroup || currentGroup.type !== groupType || this.shouldStartNewGroup(event, currentGroup, events, i)) {
+      if (
+        !currentGroup ||
+        currentGroup.type !== groupType ||
+        TraceVisualizer.shouldStartNewGroup(event, currentGroup, events, i)
+      ) {
         // Finalize current group
         if (currentGroup) {
           currentGroup.endTime = events[i - 1].timestamp;
@@ -60,12 +68,12 @@ export class TraceVisualizer {
         currentGroup = {
           id: `group-${generateEventId()}`,
           type: groupType,
-          label: this.getGroupLabel(groupType, event),
+          label: TraceVisualizer.getGroupLabel(groupType, event),
           startTime: event.timestamp,
           endTime: event.timestamp,
           duration: 0,
           events: [event],
-          metadata: this.extractGroupMetadata(groupType, event),
+          metadata: TraceVisualizer.extractGroupMetadata(groupType, event),
         };
       } else {
         // Add event to current group
@@ -83,14 +91,26 @@ export class TraceVisualizer {
     return groups;
   }
 
-  private static determineGroupType(event: Event, _allEvents: Event[], _index: number): EventGroupType {
+  private static determineGroupType(
+    event: Event,
+    _allEvents: Event[],
+    _index: number
+  ): EventGroupType {
     // Run lifecycle events
-    if (['run.started', 'run.completed', 'run.failed', 'run.cancelled', 'run.stopped'].includes(event.type)) {
+    if (
+      ['run.started', 'run.completed', 'run.failed', 'run.cancelled', 'run.stopped'].includes(
+        event.type
+      )
+    ) {
       return 'run_lifecycle';
     }
 
     // Error events
-    if (event.type === 'error.occurred' || event.type === 'action.failed' || event.type === 'tool.failed') {
+    if (
+      event.type === 'error.occurred' ||
+      event.type === 'action.failed' ||
+      event.type === 'tool.failed'
+    ) {
       return 'error';
     }
 
@@ -110,7 +130,11 @@ export class TraceVisualizer {
     }
 
     // Reasoning cycle (intention generation and execution)
-    if (event.type === 'intention.generated' || event.type === 'intention.rejected' || event.type === 'action.executed') {
+    if (
+      event.type === 'intention.generated' ||
+      event.type === 'intention.rejected' ||
+      event.type === 'action.executed'
+    ) {
       return 'reasoning_cycle';
     }
 
@@ -125,7 +149,7 @@ export class TraceVisualizer {
     index: number
   ): boolean {
     // Start new group if switching to a different type
-    const newGroupType = this.determineGroupType(event, allEvents, index);
+    const newGroupType = TraceVisualizer.determineGroupType(event, allEvents, index);
     if (newGroupType !== currentGroup.type) {
       return true;
     }
@@ -205,7 +229,7 @@ export class TraceVisualizer {
         id: event.id,
         timestamp: event.timestamp,
         type: event.type,
-        description: this.getEventDescription(event),
+        description: TraceVisualizer.getEventDescription(event),
         groupId: group?.id,
         event,
       };
@@ -214,12 +238,13 @@ export class TraceVisualizer {
 
   private static getEventDescription(event: Event): string {
     switch (event.type) {
-      case 'intention.generated':
+      case 'intention.generated': {
         const intention = (event.data.intention as { type?: string; toolName?: string }) || {};
         if (intention.type === 'tool_call' && intention.toolName) {
           return `Generate intention: Call tool ${intention.toolName}`;
         }
         return 'Generate intention';
+      }
       case 'action.executed':
         return `Action executed: ${(event.data.toolName as string) || 'unknown'}`;
       case 'tool.called':
@@ -239,7 +264,10 @@ export class TraceVisualizer {
     }
   }
 
-  private static buildSummary(events: Event[], groups: EventGroup[]): TraceVisualization['summary'] {
+  private static buildSummary(
+    events: Event[],
+    groups: EventGroup[]
+  ): TraceVisualization['summary'] {
     const groupsByType: Record<EventGroupType, number> = {
       run_lifecycle: 0,
       reasoning_cycle: 0,
@@ -263,7 +291,9 @@ export class TraceVisualizer {
         toolsCalled: events.filter((e) => e.type === 'tool.called').length,
         policiesChecked: events.filter((e) => e.type === 'policy.checked').length,
         approvalsRequested: events.filter((e) => e.type === 'approval.requested').length,
-        errors: events.filter((e) => ['error.occurred', 'action.failed', 'tool.failed'].includes(e.type)).length,
+        errors: events.filter((e) =>
+          ['error.occurred', 'action.failed', 'tool.failed'].includes(e.type)
+        ).length,
       },
     };
   }
@@ -307,4 +337,3 @@ export class TraceVisualizer {
     };
   }
 }
-

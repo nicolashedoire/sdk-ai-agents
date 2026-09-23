@@ -44,9 +44,7 @@ export class CapabilityRegistry {
   }
 
   getCapabilitiesByTool(toolName: string): Capability[] {
-    return Array.from(this.capabilities.values()).filter((cap) =>
-      cap.tools.includes(toolName)
-    );
+    return Array.from(this.capabilities.values()).filter((cap) => cap.tools.includes(toolName));
   }
 
   unregisterCapability(name: string): boolean {
@@ -57,4 +55,3 @@ export class CapabilityRegistry {
     this.capabilities.clear();
   }
 }
-

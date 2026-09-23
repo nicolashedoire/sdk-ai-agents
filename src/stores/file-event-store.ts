@@ -192,7 +192,11 @@ export class FileEventStore implements IEventStore {
     try {
       const existingEvents = await this.loadExistingEvents(filePath);
       const temporaryPath = `${filePath}.${uuidv4()}.tmp`;
-      await fs.writeFile(temporaryPath, JSON.stringify([...existingEvents, ...batch], null, 2), 'utf-8');
+      await fs.writeFile(
+        temporaryPath,
+        JSON.stringify([...existingEvents, ...batch], null, 2),
+        'utf-8'
+      );
       await fs.rename(temporaryPath, filePath);
     } catch (error) {
       pending.unshift(...batch);

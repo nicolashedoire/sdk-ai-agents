@@ -48,5 +48,3 @@ export interface RegressionReport {
     similarityScore: number;
   };
 }
-
-

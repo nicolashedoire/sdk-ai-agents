@@ -36,18 +36,22 @@ export class ReasoningGraphBuilder {
         case 'intention.generated':
           {
             const nodeId = `intention-${event.id}`;
-            const intentionData = (event.data.intention as { type?: string; toolName?: string; reasoning?: string } | undefined) || this.extractIntentionFromData(event.data);
-            
+            const intentionData =
+              (event.data.intention as
+                | { type?: string; toolName?: string; reasoning?: string }
+                | undefined) || ReasoningGraphBuilder.extractIntentionFromData(event.data);
+
             const node: ReasoningNode = {
               id: nodeId,
               type: 'intention',
-              label: this.getIntentionLabel(intentionData),
+              label: ReasoningGraphBuilder.getIntentionLabel(intentionData),
               timestamp: event.timestamp,
               data: {
                 intention: {
                   type: intentionData?.type || 'unknown',
                   toolName: intentionData?.toolName,
-                  reasoning: intentionData?.reasoning || (event.data.message as string) || undefined,
+                  reasoning:
+                    intentionData?.reasoning || (event.data.message as string) || undefined,
                 },
               },
               metadata: event.metadata,
@@ -104,7 +108,11 @@ export class ReasoningGraphBuilder {
                 source: lastNodeId,
                 target: nodeId,
                 type: 'validates',
-                label: policyData.allowed ? 'Allowed' : policyData.requiresApproval ? 'Requires Approval' : 'Denied',
+                label: policyData.allowed
+                  ? 'Allowed'
+                  : policyData.requiresApproval
+                    ? 'Requires Approval'
+                    : 'Denied',
               });
             }
             lastNodeId = nodeId;
@@ -122,7 +130,7 @@ export class ReasoningGraphBuilder {
               data: {
                 decision: {
                   choice: 'request_approval',
-                  reasoning: event.data.reason as string || undefined,
+                  reasoning: (event.data.reason as string) || undefined,
                 },
               },
               metadata: event.metadata,
@@ -177,16 +185,18 @@ export class ReasoningGraphBuilder {
         case 'action.executed':
           {
             const nodeId = `action-${event.id}`;
-            const intentionData = event.data.intention as {
-              type?: string;
-              toolName?: string;
-              reasoning?: string;
-            } | undefined;
+            const intentionData = event.data.intention as
+              | {
+                  type?: string;
+                  toolName?: string;
+                  reasoning?: string;
+                }
+              | undefined;
 
             const node: ReasoningNode = {
               id: nodeId,
               type: 'action',
-              label: this.getActionLabel(intentionData, event.data),
+              label: ReasoningGraphBuilder.getActionLabel(intentionData, event.data),
               timestamp: event.timestamp,
               data: {
                 action: {
@@ -325,21 +335,23 @@ export class ReasoningGraphBuilder {
     return null;
   }
 
-  private static getIntentionLabel(intention: {
-    type?: string;
-    toolName?: string;
-    reasoning?: string;
-  } | null): string {
+  private static getIntentionLabel(
+    intention: {
+      type?: string;
+      toolName?: string;
+      reasoning?: string;
+    } | null
+  ): string {
     if (!intention) return 'Intention';
-    
+
     if (intention.type === 'tool_call' && intention.toolName) {
       return `Call Tool: ${intention.toolName}`;
     }
-    
+
     if (intention.type === 'final_answer') {
       return 'Final Answer';
     }
-    
+
     return `Intention: ${intention.type || 'unknown'}`;
   }
 
@@ -350,12 +362,11 @@ export class ReasoningGraphBuilder {
     if (intention?.type === 'tool_call' && intention.toolName) {
       return `Execute: ${intention.toolName}`;
     }
-    
+
     if (intention?.type === 'final_answer') {
       return 'Return Answer';
     }
-    
+
     return 'Action';
   }
 }
-

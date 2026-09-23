@@ -106,10 +106,10 @@ export class OpenAIProvider implements LLMProvider {
     if (error instanceof Error) {
       // Checked with instanceof so it survives minified bundles; guarded for test doubles.
       const connectionError: unknown = Reflect.get(OpenAI, 'APIConnectionError');
-      const connectionFailure = typeof connectionError === 'function' && error instanceof connectionError;
+      const connectionFailure =
+        typeof connectionError === 'function' && error instanceof connectionError;
       return new LLMProviderError('openai', error, true, { connectionFailure });
     }
     return new LLMProviderError('openai', new Error(String(error)), true);
   }
 }
-

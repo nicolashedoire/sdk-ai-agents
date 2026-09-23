@@ -52,8 +52,9 @@ export class GoldenTraceManager {
   }
 
   async getGoldenTrace(goldenTraceId: string): Promise<GoldenTrace | null> {
-    if (this.goldenTracesCache.has(goldenTraceId)) {
-      return this.goldenTracesCache.get(goldenTraceId)!;
+    const cached = this.goldenTracesCache.get(goldenTraceId);
+    if (cached) {
+      return cached;
     }
 
     try {
@@ -104,7 +105,7 @@ export class GoldenTraceManager {
 
   async deleteGoldenTrace(goldenTraceId: string): Promise<boolean> {
     await this.ensureGoldenTracesDir();
-    
+
     try {
       const filePath = join(this.goldenTracesDir, `${goldenTraceId}.json`);
       await fs.unlink(filePath);
@@ -124,7 +125,7 @@ export class GoldenTraceManager {
     format: 'json' | 'yaml' = 'json'
   ): Promise<string> {
     await this.ensureGoldenTracesDir();
-    
+
     const goldenTrace = await this.getGoldenTrace(goldenTraceId);
     if (!goldenTrace) {
       throw new Error(`Golden trace ${goldenTraceId} not found`);
@@ -176,4 +177,3 @@ export class GoldenTraceManager {
     return String(obj);
   }
 }
-

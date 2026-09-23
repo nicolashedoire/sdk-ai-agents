@@ -54,5 +54,3 @@ export interface AssertionEvaluationReport {
   errorAssertions: number;
   results: AssertionResult[];
 }
-
-

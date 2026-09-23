@@ -49,4 +49,3 @@ export interface RegressionTestSuiteResult {
     criticalRegressions: number;
   };
 }
-

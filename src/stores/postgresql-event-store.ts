@@ -17,10 +17,16 @@ export interface PostgreSQLConfig {
  * PostgreSQL-specific connection wrapper for SQLEventStore.
  * This uses pg (node-postgres) for PostgreSQL support.
  */
-export class PostgreSQLConnection implements SQLConnection {
-  private pool: any; // pg.Pool instance
+/** The subset of `pg.Pool` the store uses (a real `pg.Pool` satisfies it). */
+export interface PostgreSQLPool {
+  query(sql: string, params?: unknown[]): Promise<{ rows: unknown[] }>;
+  end(): Promise<void>;
+}
 
-  constructor(pool: any) {
+export class PostgreSQLConnection implements SQLConnection {
+  private pool: PostgreSQLPool;
+
+  constructor(pool: PostgreSQLPool) {
     this.pool = pool;
   }
 
@@ -43,7 +49,9 @@ export class PostgreSQLConnection implements SQLConnection {
  * Uses pg (node-postgres) for PostgreSQL database access.
  */
 export class PostgreSQLEventStore extends SQLEventStore {
-  constructor(config: Omit<SQLEventStoreConfig, 'connection'> & { pool: any; tableName?: string }) {
+  constructor(
+    config: Omit<SQLEventStoreConfig, 'connection'> & { pool: PostgreSQLPool; tableName?: string }
+  ) {
     // pool is used via connection, no need to store separately
     const connection = new PostgreSQLConnection(config.pool);
     super({
@@ -104,7 +112,7 @@ export class PostgreSQLEventStore extends SQLEventStore {
   /**
    * Override append to handle PostgreSQL-specific JSON handling.
    */
-  async append(runId: string, event: any): Promise<void> {
+  async append(runId: string, event: Event): Promise<void> {
     // Ensure run exists in runs table
     await this.ensureRunExists(runId, event.metadata?.agentId as string | undefined);
 
@@ -147,7 +155,12 @@ export class PostgreSQLEventStore extends SQLEventStore {
     const params: unknown[] = [runId];
     let paramIndex = 2;
 
-    const { sql: updatedSQL, paramIndex: updatedParamIndex } = this.applyFiltersToSQLPostgreSQL(sql, params, filters, paramIndex);
+    const { sql: updatedSQL, paramIndex: updatedParamIndex } = this.applyFiltersToSQLPostgreSQL(
+      sql,
+      params,
+      filters,
+      paramIndex
+    );
     sql = updatedSQL;
     paramIndex = updatedParamIndex;
 
@@ -187,11 +200,20 @@ export class PostgreSQLEventStore extends SQLEventStore {
    * Note: This method is overridden but not used directly in PostgreSQL implementation.
    * We use applyFiltersToSQLPostgreSQL instead for better control.
    */
-  protected applyFiltersToSQL(sql: string, params: unknown[], filters?: EventFilters): { sql: string; params: unknown[] } {
+  protected applyFiltersToSQL(
+    sql: string,
+    params: unknown[],
+    filters?: EventFilters
+  ): { sql: string; params: unknown[] } {
     if (!filters) return { sql, params };
 
     // Use PostgreSQL-specific filter application
-    const { sql: updatedSQL } = this.applyFiltersToSQLPostgreSQL(sql, params, filters, params.length + 1);
+    const { sql: updatedSQL } = this.applyFiltersToSQLPostgreSQL(
+      sql,
+      params,
+      filters,
+      params.length + 1
+    );
     return { sql: updatedSQL, params };
   }
 
@@ -199,7 +221,12 @@ export class PostgreSQLEventStore extends SQLEventStore {
    * PostgreSQL-specific filter application (helper).
    * Returns the modified SQL string and the next parameter index.
    */
-  private applyFiltersToSQLPostgreSQL(sql: string, params: unknown[], filters?: EventFilters, startIndex = 1): { sql: string; paramIndex: number } {
+  private applyFiltersToSQLPostgreSQL(
+    sql: string,
+    params: unknown[],
+    filters?: EventFilters,
+    startIndex = 1
+  ): { sql: string; paramIndex: number } {
     if (!filters) return { sql, paramIndex: startIndex };
 
     let paramIndex = startIndex;
@@ -248,7 +275,7 @@ export class PostgreSQLEventStore extends SQLEventStore {
     if (filters.dataQuery) {
       const { field, operator, value } = filters.dataQuery;
       const jsonPath = `data->>'${field}'`;
-      
+
       switch (operator) {
         case 'eq':
           resultSQL += ` AND ${jsonPath} = $${paramIndex++}`;
@@ -278,7 +305,7 @@ export class PostgreSQLEventStore extends SQLEventStore {
       return [];
     }
 
-    let sql = `SELECT `;
+    let sql = 'SELECT ';
     const params: unknown[] = [];
     let paramIndex = 1;
 
@@ -307,7 +334,12 @@ export class PostgreSQLEventStore extends SQLEventStore {
     }
 
     sql += ' WHERE 1=1';
-    const { sql: updatedSQL, paramIndex: updatedParamIndex } = this.applyFiltersToSQLPostgreSQL(sql, params, filters, paramIndex);
+    const { sql: updatedSQL, paramIndex: updatedParamIndex } = this.applyFiltersToSQLPostgreSQL(
+      sql,
+      params,
+      filters,
+      paramIndex
+    );
     sql = updatedSQL;
     paramIndex = updatedParamIndex;
     sql += ' GROUP BY key ORDER BY count DESC';
@@ -331,7 +363,11 @@ export class PostgreSQLEventStore extends SQLEventStore {
         try {
           await this.connection.execute(
             'INSERT INTO runs (id, agent_id, created_at) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING',
-            [run.id, run.agentId || null, run.createdAt ? new Date(run.createdAt).toISOString() : null]
+            [
+              run.id,
+              run.agentId || null,
+              run.createdAt ? new Date(run.createdAt).toISOString() : null,
+            ]
           );
         } catch {
           // Runs table might not exist, ignore
@@ -343,7 +379,7 @@ export class PostgreSQLEventStore extends SQLEventStore {
     const batchSize = 100;
     for (let i = 0; i < backupData.events.length; i += batchSize) {
       const batch = backupData.events.slice(i, i + batchSize);
-      
+
       for (const { runId, event } of batch) {
         await this.append(runId, event);
       }
@@ -357,4 +393,3 @@ export class PostgreSQLEventStore extends SQLEventStore {
     await this.connection.close();
   }
 }
-
