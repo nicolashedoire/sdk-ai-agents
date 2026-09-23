@@ -282,11 +282,15 @@ describe('ApprovalManager', () => {
         parameters: {},
       };
 
-      await manager.requestApproval('run-1', 'agent-1', intention1, 'policy-1');
-      await manager.requestApproval('run-1', 'agent-1', intention2, 'policy-1');
+      const first = await manager.requestApproval('run-1', 'agent-1', intention1, 'policy-1');
+      const second = await manager.requestApproval('run-1', 'agent-1', intention2, 'policy-1');
       await manager.requestApproval('run-2', 'agent-1', intention1, 'policy-1');
 
       manager.cancelAllForRun('run-1');
+
+      // Whoever waits on a cancelled approval is told so.
+      await expect(first.waitForApproval).rejects.toThrow('Approval request cancelled');
+      await expect(second.waitForApproval).rejects.toThrow('Approval request cancelled');
 
       const run1Approvals = manager.getPendingApprovalsForRun('run-1');
       expect(run1Approvals.length).toBe(0);
