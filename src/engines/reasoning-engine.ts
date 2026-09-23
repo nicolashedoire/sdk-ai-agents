@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import { LLMProviderError } from '../errors/index.js';
-import type { LLMProvider } from '../providers/llm-provider.js';
+import type { LLMProvider, LLMResponse } from '../providers/llm-provider.js';
 import { FallbackProvider } from '../providers/fallback-provider.js';
 import type { ProviderSettings } from '../types/agent.js';
 import type { IEventStore } from '../stores/event-store.js';
@@ -88,6 +88,7 @@ export class ReasoningEngine {
         maxTokens = context.maxTokens;
         
         const result = await this.provider.generateCompletionWithFallback({
+          runId: context.runId,
           model,
           messages,
           tools,
@@ -118,6 +119,7 @@ export class ReasoningEngine {
         maxTokens = resolvedSettings.maxTokens ?? context.maxTokens;
         
         response = await this.provider.generateCompletion({
+          runId: context.runId,
           model,
           messages,
           tools,
@@ -127,7 +129,7 @@ export class ReasoningEngine {
         });
       }
 
-      await this.logIntentionGenerated(context, eventStore, response);
+      await this.logIntentionGenerated(context, eventStore, { ...response, requestedModel: model });
 
       return this.parseIntention(response);
     } catch (error) {
@@ -190,7 +192,13 @@ export class ReasoningEngine {
   private async logIntentionGenerated(
     context: ReasoningContext,
     eventStore: IEventStore,
-    response: { content: string | null; toolCalls?: Array<{ function: { name: string; arguments: string } }> }
+    response: {
+      content: string | null;
+      toolCalls?: Array<{ function: { name: string; arguments: string } }>;
+      model?: string;
+      requestedModel?: string;
+      usage?: LLMResponse['usage'];
+    }
   ): Promise<void> {
     await eventStore.append(context.runId, {
       id: generateEventId(),
@@ -205,6 +213,9 @@ export class ReasoningEngine {
             arguments: tc.function.arguments,
           },
         })),
+        ...(response.model ? { model: response.model } : {}),
+        ...(response.requestedModel ? { requestedModel: response.requestedModel } : {}),
+        ...(response.usage ? { usage: response.usage } : {}),
       },
       metadata: {
         agentId: context.agentId,
@@ -294,7 +305,7 @@ export class ReasoningEngine {
       function: {
         name: tool.name,
         description: tool.description,
-        parameters: this.zodSchemaToJsonSchema(tool.schema),
+        parameters: tool.inputJsonSchema ?? this.zodSchemaToJsonSchema(tool.schema),
       },
     }));
   }

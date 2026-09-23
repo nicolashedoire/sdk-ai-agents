@@ -21,256 +21,256 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 
 **Functional Requirements:**
 
-Le projet SDK_AI_Agents comprend 78 Functional Requirements organisés en 9 epics MVP avec 65 stories. Les domaines fonctionnels principaux sont :
+The SDK_AI_Agents project comprises 78 Functional Requirements organized into 9 MVP epics with 65 stories. The main functional domains are:
 
-- **Agent Lifecycle & Execution Management** : Création, démarrage, arrêt, gestion d'état des agents
-- **Tool & Capability Management** : Définition, validation, contrôle des outils avec sécurité deny-by-default
-- **Policies & Governance** : Système de gouvernance native avec policies globales et spécifiques
-- **Runtime Architecture** : Séparation stricte raisonnement/action (Reasoning Engine ≠ Action Engine)
-- **Event Sourcing & Persistence** : Event log comme source de vérité unique pour traçabilité complète
-- **Tracing & Observability** : Observabilité complète des décisions, contraintes et raisonnement
-- **Replay & Debugging** : Replay déterministe sans LLM pour debugging et audit
-- **Versioning & Audit** : Traçabilité des versions d'agents et exécutions
+- **Agent Lifecycle & Execution Management**: Creation, start, stop, and state management of agents
+- **Tool & Capability Management**: Definition, validation, and control of tools with deny-by-default security
+- **Policies & Governance**: Native governance system with global and specific policies
+- **Runtime Architecture**: Strict separation of reasoning/action (Reasoning Engine ≠ Action Engine)
+- **Event Sourcing & Persistence**: Event log as the single source of truth for complete traceability
+- **Tracing & Observability**: Complete observability of decisions, constraints, and reasoning
+- **Replay & Debugging**: Deterministic replay without the LLM for debugging and audit
+- **Versioning & Audit**: Traceability of agent and execution versions
 
 **Non-Functional Requirements:**
 
-Les NFRs critiques qui vont guider les décisions architecturales :
+The critical NFRs that will guide the architectural decisions:
 
-- **Performance** : Overhead SDK < 5-10ms (hors LLM/tools), replay sans appel LLM
-- **Fiabilité** : 100% des runs rejouables, aucun événement perdu, aucun tool sans event correspondant
-- **Sécurité** : Deny-by-default structurel, sécurité par impossibilité (pas par configuration)
-- **Type-safety** : TypeScript strict, API entièrement typée, prévisible
-- **Scalabilité** : Event store file-based (MVP) → SQL (production) → distribué (scale)
-- **Déterminisme** : Replay = même séquence logique, même ordre de tool calls
+- **Performance**: SDK overhead < 5-10ms (excluding LLM/tools), replay without an LLM call
+- **Reliability**: 100% of runs replayable, no lost events, no tool without a corresponding event
+- **Security**: Structural deny-by-default, security by impossibility (not by configuration)
+- **Type-safety**: Strict TypeScript, fully typed and predictable API
+- **Scalability**: File-based event store (MVP) → SQL (production) → distributed (scale)
+- **Determinism**: Replay = same logical sequence, same tool call order
 
 **Scale & Complexity:**
 
-- **Primary domain** : SDK/package TypeScript/Node.js (developer tool)
-- **Complexity level** : Moyenne à élevée (architecture sophistiquée sous-jacente, API simple exposée)
-- **Estimated architectural components** : ~8 composants majeurs (Event Store, Reasoning Engine, Action Engine, Policy Engine, Tool Registry, Trace Engine, Replay Engine, SDK API Layer)
+- **Primary domain**: TypeScript/Node.js SDK/package (developer tool)
+- **Complexity level**: Medium to high (sophisticated underlying architecture, simple exposed API)
+- **Estimated architectural components**: ~8 major components (Event Store, Reasoning Engine, Action Engine, Policy Engine, Tool Registry, Trace Engine, Replay Engine, SDK API Layer)
 
 ### Technical Constraints & Dependencies
 
-**Contraintes techniques non négociables (PRD) :**
+**Non-negotiable technical constraints (PRD):**
 
-1. **Event log = source de vérité unique** : Pas de logique "cachée", tout est traçable et rejouable
-2. **Deny-by-default** : Tool, action, capability - tout doit être explicitement autorisé
-3. **API stable et minimaliste** : Peu de concepts mais solides, type-safe, documentée, prévisible
-4. **Séparation raisonnement/action** : Le LLM ne provoque jamais d'effet de bord direct
-5. **Replay sans LLM** : Replay déterministe à partir des événements uniquement
+1. **Event log = single source of truth**: No "hidden" logic, everything is traceable and replayable
+2. **Deny-by-default**: Tool, action, capability - everything must be explicitly authorized
+3. **Stable and minimalist API**: Few but solid concepts, type-safe, documented, predictable
+4. **Reasoning/action separation**: The LLM never directly causes a side effect
+5. **Replay without the LLM**: Deterministic replay from events alone
 
-**Stack technique MVP :**
+**MVP technical stack:**
 
-- TypeScript 5.x avec mode strict
+- TypeScript 5.x with strict mode
 - Node.js 20+ (LTS)
-- Support ESM et CommonJS
+- ESM and CommonJS support
 - npm package (@sdk-ai-agents/core)
-- Event store : in-memory + file (MVP)
-- 1 provider LLM (OpenAI ou Anthropic)
+- Event store: in-memory + file (MVP)
+- 1 LLM provider (OpenAI or Anthropic)
 
-**Dépendances identifiées :**
+**Identified dependencies:**
 
-- Provider LLM (OpenAI ou Anthropic) pour Reasoning Engine
-- Zod ou équivalent pour validation de schémas (tool inputs)
-- Système de fichiers pour persistance événements (MVP)
-- Potentiellement SQL pour event store production (post-MVP)
+- LLM provider (OpenAI or Anthropic) for the Reasoning Engine
+- Zod or equivalent for schema validation (tool inputs)
+- File system for event persistence (MVP)
+- Potentially SQL for the production event store (post-MVP)
 
 ### Cross-Cutting Concerns Identified
 
-**Concerns transversaux qui affecteront plusieurs composants :**
+**Cross-cutting concerns that will affect several components:**
 
-1. **Event-Sourcing** : Tous les composants doivent émettre des événements structurés, l'event log est la source de vérité
-2. **Sécurité by Design** : Deny-by-default doit être garanti architecturalement, pas optionnellement
-3. **Observabilité** : Chaque décision, action, contrainte doit être traçable
-4. **Testabilité** : Architecture doit permettre tests basés sur traces (golden traces), replay pour tests
-5. **Versioning & Audit** : Traçabilité des versions d'agents et exécutions pour conformité
-6. **Performance** : Overhead minimal malgré traçabilité complète (< 5-10ms)
-7. **Simplicité API** : Complexité interne masquée par API simple et intuitive
+1. **Event-Sourcing**: All components must emit structured events; the event log is the source of truth
+2. **Security by Design**: Deny-by-default must be guaranteed architecturally, not optionally
+3. **Observability**: Every decision, action, and constraint must be traceable
+4. **Testability**: Architecture must allow trace-based tests (golden traces), replay for tests
+5. **Versioning & Audit**: Traceability of agent and execution versions for compliance
+6. **Performance**: Minimal overhead despite complete traceability (< 5-10ms)
+7. **API Simplicity**: Internal complexity hidden behind a simple, intuitive API
 
-### Défis Architecturaux Uniques
+### Unique Architectural Challenges
 
-**Défis spécifiques identifiés :**
+**Specific challenges identified:**
 
-1. **Event-sourcing invisible** : Complexité interne (event-sourcing) masquée par API simple
-2. **Séparation raisonnement/action garantie** : Architecture doit garantir que LLM ne provoque jamais d'effet de bord
-3. **Replay déterministe sans LLM** : Replay doit fonctionner uniquement à partir des événements persistés
-4. **Gouvernance native** : Policies intégrées au runtime, pas un plugin optionnel
-5. **Performance avec traçabilité complète** : Overhead minimal malgré event-sourcing complet
+1. **Invisible event-sourcing**: Internal complexity (event-sourcing) hidden behind a simple API
+2. **Guaranteed reasoning/action separation**: Architecture must guarantee that the LLM never directly causes a side effect
+3. **Deterministic replay without the LLM**: Replay must work solely from persisted events
+4. **Native governance**: Policies built into the runtime, not an optional plugin
+5. **Performance with complete traceability**: Minimal overhead despite full event-sourcing
 
-### Implications Architecturales
+### Architectural Implications
 
-**Composants architecturaux estimés :**
+**Estimated architectural components:**
 
 - Event Store (in-memory + file persistence)
-- Event Bus / Event Publisher (distribution événements)
-- Reasoning Engine (intégration LLM, génération intentions)
-- Action Engine (exécution tools gouvernée)
-- Policy Engine (validation & enforcement policies)
-- Tool Registry (gestion capabilities/tools)
-- Trace/Replay Engine (tracing, replay déterministe)
-- SDK API Layer (facade simple masquant complexité)
+- Event Bus / Event Publisher (event distribution)
+- Reasoning Engine (LLM integration, intention generation)
+- Action Engine (governed tool execution)
+- Policy Engine (policy validation & enforcement)
+- Tool Registry (capability/tool management)
+- Trace/Replay Engine (tracing, deterministic replay)
+- SDK API Layer (simple facade hiding complexity)
 
-**Patterns architecturaux requis :**
+**Required architectural patterns:**
 
-- Event Sourcing (source de vérité unique)
-- CQRS (séparation raisonnement/action)
-- Strategy Pattern (providers LLM, event stores)
-- Facade Pattern (API simple masquant complexité interne)
-- Observer Pattern (tracing, événements)
-- Repository Pattern (abstraction accès données)
+- Event Sourcing (single source of truth)
+- CQRS (reasoning/action separation)
+- Strategy Pattern (LLM providers, event stores)
+- Facade Pattern (simple API hiding internal complexity)
+- Observer Pattern (tracing, events)
+- Repository Pattern (data access abstraction)
 
 ---
 
 ## Core Architectural Decisions
 
-### ADR-001: Event-Sourcing comme Source de Vérité Unique
+### ADR-001: Event-Sourcing as the Single Source of Truth
 
 **Status:** Accepted
 
 **Context:**
-Le replay natif et l'audit complet sont des différenciateurs clés du SDK. Pour garantir que chaque exécution est rejouable et traçable, nous devons stocker l'historique complet de chaque action.
+Native replay and full audit are key differentiators of the SDK. To guarantee that every execution is replayable and traceable, we must store the complete history of each action.
 
 **Decision:**
-Adopter l'Event-Sourcing comme pattern architectural fondamental. L'event log est la source de vérité unique pour toutes les exécutions. Aucune logique métier ne modifie l'état sans générer d'événement correspondant.
+Adopt Event-Sourcing as a foundational architectural pattern. The event log is the single source of truth for all executions. No business logic modifies state without generating a corresponding event.
 
 **Consequences:**
-- ✅ Replay déterministe possible sans LLM
-- ✅ Audit trail complet garanti
-- ✅ Traçabilité complète de chaque décision
-- ⚠️ Overhead de persistance (mitigé par écriture asynchrone)
-- ⚠️ Complexité interne accrue (masquée par API simple)
+- ✅ Deterministic replay possible without the LLM
+- ✅ Complete audit trail guaranteed
+- ✅ Complete traceability of every decision
+- ⚠️ Persistence overhead (mitigated by asynchronous writing)
+- ⚠️ Increased internal complexity (hidden behind a simple API)
 
 **Implementation:**
-- Event Store avec interface abstraite (permettant file → SQL → distribué)
-- Tous les composants émettent des événements structurés
-- Event log immuable (append-only)
-- Projection simple pour reconstruction d'état
+- Event Store with an abstract interface (allowing file → SQL → distributed)
+- All components emit structured events
+- Immutable event log (append-only)
+- Simple projection for state reconstruction
 
 ---
 
-### ADR-002: Séparation Raisonnement/Action (CQRS)
+### ADR-002: Reasoning/Action Separation (CQRS)
 
 **Status:** Accepted
 
 **Context:**
-Le principe fondamental du SDK est que "le LLM ne provoque jamais d'effet de bord". Pour garantir cette propriété structurellement, nous devons séparer clairement le raisonnement de l'action.
+The SDK's fundamental principle is that "the LLM never causes a side effect." To structurally guarantee this property, we must clearly separate reasoning from action.
 
 **Decision:**
-Adopter une architecture CQRS avec deux engines distincts :
-- **Reasoning Engine** : Intègre le LLM, génère des intentions structurées (Command)
-- **Action Engine** : Valide et exécute les actions gouvernées (Command Handler)
+Adopt a CQRS architecture with two distinct engines:
+- **Reasoning Engine**: Integrates the LLM, generates structured intentions (Command)
+- **Action Engine**: Validates and executes governed actions (Command Handler)
 
-Le LLM ne peut jamais appeler directement un tool. Toutes les actions passent par l'Action Engine qui applique les policies.
+The LLM can never directly call a tool. All actions go through the Action Engine, which applies the policies.
 
 **Consequences:**
-- ✅ Sécurité garantie par architecture (pas par configuration)
-- ✅ Gouvernance native possible
-- ✅ Traçabilité complète raisonnement → action
-- ⚠️ Latence légèrement accrue (mitigée par validation rapide)
-- ⚠️ Complexité architecture (masquée par API simple)
+- ✅ Security guaranteed by architecture (not by configuration)
+- ✅ Native governance possible
+- ✅ Complete reasoning → action traceability
+- ⚠️ Slightly increased latency (mitigated by fast validation)
+- ⚠️ Architectural complexity (hidden behind a simple API)
 
 **Implementation:**
-- Reasoning Engine : Interface avec LLM, génère `Intention` structurée
-- Action Engine : Reçoit `Intention`, valide via Policy Engine, exécute via Tool Registry
-- Communication via événements (pas d'appels directs)
+- Reasoning Engine: Interfaces with the LLM, generates a structured `Intention`
+- Action Engine: Receives the `Intention`, validates it via the Policy Engine, executes it via the Tool Registry
+- Communication via events (no direct calls)
 
 ---
 
-### ADR-003: Deny-by-Default Structurel
+### ADR-003: Structural Deny-by-Default
 
 **Status:** Accepted
 
 **Context:**
-La sécurité doit être une propriété structurelle, pas une feature optionnelle. Pour garantir que les agents ne peuvent pas faire d'actions non autorisées, nous devons implémenter deny-by-default au niveau architectural.
+Security must be a structural property, not an optional feature. To guarantee that agents cannot perform unauthorized actions, we must implement deny-by-default at the architectural level.
 
 **Decision:**
-Tout est interdit par défaut. Un tool doit être explicitement déclaré ET autorisé dans une policy pour être utilisable. Le Tool Registry maintient une allowlist stricte. Le Policy Engine vérifie chaque intention avant exécution.
+Everything is forbidden by default. A tool must be explicitly declared AND authorized in a policy to be usable. The Tool Registry maintains a strict allowlist. The Policy Engine checks every intention before execution.
 
 **Consequences:**
-- ✅ Sécurité par impossibilité (pas par configuration)
-- ✅ Réduction drastique des risques
-- ✅ Conformité facilitée
-- ⚠️ Configuration explicite requise (acceptable pour sécurité)
+- ✅ Security by impossibility (not by configuration)
+- ✅ Drastic risk reduction
+- ✅ Easier compliance
+- ⚠️ Explicit configuration required (acceptable for security)
 
 **Implementation:**
-- Tool Registry : Allowlist stricte, rejet automatique des tools non déclarés
-- Policy Engine : Vérification obligatoire avant chaque action
-- Validation au niveau Action Engine (dernière ligne de défense)
+- Tool Registry: Strict allowlist, automatic rejection of undeclared tools
+- Policy Engine: Mandatory check before each action
+- Validation at the Action Engine level (last line of defense)
 
 ---
 
-### ADR-004: Event Store Abstraction avec Migration Progressive
+### ADR-004: Event Store Abstraction with Progressive Migration
 
 **Status:** Accepted
 
 **Context:**
-Le MVP nécessite un event store simple (file-based), mais la production nécessitera une scalabilité horizontale. Nous devons permettre une migration progressive sans réécriture.
+The MVP requires a simple (file-based) event store, but production will require horizontal scalability. We must allow progressive migration without a rewrite.
 
 **Decision:**
-Créer une interface abstraite `EventStore` avec implémentations multiples :
-- MVP : `FileEventStore` (in-memory + file persistence)
-- Production : `SQLEventStore` (PostgreSQL/MySQL)
-- Scale : `DistributedEventStore` (Kafka-style, post-MVP)
+Create an abstract `EventStore` interface with multiple implementations:
+- MVP: `FileEventStore` (in-memory + file persistence)
+- Production: `SQLEventStore` (PostgreSQL/MySQL)
+- Scale: `DistributedEventStore` (Kafka-style, post-MVP)
 
-L'interface garantit la compatibilité et permet migration transparente.
+The interface guarantees compatibility and enables transparent migration.
 
 **Consequences:**
-- ✅ MVP simple et rapide à implémenter
-- ✅ Migration progressive possible
-- ✅ Scalabilité future garantie
-- ⚠️ Abstraction supplémentaire (justifiée par flexibilité)
+- ✅ Simple, fast-to-implement MVP
+- ✅ Progressive migration possible
+- ✅ Future scalability guaranteed
+- ⚠️ Additional abstraction (justified by flexibility)
 
 **Implementation:**
-- Interface `IEventStore` avec méthodes : `append()`, `getEvents()`, `getRunIds()`
-- Implémentations concrètes : `FileEventStore`, `SQLEventStore` (futur)
-- Factory pattern pour création selon configuration
+- `IEventStore` interface with methods: `append()`, `getEvents()`, `getRunIds()`
+- Concrete implementations: `FileEventStore`, `SQLEventStore` (future)
+- Factory pattern for creation based on configuration
 
 ---
 
-### ADR-005: Replay Sans LLM (Déterministe)
+### ADR-005: Replay Without the LLM (Deterministic)
 
 **Status:** Accepted
 
 **Context:**
-Le replay est la killer feature du MVP. Pour être rapide, économique et déterministe, le replay ne doit pas recontacter le LLM.
+Replay is the MVP's killer feature. To be fast, economical, and deterministic, replay must not recontact the LLM.
 
 **Decision:**
-Le replay utilise uniquement les événements persistés. Les intentions originales générées par le LLM sont réutilisées telles quelles. Le replay reproduit la même séquence logique sans appel LLM.
+Replay uses only persisted events. The original intentions generated by the LLM are reused as-is. Replay reproduces the same logical sequence without an LLM call.
 
 **Consequences:**
-- ✅ Replay rapide (< 100ms vs plusieurs secondes)
-- ✅ Replay économique (pas de coût LLM)
-- ✅ Replay déterministe (même séquence)
-- ⚠️ Replay ne teste pas les changements de prompt (acceptable, c'est un feature, pas un bug)
+- ✅ Fast replay (< 100ms vs. several seconds)
+- ✅ Economical replay (no LLM cost)
+- ✅ Deterministic replay (same sequence)
+- ⚠️ Replay does not test prompt changes (acceptable, this is a feature, not a bug)
 
 **Implementation:**
-- Replay Engine charge les événements du runId
-- Filtre les événements d'intention LLM
-- Réutilise les intentions pour exécution via Action Engine
-- Génère nouveaux événements avec préfixe "replay:"
+- Replay Engine loads the runId's events
+- Filters LLM intention events
+- Reuses the intentions for execution via the Action Engine
+- Generates new events with a "replay:" prefix
 
 ---
 
-### ADR-006: API Facade Masquant Complexité
+### ADR-006: API Facade Hiding Complexity
 
 **Status:** Accepted
 
 **Context:**
-L'architecture interne est sophistiquée (event-sourcing, CQRS, séparation engines), mais l'API doit rester simple et intuitive (< 10 lignes pour Quick Start).
+The internal architecture is sophisticated (event-sourcing, CQRS, engine separation), but the API must remain simple and intuitive (< 10 lines for Quick Start).
 
 **Decision:**
-Implémenter une couche Facade (SDK API Layer) qui masque la complexité interne. L'API expose des concepts simples (agent, tool, run) tandis que l'implémentation gère les événements, policies, et engines en arrière-plan.
+Implement a Facade layer (SDK API Layer) that hides the internal complexity. The API exposes simple concepts (agent, tool, run) while the implementation handles events, policies, and engines behind the scenes.
 
 **Consequences:**
-- ✅ API simple et intuitive
-- ✅ Courbe d'apprentissage réduite
-- ✅ Complexité interne isolée
-- ⚠️ Couche d'abstraction supplémentaire (justifiée par DX)
+- ✅ Simple, intuitive API
+- ✅ Reduced learning curve
+- ✅ Internal complexity isolated
+- ⚠️ Additional abstraction layer (justified by DX)
 
 **Implementation:**
-- SDK API Layer : `createSDK()`, `createAgent()`, `defineTool()`, `agent.run()`
-- Mapping automatique API → événements internes
-- Configuration par défaut intelligente
+- SDK API Layer: `createSDK()`, `createAgent()`, `defineTool()`, `agent.run()`
+- Automatic mapping of API → internal events
+- Smart default configuration
 
 ---
 
@@ -306,13 +306,13 @@ Implémenter une couche Facade (SDK API Layer) qui masque la complexité interne
 
 #### 1. SDK API Layer (Facade)
 
-**Responsabilités:**
-- Interface publique simple et intuitive
-- Mapping API → événements internes
-- Configuration par défaut intelligente
-- Gestion du cycle de vie SDK et agents
+**Responsibilities:**
+- Simple, intuitive public interface
+- API → internal events mapping
+- Smart default configuration
+- SDK and agent lifecycle management
 
-**Interfaces principales:**
+**Main interfaces:**
 ```typescript
 interface SDK {
   createAgent(config: AgentConfig): Agent
@@ -329,7 +329,7 @@ interface Agent {
 }
 ```
 
-**Dépendances:**
+**Dependencies:**
 - Reasoning Engine
 - Action Engine
 - Policy Engine
@@ -340,11 +340,11 @@ interface Agent {
 
 #### 2. Reasoning Engine
 
-**Responsabilités:**
-- Intégration avec provider LLM (OpenAI/Anthropic)
-- Génération d'intentions structurées depuis réponses LLM
-- Gestion du contexte conversationnel
-- Émission d'événements de raisonnement
+**Responsibilities:**
+- Integration with the LLM provider (OpenAI/Anthropic)
+- Generation of structured intentions from LLM responses
+- Conversational context management
+- Emission of reasoning events
 
 **Interfaces:**
 ```typescript
@@ -361,25 +361,25 @@ interface Intention {
 }
 ```
 
-**Dépendances:**
+**Dependencies:**
 - LLM Provider (Strategy Pattern)
-- Event Store (émission événements)
-- Tool Registry (connaître tools disponibles pour contexte)
+- Event Store (event emission)
+- Tool Registry (knowing available tools for context)
 
-**Contraintes:**
-- Ne peut jamais exécuter directement un tool
-- Ne peut jamais provoquer d'effet de bord
-- Génère uniquement des intentions structurées
+**Constraints:**
+- Can never directly execute a tool
+- Can never cause a side effect
+- Generates only structured intentions
 
 ---
 
 #### 3. Action Engine
 
-**Responsabilités:**
-- Réception et validation des intentions
-- Exécution des tools via Tool Registry
-- Application des policies via Policy Engine
-- Émission d'événements d'action
+**Responsibilities:**
+- Reception and validation of intentions
+- Execution of tools via the Tool Registry
+- Application of policies via the Policy Engine
+- Emission of action events
 
 **Interfaces:**
 ```typescript
@@ -396,25 +396,25 @@ interface ActionResult {
 }
 ```
 
-**Dépendances:**
+**Dependencies:**
 - Policy Engine (validation)
-- Tool Registry (exécution)
-- Event Store (émission événements)
+- Tool Registry (execution)
+- Event Store (event emission)
 
-**Contraintes:**
-- Toute action doit passer par Action Engine
-- Validation obligatoire avant exécution
-- Émission d'événement pour chaque action
+**Constraints:**
+- Every action must go through the Action Engine
+- Mandatory validation before execution
+- Event emission for every action
 
 ---
 
 #### 4. Policy Engine
 
-**Responsabilités:**
-- Validation des intentions contre policies actives
-- Application des policies globales et spécifiques
-- Vérification budgets, timeouts, allowlists
-- Émission d'événements de validation
+**Responsibilities:**
+- Validation of intentions against active policies
+- Application of global and specific policies
+- Checking budgets, timeouts, allowlists
+- Emission of validation events
 
 **Interfaces:**
 ```typescript
@@ -438,22 +438,22 @@ interface PolicyValidationResult {
 }
 ```
 
-**Dépendances:**
-- Event Store (émission événements validation)
+**Dependencies:**
+- Event Store (emission of validation events)
 
-**Contraintes:**
-- Deny-by-default : tout est interdit sauf explicitement autorisé
-- Vérification obligatoire avant chaque action
+**Constraints:**
+- Deny-by-default: everything is forbidden unless explicitly authorized
+- Mandatory check before each action
 
 ---
 
 #### 5. Tool Registry
 
-**Responsabilités:**
-- Gestion des tools déclarés
-- Validation des schémas d'inputs
-- Exécution des tools avec validation
-- Allowlist stricte (deny-by-default)
+**Responsibilities:**
+- Management of declared tools
+- Validation of input schemas
+- Execution of tools with validation
+- Strict allowlist (deny-by-default)
 
 **Interfaces:**
 ```typescript
@@ -472,24 +472,24 @@ interface ToolDefinition {
 }
 ```
 
-**Dépendances:**
-- Zod (validation schémas)
-- Event Store (émission événements tool)
+**Dependencies:**
+- Zod (schema validation)
+- Event Store (emission of tool events)
 
-**Contraintes:**
-- Rejet automatique des tools non déclarés
-- Validation obligatoire avant exécution
-- Allowlist stricte
+**Constraints:**
+- Automatic rejection of undeclared tools
+- Mandatory validation before execution
+- Strict allowlist
 
 ---
 
 #### 6. Event Store
 
-**Responsabilités:**
-- Persistance des événements (append-only)
-- Récupération des événements par runId
-- Filtrage et requêtes sur événements
-- Abstraction pour différentes implémentations
+**Responsibilities:**
+- Persistence of events (append-only)
+- Retrieval of events by runId
+- Filtering and querying events
+- Abstraction for different implementations
 
 **Interfaces:**
 ```typescript
@@ -522,23 +522,23 @@ type EventType =
   | 'tool.failed'
 ```
 
-**Implémentations MVP:**
-- `FileEventStore` : Persistance in-memory + fichier JSON
-- Structure : `events/{runId}.json`
+**MVP implementations:**
+- `FileEventStore`: In-memory + JSON file persistence
+- Structure: `events/{runId}.json`
 
-**Implémentations futures:**
-- `SQLEventStore` : PostgreSQL/MySQL
-- `DistributedEventStore` : Kafka-style (post-MVP)
+**Future implementations:**
+- `SQLEventStore`: PostgreSQL/MySQL
+- `DistributedEventStore`: Kafka-style (post-MVP)
 
 ---
 
 #### 7. Trace/Replay Engine
 
-**Responsabilités:**
-- Construction de traces depuis événements
-- Replay déterministe sans LLM
-- Comparaison de runs (post-MVP)
-- Export de traces
+**Responsibilities:**
+- Building traces from events
+- Deterministic replay without the LLM
+- Run comparison (post-MVP)
+- Trace export
 
 **Interfaces:**
 ```typescript
@@ -562,13 +562,13 @@ interface Trace {
 }
 ```
 
-**Dépendances:**
-- Event Store (lecture événements)
-- Action Engine (replay exécution)
+**Dependencies:**
+- Event Store (event reading)
+- Action Engine (replay execution)
 
-**Contraintes:**
-- Replay sans appel LLM
-- Déterminisme relatif (même séquence logique)
+**Constraints:**
+- Replay without an LLM call
+- Relative determinism (same logical sequence)
 
 ---
 
@@ -672,12 +672,12 @@ interface RunInput {
 #### Event Base Structure
 ```typescript
 interface Event {
-  id: string                    // UUID unique
-  runId: string                 // ID de l'exécution
-  type: EventType              // Type d'événement
-  timestamp: number            // Timestamp Unix (ms)
-  data: EventData             // Données spécifiques au type
-  metadata?: EventMetadata     // Métadonnées additionnelles
+  id: string                    // Unique UUID
+  runId: string                 // Execution ID
+  type: EventType              // Event type
+  timestamp: number            // Unix timestamp (ms)
+  data: EventData             // Type-specific data
+  metadata?: EventMetadata     // Additional metadata
 }
 
 interface EventMetadata {
@@ -951,32 +951,32 @@ console.log(replay.output)
 
 ### Security Principles
 
-1. **Deny-by-Default** : Tout est interdit sauf explicitement autorisé
-2. **Sécurité par Impossibilité** : Architecture garantit la sécurité, pas la configuration
-3. **Validation Multi-Niveaux** : Tool Registry → Policy Engine → Action Engine
-4. **Traçabilité Complète** : Toute action est tracée et auditable
+1. **Deny-by-Default**: Everything is forbidden unless explicitly authorized
+2. **Security by Impossibility**: The architecture guarantees security, not the configuration
+3. **Multi-Level Validation**: Tool Registry → Policy Engine → Action Engine
+4. **Complete Traceability**: Every action is traced and auditable
 
 ### Security Layers
 
 #### Layer 1: Tool Registry (Allowlist)
-- Seuls les tools explicitement déclarés sont disponibles
-- Rejet automatique des tools non déclarés
-- Validation des schémas avant exécution
+- Only explicitly declared tools are available
+- Automatic rejection of undeclared tools
+- Schema validation before execution
 
 #### Layer 2: Policy Engine (Governance)
-- Vérification des policies avant chaque action
-- Budgets, timeouts, allowlists appliqués
-- Rejet si policy violée
+- Policy checks before each action
+- Budgets, timeouts, allowlists applied
+- Rejection if a policy is violated
 
 #### Layer 3: Action Engine (Execution)
-- Dernière ligne de défense
-- Validation finale avant exécution
-- Isolation des erreurs
+- Last line of defense
+- Final validation before execution
+- Error isolation
 
 ### Threat Model
 
 **Threats Mitigated:**
-- ✅ Tool injection (validation schéma)
+- ✅ Tool injection (schema validation)
 - ✅ Unauthorized tool execution (allowlist + policies)
 - ✅ Resource exhaustion (budgets + timeouts)
 - ✅ Unauthorized actions (deny-by-default)
@@ -984,7 +984,7 @@ console.log(replay.output)
 
 **Threats Not Mitigated (Post-MVP):**
 - ⚠️ LLM prompt injection (mitigation post-MVP)
-- ⚠️ Tool handler vulnerabilities (responsabilité développeur)
+- ⚠️ Tool handler vulnerabilities (developer's responsibility)
 - ⚠️ Event store tampering (mitigation: signatures post-MVP)
 
 ---
@@ -993,35 +993,35 @@ console.log(replay.output)
 
 ### Performance Targets (MVP)
 
-- **Overhead SDK** : < 5-10ms par événement (hors LLM/tools)
-- **Replay Latency** : < 100ms pour exécution complète
-- **Event Persistence** : Asynchrone, non-bloquant
-- **Tool Execution** : Pas d'overhead SDK significatif
+- **SDK Overhead**: < 5-10ms per event (excluding LLM/tools)
+- **Replay Latency**: < 100ms for a complete execution
+- **Event Persistence**: Asynchronous, non-blocking
+- **Tool Execution**: No significant SDK overhead
 
 ### Scalability Strategy
 
 #### MVP: File-Based Event Store
-- **Limite** : ~1000 runs simultanés
-- **Stockage** : Fichiers JSON par runId
-- **Performance** : Acceptable pour MVP
+- **Limit**: ~1000 concurrent runs
+- **Storage**: JSON files per runId
+- **Performance**: Acceptable for MVP
 
 #### Phase 2: SQL-Based Event Store
-- **Limite** : ~10,000 runs simultanés
-- **Stockage** : PostgreSQL/MySQL
-- **Migration** : Export/import depuis file-based
+- **Limit**: ~10,000 concurrent runs
+- **Storage**: PostgreSQL/MySQL
+- **Migration**: Export/import from file-based
 
 #### Phase 3: Distributed Event Store
-- **Limite** : Illimitée (scalabilité horizontale)
-- **Stockage** : Kafka-style (Kafka, EventStore, etc.)
-- **Migration** : Depuis SQL avec réplication
+- **Limit**: Unlimited (horizontal scalability)
+- **Storage**: Kafka-style (Kafka, EventStore, etc.)
+- **Migration**: From SQL with replication
 
 ### Optimization Strategies
 
-1. **Event Persistence Async** : Écriture non-bloquante
-2. **Event Batching** : Groupement événements pour écriture
-3. **Lazy Loading** : Chargement événements à la demande
-4. **Caching** : Cache in-memory pour événements fréquents
-5. **Compression** : Compression événements anciens (post-MVP)
+1. **Async Event Persistence**: Non-blocking writes
+2. **Event Batching**: Grouping events for writing
+3. **Lazy Loading**: On-demand event loading
+4. **Caching**: In-memory cache for frequent events
+5. **Compression**: Compression of old events (post-MVP)
 
 ---
 
@@ -1030,24 +1030,24 @@ console.log(replay.output)
 ### Phase 1: MVP Core (Weeks 1-4)
 1. Event Store interface + FileEventStore
 2. Event schema & types
-3. Tool Registry avec validation Zod
-4. Policy Engine basique
+3. Tool Registry with Zod validation
+4. Basic Policy Engine
 5. Reasoning Engine (OpenAI integration)
 6. Action Engine
 7. SDK API Layer (Facade)
-8. Replay Engine basique
+8. Basic Replay Engine
 
 ### Phase 2: MVP Polish (Weeks 5-6)
 1. Tracing & observability
 2. Error handling & validation
 3. Documentation & examples
-4. Tests unitaires & intégration
+4. Unit & integration tests
 5. Performance optimization
 
 ### Phase 3: MVP Validation (Weeks 7-8)
 1. Quick Start guide
-2. Example complet fonctionnel
-3. Feedback early adopters
+2. Complete functional example
+3. Early adopter feedback
 4. Bug fixes & improvements
 
 ---
@@ -1146,9 +1146,9 @@ User          SDK API      Replay       Action      Event      Tool
 #### 1. Validation Errors (400-level)
 **Sources:** Tool Registry, Policy Engine, Input Validation
 **Handling:**
-- Erreur immédiate, pas d'exécution
-- Événement `validation.failed` émis
-- Message d'erreur clair et actionnable
+- Immediate error, no execution
+- `validation.failed` event emitted
+- Clear, actionable error message
 
 ```typescript
 class ValidationError extends SDKError {
@@ -1165,9 +1165,9 @@ class ValidationError extends SDKError {
 #### 2. Policy Violation Errors (403-level)
 **Sources:** Policy Engine
 **Handling:**
-- Action bloquée, intention rejetée
-- Événement `policy.violated` émis
-- Retry possible avec nouvelle intention
+- Action blocked, intention rejected
+- `policy.violated` event emitted
+- Retry possible with a new intention
 
 ```typescript
 class PolicyViolationError extends SDKError {
@@ -1184,9 +1184,9 @@ class PolicyViolationError extends SDKError {
 #### 3. Tool Execution Errors (500-level)
 **Sources:** Tool handlers
 **Handling:**
-- Erreur capturée, événement `tool.failed` émis
-- Run peut continuer ou échouer selon configuration
-- Retry possible selon type d'erreur
+- Error captured, `tool.failed` event emitted
+- Run can continue or fail depending on configuration
+- Retry possible depending on error type
 
 ```typescript
 class ToolExecutionError extends SDKError {
@@ -1203,9 +1203,9 @@ class ToolExecutionError extends SDKError {
 #### 4. LLM Provider Errors (500-level)
 **Sources:** Reasoning Engine, LLM Provider
 **Handling:**
-- Retry avec backoff exponentiel
-- Événement `llm.error` émis
-- Run échoue si retries épuisés
+- Retry with exponential backoff
+- `llm.error` event emitted
+- Run fails if retries are exhausted
 
 ```typescript
 class LLMProviderError extends SDKError {
@@ -1222,9 +1222,9 @@ class LLMProviderError extends SDKError {
 #### 5. Event Store Errors (500-level)
 **Sources:** Event Store persistence
 **Handling:**
-- Retry avec backoff
-- Run peut continuer si événements en mémoire
-- Échec critique si persistance impossible
+- Retry with backoff
+- Run can continue if events are in memory
+- Critical failure if persistence is impossible
 
 ```typescript
 class EventStoreError extends SDKError {
@@ -1240,23 +1240,23 @@ class EventStoreError extends SDKError {
 ### Error Recovery Strategies
 
 #### Strategy 1: Fail-Fast (Validation Errors)
-- Erreur immédiate, pas d'exécution
-- Utilisé pour: Validation inputs, configuration invalide
+- Immediate error, no execution
+- Used for: Input validation, invalid configuration
 
 #### Strategy 2: Retry with Backoff (Transient Errors)
-- Retry automatique avec backoff exponentiel
-- Utilisé pour: LLM provider errors, network errors
-- Max retries: 3 par défaut
+- Automatic retry with exponential backoff
+- Used for: LLM provider errors, network errors
+- Max retries: 3 by default
 
 #### Strategy 3: Continue on Error (Tool Errors)
-- Run continue malgré erreur tool
-- Événement d'erreur émis
-- Utilisé pour: Tool execution errors non-critiques
+- Run continues despite a tool error
+- Error event emitted
+- Used for: Non-critical tool execution errors
 
 #### Strategy 4: Fail Run (Critical Errors)
-- Run échoue immédiatement
-- Tous les événements jusqu'à l'erreur sont persistés
-- Utilisé pour: Policy violations critiques, event store failures
+- Run fails immediately
+- All events up to the error are persisted
+- Used for: Critical policy violations, event store failures
 
 ### Error Event Schema
 
@@ -1285,7 +1285,7 @@ interface ErrorEvent extends Event {
 ### Testing Pyramid
 
 #### Level 1: Unit Tests (70%)
-**Scope:** Composants individuels isolés
+**Scope:** Individual, isolated components
 **Coverage Target:** > 80%
 
 **Components to Test:**
@@ -1314,14 +1314,14 @@ describe('ToolRegistry', () => {
 ```
 
 #### Level 2: Integration Tests (20%)
-**Scope:** Interactions entre composants
+**Scope:** Interactions between components
 **Coverage Target:** > 60%
 
 **Flows to Test:**
-- Reasoning → Action flow complet
-- Policy enforcement end-to-end
-- Event emission et persistence
-- Replay flow complet
+- Complete Reasoning → Action flow
+- End-to-end policy enforcement
+- Event emission and persistence
+- Complete replay flow
 
 **Example:**
 ```typescript
@@ -1342,12 +1342,12 @@ describe('Agent Execution Flow', () => {
 ```
 
 #### Level 3: End-to-End Tests (10%)
-**Scope:** Scénarios utilisateur complets
-**Coverage Target:** Scénarios critiques
+**Scope:** Complete user scenarios
+**Coverage Target:** Critical scenarios
 
 **Scenarios:**
-- Quick Start flow complet
-- Replay d'un run complet
+- Complete Quick Start flow
+- Replay of a complete run
 - Policy violation handling
 - Error recovery
 
@@ -1419,9 +1419,9 @@ describe('Agent Behavior Regression', () => {
 ### Test Coverage Goals
 
 - **Unit Tests:** > 80% coverage
-- **Integration Tests:** Tous les flows critiques
-- **E2E Tests:** Scénarios MVP complets
-- **Performance Tests:** Latence, throughput (post-MVP)
+- **Integration Tests:** All critical flows
+- **E2E Tests:** Complete MVP scenarios
+- **Performance Tests:** Latency, throughput (post-MVP)
 
 ---
 
@@ -1430,10 +1430,10 @@ describe('Agent Behavior Regression', () => {
 ### Logging Strategy
 
 #### Log Levels
-- **DEBUG:** Événements détaillés, développement
-- **INFO:** Exécutions normales, événements importants
+- **DEBUG:** Detailed events, development
+- **INFO:** Normal executions, important events
 - **WARN:** Policy violations, retries
-- **ERROR:** Erreurs critiques, échecs
+- **ERROR:** Critical errors, failures
 
 #### Log Structure
 ```typescript
@@ -1450,27 +1450,27 @@ interface LogEntry {
 ```
 
 #### Logging Implementation
-- Console logging pour développement
-- Structured logging (JSON) pour production
-- Log rotation pour fichiers
-- Integration avec systèmes externes (post-MVP)
+- Console logging for development
+- Structured logging (JSON) for production
+- Log rotation for files
+- Integration with external systems (post-MVP)
 
 ### Monitoring & Observability
 
-#### Metrics à Tracker (MVP)
-- Nombre de runs par agent
-- Taux de succès/échec
-- Latence moyenne par run
-- Nombre d'événements par run
-- Taux de policy violations
-- Erreurs par type
+#### Metrics to Track (MVP)
+- Number of runs per agent
+- Success/failure rate
+- Average latency per run
+- Number of events per run
+- Policy violation rate
+- Errors by type
 
-#### Metrics à Tracker (Post-MVP)
-- Coûts LLM par run
-- Throughput (runs/seconde)
-- Taille moyenne événements
-- Taux d'utilisation replay
-- Performance event store
+#### Metrics to Track (Post-MVP)
+- LLM cost per run
+- Throughput (runs/second)
+- Average event size
+- Replay usage rate
+- Event store performance
 
 #### Health Checks
 ```typescript
@@ -1494,41 +1494,41 @@ interface ComponentHealth {
 ### Deployment Considerations
 
 #### MVP Deployment
-- Package npm standard
+- Standard npm package
 - Installation via `npm install`
-- Pas de dépendances externes (sauf LLM provider)
-- Event store file-based (local)
+- No external dependencies (except the LLM provider)
+- File-based event store (local)
 
 #### Production Deployment (Post-MVP)
-- Event store SQL (optionnel)
-- Configuration via variables d'environnement
+- SQL event store (optional)
+- Configuration via environment variables
 - Health checks endpoint
 - Metrics export (Prometheus format)
 
 ### Backup & Recovery
 
 #### Event Store Backup (MVP)
-- Fichiers événements sauvegardés manuellement
-- Export JSON pour archivage
-- Pas de backup automatique (MVP)
+- Event files backed up manually
+- JSON export for archiving
+- No automatic backup (MVP)
 
 #### Event Store Backup (Post-MVP)
-- Backup automatique SQL
-- Réplication event store distribué
+- Automatic SQL backup
+- Distributed event store replication
 - Point-in-time recovery
-- Archivage événements anciens
+- Archiving of old events
 
 ### Security Operations
 
 #### Secrets Management
-- API keys LLM: Variables d'environnement
-- Pas de secrets dans code
-- Rotation des clés supportée
+- LLM API keys: Environment variables
+- No secrets in code
+- Key rotation supported
 
 #### Audit Trail
-- Tous les événements sont auditables
-- Export event log pour conformité
-- Signatures cryptographiques (post-MVP)
+- All events are auditable
+- Event log export for compliance
+- Cryptographic signatures (post-MVP)
 
 ---
 
@@ -1536,14 +1536,14 @@ interface ComponentHealth {
 
 ### Pattern 1: Event Emission Pattern
 
-**Tous les composants doivent émettre des événements pour leurs actions:**
+**All components must emit events for their actions:**
 
 ```typescript
 class ActionEngine {
   constructor(private eventStore: IEventStore) {}
   
   async executeIntention(intention: Intention, context: ActionContext): Promise<ActionResult> {
-    // Émettre événement avant action
+    // Emit event before the action
     await this.eventStore.append(context.runId, {
       id: generateId(),
       runId: context.runId,
@@ -1555,7 +1555,7 @@ class ActionEngine {
     try {
       const result = await this.executeTool(intention)
       
-      // Émettre événement succès
+      // Emit success event
       await this.eventStore.append(context.runId, {
         id: generateId(),
         runId: context.runId,
@@ -1566,7 +1566,7 @@ class ActionEngine {
       
       return { success: true, result }
     } catch (error) {
-      // Émettre événement échec
+      // Emit failure event
       await this.eventStore.append(context.runId, {
         id: generateId(),
         runId: context.runId,
@@ -1583,7 +1583,7 @@ class ActionEngine {
 
 ### Pattern 2: Policy Enforcement Pattern
 
-**Toute action doit passer par Policy Engine:**
+**Every action must go through the Policy Engine:**
 
 ```typescript
 class ActionEngine {
@@ -1593,7 +1593,7 @@ class ActionEngine {
   ) {}
   
   async executeIntention(intention: Intention, context: ActionContext): Promise<ActionResult> {
-    // Validation obligatoire
+    // Mandatory validation
     const validation = await this.policyEngine.validate(intention, context)
     
     if (!validation.allowed) {
@@ -1604,7 +1604,7 @@ class ActionEngine {
       )
     }
     
-    // Exécution seulement si autorisée
+    // Execution only if authorized
     return await this.toolRegistry.executeTool(intention.toolName!, intention.parameters)
   }
 }
@@ -1612,7 +1612,7 @@ class ActionEngine {
 
 ### Pattern 3: Deny-by-Default Pattern
 
-**Tool Registry rejette automatiquement les tools non déclarés:**
+**Tool Registry automatically rejects undeclared tools:**
 
 ```typescript
 class ToolRegistry {
@@ -1623,16 +1623,16 @@ class ToolRegistry {
   }
   
   async executeTool(name: string, parameters: unknown): Promise<unknown> {
-    // Deny-by-default: rejet si tool non déclaré
+    // Deny-by-default: reject if the tool is not declared
     const tool = this.tools.get(name)
     if (!tool) {
       throw new ToolNotFoundError(`Tool "${name}" is not declared`)
     }
     
-    // Validation schéma
+    // Schema validation
     const validated = tool.schema.parse(parameters)
     
-    // Exécution
+    // Execution
     return await tool.handler(validated)
   }
 }
@@ -1640,7 +1640,7 @@ class ToolRegistry {
 
 ### Pattern 4: Async Event Persistence
 
-**Persistance asynchrone pour ne pas bloquer l'exécution:**
+**Asynchronous persistence so as not to block execution:**
 
 ```typescript
 class FileEventStore implements IEventStore {
@@ -1648,15 +1648,15 @@ class FileEventStore implements IEventStore {
   private flushInterval: NodeJS.Timeout
   
   constructor() {
-    // Flush périodique (toutes les 100ms ou 10 événements)
+    // Periodic flush (every 100ms or 10 events)
     this.flushInterval = setInterval(() => this.flush(), 100)
   }
   
   async append(runId: string, event: Event): Promise<void> {
-    // Ajout immédiat en mémoire
+    // Immediate in-memory addition
     this.pendingEvents.push(event)
     
-    // Flush si seuil atteint
+    // Flush if threshold reached
     if (this.pendingEvents.length >= 10) {
       await this.flush()
     }
@@ -1668,7 +1668,7 @@ class FileEventStore implements IEventStore {
     const events = [...this.pendingEvents]
     this.pendingEvents = []
     
-    // Écriture asynchrone (non-bloquant)
+    // Asynchronous (non-blocking) write
     await Promise.all(
       events.map(event => this.writeToFile(event))
     )
@@ -1678,25 +1678,25 @@ class FileEventStore implements IEventStore {
 
 ### Pattern 5: Replay Deterministic Pattern
 
-**Replay utilise uniquement les événements, pas le LLM:**
+**Replay uses only events, not the LLM:**
 
 ```typescript
 class ReplayEngine {
   async replay(runId: string): Promise<RunResult> {
-    // Charger événements originaux
+    // Load original events
     const originalEvents = await this.eventStore.getEvents(runId)
     
-    // Filtrer intentions LLM
+    // Filter LLM intentions
     const intentions = originalEvents.filter(
       e => e.type === 'intention.generated'
     )
     
-    // Rejouer avec intentions originales (pas de LLM)
+    // Replay with original intentions (no LLM)
     const newRunId = generateRunId()
     for (const intentionEvent of intentions) {
       const intention = intentionEvent.data.intention
       
-      // Exécuter via Action Engine (sans Reasoning Engine)
+      // Execute via Action Engine (without Reasoning Engine)
       await this.actionEngine.executeIntention(intention, {
         runId: newRunId,
         mode: 'replay'
@@ -1710,13 +1710,13 @@ class ReplayEngine {
 
 ### Best Practices
 
-1. **Toujours émettre un événement avant/après action critique**
-2. **Validation multi-niveaux: Tool Registry → Policy Engine → Action Engine**
-3. **Erreurs explicites avec contexte pour debugging**
-4. **Async/await pour opérations I/O (event store, LLM)**
-5. **Type-safety strict avec TypeScript**
-6. **Configuration par défaut intelligente**
-7. **Isolation des erreurs (un tool qui échoue ne fait pas échouer le run)**
+1. **Always emit an event before/after a critical action**
+2. **Multi-level validation: Tool Registry → Policy Engine → Action Engine**
+3. **Explicit errors with context for debugging**
+4. **Async/await for I/O operations (event store, LLM)**
+5. **Strict type-safety with TypeScript**
+6. **Smart default configuration**
+7. **Error isolation (a failing tool does not fail the whole run)**
 
 ---
 
@@ -1725,14 +1725,14 @@ class ReplayEngine {
 ### Versioning Strategy
 
 #### Semantic Versioning
-- **MAJOR:** Breaking changes API publique
-- **MINOR:** Nouvelles features compatibles
-- **PATCH:** Bug fixes, améliorations
+- **MAJOR:** Breaking changes to the public API
+- **MINOR:** New backward-compatible features
+- **PATCH:** Bug fixes, improvements
 
 #### API Stability Promise
-- **MVP → v1.0:** API peut changer (pré-release)
-- **v1.0+:** API stable, breaking changes seulement en MAJOR
-- **Deprecation:** Features dépréciées avec warning 2 versions avant suppression
+- **MVP → v1.0:** API may change (pre-release)
+- **v1.0+:** Stable API, breaking changes only in MAJOR releases
+- **Deprecation:** Deprecated features get a warning 2 versions before removal
 
 ### Migration Paths
 
@@ -1751,40 +1751,40 @@ async function migrateToSQL(fileStore: FileEventStore, sqlStore: SQLEventStore):
 ```
 
 #### Policy Format Migration
-- Support multiple formats de policies
-- Conversion automatique lors chargement
-- Validation format avant application
+- Support for multiple policy formats
+- Automatic conversion on load
+- Format validation before application
 
 ### Backward Compatibility
 
 #### Event Schema Evolution
-- Nouveaux champs optionnels uniquement
-- Anciens événements restent valides
-- Migration automatique lors lecture si nécessaire
+- New fields are optional only
+- Old events remain valid
+- Automatic migration on read if necessary
 
 #### API Compatibility
-- Anciennes méthodes API supportées avec deprecation warnings
-- Migration guides fournis
-- Tools de migration automatique (post-MVP)
+- Old API methods supported with deprecation warnings
+- Migration guides provided
+- Automatic migration tools (post-MVP)
 
 ---
 
 ## Open Questions & Future Considerations
 
-### Questions Ouvertes (À Résoudre Pendant Implémentation)
+### Open Questions (To Resolve During Implementation)
 
-1. **Event Store File Format** : JSON vs Binary? Compression?
-2. **Error Recovery** : Comment gérer crashes pendant exécution?
-3. **Concurrent Runs** : Gestion de plusieurs runs simultanés?
-4. **Event Size Limits** : Limite taille événements individuels?
+1. **Event Store File Format**: JSON vs. Binary? Compression?
+2. **Error Recovery**: How to handle crashes during execution?
+3. **Concurrent Runs**: Management of multiple simultaneous runs?
+4. **Event Size Limits**: Limit on individual event size?
 
 ### Future Enhancements (Post-MVP)
 
-1. **Observabilité Cognitive** : Graphe raisonnement, alternatives envisagées
-2. **Multi-Agent Orchestration** : Coordination entre agents
-3. **Approval Humaine** : Workflow d'approbation pour actions critiques
-4. **Event Signing** : Signatures cryptographiques pour audit
-5. **Distributed Tracing** : Intégration avec systèmes observabilité externes
+1. **Cognitive Observability**: Reasoning graph, alternatives considered
+2. **Multi-Agent Orchestration**: Coordination between agents
+3. **Human Approval**: Approval workflow for critical actions
+4. **Event Signing**: Cryptographic signatures for audit
+5. **Distributed Tracing**: Integration with external observability systems
 
 ---
 
@@ -1794,11 +1794,11 @@ async function migrateToSQL(fileStore: FileEventStore, sqlStore: SQLEventStore):
 
 ### Key Architectural Principles
 
-1. **Event-Sourcing First** : L'event log est la source de vérité unique
-2. **Security by Design** : Deny-by-default structurel, pas optionnel
-3. **Separation of Concerns** : Reasoning Engine ≠ Action Engine
-4. **Simplicity Through Abstraction** : API simple masquant complexité interne
-5. **Deterministic Replay** : Replay sans LLM pour debugging et audit
+1. **Event-Sourcing First**: The event log is the single source of truth
+2. **Security by Design**: Structural deny-by-default, not optional
+3. **Separation of Concerns**: Reasoning Engine ≠ Action Engine
+4. **Simplicity Through Abstraction**: Simple API hiding internal complexity
+5. **Deterministic Replay**: Replay without the LLM for debugging and audit
 
 ### Component Interaction Summary
 
@@ -1829,32 +1829,32 @@ Trace/Replay Engine
 - ✅ Replay Engine
 
 **Key Features:**
-- ✅ Agent execution avec event-sourcing
-- ✅ Tool calling contrôlé (deny-by-default)
-- ✅ Policies simples mais actives
-- ✅ Tracing structuré
-- ✅ Replay déterministe sans LLM
+- ✅ Agent execution with event-sourcing
+- ✅ Controlled tool calling (deny-by-default)
+- ✅ Simple but active policies
+- ✅ Structured tracing
+- ✅ Deterministic replay without the LLM
 - ✅ Quick Start < 30 minutes
 
 ### Success Criteria
 
 **Technical:**
-- Replay fonctionnel : 100% des runs rejouables
-- Overhead SDK : < 10ms par événement
-- Policies actives : > 60% projets avec policies
+- Functional replay: 100% of runs replayable
+- SDK overhead: < 10ms per event
+- Active policies: > 60% of projects with policies
 
 **User Experience:**
-- Time-to-first-agent : < 30 minutes
-- Tracing compréhensible : > 80% utilisateurs comprennent traces
-- API intuitive : < 10 lignes pour Quick Start
+- Time-to-first-agent: < 30 minutes
+- Understandable tracing: > 80% of users understand traces
+- Intuitive API: < 10 lines for Quick Start
 
 ### Next Steps
 
-1. **Implementation Phase 1** : Event Store + Core Components
-2. **Implementation Phase 2** : SDK API Layer + Integration
-3. **Implementation Phase 3** : Replay Engine + Testing
-4. **Validation Phase** : Early adopters feedback
-5. **Iteration** : Refinement basé sur feedback
+1. **Implementation Phase 1**: Event Store + Core Components
+2. **Implementation Phase 2**: SDK API Layer + Integration
+3. **Implementation Phase 3**: Replay Engine + Testing
+4. **Validation Phase**: Early adopter feedback
+5. **Iteration**: Refinement based on feedback
 
 ---
 
@@ -1862,4 +1862,3 @@ Trace/Replay Engine
 
 **Last Updated:** 2026-01-06
 **Version:** 1.0
-

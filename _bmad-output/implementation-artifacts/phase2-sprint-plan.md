@@ -1,210 +1,209 @@
 # Sprint Plan Phase 2 - SDK_AI_Agents
 
-**Date de planification:** 2026-01-06  
+**Planning date:** 2026-01-06  
 **Sprint:** Phase 2 - Production-Ready  
-**Durée:** À définir selon capacité
+**Duration:** To be defined based on capacity
 
-## 🎯 Objectifs du Sprint Phase 2
+## 🎯 Phase 2 Sprint Objectives
 
-Transformer le MVP en une solution production-ready avec :
-- Multi-providers LLM pour flexibilité
-- Policies avancées pour gouvernance renforcée
-- Event Store SQL-based pour scalabilité
-- Observabilité cognitive pour compréhension approfondie
+Transform the MVP into a production-ready solution with:
+- Multi-provider LLM for flexibility
+- Advanced policies for stronger governance
+- SQL-based Event Store for scalability
+- Cognitive observability for deeper understanding
 
-## 📊 Vue d'Ensemble
+## 📊 Overview
 
-### Epics Phase 2
+### Phase 2 Epics
 
-1. **Epic 10: Multi-Providers LLM** (4 stories)
-   - Abstraction du provider
-   - Support Anthropic Claude
-   - Fallback entre providers
-   - Configuration par provider
+1. **Epic 10: Multi-Provider LLM** (4 stories)
+   - Provider abstraction
+   - Anthropic Claude support
+   - Fallback between providers
+   - Per-provider configuration
 
-2. **Epic 11: Policies Avancées** (4 stories)
-   - Approval humaine
-   - Budgets complexes
-   - Policies conditionnelles
+2. **Epic 11: Advanced Policies** (4 stories)
+   - Human approval
+   - Complex budgets
+   - Conditional policies
    - Audit trail
 
-3. **Epic 12: Event Store SQL-Based** (5 stories)
-   - Interface SQL Event Store
-   - Migration PostgreSQL
-   - Requêtes avancées
-   - Indexation
-   - Backup/Restauration
+3. **Epic 12: SQL-Based Event Store** (5 stories)
+   - SQL Event Store interface
+   - PostgreSQL migration
+   - Advanced queries
+   - Indexing
+   - Backup/Restore
 
-4. **Epic 13: Observabilité Cognitive** (4 stories)
-   - Graphe de raisonnement
-   - Alternatives envisagées
-   - Patterns de décision
-   - Visualisation des traces
+4. **Epic 13: Cognitive Observability** (4 stories)
+   - Reasoning graph
+   - Alternatives considered
+   - Decision patterns
+   - Trace visualization
 
-**Total:** 17 stories Phase 2
+**Total:** 17 Phase 2 stories
 
-## 🎯 Priorisation Recommandée
+## 🎯 Recommended Prioritization
 
-### Priorité 1 (Impact Élevé, Effort Moyen)
+### Priority 1 (High Impact, Medium Effort)
 
-1. **Epic 10: Multi-Providers LLM**
-   - Story 10.1: Abstraction du Provider LLM
-   - Story 10.2: Support Anthropic Claude
-   - **Justification:** Flexibilité immédiate, demande utilisateur forte
+1. **Epic 10: Multi-Provider LLM**
+   - Story 10.1: LLM Provider Abstraction
+   - Story 10.2: Anthropic Claude Support
+   - **Justification:** Immediate flexibility, strong user demand
 
-2. **Epic 11: Policies Avancées**
-   - Story 11.1: Approval Humaine
-   - Story 11.4: Audit Trail des Policies
-   - **Justification:** Gouvernance critique pour production
+2. **Epic 11: Advanced Policies**
+   - Story 11.1: Human Approval
+   - Story 11.4: Policy Audit Trail
+   - **Justification:** Critical governance for production
 
-### Priorité 2 (Impact Moyen, Effort Variable)
+### Priority 2 (Medium Impact, Variable Effort)
 
-3. **Epic 12: Event Store SQL-Based**
-   - Story 12.1: Interface SQL Event Store
-   - Story 12.2: Migration PostgreSQL
-   - **Justification:** Scalabilité nécessaire pour production
+3. **Epic 12: SQL-Based Event Store**
+   - Story 12.1: SQL Event Store Interface
+   - Story 12.2: PostgreSQL Migration
+   - **Justification:** Scalability needed for production
 
-4. **Epic 13: Observabilité Cognitive**
-   - Story 13.1: Graphe de Raisonnement
-   - Story 13.2: Alternatives Envisagées
-   - **Justification:** Valeur ajoutée pour debugging et amélioration
+4. **Epic 13: Cognitive Observability**
+   - Story 13.1: Reasoning Graph
+   - Story 13.2: Alternatives Considered
+   - **Justification:** Added value for debugging and improvement
 
-## 📋 Plan de Sprint Détaillé
+## 📋 Detailed Sprint Plan
 
-### Sprint 1: Multi-Providers LLM
+### Sprint 1: Multi-Provider LLM
 
-**Objectif:** Permettre l'utilisation de plusieurs providers LLM
-
-**Stories:**
-- 10.1: Abstraction du Provider LLM (ready-for-dev)
-- 10.2: Support Anthropic Claude (backlog)
-- 10.3: Fallback entre Providers (backlog)
-- 10.4: Configuration par Provider (backlog)
-
-**Critères de succès:**
-- ✅ Abstraction LLM fonctionnelle
-- ✅ Support Anthropic opérationnel
-- ✅ Tests passent avec les deux providers
-- ✅ Documentation mise à jour
-
-### Sprint 2: Policies Avancées (Partie 1)
-
-**Objectif:** Implémenter approval humaine et audit trail
+**Objective:** Enable the use of multiple LLM providers
 
 **Stories:**
-- 11.1: Approval Humaine (ready-for-dev)
-- 11.4: Audit Trail des Policies (ready-for-dev)
+- 10.1: LLM Provider Abstraction (ready-for-dev)
+- 10.2: Anthropic Claude Support (backlog)
+- 10.3: Fallback Between Providers (backlog)
+- 10.4: Per-Provider Configuration (backlog)
 
-**Critères de succès:**
-- ✅ Workflow d'approbation fonctionnel
-- ✅ Audit trail complet et consultable
-- ✅ Tests complets
-- ✅ Documentation des workflows
+**Success criteria:**
+- ✅ Functional LLM abstraction
+- ✅ Operational Anthropic support
+- ✅ Tests pass with both providers
+- ✅ Updated documentation
 
-### Sprint 3: Policies Avancées (Partie 2)
+### Sprint 2: Advanced Policies (Part 1)
 
-**Objectif:** Budgets complexes et policies conditionnelles
-
-**Stories:**
-- 11.2: Budgets Complexes (backlog)
-- 11.3: Policies Conditionnelles (backlog)
-
-**Critères de succès:**
-- ✅ Budgets par tool/agent/période fonctionnels
-- ✅ Policies conditionnelles opérationnelles
-- ✅ Tests complets
-- ✅ Exemples d'utilisation
-
-### Sprint 4: Event Store SQL-Based (Partie 1)
-
-**Objectif:** Interface SQL et migration PostgreSQL
+**Objective:** Implement human approval and audit trail
 
 **Stories:**
-- 12.1: Interface SQL Event Store (backlog)
-- 12.2: Migration PostgreSQL (backlog)
+- 11.1: Human Approval (ready-for-dev)
+- 11.4: Policy Audit Trail (ready-for-dev)
 
-**Critères de succès:**
-- ✅ Interface SQL Event Store implémentée
-- ✅ Migration PostgreSQL fonctionnelle
-- ✅ Migration depuis FileEventStore possible
-- ✅ Tests de performance
+**Success criteria:**
+- ✅ Functional approval workflow
+- ✅ Complete and queryable audit trail
+- ✅ Complete tests
+- ✅ Workflow documentation
 
-### Sprint 5: Event Store SQL-Based (Partie 2)
+### Sprint 3: Advanced Policies (Part 2)
 
-**Objectif:** Requêtes avancées et optimisations
-
-**Stories:**
-- 12.3: Requêtes Avancées (backlog)
-- 12.4: Indexation pour Performance (backlog)
-- 12.5: Backup et Restauration (backlog)
-
-**Critères de succès:**
-- ✅ Requêtes avancées fonctionnelles
-- ✅ Indexation optimisée
-- ✅ Backup/restauration opérationnels
-- ✅ Documentation complète
-
-### Sprint 6: Observabilité Cognitive
-
-**Objectif:** Graphe de raisonnement et patterns
+**Objective:** Complex budgets and conditional policies
 
 **Stories:**
-- 13.1: Graphe de Raisonnement (backlog)
-- 13.2: Alternatives Envisagées (backlog)
-- 13.3: Patterns de Décision (backlog)
-- 13.4: Visualisation des Traces (backlog)
+- 11.2: Complex Budgets (backlog)
+- 11.3: Conditional Policies (backlog)
 
-**Critères de succès:**
-- ✅ Graphe de raisonnement généré
-- ✅ Alternatives visibles
-- ✅ Patterns identifiés
-- ✅ Visualisation fonctionnelle
+**Success criteria:**
+- ✅ Functional per-tool/agent/period budgets
+- ✅ Operational conditional policies
+- ✅ Complete tests
+- ✅ Usage examples
 
-## 🎯 Recommandations
+### Sprint 4: SQL-Based Event Store (Part 1)
 
-### Ordre d'Implémentation Suggéré
+**Objective:** SQL interface and PostgreSQL migration
 
-1. **Sprint 1:** Multi-Providers LLM (fondation pour flexibilité)
-2. **Sprint 2:** Policies Avancées Partie 1 (gouvernance critique)
-3. **Sprint 3:** Policies Avancées Partie 2 (compléter gouvernance)
-4. **Sprint 4-5:** Event Store SQL-Based (scalabilité)
-5. **Sprint 6:** Observabilité Cognitive (valeur ajoutée)
+**Stories:**
+- 12.1: SQL Event Store Interface (backlog)
+- 12.2: PostgreSQL Migration (backlog)
 
-### Dépendances
+**Success criteria:**
+- ✅ SQL Event Store interface implemented
+- ✅ Functional PostgreSQL migration
+- ✅ Migration from FileEventStore possible
+- ✅ Performance tests
 
-- Epic 10 peut être fait en parallèle avec Epic 11
-- Epic 12 nécessite que l'interface soit stable
-- Epic 13 peut bénéficier des données SQL (Epic 12)
+### Sprint 5: SQL-Based Event Store (Part 2)
 
-### Risques Identifiés
+**Objective:** Advanced queries and optimizations
 
-1. **Complexité abstraction LLM:** Différences entre providers
-   - Mitigation: Prototype rapide, tests précoces
+**Stories:**
+- 12.3: Advanced Queries (backlog)
+- 12.4: Indexing for Performance (backlog)
+- 12.5: Backup and Restore (backlog)
 
-2. **Performance SQL:** Latence possible
-   - Mitigation: Benchmarks, optimisation indexation
+**Success criteria:**
+- ✅ Functional advanced queries
+- ✅ Optimized indexing
+- ✅ Operational backup/restore
+- ✅ Complete documentation
 
-3. **Complexité policies avancées:** Workflow d'approbation
-   - Mitigation: Design simple d'abord, itérer
+### Sprint 6: Cognitive Observability
 
-## 📊 Métriques de Succès Phase 2
+**Objective:** Reasoning graph and patterns
 
-- ✅ Multi-providers fonctionnels (OpenAI + Anthropic)
-- ✅ Approval humaine opérationnelle
-- ✅ Event Store SQL scalable
-- ✅ Observabilité cognitive utile
-- ✅ Performance maintenue ou améliorée
-- ✅ Tests complets pour toutes les features
+**Stories:**
+- 13.1: Reasoning Graph (backlog)
+- 13.2: Alternatives Considered (backlog)
+- 13.3: Decision Patterns (backlog)
+- 13.4: Trace Visualization (backlog)
 
-## 🚀 Prochaines Actions
+**Success criteria:**
+- ✅ Reasoning graph generated
+- ✅ Alternatives visible
+- ✅ Patterns identified
+- ✅ Functional visualization
 
-1. **Créer les stories détaillées** avec `/bmad:bmm:workflows:create-story`
-2. **Démarrer Sprint 1** avec Epic 10
-3. **Suivre la progression** avec `/bmad:bmm:workflows:sprint-status`
-4. **Rétrospectives régulières** après chaque sprint
+## 🎯 Recommendations
+
+### Suggested Implementation Order
+
+1. **Sprint 1:** Multi-Provider LLM (foundation for flexibility)
+2. **Sprint 2:** Advanced Policies Part 1 (critical governance)
+3. **Sprint 3:** Advanced Policies Part 2 (complete governance)
+4. **Sprint 4-5:** SQL-Based Event Store (scalability)
+5. **Sprint 6:** Cognitive Observability (added value)
+
+### Dependencies
+
+- Epic 10 can be done in parallel with Epic 11
+- Epic 12 requires the interface to be stable
+- Epic 13 can benefit from SQL data (Epic 12)
+
+### Identified Risks
+
+1. **LLM abstraction complexity:** Differences between providers
+   - Mitigation: Rapid prototype, early testing
+
+2. **SQL performance:** Possible latency
+   - Mitigation: Benchmarks, indexing optimization
+
+3. **Advanced policy complexity:** Approval workflow
+   - Mitigation: Simple design first, iterate
+
+## 📊 Phase 2 Success Metrics
+
+- ✅ Functional multi-providers (OpenAI + Anthropic)
+- ✅ Operational human approval
+- ✅ Scalable SQL Event Store
+- ✅ Useful cognitive observability
+- ✅ Maintained or improved performance
+- ✅ Complete tests for all features
+
+## 🚀 Next Actions
+
+1. **Create detailed stories** with `/bmad:bmm:workflows:create-story`
+2. **Start Sprint 1** with Epic 10
+3. **Track progress** with `/bmad:bmm:workflows:sprint-status`
+4. **Regular retrospectives** after each sprint
 
 ---
 
-**Prêt à démarrer Phase 2 !** 🎉
-
+**Ready to start Phase 2!** 🎉
 

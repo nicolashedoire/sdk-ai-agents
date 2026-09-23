@@ -1,93 +1,93 @@
-# Story 13.1: Graphe de Raisonnement Visualisable
+# Story 13.1: Visualizable Reasoning Graph
 
 **Story ID:** 13.1  
-**Epic:** 13 - Observabilité Cognitive  
+**Epic:** 13 - Cognitive Observability  
 **Status:** review  
 **Created:** 2026-01-06
 
 ## User Story
 
-**As a** développeur,
-**I want** visualiser le graphe de raisonnement de l'agent,
-**So that** je peux comprendre comment l'agent a pensé.
+**As a** developer,
+**I want** to visualize the agent's reasoning graph,
+**So that** I can understand how the agent thought.
 
 ## Acceptance Criteria
 
-**Given** une exécution d'agent
-**When** je récupère le graphe de raisonnement
-**Then** je peux voir les étapes de raisonnement
-**And** les connexions entre les décisions sont visibles
-**And** le graphe est exportable (JSON, Graphviz, etc.)
+**Given** an agent execution
+**When** I retrieve the reasoning graph
+**Then** I can see the reasoning steps
+**And** the connections between decisions are visible
+**And** the graph is exportable (JSON, Graphviz, etc.)
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events traced
 
 ## Technical Requirements
 
-### Stack Front-End
+### Front-End Stack
 
-**Technologies requises:**
-- **Storybook 10**: Pour le développement et la documentation des composants UI
-- **Tailwind CSS**: Pour le styling et le design system
-- **shadcn/ui**: Composants UI réutilisables basés sur Radix UI
+**Required technologies:**
+- **Storybook 10**: For UI component development and documentation
+- **Tailwind CSS**: For styling and the design system
+- **shadcn/ui**: Reusable UI components based on Radix UI
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- À implémenter avec composants React/TypeScript
-- Visualisation interactive du graphe de raisonnement
-- Export en formats multiples (JSON, Graphviz)
+**Current state:**
+- To be implemented with React/TypeScript components
+- Interactive visualization of the reasoning graph
+- Export in multiple formats (JSON, Graphviz)
 
-**Fichiers concernés:**
-- Composants React dans `src/components/` ou `src/ui/`
-- Stories Storybook dans `.storybook/`
-- Styles Tailwind CSS
-- Composants shadcn/ui pour l'interface
+**Files concerned:**
+- React components in `src/components/` or `src/ui/`
+- Storybook stories in `.storybook/`
+- Tailwind CSS styles
+- shadcn/ui components for the interface
 
-### Implémentation
+### Implementation
 
-**Composants à créer:**
-- `ReasoningGraph` - Composant principal de visualisation
-- `GraphNode` - Nœud du graphe (décision/intention)
-- `GraphEdge` - Connexion entre nœuds
-- `GraphControls` - Contrôles de navigation (zoom, pan, etc.)
-- `GraphExport` - Export du graphe
+**Components to create:**
+- `ReasoningGraph` - Main visualization component
+- `GraphNode` - Graph node (decision/intention)
+- `GraphEdge` - Connection between nodes
+- `GraphControls` - Navigation controls (zoom, pan, etc.)
+- `GraphExport` - Graph export
 
-**Bibliothèques recommandées:**
-- `react-flow` ou `vis-network` pour le rendu du graphe
-- Composants shadcn/ui pour les contrôles (Button, Dialog, etc.)
-- Tailwind CSS pour le styling
+**Recommended libraries:**
+- `react-flow` or `vis-network` for graph rendering
+- shadcn/ui components for controls (Button, Dialog, etc.)
+- Tailwind CSS for styling
 
 **Storybook:**
-- Créer des stories pour chaque composant
-- Documenter les props et les états
-- Exemples d'utilisation avec données réelles
+- Create stories for each component
+- Document props and states
+- Usage examples with real data
 
 ## Library & Framework Requirements
 
-### Dépendances Front-End Requises
+### Required Front-End Dependencies
 
 **Storybook:**
 - `@storybook/react` v10.x
 - `@storybook/addon-essentials` v10.x
-- Configuration Storybook 10 selon les meilleures pratiques
+- Storybook 10 configuration following best practices
 
 **Tailwind CSS:**
-- `tailwindcss` dernière version stable
-- `postcss` et `autoprefixer`
-- Configuration Tailwind avec thème personnalisé si nécessaire
+- `tailwindcss` latest stable version
+- `postcss` and `autoprefixer`
+- Tailwind configuration with a custom theme if needed
 
 **shadcn/ui:**
 - Installation via `npx shadcn-ui@latest init`
-- Composants nécessaires: Button, Dialog, Card, Tabs, etc.
-- Configuration selon documentation officielle
+- Required components: Button, Dialog, Card, Tabs, etc.
+- Configuration per official documentation
 
-**Bibliothèques de visualisation:**
-- `react-flow` ou `@visx/network` pour le graphe
-- `d3` ou `cytoscape` pour visualisation avancée (optionnel)
+**Visualization libraries:**
+- `react-flow` or `@visx/network` for the graph
+- `d3` or `cytoscape` for advanced visualization (optional)
 
 ### Installation
 
@@ -102,9 +102,9 @@ npx tailwindcss init -p
 # shadcn/ui
 npx shadcn-ui@latest init
 
-# Bibliothèques de visualisation
+# Visualization libraries
 npm install react-flow
-# ou
+# or
 npm install @visx/network
 ```
 
@@ -114,108 +114,108 @@ npm install @visx/network
 src/
   components/
     reasoning-graph/
-      ReasoningGraph.tsx      # Composant principal
-      GraphNode.tsx            # Composant nœud
-      GraphEdge.tsx            # Composant connexion
-      GraphControls.tsx        # Contrôles navigation
-      GraphExport.tsx          # Export graphe
+      ReasoningGraph.tsx      # Main component
+      GraphNode.tsx            # Node component
+      GraphEdge.tsx            # Connection component
+      GraphControls.tsx        # Navigation controls
+      GraphExport.tsx          # Graph export
       index.ts                 # Exports
-  ui/                         # Composants shadcn/ui
+  ui/                         # shadcn/ui components
     button.tsx
     dialog.tsx
     card.tsx
     tabs.tsx
     ...
 .storybook/
-  main.ts                     # Configuration Storybook 10
-  preview.ts                  # Configuration preview
+  main.ts                     # Storybook 10 configuration
+  preview.ts                  # Preview configuration
 stories/
-  ReasoningGraph.stories.tsx   # Stories Storybook
+  ReasoningGraph.stories.tsx   # Storybook stories
   GraphNode.stories.tsx
   ...
-tailwind.config.js            # Configuration Tailwind
-postcss.config.js             # Configuration PostCSS
+tailwind.config.js            # Tailwind configuration
+postcss.config.js             # PostCSS configuration
 ```
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
-5. **Composants réutilisables**: shadcn/ui pour cohérence UI
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events traced
+4. **Security**: Deny-by-default respected
+5. **Reusable components**: shadcn/ui for consistency
 
 ## Testing Requirements
 
-- ✅ Tests unitaires des composants React
-- ✅ Tests Storybook avec interactions
-- ✅ Tests d'intégration avec données réelles
-- ✅ Tests d'accessibilité (a11y)
-- ✅ Tests de performance avec grands graphes
+- ✅ Unit tests for React components
+- ✅ Storybook tests with interactions
+- ✅ Integration tests with real data
+- ✅ Accessibility tests (a11y)
+- ✅ Performance tests with large graphs
 
 ## Story Completion Status
 
 **Status:** review  
-**Implementation:** Backend complété - Génération et export du graphe de raisonnement  
-**Notes:** Partie backend implémentée. La visualisation frontend (React/Storybook) peut être ajoutée séparément.
+**Implementation:** Backend completed - Reasoning graph generation and export  
+**Notes:** Backend part implemented. Frontend visualization (React/Storybook) can be added separately.
 
 ## Implementation Details (Backend)
 
 ### Components Created
 
 1. **ReasoningGraph Types** (`src/types/reasoning-graph.ts`)
-   - `ReasoningNode`: Représente un nœud du graphe (intention, action, tool, policy, decision, start, end)
-   - `ReasoningEdge`: Représente une connexion entre nœuds (leads_to, triggers, validates, rejects, approves)
-   - `ReasoningGraph`: Structure complète du graphe avec métadonnées
+   - `ReasoningNode`: Represents a graph node (intention, action, tool, policy, decision, start, end)
+   - `ReasoningEdge`: Represents a connection between nodes (leads_to, triggers, validates, rejects, approves)
+   - `ReasoningGraph`: Complete graph structure with metadata
 
 2. **ReasoningGraphBuilder** (`src/utils/reasoning-graph-builder.ts`)
-   - `buildFromEvents()`: Construit le graphe de raisonnement à partir d'une séquence d'événements
-   - Extrait les intentions, actions, tools, policies, et décisions des événements
-   - Crée les connexions entre les nœuds selon la séquence temporelle
-   - Gère les workflows d'approbation et les vérifications de policies
+   - `buildFromEvents()`: Builds the reasoning graph from a sequence of events
+   - Extracts intentions, actions, tools, policies, and decisions from events
+   - Creates connections between nodes according to temporal sequence
+   - Handles approval workflows and policy checks
 
 3. **ReasoningGraphExporter** (`src/utils/reasoning-graph-export.ts`)
-   - `toJSON()`: Export en format JSON (avec option pretty-print)
-   - `toGraphviz()`: Export en format Graphviz DOT pour visualisation
-   - Supporte les options de personnalisation (direction, nodeShape, nodeStyle)
-   - Échappe correctement les caractères spéciaux dans les labels
+   - `toJSON()`: Export in JSON format (with pretty-print option)
+   - `toGraphviz()`: Export in Graphviz DOT format for visualization
+   - Supports customization options (direction, nodeShape, nodeStyle)
+   - Correctly escapes special characters in labels
 
 4. **SDK Methods** (`src/sdk.ts`)
-   - `getReasoningGraph(runId)`: Récupère le graphe de raisonnement pour un run
-   - `exportReasoningGraph(runId, format)`: Exporte le graphe en JSON ou Graphviz
+   - `getReasoningGraph(runId)`: Retrieves the reasoning graph for a run
+   - `exportReasoningGraph(runId, format)`: Exports the graph as JSON or Graphviz
 
-### Node Types Supported
+### Supported Node Types
 
-- **start**: Début d'une exécution (`run.started`)
-- **intention**: Intention générée par le LLM (`intention.generated`)
-- **action**: Action exécutée (`action.executing`, `action.executed`)
-- **tool**: Appel d'outil (`tool.called`)
-- **policy**: Vérification de policy (`policy.checked`)
-- **decision**: Décision prise (approval requests, approvals, rejections)
-- **end**: Fin d'exécution (`run.completed`, `run.failed`, `run.cancelled`)
+- **start**: Beginning of an execution (`run.started`)
+- **intention**: Intention generated by the LLM (`intention.generated`)
+- **action**: Action executed (`action.executing`, `action.executed`)
+- **tool**: Tool call (`tool.called`)
+- **policy**: Policy check (`policy.checked`)
+- **decision**: Decision made (approval requests, approvals, rejections)
+- **end**: End of execution (`run.completed`, `run.failed`, `run.cancelled`)
 
-### Edge Types Supported
+### Supported Edge Types
 
-- **leads_to**: Connexion séquentielle normale
-- **triggers**: Une action déclenche une autre
-- **validates**: Une policy valide une intention
-- **rejects**: Une policy ou approbation rejette une action
-- **approves**: Une approbation approuve une action
+- **leads_to**: Normal sequential connection
+- **triggers**: One action triggers another
+- **validates**: A policy validates an intention
+- **rejects**: A policy or approval rejects an action
+- **approves**: An approval approves an action
 
 ### Tests
 
 - **Unit Tests**: `src/__tests__/reasoning-graph.test.ts` (9 tests, all passing)
-  - Tests pour la construction du graphe depuis les événements
-  - Tests pour différents types de nœuds et edges
-  - Tests pour les workflows d'approbation
-  - Tests pour l'export JSON et Graphviz
+  - Tests for building the graph from events
+  - Tests for different node and edge types
+  - Tests for approval workflows
+  - Tests for JSON and Graphviz export
 
 - **Integration Tests**: `src/__tests__/sdk-reasoning-graph.test.ts` (4 tests, all passing)
-  - Tests pour `getReasoningGraph()` via SDK
-  - Tests pour `exportReasoningGraph()` en JSON et Graphviz
-  - Tests de gestion d'erreurs
+  - Tests for `getReasoningGraph()` via SDK
+  - Tests for `exportReasoningGraph()` in JSON and Graphviz
+  - Tests for error handling
 
 ### Usage Example
 
@@ -238,8 +238,8 @@ console.log(dot);
 
 ### Next Steps (Frontend)
 
-La partie backend est complète. Pour la visualisation frontend :
-- Utiliser les données JSON du graphe
-- Créer des composants React avec react-flow ou vis-network
-- Intégrer avec Storybook pour la documentation
-- Utiliser Tailwind CSS et shadcn/ui pour le styling
+The backend part is complete. For frontend visualization:
+- Use the graph's JSON data
+- Create React components with react-flow or vis-network
+- Integrate with Storybook for documentation
+- Use Tailwind CSS and shadcn/ui for styling

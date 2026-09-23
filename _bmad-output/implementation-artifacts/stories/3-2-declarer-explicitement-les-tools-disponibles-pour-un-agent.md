@@ -1,4 +1,4 @@
-# Story 3.2: Déclarer explicitement les tools disponibles pour un agent
+# Story 3.2: Explicitly declaring the tools available to an agent
 
 **Story ID:** 3.2  
 **Epic:** 3 - Tool & Capability Management  
@@ -7,59 +7,59 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** déclarer explicitement les tools disponibles pour un agent,
-**So that** je contrôle précisément ce que l'agent peut utiliser.
+**As a** developer,
+**I want** to explicitly declare the tools available to an agent,
+**So that** I precisely control what the agent can use.
 
 ## Acceptance Criteria
 
-**Given** des tools sont définis
-**When** je configure un agent avec `agent.addTools([tool1, tool2])`
-**Then** seuls ces tools sont disponibles pour l'agent
-**And** tout tool non déclaré est inaccessible (deny by default)
-**And** la configuration est validée avant l'exécution
+**Given** tools are defined
+**When** I configure an agent with `agent.addTools([tool1, tool2])`
+**Then** only these tools are available to the agent
+**And** any undeclared tool is inaccessible (deny by default)
+**And** the configuration is validated before execution
 
 ## Business Value
 
-- **Contrôle**: Tools explicites
-- **Sécurité**: Deny-by-default
-- **Validation**: Configuration vérifiée
+- **Control**: Explicit tools
+- **Security**: Deny-by-default
+- **Validation**: Configuration checked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase MVP
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current State:**
+- Complete implementation in the MVP codebase
+- Feature tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files Involved:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée dans le MVP. Voir les fichiers sources pour les détails d'implémentation.
+Feature implemented and tested in the MVP. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Feature validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète dans le MVP  
-**Notes:** Story MVP complétée et testée
+**Implementation:** Complete in the MVP  
+**Notes:** MVP story completed and tested

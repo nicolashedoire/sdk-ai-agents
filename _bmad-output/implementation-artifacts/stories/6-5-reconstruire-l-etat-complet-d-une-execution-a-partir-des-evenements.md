@@ -1,4 +1,4 @@
-# Story 6.5: Reconstruire l'état complet d'une exécution à partir des événements
+# Story 6.5: Reconstruct the complete state of an execution from events
 
 **Story ID:** 6.5  
 **Epic:** 6 - Event Sourcing & Persistence  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** reconstruire l'état complet d'une exécution à partir des événements,
-**So that** je peux comprendre et rejouer n'importe quelle exécution.
+**As a** developer,
+**I want** reconstruct the complete state of an execution from events,
+**So that** I can understand and replay any execution.
 
 ## Acceptance Criteria
 
-**Given** un runId existe avec ses événements persistés
-**When** je charge les événements pour ce runId
-**Then** je peux reconstruire l'état complet de l'exécution
-**And** tous les détails (intentions, validations, actions, résultats) sont disponibles
-**And** l'ordre chronologique est préservé
-**And** l'état reconstruit est identique à l'état original
+**Given** a runId exists with its persisted events
+**When** I load the events for this runId
+**Then** I can reconstruct the complete state of the execution
+**And** all details (intentions, validations, actions, results) are available
+**And** the chronological order is preserved
+**And** the reconstructed state is identical to the original state
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current state:**
+- Complete implementation in the codebase
+- Functionality tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files concerned:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Functionality implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Functionality validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested

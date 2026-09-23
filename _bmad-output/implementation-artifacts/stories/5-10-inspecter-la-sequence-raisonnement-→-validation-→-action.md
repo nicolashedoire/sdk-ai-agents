@@ -1,66 +1,66 @@
-# Story 5.10: Inspecter la séquence raisonnement → validation → action
+# Story 5.10: Inspecting the reasoning → validation → action sequence
 
 **Story ID:** 5.10  
-**Epic:** 5 - Runtime Architecture - Séparation Raisonnement/Action  
+**Epic:** 5 - Runtime Architecture - Reasoning/Action Separation  
 **Status:** done  
 **Created:** 2026-01-06
 
 ## User Story
 
-**As a** développeur,
-**I want** inspecter la séquence raisonnement → validation → action,
-**So that** je peux comprendre le flux complet de décision de l'agent.
+**As a** developer,
+**I want** to inspect the reasoning → validation → action sequence,
+**So that** I can understand the agent's complete decision flow.
 
 ## Acceptance Criteria
 
-**Given** une exécution a été effectuée
-**When** je consulte les traces d'une action
-**Then** je vois la séquence complète : intention LLM → validation → exécution
-**And** chaque étape est tracée avec ses détails
-**And** les timestamps montrent l'ordre chronologique
-**And** les liens entre les événements sont clairs
+**Given** an execution has taken place
+**When** I consult the traces of an action
+**Then** I see the complete sequence: LLM intention → validation → execution
+**And** each step is tracked with its details
+**And** the timestamps show the chronological order
+**And** the links between the events are clear
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current State:**
+- Complete implementation in the codebase
+- Feature tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files Involved:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Feature implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Feature validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested

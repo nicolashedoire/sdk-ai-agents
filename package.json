@@ -1,12 +1,33 @@
 {
   "name": "@sdk-ai-agents/core",
-  "version": "0.1.0",
-  "description": "Infrastructure de gouvernance des agents IA avec event-sourcing natif, replay et sécurité by design",
+  "version": "0.2.0",
+  "description": "Governed AI agents that reason before they act: explicit cognition, typed decisions (Jev), MCP connectors, event sourcing, replay, costs, retries and incident alerts.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp.d.ts",
+      "import": "./dist/mcp.js",
+      "default": "./dist/mcp.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "mcp": [
+        "./dist/mcp.d.ts"
+      ]
+    }
+  },
   "type": "module",
   "scripts": {
     "build": "tsc",
+    "typecheck:tests": "tsc -p tsconfig.test.json",
     "dev": "tsc --watch",
     "test": "vitest",
     "test:watch": "vitest --watch",
@@ -19,15 +40,28 @@
     "example:quick-start": "tsx examples/quick-start.ts",
     "example:complete": "tsx examples/complete-example.ts",
     "test:api": "tsx examples/test-api.ts",
-    "clean": "rm -rf dist"
+    "example:cognitive": "tsx examples/cognitive-agent.ts",
+    "example:mcp": "tsx examples/mcp-server.ts",
+    "clean": "rm -rf dist",
+    "prepare": "npm run build",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "keywords": [
     "ai",
     "agents",
     "llm",
+    "cognitive-architecture",
+    "reasoning",
+    "jev",
+    "typed-decisions",
+    "mcp",
+    "model-context-protocol",
     "event-sourcing",
     "governance",
     "replay",
+    "observability",
     "typescript"
   ],
   "author": "Nicolashedoire",
@@ -38,34 +72,48 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
     "openai": "^4.20.0",
-    "uuid": "^9.0.1",
-    "zod": "^3.22.4"
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.7.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@types/node": "^20.10.0",
     "@types/pg": "^8.10.9",
     "@types/uuid": "^9.0.7",
     "@vitest/coverage-v8": "^1.0.4",
+    "mermaid": "11.17.2",
     "pg": "^8.11.3",
     "tsx": "^4.7.0",
     "typescript": "^5.3.2",
-    "vitest": "^1.0.4"
+    "vitepress": "1.6.4",
+    "vitepress-plugin-mermaid": "2.0.17",
+    "vitest": "^1.0.4",
+    "zod": "3.25.76"
   },
   "peerDependencies": {
+    "zod": "^3.25.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "pg": "^8.11.0"
   },
   "files": [
     "dist",
     "README.md",
-    "docs"
+    "CHANGELOG.md"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/nicolashedoire/SDK_AI_Agents.git"
+    "url": "https://github.com/nicolashedoire/sdk-ai-agents.git"
   },
   "bugs": {
-    "url": "https://github.com/nicolashedoire/SDK_AI_Agents/issues"
+    "url": "https://github.com/nicolashedoire/sdk-ai-agents/issues"
   },
-  "homepage": "https://github.com/nicolashedoire/SDK_AI_Agents#readme"
+  "homepage": "https://github.com/nicolashedoire/sdk-ai-agents#readme",
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    },
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    }
+  }
 }

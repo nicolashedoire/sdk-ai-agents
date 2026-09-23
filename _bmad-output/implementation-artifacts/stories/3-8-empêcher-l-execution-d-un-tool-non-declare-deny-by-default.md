@@ -1,4 +1,4 @@
-# Story 3.8: Empêcher l'exécution d'un tool non déclaré (deny by default)
+# Story 3.8: Preventing the execution of an undeclared tool (deny by default)
 
 **Story ID:** 3.8  
 **Epic:** 3 - Tool & Capability Management  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** que le système empêche l'exécution d'un tool non déclaré,
-**So that** la sécurité est garantie par design, pas par configuration.
+**As a** developer,
+**I want** the system to prevent the execution of an undeclared tool,
+**So that** security is guaranteed by design, not by configuration.
 
 ## Acceptance Criteria
 
-**Given** un agent est configuré avec des tools spécifiques
-**When** l'agent tente d'appeler un tool non déclaré
-**Then** l'appel est bloqué immédiatement
-**And** une erreur claire est générée
-**And** l'événement de blocage est tracé
-**And** aucun effet de bord n'est produit
+**Given** an agent is configured with specific tools
+**When** the agent attempts to call an undeclared tool
+**Then** the call is blocked immediately
+**And** a clear error is generated
+**And** the blocking event is tracked
+**And** no side effect is produced
 
 ## Business Value
 
-- **Sécurité**: Blocage automatique
-- **Design**: Sécurité structurelle
-- **Traçabilité**: Blocages tracés
+- **Security**: Automatic blocking
+- **Design**: Structural security
+- **Traceability**: Blocks tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase MVP
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current State:**
+- Complete implementation in the MVP codebase
+- Feature tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files Involved:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée dans le MVP. Voir les fichiers sources pour les détails d'implémentation.
+Feature implemented and tested in the MVP. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Feature validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète dans le MVP  
-**Notes:** Story MVP complétée et testée
+**Implementation:** Complete in the MVP  
+**Notes:** MVP story completed and tested

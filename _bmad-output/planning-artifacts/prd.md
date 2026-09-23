@@ -19,1594 +19,1593 @@ lastStep: 8
 
 ## Executive Summary
 
-SDK_AI_Agents crée la confiance opérationnelle nécessaire pour déployer des agents IA en production. Alors que les équipes savent faire "parler" une IA, elles ne savent pas faire agir une IA de manière fiable, contrôlée, explicable et sécurisée en production.
+SDK_AI_Agents creates the operational trust needed to deploy AI agents in production. While teams know how to make an AI "talk," they don't know how to make an AI act reliably, in a controlled, explainable, and secure way in production.
 
-Le problème n'est pas le LLM, mais l'architecture autour du LLM. Les équipes techniques bricolent des agents fragiles, réinventent leurs propres frameworks, et gèrent la sécurité "à la confiance" avec des logs pauvres et des tests quasi inexistants.
+The problem isn't the LLM, but the architecture around the LLM. Technical teams cobble together fragile agents, reinvent their own frameworks, and handle security "on trust," with poor logs and virtually no tests.
 
-SDK_AI_Agents transforme les agents IA d'outils expérimentaux en systèmes décisionnels gouvernables, explicables et prêts pour la production. Il ne cherche pas à être un meilleur prompt framework ou un wrapper de LLM, mais l'infrastructure de gouvernance des agents IA où l'agent propose et le système décide.
+SDK_AI_Agents transforms AI agents from experimental tools into governable, explainable, production-ready decision-making systems. It doesn't aim to be a better prompt framework or an LLM wrapper, but the governance infrastructure for AI agents where the agent proposes and the system decides.
 
-**Vision en une phrase :** SDK_AI_Agents crée la confiance opérationnelle nécessaire pour déployer des agents IA en production.
+**Vision in one sentence:** SDK_AI_Agents creates the operational trust needed to deploy AI agents in production.
 
-### Ce qui rend ce produit spécial
+### What makes this product special
 
-SDK_AI_Agents se distingue par huit différenciateurs stratégiques qui convergent vers la confiance opérationnelle :
+SDK_AI_Agents stands out through eight strategic differentiators that converge toward operational trust:
 
-#### Différenciateurs techniques fondamentaux
+#### Foundational technical differentiators
 
-1. **Event-sourcing natif** → Replay, audit et comparaison de comportements en une commande
-   - Chaque exécution est traçable, rejouable et comparable
-   - Unique sur le marché : impossible avec LangChain ou autres frameworks
+1. **Native event-sourcing** → Replay, audit, and behavior comparison in a single command
+   - Every execution is traceable, replayable, and comparable
+   - Unique in the market: impossible with LangChain or other frameworks
 
-2. **Séparation raisonnement/action** → Sécurité par design (le LLM ne provoque jamais d'effet de bord)
-   - Le LLM génère des intentions structurées, jamais d'actions directes
-   - Toutes les actions passent par un Action Engine gouverné
+2. **Separation of reasoning/action** → Security by design (the LLM never causes a side effect)
+   - The LLM generates structured intentions, never direct actions
+   - All actions pass through a governed Action Engine
 
-3. **Gouvernance intégrée by design** → Policies, budgets, garde-fous natifs
-   - La gouvernance n'est pas une option ni un plugin : elle est structurelle, intégrée au runtime
-   - Sécurité "deny by default" avec contrats explicites pour chaque capability
+3. **Built-in governance by design** → Native policies, budgets, guardrails
+   - Governance is not an option or a plugin: it is structural, built into the runtime
+   - "Deny by default" security with explicit contracts for each capability
 
-4. **Testabilité native des agents** → Golden traces, replay déterministe, non-régression
-   - Les agents deviennent des objets logiciels testables, pas des comportements probabilistes
-   - QA, CI/CD, rollback et amélioration continue possibles
+4. **Native testability of agents** → Golden traces, deterministic replay, non-regression
+   - Agents become testable software objects, not probabilistic behaviors
+   - QA, CI/CD, rollback, and continuous improvement become possible
 
-#### Différenciateurs stratégiques profonds
+#### Deep strategic differentiators
 
-5. **Agent ≠ LLM** → Changement de paradigme fondamental
-   - Un agent n'est pas un LLM avec des tools
-   - Un agent est un système décisionnel gouverné, dont le LLM n'est qu'un composant
-   - Justifie l'existence d'une infrastructure dédiée, au-delà des frameworks d'orchestration
+5. **Agent ≠ LLM** → A fundamental paradigm shift
+   - An agent is not an LLM with tools
+   - An agent is a governed decision-making system, of which the LLM is only one component
+   - Justifies the existence of dedicated infrastructure, beyond orchestration frameworks
 
-6. **Agent comme artefact logiciel** → Versionnable, comparable, testable, auditable
-   - Chaque run est un artefact logiciel industriel, pas une magie probabiliste
-   - Permet QA structurée, CI/CD, rollback et amélioration continue
-   - Peu d'outils vont aussi loin structurellement
+6. **Agent as software artifact** → Versionable, comparable, testable, auditable
+   - Each run is an industrial software artifact, not probabilistic magic
+   - Enables structured QA, CI/CD, rollback, and continuous improvement
+   - Few tools go this far structurally
 
-7. **Observabilité cognitive** → Observer le raisonnement, pas seulement l'exécution
-   - Pas seulement logs, métriques, spans
-   - Comprendre pourquoi cette décision, quelles contraintes ont pesé, quelles alternatives ont été envisagées
-   - Observer comment l'agent raisonne sous contrainte, pas seulement ce qu'il fait
+7. **Cognitive observability** → Observing the reasoning, not just the execution
+   - Not just logs, metrics, spans
+   - Understanding why this decision, which constraints came into play, which alternatives were considered
+   - Observing how the agent reasons under constraint, not just what it does
 
-8. **Sécurité par impossibilité** → Propriété structurelle, pas feature
-   - Pas de tool sans déclaration explicite
-   - Pas d'action sans policy vérifiée
-   - Pas d'exécution sans trace complète
-   - La sécurité n'est pas une feature, c'est une propriété structurelle
+8. **Security through impossibility** → A structural property, not a feature
+   - No tool without explicit declaration
+   - No action without a verified policy
+   - No execution without a complete trace
+   - Security is not a feature, it is a structural property
 
-**Positionnement clair :**
-- ❌ Pas un meilleur LangChain
-- ❌ Pas un wrapper LLM
-- ✅ Infrastructure de gouvernance de l'intelligence agissante
-- ✅ Couche structurante entre IA et monde réel (comparable à Terraform pour infra, Prisma pour données)
+**Clear positioning:**
+- ❌ Not a better LangChain
+- ❌ Not an LLM wrapper
+- ✅ Governance infrastructure for acting intelligence
+- ✅ A structuring layer between AI and the real world (comparable to Terraform for infrastructure, Prisma for data)
 
-**Évolution de la vision :**
-SDK_AI_Agents n'est pas un outil pour créer des agents, c'est une infrastructure de gouvernance de l'intelligence agissante. La vision a évolué :
-- Du "comment faire" au "comment assumer" — assumer les conséquences des agents
-- Du runtime au système de preuves — prouver ce qu'ils ont fait, pourquoi, sous quelles règles
-- Du dev tool à l'infrastructure stratégique — standard potentiel, pas simple SDK
+**Evolution of the vision:**
+SDK_AI_Agents is not a tool for creating agents, it is a governance infrastructure for acting intelligence. The vision has evolved:
+- From "how to do it" to "how to own it" — owning the consequences of agents
+- From runtime to a proof system — proving what they did, why, under which rules
+- From dev tool to strategic infrastructure — a potential standard, not just an SDK
 
 ## Project Classification
 
 **Technical Type:** `developer_tool`
-- SDK/package TypeScript/Node.js pour développeurs backend et tech leads
-- Focus sur gouvernance, observabilité et testabilité des agents IA
+- TypeScript/Node.js SDK/package for backend developers and tech leads
+- Focus on governance, observability, and testability of AI agents
 
 **Domain:** `general`
-- Outil général pour développeurs travaillant avec des agents IA
-- Applicable à tous les domaines nécessitant des agents IA en production
+- General-purpose tool for developers working with AI agents
+- Applicable to any domain requiring AI agents in production
 
-**Complexity:** `low` (avec aspects techniques avancés)
-- API simple par défaut (Quick Start en 10 lignes)
-- Architecture sophistiquée sous-jacente (event-sourcing, séparation raisonnement/action)
-- Complexité gérée par le SDK, pas exposée au développeur
+**Complexity:** `low` (with advanced technical aspects)
+- Simple API by default (10-line Quick Start)
+- Sophisticated underlying architecture (event-sourcing, reasoning/action separation)
+- Complexity managed by the SDK, not exposed to the developer
 
-**Project Context:** Greenfield — nouveau projet
+**Project Context:** Greenfield — new project
 
 ## Success Criteria
 
-**Principe directeur :**
+**Guiding principle:**
 
-Le succès de SDK_AI_Agents ne se mesure pas au nombre d'agents créés, mais au niveau de confiance que les équipes accordent aux agents en production.
+The success of SDK_AI_Agents is not measured by the number of agents created, but by the level of trust teams place in agents in production.
 
-**Succès = les équipes osent confier de vraies actions à des agents.**
+**Success = teams dare to entrust real actions to agents.**
 
 ### User Success
 
-#### Métriques Time-to-Value
+#### Time-to-Value Metrics
 
-Ces métriques mesurent la friction d'entrée et la vitesse d'appropriation :
+These metrics measure onboarding friction and speed of adoption:
 
-| Métrique | Cible | Mesure |
+| Metric | Target | Measurement |
 |----------|-------|--------|
-| Temps pour premier agent fonctionnel | < 30 minutes | Depuis installation jusqu'à premier `agent.run()` réussi |
-| Temps pour premier agent en prod | < 1 journée | Depuis création agent jusqu'à déploiement production |
-| Temps pour comprendre un incident agent | < 5 minutes | Depuis signalement incident jusqu'à compréhension via replay |
-| Temps pour rejouer un run | < 10 secondes | Commande `sdk.replay(runId)` jusqu'à résultat |
+| Time to first working agent | < 30 minutes | From install to first successful `agent.run()` |
+| Time to first agent in prod | < 1 day | From agent creation to production deployment |
+| Time to understand an agent incident | < 5 minutes | From incident report to understanding via replay |
+| Time to replay a run | < 10 seconds | From `sdk.replay(runId)` command to result |
 
-#### Métriques de Confiance Acquise
+#### Acquired Trust Metrics
 
-Ces métriques valident que l'utilisateur ne se contente pas d'essayer, mais s'engage :
+These metrics validate that the user isn't just trying it out, but is truly engaging:
 
-| Axe | Métrique | Cible MVP |
+| Axis | Metric | MVP Target |
 |-----|----------|-----------|
-| **Confiance** | % d'agents autorisés à effectuer des actions réelles | > 50% des agents en prod |
-| **Maîtrise** | % d'incidents reproduits avec succès via replay | 100% des incidents reproductibles |
-| **Adoption profonde** | % de projets utilisant policies + replay (pas juste run()) | > 60% des projets |
+| **Trust** | % of agents authorized to perform real actions | > 50% of agents in prod |
+| **Mastery** | % of incidents successfully reproduced via replay | 100% of incidents reproducible |
+| **Deep adoption** | % of projects using policies + replay (not just run()) | > 60% of projects |
 
-#### Moments de Succès Utilisateur (Aha Moments)
+#### User Success Moments (Aha Moments)
 
-**Moment Aha #1 - Développeur (Alex) :**
-"J'ai reproduit un incident en 30 secondes et compris exactement pourquoi l'agent a fait ça."
+**Aha Moment #1 - Developer (Alex):**
+"I reproduced an incident in 30 seconds and understood exactly why the agent did that."
 
-**Moment Aha #2 - Tech Lead (Sarah) :**
-"Je peux valider ce PR d'agent sans stress, car tout est tracé et contrôlé."
+**Aha Moment #2 - Tech Lead (Sarah):**
+"I can approve this agent PR without stress, because everything is traced and controlled."
 
-**Moment Aha #3 - Product Engineer (Jordan) :**
-"Je peux améliorer l'agent sans casser ce qui marchait."
+**Aha Moment #3 - Product Engineer (Jordan):**
+"I can improve the agent without breaking what was working."
 
-**Moment Aha #4 - Tech Lead (Gouvernance) :**
-"Je peux définir une règle globale et elle s'applique à tous les agents."
-➡️ Valide la gouvernance transversale.
+**Aha Moment #4 - Tech Lead (Governance):**
+"I can define a global rule and it applies to every agent."
+➡️ Validates cross-cutting governance.
 
-**Moment Aha #5 - Product (Comparaison) :**
-"Je peux comparer deux versions d'un agent comme je comparerais deux features."
-➡️ Valide que l'agent devient un objet produit, pas un comportement magique.
+**Aha Moment #5 - Product (Comparison):**
+"I can compare two versions of an agent the way I'd compare two features."
+➡️ Validates that the agent becomes a product object, not magic behavior.
 
-#### Adoption des Fonctionnalités Différenciantes
+#### Adoption of Differentiating Features
 
-| Feature | Signal de succès | Objectif MVP |
+| Feature | Success signal | MVP goal |
 |---------|------------------|--------------|
-| Event tracing | > 70% des agents | Agents avec tracing activé |
-| Policies actives | > 60% des projets | Projets avec au moins une policy définie |
-| Tool scopes / allowlist | > 50% | Agents avec capabilities contrôlées |
-| Replay utilisé | > 40% | Utilisateurs ayant utilisé replay au moins une fois |
-| Tests d'agents (golden traces) | > 30% | Projets avec tests structurés d'agents |
+| Event tracing | > 70% of agents | Agents with tracing enabled |
+| Active policies | > 60% of projects | Projects with at least one policy defined |
+| Tool scopes / allowlist | > 50% | Agents with controlled capabilities |
+| Replay used | > 40% | Users who used replay at least once |
+| Agent tests (golden traces) | > 30% | Projects with structured agent tests |
 
-👉 **Ces chiffres sont volontairement ambitieux : ce sont des features "qui font mal" si inutiles.**
+👉 **These figures are deliberately ambitious: these are features that "hurt" if left unused.**
 
-#### Personas et Résultats Attendus
+#### Personas and Expected Outcomes
 
-**Alex - Développeur Backend :**
-- Agent en production stable depuis > 1 semaine
-- Temps de debugging incidents < 5 minutes (vs 4 heures avant)
-- Confiance tech lead obtenue
+**Alex - Backend Developer:**
+- Agent stable in production for > 1 week
+- Incident debugging time < 5 minutes (vs. 4 hours before)
+- Tech lead trust achieved
 
-**Sarah - Tech Lead / Architecte :**
-- 100% des agents utilisent SDK_AI_Agents (standardisation)
-- 0 incidents non auditables
-- Conformité réglementaire atteinte
+**Sarah - Tech Lead / Architect:**
+- 100% of agents use SDK_AI_Agents (standardization)
+- 0 non-auditable incidents
+- Regulatory compliance achieved
 
-**Jordan - Product / Platform Engineer :**
-- Comparaison de versions fonctionnelle
-- 0 régressions après améliorations
-- Métriques d'amélioration mesurables
+**Jordan - Product / Platform Engineer:**
+- Working version comparison
+- 0 regressions after improvements
+- Measurable improvement metrics
 
 ### Business Success
 
-#### Succès à 3 Mois - Validation du Problème
+#### Success at 3 Months - Problem Validation
 
-**Objectif :** Valider l'adéquation problème / solution
+**Objective:** Validate problem/solution fit
 
-**Indicateurs clés (preuves, pas volumes) :**
-- ≥ 3 équipes utilisant le SDK en production
-- ≥ 1 incident réel rejoué et compris
-- Feedback utilisateur explicitant : "C'est le replay / tracing / policies qui nous a convaincus"
+**Key indicators (proof, not volume):**
+- ≥ 3 teams using the SDK in production
+- ≥ 1 real incident replayed and understood
+- User feedback stating: "It's the replay / tracing / policies that convinced us"
 
-**Métriques :**
-- **Projets actifs** avec agents en prod : ≥ 3 projets
-- **Nombre de runs tracés / replays** : > 1000 runs tracés
-- **Feedback qualitatif fort** : Témoignages utilisateurs, cas d'usage documentés
-- **Adoption volontaire** : > 50% utilisateurs activent features gouvernance
+**Metrics:**
+- **Active projects** with agents in prod: ≥ 3 projects
+- **Number of traced runs / replays**: > 1000 traced runs
+- **Strong qualitative feedback**: User testimonials, documented use cases
+- **Voluntary adoption**: > 50% of users enable governance features
 
-**Critères de succès :**
-- ✅ Validation que le problème est réel et que la solution fonctionne
-- ✅ Early adopters satisfaits et recommandent le SDK
-- ✅ Preuve de valeur mesurable (temps économisé, incidents évités)
+**Success criteria:**
+- ✅ Validation that the problem is real and the solution works
+- ✅ Satisfied early adopters who recommend the SDK
+- ✅ Measurable proof of value (time saved, incidents avoided)
 
-#### Succès à 12 Mois - Validation du Positionnement
+#### Success at 12 Months - Positioning Validation
 
-**Objectif :** Devenir un standard de facto pour gouvernance agents IA
+**Objective:** Become a de facto standard for AI agent governance
 
-**Indicateurs (validation du changement de pratiques) :**
-- SDK utilisé comme socle standard (pas juste une lib parmi d'autres)
-- Cas d'usage à enjeu réel (actions non triviales)
-- Adoption volontaire des garde-fous (pas imposée)
+**Indicators (validation of practice change):**
+- SDK used as the standard foundation (not just one lib among others)
+- Real-stakes use cases (non-trivial actions)
+- Voluntary adoption of guardrails (not imposed)
 
-**Métriques :**
-- **Rétention des équipes** : > 80% équipes continuent après 6 mois
-- **Nombre moyen d'agents par projet** : > 3 agents par projet
-- **Adoption des features avancées** : > 40% utilisent gouvernance avancée
-- **Cas d'usage critiques** : > 20% agents avec actions réelles (pas chat)
+**Metrics:**
+- **Team retention**: > 80% of teams continue after 6 months
+- **Average number of agents per project**: > 3 agents per project
+- **Adoption of advanced features**: > 40% use advanced governance
+- **Critical use cases**: > 20% of agents with real actions (not chat)
 
-**Critères de succès :**
-- ✅ Positionnement comme infrastructure de gouvernance standard
-- ✅ Adoption par entreprises réglementées (finance, santé)
-- ✅ Communauté active avec contributions
+**Success criteria:**
+- ✅ Positioning as the standard governance infrastructure
+- ✅ Adoption by regulated companies (finance, healthcare)
+- ✅ Active community with contributions
 
-#### Métriques à Suivre (sans optimiser au MVP)
+#### Metrics to Track (without optimizing at MVP)
 
-À suivre pour comprendre la profondeur d'usage :
-- Nombre d'agents par projet (profondeur d'usage)
-- Rétention équipe → projet suivant
-- Nombre de runs / replays par agent
+To track in order to understand depth of usage:
+- Number of agents per project (depth of usage)
+- Team retention → next project
+- Number of runs / replays per agent
 
-À garder pour plus tard (post-MVP) :
-- Revenus
+To keep for later (post-MVP):
+- Revenue
 - Pricing
 - ARR
 
-👉 **Au MVP, la crédibilité technique et la confiance priment sur la monétisation.**
+👉 **At MVP, technical credibility and trust take priority over monetization.**
 
 ### Technical Success
 
-#### Critères Techniques MVP
+#### MVP Technical Criteria
 
-**Performance :**
-- Overhead SDK (hors LLM/tools) < 5–10 ms
-- Replay sans appel LLM
+**Performance:**
+- SDK overhead (excluding LLM/tools) < 5–10 ms
+- Replay without an LLM call
 
-**Fiabilité :**
-- Aucun tool exécuté sans event correspondant
-- Aucune action non traçable
-- Aucun run "orphelin" (sans trace complète)
+**Reliability:**
+- No tool executed without a corresponding event
+- No non-traceable action
+- No "orphan" run (without a complete trace)
 
-**Déterminisme relatif :**
-- Replay = même séquence logique
-- Même tool calls dans le même ordre
-- 👉 **La reproductibilité est plus importante que la vitesse brute.**
+**Relative determinism:**
+- Replay = same logical sequence
+- Same tool calls in the same order
+- 👉 **Reproducibility matters more than raw speed.**
 
-#### Contraintes Techniques Non Négociables
+#### Non-Negotiable Technical Constraints
 
-1. **Event log = source de vérité**
-   - Pas de logique "cachée"
-   - Tout est traçable et rejouable
+1. **Event log = source of truth**
+   - No "hidden" logic
+   - Everything is traceable and replayable
 
 2. **Deny by default**
-   - Tool, action, capability : tout doit être explicitement autorisé
-   - Sécurité par impossibilité, pas par configuration
+   - Tool, action, capability: everything must be explicitly authorized
+   - Security through impossibility, not through configuration
 
-3. **API stable et minimaliste**
-   - Peu de concepts, mais solides
-   - Type-safe, documentée, prévisible
+3. **Stable, minimal API**
+   - Few concepts, but solid ones
+   - Type-safe, documented, predictable
 
-#### KPIs de Validation MVP (Priorisation Stricte)
+#### MVP Validation KPIs (Strict Prioritization)
 
-**Priorité 1 - Critiques (si ces 3 sont vrais → concept validé) :**
-1. 🔁 **Replay fonctionnel et utilisé** : 100% des runs rejouables
-2. 🔍 **Tracing compréhensible sans effort** : > 80% utilisateurs comprennent traces
-3. 🔐 **Policies réellement actives** : > 60% projets avec policies
+**Priority 1 - Critical (if these 3 are true → concept validated):**
+1. 🔁 **Working and used replay**: 100% of runs replayable
+2. 🔍 **Effortlessly understandable tracing**: > 80% of users understand traces
+3. 🔐 **Genuinely active policies**: > 60% of projects with policies
 
-**Priorité 2 - Optimisables :**
-4. ⏱️ **Time-to-first-agent acceptable** : < 30 minutes
+**Priority 2 - Optimizable:**
+4. ⏱️ **Acceptable time-to-first-agent**: < 30 minutes
 
-👉 **Si 1, 2 et 3 sont vrais → le concept est validé. Le reste est optimisable.**
+👉 **If 1, 2, and 3 are true → the concept is validated. The rest is optimizable.**
 
 ### Measurable Outcomes
 
-#### Qualité & Fiabilité
+#### Quality & Reliability
 
-| Métrique | Objectif MVP | Mesure |
+| Metric | MVP Goal | Measurement |
 |----------|--------------|--------|
-| Incidents agents en prod | ↓ significative | Nombre d'incidents par mois |
-| Incidents non reproductibles | ≈ 0 | Incidents où replay impossible |
-| Rollback / hotfix agents | ↓ | Nombre de rollbacks nécessaires |
-| Désactivation d'agents par peur | ↓ | Agents désactivés par manque de confiance |
+| Agent incidents in prod | Significant ↓ | Number of incidents per month |
+| Non-reproducible incidents | ≈ 0 | Incidents where replay is impossible |
+| Agent rollback / hotfix | ↓ | Number of rollbacks needed |
+| Agent deactivation out of fear | ↓ | Agents disabled due to lack of trust |
 
-#### Impact Business (Post-MVP)
+#### Business Impact (Post-MVP)
 
-| KPI | Cible 3 mois | Cible 12 mois | Mesure |
+| KPI | 3-month target | 12-month target | Measurement |
 |-----|--------------|---------------|--------|
-| Temps développement | -40% | -60% | vs solution maison |
-| Coûts IA | -20% | -30% | vs baseline sans monitoring |
-| Time to production | -30% | -50% | vs solution maison |
+| Development time | -40% | -60% | vs. in-house solution |
+| AI costs | -20% | -30% | vs. baseline without monitoring |
+| Time to production | -30% | -50% | vs. in-house solution |
 
 ## Product Scope
 
 ### MVP - Minimum Viable Product
 
-**Principe directeur :**
-Le MVP doit prouver qu'un agent peut agir en production de manière contrôlée, explicable et rejouable.
+**Guiding principle:**
+The MVP must prove that an agent can act in production in a controlled, explainable, and replayable way.
 
-**Le MVP en une phrase :**
-Un runtime d'agent événementiel capable d'exécuter des tools de façon contrôlée, avec tracing et replay natifs.
+**The MVP in one sentence:**
+An event-driven agent runtime capable of executing tools in a controlled way, with native tracing and replay.
 
-**Le MVP doit démontrer :**
-👉 **"Je peux comprendre, rejouer et sécuriser le comportement de mon agent."**
+**The MVP must demonstrate:**
+👉 **"I can understand, replay, and secure my agent's behavior."**
 
-#### Core Features MVP
+#### Core MVP Features
 
-1. **Runtime d'Agent Événementiel (CORE)**
-   - Exécuter un agent via une boucle simple (max steps)
-   - Émettre des événements structurés à chaque étape
-   - Persister ces événements (au moins in-memory + file)
+1. **Event-Driven Agent Runtime (CORE)**
+   - Execute an agent via a simple loop (max steps)
+   - Emit structured events at each step
+   - Persist these events (at least in-memory + file)
 
-2. **Tool Calling Typé et Contrôlé**
-   - Définition explicite des tools (`defineTool`)
-   - Validation des inputs (Zod / schema)
-   - Tool registry avec allowlist
-   - Tool call visible dans les events
+2. **Typed and Controlled Tool Calling**
+   - Explicit tool definition (`defineTool`)
+   - Input validation (Zod / schema)
+   - Tool registry with allowlist
+   - Tool call visible in the events
 
-3. **Policies Minimales (Sécurité by Design)**
-   - Allowlist tools (deny by default)
-   - Budget max (tokens ou steps)
+3. **Minimal Policies (Security by Design)**
+   - Tool allowlist (deny by default)
+   - Max budget (tokens or steps)
    - Timeout / max steps
 
-4. **Observabilité Native (Tracing First-Class)**
-   - Traces lisibles (JSON structuré)
-   - Chaque run a un `runId`
-   - Chaque décision, tool call, erreur est tracée
-   - Export possible (console + fichier)
+4. **Native Observability (Tracing First-Class)**
+   - Readable traces (structured JSON)
+   - Every run has a `runId`
+   - Every decision, tool call, error is traced
+   - Export possible (console + file)
 
-5. **Replay d'Exécution (Killer Feature MVP)**
-   - Rejouer un run à partir des events
-   - Sans recontacter le LLM (mode "replay")
-   - Même séquence, mêmes tool calls
+5. **Execution Replay (MVP Killer Feature)**
+   - Replay a run from its events
+   - Without contacting the LLM again ("replay" mode)
+   - Same sequence, same tool calls
 
-6. **DX Minimale mais Solide**
-   - Quickstart en < 10 lignes
-   - 1 exemple complet (agent + tool + replay)
-   - API TypeScript claire et typée
-   - Documentation essentielle
+6. **Minimal but Solid DX**
+   - Quickstart in < 10 lines
+   - 1 complete example (agent + tool + replay)
+   - Clear, typed TypeScript API
+   - Essential documentation
 
-**MVP Checklist :**
-- ✅ Agent runtime événementiel
-- ✅ Tool calling typé + allowlist
-- ✅ Policies simples (budget, steps, timeout)
-- ✅ Tracing structuré
-- ✅ Replay d'exécution
-- ✅ 1 provider LLM (OpenAI ou Anthropic)
-- ✅ 1 exemple réel complet
-- ✅ Tests basés sur traces
+**MVP Checklist:**
+- ✅ Event-driven agent runtime
+- ✅ Typed tool calling + allowlist
+- ✅ Simple policies (budget, steps, timeout)
+- ✅ Structured tracing
+- ✅ Execution replay
+- ✅ 1 LLM provider (OpenAI or Anthropic)
+- ✅ 1 complete real example
+- ✅ Trace-based tests
 
 ### Growth Features (Post-MVP)
 
-**Phase 2 - Production-Ready (3-4 mois) :**
-- Policies avancées (approval humaine, budgets complexes)
-- Observabilité cognitive (graphe raisonnement)
-- Capabilities system complet
-- Multi-providers LLM
+**Phase 2 - Production-Ready (3-4 months):**
+- Advanced policies (human approval, complex budgets)
+- Cognitive observability (reasoning graph)
+- Complete capabilities system
+- Multi-provider LLM support
 
-**Phase 3 - Advanced Features (6-12 mois) :**
-- Mémoire causale et temporelle
+**Phase 3 - Advanced Features (6-12 months):**
+- Causal and temporal memory
 - Time travel debugging
 - Multi-agent orchestration
-- Conformité sectorielle (finance, santé)
+- Sector-specific compliance (finance, healthcare)
 
 ### Vision (Future)
 
-**Phase 4 - Platform (12-24 mois) :**
-- Marketplace de plugins
-- UI/Dashboard web
-- Support multi-langages (Python)
-- Écosystème et communauté
+**Phase 4 - Platform (12-24 months):**
+- Plugin marketplace
+- Web UI/Dashboard
+- Multi-language support (Python)
+- Ecosystem and community
 
-**Hors MVP explicite :**
+**Explicitly out of MVP:**
 - ❌ Multi-agent orchestration
-- ❌ Mémoire vectorielle / RAG avancé
-- ❌ UI / dashboard web
-- ❌ Marketplace de plugins
-- ❌ Approval humaine interactive (structure existe, pas l'UI)
+- ❌ Vector memory / advanced RAG
+- ❌ Web UI / dashboard
+- ❌ Plugin marketplace
+- ❌ Interactive human approval (structure exists, not the UI)
 - ❌ Fine-tuning / training
-- ❌ Optimisation avancée des coûts
-- ❌ Support multi-langages (TypeScript uniquement pour MVP)
+- ❌ Advanced cost optimization
+- ❌ Multi-language support (TypeScript only for MVP)
 
-👉 **Si on les inclut, on rate le MVP.**
+👉 **Including these would mean missing the MVP.**
 
 ## User Journeys
 
-### Journey 1 : Alex - Du doute à la confiance opérationnelle
+### Journey 1: Alex - From doubt to operational trust
 
-**Le héros :** Alex, développeur backend senior dans une SaaS B2B de 20 personnes. Stack : Node.js, TypeScript, PostgreSQL. Il doit intégrer un agent qui automatise des actions client dans l'application existante.
+**The hero:** Alex, senior backend developer at a 20-person B2B SaaS company. Stack: Node.js, TypeScript, PostgreSQL. He needs to integrate an agent that automates customer actions in the existing application.
 
-**Scène d'ouverture - Vendredi 18h30 :**
-Un bug en production lié à l'agent. L'agent a modifié des données critiques de manière inattendue. Alex ne peut pas reproduire le problème. Il passe 4 heures à chercher dans les logs console, sans résultat. Son tech lead lui demande des explications qu'il ne peut pas donner. Il se sent impuissant et frustré.
+**Opening scene - Friday 6:30 PM:**
+A production bug related to the agent. The agent unexpectedly modified critical data. Alex can't reproduce the problem. He spends 4 hours digging through console logs, with no result. His tech lead asks for explanations he can't give. He feels powerless and frustrated.
 
-**Action montante - Lundi matin :**
-Il découvre SDK_AI_Agents via un article technique qui mentionne "replay natif en 1 commande". Intrigué, il installe le package : `npm install @sdk-ai-agents/core`. Il suit le Quick Start et crée son premier agent fonctionnel en moins de 30 minutes. Il est surpris par la simplicité de l'API.
+**Rising action - Monday morning:**
+He discovers SDK_AI_Agents via a technical article that mentions "native replay in 1 command." Intrigued, he installs the package: `npm install @sdk-ai-agents/core`. He follows the Quick Start and creates his first working agent in under 30 minutes. He's surprised by the simplicity of the API.
 
-Il migre progressivement son code existant. Il définit ses premières capabilities avec `defineTool()`, et il comprend immédiatement que chaque tool doit être explicitement autorisé. Il configure des policies simples : budget max de tokens, timeout, allowlist de tools. Il voit que la sécurité est "deny by default" — c'est exactement ce dont il avait besoin.
+He gradually migrates his existing code. He defines his first capabilities with `defineTool()`, and immediately understands that every tool must be explicitly authorized. He configures simple policies: max token budget, timeout, tool allowlist. He sees that security is "deny by default" — exactly what he needed.
 
-**Climax - Deux semaines plus tard, 14h23 :**
-Un incident similaire se produit. Cette fois, il exécute `sdk.replay(runId)` et voit exactement ce qui s'est passé. Il comprend pourquoi l'agent a pris cette décision, quelles contraintes ont pesé, et quelles alternatives ont été envisagées. Il corrige le problème en 5 minutes au lieu de 4 heures.
+**Climax - Two weeks later, 2:23 PM:**
+A similar incident occurs. This time, he runs `sdk.replay(runId)` and sees exactly what happened. He understands why the agent made that decision, which constraints came into play, and which alternatives were considered. He fixes the problem in 5 minutes instead of 4 hours.
 
-Son tech lead valide le PR sans stress, car tout est tracé. Alex peut expliquer chaque décision, chaque tool call, chaque contrainte. Il se sent enfin en contrôle.
+His tech lead approves the PR without stress, because everything is traced. Alex can explain every decision, every tool call, every constraint. He finally feels in control.
 
-**Résolution - Trois mois plus tard :**
-Son agent tourne en production sans incidents majeurs. Il peut rejouer n'importe quel run, comprendre chaque décision, et itérer en confiance. Il recommande SDK_AI_Agents à ses collègues. Il a gagné la confiance de son tech lead et se sent serein.
+**Resolution - Three months later:**
+His agent runs in production without major incidents. He can replay any run, understand every decision, and iterate with confidence. He recommends SDK_AI_Agents to his colleagues. He has earned his tech lead's trust and feels at ease.
 
-**Ce que révèle ce journey :**
-- Quick Start en < 30 minutes
-- API claire et intuitive
-- Replay natif pour debugging
-- Sécurité "deny by default" avec capabilities
-- Policies simples mais efficaces
-- Observabilité complète
-
----
-
-### Journey 2 : Sarah - De la peur à la gouvernance organisationnelle
-
-**Le héros :** Sarah, Tech Lead dans une scale-up de 50-200 personnes. Plusieurs équipes développent des agents IA, chacune avec son propre framework. Elle est responsable de la sécurité, de la fiabilité et du contrôle des coûts.
-
-**Scène d'ouverture - Réunion d'urgence :**
-Elle découvre qu'un agent a modifié des données critiques sans traçabilité. Elle ne peut pas expliquer ce qui s'est passé ni prouver la conformité. Elle bloque temporairement tous les agents en production. Les équipes sont frustrées, l'innovation est bloquée.
-
-**Action montante - Semaine suivante :**
-Elle évalue SDK_AI_Agents pendant 2 semaines. Elle teste la gouvernance native, l'audit trail complet, et la séparation raisonnement/action. Elle comprend que le LLM ne provoque jamais d'effet de bord direct — toutes les actions passent par un Action Engine gouverné.
-
-Elle configure des policies globales qui s'appliquent automatiquement à tous les agents de l'organisation. Elle définit des budgets max, des allowlists de capabilities, et des contraintes de sécurité. Elle voit que la gouvernance n'est pas une option ni un plugin — elle est structurelle, intégrée au runtime.
-
-**Climax - Audit de conformité, 2 mois plus tard :**
-Lors d'un audit réglementaire, elle exporte l'audit trail complet de tous les agents. Elle démontre que chaque action est traçable, chaque décision explicable, et que les policies de sécurité sont appliquées automatiquement. L'auditeur valide la conformité sans surcouches complexes.
-
-Elle montre comment elle peut définir une règle globale et elle s'applique à tous les agents. Elle montre comment chaque run est un artefact signable, archivable, comparable. L'auditeur est impressionné par la traçabilité complète.
-
-**Résolution - Six mois plus tard :**
-SDK_AI_Agents est le standard pour tous les agents de l'organisation. Elle peut définir des règles globales qui s'appliquent automatiquement, et elle a une visibilité complète sur tous les agents. L'innovation IA est autorisée avec gouvernance. Elle se sent enfin en contrôle.
-
-**Ce que révèle ce journey :**
-- Gouvernance native avec policies centralisées
-- Audit trail complet pour conformité
-- Visibilité sur tous les agents et leurs actions
-- Contrôle des coûts et budgets
-- Standardisation sans bloquer l'innovation
-- Séparation raisonnement/action pour sécurité
+**What this journey reveals:**
+- Quick Start in < 30 minutes
+- Clear and intuitive API
+- Native replay for debugging
+- "Deny by default" security with capabilities
+- Simple but effective policies
+- Complete observability
 
 ---
 
-### Journey 3 : Jordan - De l'incertitude à l'itération produit confiante
+### Journey 2: Sarah - From fear to organizational governance
 
-**Le héros :** Jordan, Product Engineer dans une SaaS avec forte composante IA. Il doit améliorer le comportement d'un agent existant, mais chaque changement de prompt est risqué et il ne peut pas comparer les versions.
+**The hero:** Sarah, Tech Lead at a 50-200 person scale-up. Several teams develop AI agents, each with its own framework. She is responsible for security, reliability, and cost control.
 
-**Scène d'ouverture - Sprint planning :**
-Il modifie le prompt pour améliorer l'agent, mais une régression apparaît en production. Il ne peut pas comparer les deux versions ni comprendre ce qui a changé. Il doit rollback et perdre l'amélioration. Il se sent frustré et découragé.
+**Opening scene - Emergency meeting:**
+She discovers that an agent modified critical data with no traceability. She can't explain what happened or prove compliance. She temporarily blocks all agents in production. Teams are frustrated, innovation is stalled.
 
-**Action montante - Semaine suivante :**
-Il migre l'agent vers SDK_AI_Agents. Il configure les capabilities et active le tracing. Il modifie le prompt et exécute des tests avec des scénarios réels. Il compare les runs avant/après avec `sdk.compare(runId1, runId2)`.
+**Rising action - The following week:**
+She evaluates SDK_AI_Agents for 2 weeks. She tests native governance, the complete audit trail, and the reasoning/action separation. She understands that the LLM never directly causes a side effect — all actions pass through a governed Action Engine.
 
-Il voit exactement ce qui a changé : quelles décisions ont été prises différemment, quelles contraintes ont pesé, quelles alternatives ont été envisagées. Il comprend pourquoi certaines améliorations fonctionnent et pourquoi certaines régressions apparaissent.
+She configures global policies that automatically apply to every agent in the organization. She defines max budgets, capability allowlists, and security constraints. She sees that governance is not an option or a plugin — it is structural, built into the runtime.
 
-**Climax - Feature launch, 1 mois plus tard :**
-Il identifie précisément les améliorations et les régressions. Il ajuste le prompt pour garder les améliorations tout en évitant les régressions. Il déploie avec confiance, car il a mesuré l'impact avant la mise en production.
+**Climax - Compliance audit, 2 months later:**
+During a regulatory audit, she exports the complete audit trail for all agents. She demonstrates that every action is traceable, every decision explainable, and that security policies are applied automatically. The auditor validates compliance without complex workarounds.
 
-Il peut comparer deux versions d'un agent comme il comparerait deux features. Il peut tester des scénarios avant mise en prod. Il peut améliorer l'agent sans régression. Il se sent enfin en contrôle de l'évolution de l'agent.
+She shows how she can define a global rule and have it apply to every agent. She shows how every run is a signable, archivable, comparable artifact. The auditor is impressed by the complete traceability.
 
-**Résolution - Trois mois plus tard :**
-Il peut maintenant itérer sur l'agent comme sur une feature produit classique. Il compare les versions, mesure les améliorations, et évite les régressions. L'agent évolue de manière prévisible et mesurable. Il se sent serein et productif.
+**Resolution - Six months later:**
+SDK_AI_Agents is the standard for every agent in the organization. She can define global rules that apply automatically, and she has full visibility into every agent. AI innovation is allowed, with governance. She finally feels in control.
 
-**Ce que révèle ce journey :**
-- Comparaison de runs pour mesurer améliorations
-- Tests structurés avant déploiement
-- Observabilité cognitive pour comprendre comportement
-- Itération rapide sans risques
-- Agent comme artefact logiciel versionnable
-
----
-
-### Journey 4 : Maya - Sécurité & Conformité - De la méfiance à l'approbation confiante
-
-**Le héros :** Maya, responsable Sécurité & Conformité dans une entreprise réglementée (finance). Elle doit valider la sécurité et la conformité des agents IA avant déploiement, mais elle ne peut pas auditer les comportements IA avec les outils actuels.
-
-**Scène d'ouverture - Réunion de validation :**
-Une équipe produit veut déployer un agent pour automatiser des actions critiques. Maya ne peut pas valider la sécurité ni prouver la conformité. Elle bloque le déploiement, frustrant l'équipe produit et ralentissant l'innovation. Elle se sent coincée entre sécurité et innovation.
-
-**Action montante - Évaluation, 2 semaines :**
-Elle découvre SDK_AI_Agents via une recommandation de Sarah (Tech Lead). Elle évalue l'audit trail complet, les policies centralisées vérifiables, et la traçabilité de chaque décision. Elle teste la séparation raisonnement/action et la sécurité "deny by default".
-
-Elle comprend que chaque tool doit être explicitement autorisé, chaque action doit passer par une policy vérifiée, et chaque exécution doit être tracée. Elle voit que la sécurité n'est pas une feature — c'est une propriété structurelle.
-
-**Climax - Audit réglementaire, 3 mois plus tard :**
-Lors d'un audit réglementaire, elle exporte l'audit trail complet de tous les agents. Elle démontre que chaque action est traçable, chaque décision explicable, et que les policies de sécurité sont appliquées automatiquement. L'auditeur valide la conformité sans surcouches complexes.
-
-Elle montre comment elle peut définir des policies de sécurité globales qui s'appliquent automatiquement à tous les agents. Elle montre comment chaque run est un artefact signable, archivable, comparable. L'auditeur est impressionné par la gouvernance native.
-
-**Résolution - Six mois plus tard :**
-Elle peut maintenant approuver les agents IA avec confiance. Elle définit des policies de sécurité globales qui s'appliquent automatiquement à tous les agents. Elle ne bloque plus l'innovation IA grâce à la gouvernance native, et la conformité est atteinte sans complexité supplémentaire. Elle se sent enfin alignée avec l'innovation.
-
-**Ce que révèle ce journey :**
-- Audit trail complet pour conformité réglementaire
-- Policies centralisées et vérifiables
-- Traçabilité de chaque décision et action
-- Sécurité "deny by default" avec capabilities contrôlées
-- Agents certifiables pour domaines réglementés
+**What this journey reveals:**
+- Native governance with centralized policies
+- Complete audit trail for compliance
+- Visibility into all agents and their actions
+- Cost and budget control
+- Standardization without blocking innovation
+- Reasoning/action separation for security
 
 ---
 
-### Journey 5 : Sam - Product Manager - De l'hésitation à la confiance produit
+### Journey 3: Jordan - From uncertainty to confident product iteration
 
-**Le héros :** Sam, Product Manager dans une SaaS avec forte composante IA. Il doit définir des features IA et mesurer l'impact utilisateur, mais il ne peut pas faire confiance aux agents pour des features critiques à cause de leur imprévisibilité.
+**The hero:** Jordan, Product Engineer at an AI-heavy SaaS company. He needs to improve an existing agent's behavior, but every prompt change is risky and he can't compare versions.
 
-**Scène d'ouverture - Post-mortem d'incident :**
-Il lance une feature IA qui génère des incidents utilisateurs. Il ne peut pas comprendre pourquoi l'agent agit d'une certaine manière ni mesurer l'impact réel. Il doit désactiver la feature, frustrant les utilisateurs et l'équipe technique. Il se sent impuissant.
+**Opening scene - Sprint planning:**
+He modifies the prompt to improve the agent, but a regression appears in production. He can't compare the two versions or understand what changed. He has to roll back and lose the improvement. He feels frustrated and discouraged.
 
-**Action montante - Découverte, 1 semaine :**
-Il découvre SDK_AI_Agents via Jordan (Product Engineer). Il explore l'observabilité cognitive, le contrôle des coûts IA, et la réduction des incidents. Il comprend que les agents peuvent être fiables et prévisibles avec la bonne infrastructure.
+**Rising action - The following week:**
+He migrates the agent to SDK_AI_Agents. He configures the capabilities and enables tracing. He modifies the prompt and runs tests with real scenarios. He compares before/after runs with `sdk.compare(runId1, runId2)`.
 
-Il voit comment l'observabilité cognitive permet de comprendre pourquoi l'agent agit, pas seulement ce qu'il fait. Il voit comment le contrôle des coûts IA permet de gérer les budgets. Il comprend que les agents peuvent être observables et contrôlables.
+He sees exactly what changed: which decisions were made differently, which constraints came into play, which alternatives were considered. He understands why some improvements work and why some regressions appear.
 
-**Climax - Nouvelle feature launch, 2 mois plus tard :**
-Il lance une nouvelle feature IA avec SDK_AI_Agents. Il peut observer le comportement des utilisateurs via l'observabilité cognitive, mesurer l'impact réel, et contrôler les coûts IA. Quand un incident survient, il peut le comprendre et le corriger rapidement grâce au replay.
+**Climax - Feature launch, 1 month later:**
+He precisely identifies the improvements and regressions. He adjusts the prompt to keep the improvements while avoiding the regressions. He deploys with confidence, because he measured the impact before going to production.
 
-Il peut comparer deux versions d'un agent comme il comparerait deux features. Il peut tester des scénarios avant mise en prod. Il peut améliorer l'agent sans régression. Il se sent enfin en contrôle de l'évolution des features IA.
+He can compare two versions of an agent the way he would compare two features. He can test scenarios before going to prod. He can improve the agent without regression. He finally feels in control of the agent's evolution.
 
-**Résolution - Six mois plus tard :**
-Il peut maintenant faire confiance aux agents pour des features critiques. Il comprend mieux l'impact des agents grâce à l'observabilité, et les incidents sont réduits. Il peut itérer sur les features IA comme sur des features produit classiques. Il se sent serein et productif.
+**Resolution - Three months later:**
+He can now iterate on the agent like a regular product feature. He compares versions, measures improvements, and avoids regressions. The agent evolves predictably and measurably. He feels at ease and productive.
 
-**Ce que révèle ce journey :**
-- Agents fiables et prévisibles
-- Réduction des incidents utilisateurs
-- Observabilité pour comprendre comportement utilisateurs
-- Contrôle des coûts IA
-- Agents comme features produit itérables
-
----
-
-### Journey 6 : Dr. Chen - Data Scientist - Du support infrastructure à la valeur métier
-
-**Le héros :** Dr. Chen, Data Scientist dans une entreprise tech. Il supporte les équipes produit avec son expertise ML/IA, mais il passe trop de temps sur l'infrastructure des agents au lieu de se concentrer sur la valeur métier.
-
-**Scène d'ouverture - Sprint rétrospective :**
-Il passe des heures à aider les développeurs à intégrer des agents IA, à déboguer des problèmes d'infrastructure, et à réinventer des solutions maison. Il ne peut pas se concentrer sur l'amélioration des modèles ni sur la valeur métier. Il se sent frustré et épuisé.
-
-**Action montante - Migration, 1 mois :**
-Il découvre SDK_AI_Agents via une recommandation technique. Il apprécie le framework standardisé, la gouvernance native, et la simplicité d'intégration. Il migre progressivement les agents existants vers SDK_AI_Agents.
-
-Il voit que le framework standardisé réduit drastiquement le besoin de support. Il voit que la gouvernance native simplifie l'intégration. Il comprend que les développeurs peuvent maintenant intégrer des agents IA sans son aide constante.
-
-**Climax - Focus sur la valeur, 2 mois plus tard :**
-Il réduit drastiquement le temps passé sur l'infrastructure. Les développeurs peuvent intégrer des agents IA sans son aide constante, et il peut se concentrer sur l'amélioration des modèles et la valeur métier. Le support est simplifié grâce à la standardisation.
-
-Il passe maintenant 80% de son temps sur la valeur métier au lieu de l'infrastructure. Il peut se concentrer sur l'amélioration des modèles, l'optimisation des performances, et l'innovation ML. Il se sent enfin aligné avec sa mission.
-
-**Résolution - Six mois plus tard :**
-Il passe maintenant la majorité de son temps sur la valeur métier. Il peut se concentrer sur l'amélioration des modèles, l'optimisation des performances, et l'innovation ML. Le framework standardisé réduit le besoin de support constant. Il se sent productif et épanoui.
-
-**Ce que révèle ce journey :**
-- Framework standardisé pour agents IA
-- Moins de support nécessaire pour intégration
-- Focus sur la valeur métier plutôt que l'infrastructure
-- Standardisation simplifie le support
+**What this journey reveals:**
+- Run comparison to measure improvements
+- Structured tests before deployment
+- Cognitive observability to understand behavior
+- Fast iteration without risk
+- Agent as a versionable software artifact
 
 ---
 
-### Journey 7 : Taylor - DevOps/SRE - De l'opérationnel réactif au monitoring intelligent
+### Journey 4: Maya - Security & Compliance - From distrust to confident approval
 
-**Le héros :** Taylor, DevOps/SRE dans une entreprise tech. Il doit opérer et monitorer les agents IA en production, mais il ne peut pas comprendre les incidents ni les reproduire avec les outils actuels.
+**The hero:** Maya, Security & Compliance lead at a regulated (finance) company. She needs to validate the security and compliance of AI agents before deployment, but she can't audit AI behaviors with current tools.
 
-**Scène d'ouverture - Incident critique, 3h du matin :**
-Un agent IA cause un incident en production. Taylor ne peut pas comprendre ce qui s'est passé ni reproduire le problème. Il passe des heures à chercher dans les logs sans résultat, et l'incident se répète. Il se sent impuissant et épuisé.
+**Opening scene - Validation meeting:**
+A product team wants to deploy an agent to automate critical actions. Maya can't validate security or prove compliance. She blocks the deployment, frustrating the product team and slowing innovation. She feels stuck between security and innovation.
 
-**Action montante - Découverte, 1 semaine :**
-Il découvre SDK_AI_Agents via une recommandation de Sarah (Tech Lead). Il explore le replay natif, l'observabilité complète, et la traçabilité de chaque décision. Il configure le monitoring et les alertes basés sur les événements.
+**Rising action - Evaluation, 2 weeks:**
+She discovers SDK_AI_Agents through a recommendation from Sarah (Tech Lead). She evaluates the complete audit trail, the centralized and verifiable policies, and the traceability of every decision. She tests the reasoning/action separation and "deny by default" security.
 
-Il voit comment le replay natif permet de rejouer n'importe quelle exécution en quelques secondes. Il voit comment l'observabilité complète permet de comprendre chaque décision. Il comprend que les agents peuvent être observables et reproductibles.
+She understands that every tool must be explicitly authorized, every action must pass through a verified policy, and every execution must be traced. She sees that security is not a feature — it is a structural property.
 
-**Climax - Résolution d'incident, 1 mois plus tard :**
-Quand un incident survient, il peut rejouer l'exécution complète en quelques secondes. Il comprend immédiatement ce qui s'est passé, pourquoi l'agent a pris cette décision, et comment corriger le problème. Il peut même simuler des scénarios "et si" pour prévenir les futurs incidents.
+**Climax - Regulatory audit, 3 months later:**
+During a regulatory audit, she exports the complete audit trail for all agents. She demonstrates that every action is traceable, every decision explainable, and that security policies are applied automatically. The auditor validates compliance without complex workarounds.
 
-Il peut maintenant opérer les agents IA avec confiance. Il comprend chaque incident grâce au replay, et il peut prévenir les problèmes grâce à l'observabilité complète. Le temps de résolution des incidents est réduit de 80%.
+She shows how she can define global security policies that automatically apply to every agent. She shows how every run is a signable, archivable, comparable artifact. The auditor is impressed by the native governance.
 
-**Résolution - Trois mois plus tard :**
-Il peut maintenant opérer les agents IA avec confiance. Il comprend chaque incident grâce au replay, et il peut prévenir les problèmes grâce à l'observabilité complète. Le temps de résolution des incidents est réduit de 80%, et la fiabilité globale s'améliore. Il se sent enfin en contrôle.
+**Resolution - Six months later:**
+She can now approve AI agents with confidence. She defines global security policies that automatically apply to every agent. She no longer blocks AI innovation thanks to native governance, and compliance is achieved without additional complexity. She finally feels aligned with innovation.
 
-**Ce que révèle ce journey :**
-- Replay natif pour résolution d'incidents
-- Observabilité complète pour monitoring
-- Traçabilité de chaque décision
-- Simulation de scénarios "et si"
-- Réduction drastique du temps de résolution
+**What this journey reveals:**
+- Complete audit trail for regulatory compliance
+- Centralized and verifiable policies
+- Traceability of every decision and action
+- "Deny by default" security with controlled capabilities
+- Certifiable agents for regulated domains
 
 ---
 
-### Journey 8 : Jamie - Développeur Junior - De l'intimidation à la maîtrise progressive
+### Journey 5: Sam - Product Manager - From hesitation to product confidence
 
-**Le héros :** Jamie, développeur junior dans une startup tech. Il veut apprendre à créer des agents IA, mais il trouve les frameworks existants trop complexes et intimidants. Il a peur de faire des erreurs qui pourraient impacter la production.
+**The hero:** Sam, Product Manager at an AI-heavy SaaS company. He needs to define AI features and measure user impact, but he can't trust agents for critical features because of their unpredictability.
 
-**Scène d'ouverture - Premier essai, week-end :**
-Il essaie de créer son premier agent avec LangChain, mais il est submergé par la complexité. Il ne comprend pas comment tester son agent ni comment sécuriser les tools. Il abandonne, frustré et découragé. Il se sent incompétent.
+**Opening scene - Incident post-mortem:**
+He launches an AI feature that generates user incidents. He can't understand why the agent acts a certain way, nor measure the real impact. He has to disable the feature, frustrating users and the technical team. He feels powerless.
 
-**Action montante - Découverte, 1 semaine :**
-Il découvre SDK_AI_Agents via un tutoriel. Il suit le Quick Start et crée son premier agent fonctionnel en moins de 30 minutes. Il est surpris par la simplicité de l'API. Il comprend rapidement les concepts grâce à l'API simple et la documentation claire.
+**Rising action - Discovery, 1 week:**
+He discovers SDK_AI_Agents via Jordan (Product Engineer). He explores cognitive observability, AI cost control, and incident reduction. He understands that agents can be reliable and predictable with the right infrastructure.
 
-Il définit ses premières capabilities avec `defineTool()`, et il comprend immédiatement que chaque tool doit être explicitement autorisé. Il configure des policies simples : budget max, timeout, allowlist. Il voit que la sécurité est "deny by default" — c'est rassurant.
+He sees how cognitive observability makes it possible to understand why the agent acts, not just what it does. He sees how AI cost control makes it possible to manage budgets. He understands that agents can be observable and controllable.
 
-**Climax - Premier agent en prod, 1 mois plus tard :**
-Il crée un agent qui automatise une tâche répétitive. Quand il teste son agent, il peut voir exactement ce qui se passe grâce au tracing. Quand il fait une erreur, il peut la comprendre et la corriger rapidement grâce au replay. Il déploie son agent en production avec confiance.
+**Climax - New feature launch, 2 months later:**
+He launches a new AI feature with SDK_AI_Agents. He can observe user behavior via cognitive observability, measure real impact, and control AI costs. When an incident occurs, he can understand and fix it quickly thanks to replay.
 
-Il peut maintenant créer des agents fiables et sécurisés. Il comprend les concepts de gouvernance, d'observabilité, et de testabilité. Il se sent compétent et confiant.
+He can compare two versions of an agent the way he would compare two features. He can test scenarios before going to prod. He can improve the agent without regression. He finally feels in control of the evolution of his AI features.
 
-**Résolution - Trois mois plus tard :**
-Il devient compétent dans la création d'agents IA. Il comprend les concepts de gouvernance, d'observabilité, et de testabilité. Il peut créer des agents fiables et sécurisés, et il contribue activement à l'innovation IA de son équipe. Il se sent épanoui et productif.
+**Resolution - Six months later:**
+He can now trust agents for critical features. He understands agent impact better thanks to observability, and incidents are reduced. He can iterate on AI features like regular product features. He feels at ease and productive.
 
-**Ce que révèle ce journey :**
-- Quick Start accessible pour débutants
-- API simple et intuitive
-- Documentation claire et exemples concrets
-- Sécurité "deny by default" rassurante
-- Apprentissage progressif des concepts
+**What this journey reveals:**
+- Reliable and predictable agents
+- Reduction of user incidents
+- Observability to understand user behavior
+- AI cost control
+- Agents as iterable product features
+
+---
+
+### Journey 6: Dr. Chen - Data Scientist - From infrastructure support to business value
+
+**The hero:** Dr. Chen, Data Scientist at a tech company. He supports product teams with his ML/AI expertise, but he spends too much time on agent infrastructure instead of focusing on business value.
+
+**Opening scene - Sprint retrospective:**
+He spends hours helping developers integrate AI agents, debugging infrastructure problems, and reinventing in-house solutions. He can't focus on improving models or on business value. He feels frustrated and worn out.
+
+**Rising action - Migration, 1 month:**
+He discovers SDK_AI_Agents via a technical recommendation. He appreciates the standardized framework, the native governance, and the ease of integration. He gradually migrates existing agents to SDK_AI_Agents.
+
+He sees that the standardized framework drastically reduces the need for support. He sees that native governance simplifies integration. He understands that developers can now integrate AI agents without his constant help.
+
+**Climax - Focus on value, 2 months later:**
+He drastically reduces the time spent on infrastructure. Developers can integrate AI agents without his constant help, and he can focus on improving models and business value. Support is simplified thanks to standardization.
+
+He now spends 80% of his time on business value instead of infrastructure. He can focus on improving models, optimizing performance, and ML innovation. He finally feels aligned with his mission.
+
+**Resolution - Six months later:**
+He now spends most of his time on business value. He can focus on improving models, optimizing performance, and ML innovation. The standardized framework reduces the need for constant support. He feels productive and fulfilled.
+
+**What this journey reveals:**
+- Standardized framework for AI agents
+- Less support needed for integration
+- Focus on business value rather than infrastructure
+- Standardization simplifies support
+
+---
+
+### Journey 7: Taylor - DevOps/SRE - From reactive operations to intelligent monitoring
+
+**The hero:** Taylor, DevOps/SRE at a tech company. He needs to operate and monitor AI agents in production, but he can't understand incidents or reproduce them with current tools.
+
+**Opening scene - Critical incident, 3 AM:**
+An AI agent causes a production incident. Taylor can't understand what happened or reproduce the problem. He spends hours digging through logs with no result, and the incident recurs. He feels powerless and exhausted.
+
+**Rising action - Discovery, 1 week:**
+He discovers SDK_AI_Agents through a recommendation from Sarah (Tech Lead). He explores native replay, complete observability, and the traceability of every decision. He configures monitoring and event-based alerts.
+
+He sees how native replay makes it possible to replay any execution in seconds. He sees how complete observability makes it possible to understand every decision. He understands that agents can be observable and reproducible.
+
+**Climax - Incident resolution, 1 month later:**
+When an incident occurs, he can replay the full execution in seconds. He immediately understands what happened, why the agent made that decision, and how to fix the problem. He can even simulate "what if" scenarios to prevent future incidents.
+
+He can now operate AI agents with confidence. He understands every incident thanks to replay, and he can prevent problems thanks to complete observability. Incident resolution time is reduced by 80%.
+
+**Resolution - Three months later:**
+He can now operate AI agents with confidence. He understands every incident thanks to replay, and he can prevent problems thanks to complete observability. Incident resolution time is reduced by 80%, and overall reliability improves. He finally feels in control.
+
+**What this journey reveals:**
+- Native replay for incident resolution
+- Complete observability for monitoring
+- Traceability of every decision
+- Simulation of "what if" scenarios
+- Drastic reduction in resolution time
+
+---
+
+### Journey 8: Jamie - Junior Developer - From intimidation to gradual mastery
+
+**The hero:** Jamie, junior developer at a tech startup. He wants to learn how to build AI agents, but he finds existing frameworks too complex and intimidating. He is afraid of making mistakes that could impact production.
+
+**Opening scene - First attempt, weekend:**
+He tries to build his first agent with LangChain, but is overwhelmed by the complexity. He doesn't understand how to test his agent or how to secure the tools. He gives up, frustrated and discouraged. He feels incompetent.
+
+**Rising action - Discovery, 1 week:**
+He discovers SDK_AI_Agents via a tutorial. He follows the Quick Start and creates his first working agent in under 30 minutes. He is surprised by the simplicity of the API. He quickly grasps the concepts thanks to the simple API and clear documentation.
+
+He defines his first capabilities with `defineTool()`, and immediately understands that every tool must be explicitly authorized. He configures simple policies: max budget, timeout, allowlist. He sees that security is "deny by default" — that's reassuring.
+
+**Climax - First agent in prod, 1 month later:**
+He creates an agent that automates a repetitive task. When he tests his agent, he can see exactly what's happening thanks to tracing. When he makes a mistake, he can understand and fix it quickly thanks to replay. He deploys his agent to production with confidence.
+
+He can now build reliable and secure agents. He understands the concepts of governance, observability, and testability. He feels competent and confident.
+
+**Resolution - Three months later:**
+He becomes proficient at building AI agents. He understands the concepts of governance, observability, and testability. He can build reliable and secure agents, and he actively contributes to his team's AI innovation. He feels fulfilled and productive.
+
+**What this journey reveals:**
+- Accessible Quick Start for beginners
+- Simple and intuitive API
+- Clear documentation and concrete examples
+- Reassuring "deny by default" security
+- Progressive learning of concepts
 
 ---
 
 ### Journey Requirements Summary
 
-Ces 8 user journeys révèlent les capacités nécessaires pour SDK_AI_Agents :
+These 8 user journeys reveal the capabilities SDK_AI_Agents needs:
 
-**Capacités Core (MVP) :**
-- Quick Start en < 30 minutes
-- API TypeScript claire et intuitive
-- Replay natif pour debugging et audit
-- Tracing structuré et compréhensible
-- Policies simples mais efficaces
-- Sécurité "deny by default" avec capabilities
-- Observabilité complète de chaque décision
+**Core Capabilities (MVP):**
+- Quick Start in < 30 minutes
+- Clear and intuitive TypeScript API
+- Native replay for debugging and audit
+- Structured and understandable tracing
+- Simple but effective policies
+- "Deny by default" security with capabilities
+- Complete observability of every decision
 
-**Capacités Gouvernance :**
-- Policies centralisées et vérifiables
-- Audit trail complet pour conformité
-- Visibilité sur tous les agents et leurs actions
-- Contrôle des coûts et budgets
-- Standardisation sans bloquer l'innovation
+**Governance Capabilities:**
+- Centralized and verifiable policies
+- Complete audit trail for compliance
+- Visibility into all agents and their actions
+- Cost and budget control
+- Standardization without blocking innovation
 
-**Capacités Produit :**
-- Comparaison de runs pour mesurer améliorations
-- Tests structurés avant déploiement
-- Observabilité cognitive pour comprendre comportement
-- Itération rapide sans risques
-- Agent comme artefact logiciel versionnable
+**Product Capabilities:**
+- Run comparison to measure improvements
+- Structured tests before deployment
+- Cognitive observability to understand behavior
+- Fast iteration without risk
+- Agent as a versionable software artifact
 
-**Capacités Opérationnelles :**
-- Monitoring et alertes basés sur événements
-- Simulation de scénarios "et si"
-- Résolution d'incidents rapide grâce au replay
-- Support simplifié grâce à standardisation
+**Operational Capabilities:**
+- Event-based monitoring and alerts
+- "What if" scenario simulation
+- Fast incident resolution thanks to replay
+- Simplified support thanks to standardization
 
-**Capacités Apprentissage :**
-- Documentation claire et exemples concrets
-- Apprentissage progressif des concepts
-- Accessibilité pour développeurs de tous niveaux
+**Learning Capabilities:**
+- Clear documentation and concrete examples
+- Progressive learning of concepts
+- Accessibility for developers of all levels
 
 ## Innovation & Novel Patterns
 
-### Innovation Principale #1 : Agent ≠ LLM (Changement de Paradigme)
+### Core Innovation #1: Agent ≠ LLM (Paradigm Shift)
 
-**Nature de l'innovation :**
-Ce n'est pas une feature ni une architecture, mais un nouveau modèle mental.
+**Nature of the innovation:**
+This is not a feature or an architecture, but a new mental model.
 
-**Pourquoi c'est radical :**
-- On change ce qu'est un agent, pas comment on l'implémente
-- On justifie l'existence d'une infrastructure dédiée
-- On rend obsolètes des comparaisons directes avec LangChain
+**Why it's radical:**
+- We're changing what an agent is, not how it's implemented
+- We justify the existence of dedicated infrastructure
+- We make direct comparisons with LangChain obsolete
 
-**Positionnement :**
-Tant que le marché pense "agent = LLM + tools", SDK_AI_Agents joue sur un autre plan : un agent est un système décisionnel gouverné, dont le LLM n'est qu'un composant.
+**Positioning:**
+As long as the market thinks "agent = LLM + tools," SDK_AI_Agents plays on a different level: an agent is a governed decision-making system, of which the LLM is only one component.
 
-**Validation :**
-- Signal fort : l'utilisateur adopte le vocabulaire (runs, policies, replay, décisions, traces)
-- Quand il ne parle plus de "prompt magique", c'est gagné
+**Validation:**
+- Strong signal: the user adopts the vocabulary (runs, policies, replay, decisions, traces)
+- When they stop talking about a "magic prompt," it's won
 
-**Risque :** Complexité perçue — "c'est trop compliqué"
-**Mitigation :** API simple, Quickstart ultra court, couches avancées opt-in
-
----
-
-### Innovation Principale #2 : Event-Sourcing Natif Appliqué aux Agents
-
-**Nature de l'innovation :**
-Innovation concrète et démontrable, unique sur le marché.
-
-**Capacités uniques :**
-- Replay réel en 1 commande
-- Audit réel complet
-- Comparaison de comportements
-- Testabilité native
-
-**Pourquoi c'est décisif :**
-- Immédiatement observable
-- Immédiatement utile
-- Extrêmement difficile à copier sans redesign complet
-
-**Validation :**
-- Signal fort : un utilisateur rejoue un incident réel
-- "Sans le replay, on n'aurait jamais compris" = validation irréfutable
-
-**Innovation implicite :** Le replay comme primitive produit
-- Pas un outil de debug ou un hack
-- Primitive centrale utilisable par dev, produit, QA
-- Permet non-régression comportementale, amélioration continue, certification future
+**Risk:** Perceived complexity — "this is too complicated"
+**Mitigation:** Simple API, ultra-short Quickstart, opt-in advanced layers
 
 ---
 
-### Innovation Principale #3 : Sécurité par Impossibilité
+### Core Innovation #2: Native Event-Sourcing Applied to Agents
 
-**Nature de l'innovation :**
-Innovation structurelle, invisible mais puissante.
+**Nature of the innovation:**
+A concrete, demonstrable innovation, unique in the market.
 
-**Propriétés structurelles :**
-- Pas de tool non déclaré
-- Pas d'action sans policy vérifiée
-- Pas d'exécution sans trace complète
+**Unique capabilities:**
+- Real replay in 1 command
+- Real, complete audit
+- Behavior comparison
+- Native testability
 
-**Pourquoi c'est puissant :**
-- Parle aux tech leads et aux entreprises
-- Réduit drastiquement le risque perçu
-- Transforme "outil IA" → "infrastructure acceptable"
+**Why it's decisive:**
+- Immediately observable
+- Immediately useful
+- Extremely hard to copy without a complete redesign
 
-**Validation :**
-- Signal fort : le tech lead autorise des actions plus critiques
-- Moins de "feature flags de peur"
-- Moins de désactivation d'agents en prod
-- Le succès est le relâchement de la peur
+**Validation:**
+- Strong signal: a user replays a real incident
+- "Without replay, we would never have understood" = irrefutable validation
 
----
-
-### Innovation Bonus : Observabilité Cognitive
-
-**Nature de l'innovation :**
-Moins immédiatement comprise, mais très différenciante à moyen terme.
-
-**Capacités uniques :**
-- Pas juste ce que l'agent a fait
-- Mais pourquoi, sous quelles contraintes, avec quelles alternatives
-
-**Pourquoi c'est différenciant :**
-- Innovation de deuxième lecture : elle devient évidente après usage, pas au pitch
-- Permet de comprendre le raisonnement, pas seulement l'exécution
-
-**Validation :**
-- Signal fort : l'utilisateur utilise les traces pour améliorer l'agent
-- Pas seulement pour debug
-- Quand les traces deviennent un outil produit, c'est validé
+**Implicit innovation:** Replay as a product primitive
+- Not a debug tool or a hack
+- A central primitive usable by dev, product, QA
+- Enables behavioral non-regression, continuous improvement, future certification
 
 ---
 
-### Innovations Implicites
+### Core Innovation #3: Security Through Impossibility
 
-#### Innovation Implicite #1 : L'Agent comme Artefact Logiciel
+**Nature of the innovation:**
+A structural innovation, invisible but powerful.
 
-**Transformation fondamentale :**
-Avec SDK_AI_Agents, un agent devient :
-- Versionnable
+**Structural properties:**
+- No undeclared tool
+- No action without a verified policy
+- No execution without a complete trace
+
+**Why it's powerful:**
+- Speaks to tech leads and enterprises
+- Drastically reduces perceived risk
+- Transforms "AI tool" → "acceptable infrastructure"
+
+**Validation:**
+- Strong signal: the tech lead authorizes more critical actions
+- Fewer "fear feature flags"
+- Fewer agent deactivations in prod
+- Success is the release of fear
+
+---
+
+### Bonus Innovation: Cognitive Observability
+
+**Nature of the innovation:**
+Less immediately understood, but highly differentiating over the medium term.
+
+**Unique capabilities:**
+- Not just what the agent did
+- But why, under what constraints, with what alternatives
+
+**Why it's differentiating:**
+- A second-read innovation: it becomes obvious after use, not at the pitch
+- Makes it possible to understand the reasoning, not just the execution
+
+**Validation:**
+- Strong signal: the user uses traces to improve the agent
+- Not just for debugging
+- When traces become a product tool, it's validated
+
+---
+
+### Implicit Innovations
+
+#### Implicit Innovation #1: The Agent as a Software Artifact
+
+**Fundamental transformation:**
+With SDK_AI_Agents, an agent becomes:
+- Versionable
 - Testable
 - Comparable
 - Auditable
-- Déployable
+- Deployable
 
-**Impact :**
-- Passage d'un comportement émergent à un objet logiciel industriel
-- Fondamental pour CI/CD, QA, produit
+**Impact:**
+- Shift from emergent behavior to an industrial software object
+- Fundamental for CI/CD, QA, product
 
-#### Innovation Implicite #2 : Trust Layer pour l'IA
+#### Implicit Innovation #2: Trust Layer for AI
 
-**Positionnement stratégique :**
-SDK_AI_Agents est en réalité une couche de confiance entre l'IA et le monde réel.
+**Strategic positioning:**
+SDK_AI_Agents is, in effect, a trust layer between AI and the real world.
 
-**Pourquoi c'est fort :**
-- Positionnement très fort, notamment B2B
-- Répond au besoin de confiance opérationnelle
-- Justifie l'existence d'une infrastructure dédiée
+**Why it's strong:**
+- Very strong positioning, particularly B2B
+- Addresses the need for operational trust
+- Justifies the existence of dedicated infrastructure
 
 ---
 
 ### Market Context & Competitive Landscape
 
-**Positionnement concurrentiel :**
+**Competitive positioning:**
 
-**vs LangChain :**
-- LangChain : orchestration et tool calling
-- SDK_AI_Agents : gouvernance native, replay natif, séparation raisonnement/action
-- Différenciation : "LangChain ne peut pas faire X, Y, Z structurellement"
+**vs LangChain:**
+- LangChain: orchestration and tool calling
+- SDK_AI_Agents: native governance, native replay, reasoning/action separation
+- Differentiation: "LangChain structurally cannot do X, Y, Z"
 
-**vs Semantic Kernel :**
-- Semantic Kernel : filtres basiques, pas d'event-sourcing
-- SDK_AI_Agents : event-sourcing natif, observabilité cognitive
-- Différenciation : architecture événementielle complète
+**vs Semantic Kernel:**
+- Semantic Kernel: basic filters, no event-sourcing
+- SDK_AI_Agents: native event-sourcing, cognitive observability
+- Differentiation: complete event-driven architecture
 
-**vs AutoGPT/LangGraph :**
-- AutoGPT/LangGraph : focus orchestration
-- SDK_AI_Agents : gouvernance native, testabilité structurée
-- Différenciation : agents comme artefacts logiciels
+**vs AutoGPT/LangGraph:**
+- AutoGPT/LangGraph: orchestration-focused
+- SDK_AI_Agents: native governance, structured testability
+- Differentiation: agents as software artifacts
 
-**Avantage concurrentiel durable :**
-- Architecture cohérente pensée ensemble, pas des features ajoutées
-- Difficile à copier sans refonte complète
-- Le modèle mental (agent ≠ chatbot) est difficile à adopter pour les concurrents
+**Durable competitive advantage:**
+- A coherent architecture designed together, not features bolted on
+- Hard to copy without a complete redesign
+- The mental model (agent ≠ chatbot) is hard for competitors to adopt
 
 ---
 
 ### Validation Approach
 
-**Principe directeur :**
-Validation par l'usage, pas par le discours.
+**Guiding principle:**
+Validation through usage, not through discourse.
 
-**Métriques de validation :**
+**Validation metrics:**
 
-1. **Paradigme Agent ≠ LLM :**
-   - Adoption du vocabulaire (runs, policies, replay, décisions, traces)
-   - Abandon du vocabulaire "prompt magique"
+1. **Agent ≠ LLM paradigm:**
+   - Adoption of the vocabulary (runs, policies, replay, decisions, traces)
+   - Abandonment of the "magic prompt" vocabulary
 
-2. **Event-sourcing / Replay :**
-   - Utilisation réelle du replay pour résoudre des incidents
-   - Témoignages : "Sans le replay, on n'aurait jamais compris"
+2. **Event-sourcing / Replay:**
+   - Real use of replay to resolve incidents
+   - Testimonials: "Without replay, we would never have understood"
 
-3. **Sécurité by design :**
-   - Autorisation d'actions plus critiques par les tech leads
-   - Réduction des "feature flags de peur"
-   - Réduction des désactivations d'agents en prod
+3. **Security by design:**
+   - Authorization of more critical actions by tech leads
+   - Reduction of "fear feature flags"
+   - Reduction of agent deactivations in prod
 
-4. **Observabilité cognitive :**
-   - Utilisation des traces pour améliorer l'agent (pas seulement debug)
-   - Traces comme outil produit
+4. **Cognitive observability:**
+   - Use of traces to improve the agent (not just debugging)
+   - Traces as a product tool
 
-**Approche de validation :**
-- Parler de problèmes concrets
-- Montrer des avant / après
-- Éviter le discours "philosophique" en front
-- Démontrer, pas argumenter
+**Validation approach:**
+- Talk about concrete problems
+- Show before/after comparisons
+- Avoid "philosophical" discourse upfront
+- Demonstrate, don't argue
 
 ---
 
 ### Risk Mitigation
 
-#### Risque #1 : Complexité Perçue
+#### Risk #1: Perceived Complexity
 
-**Risque :**
-Le paradigme est plus riche → risque de "c'est trop compliqué" ou "j'ai juste besoin d'un agent simple"
+**Risk:**
+The paradigm is richer → risk of "this is too complicated" or "I just need a simple agent"
 
-**Mitigation :**
-- API simple par défaut
-- Quickstart ultra court (< 30 minutes)
-- Couches avancées opt-in
-- Documentation progressive par niveau
+**Mitigation:**
+- Simple API by default
+- Ultra-short Quickstart (< 30 minutes)
+- Opt-in advanced layers
+- Progressive documentation by level
 
-#### Risque #2 : Innovation Trop en Avance
+#### Risk #2: Innovation Too Far Ahead
 
-**Risque :**
-Le marché n'est pas encore totalement mûr pour ce niveau de gouvernance
+**Risk:**
+The market isn't yet fully mature for this level of governance
 
-**Mitigation :**
-- Parler de problèmes concrets (incidents, debugging, sécurité)
-- Montrer des avant / après mesurables
-- Éviter le discours "philosophique" en front
-- Focus sur les early adopters (tech leads, entreprises réglementées)
+**Mitigation:**
+- Talk about concrete problems (incidents, debugging, security)
+- Show measurable before/after comparisons
+- Avoid "philosophical" discourse upfront
+- Focus on early adopters (tech leads, regulated companies)
 
-#### Risque #3 : Comparaison Injuste avec Frameworks Existants
+#### Risk #3: Unfair Comparison with Existing Frameworks
 
-**Risque :**
-"Pourquoi pas LangChain + X ?"
+**Risk:**
+"Why not LangChain + X?"
 
-**Mitigation :**
-- Réponse clé : "Parce que LangChain ne peut pas faire X, Y, Z structurellement"
-- Démontrer, pas argumenter
-- Focus sur les différenciateurs concrets (replay, audit, gouvernance native)
-- Cas d'usage concrets où SDK_AI_Agents est indispensable
+**Mitigation:**
+- Key answer: "Because LangChain structurally cannot do X, Y, Z"
+- Demonstrate, don't argue
+- Focus on concrete differentiators (replay, audit, native governance)
+- Concrete use cases where SDK_AI_Agents is indispensable
 
-#### Risque #4 : Adoption Lente du Nouveau Paradigme
+#### Risk #4: Slow Adoption of the New Paradigm
 
-**Risque :**
-Les développeurs sont habitués au modèle "LLM + tools"
+**Risk:**
+Developers are used to the "LLM + tools" model
 
-**Mitigation :**
-- Migration progressive depuis frameworks existants
-- Adapters pour compatibilité
-- Quick wins immédiats (replay fonctionnel dès le premier run)
-- ROI visible rapidement
+**Mitigation:**
+- Gradual migration from existing frameworks
+- Adapters for compatibility
+- Immediate quick wins (working replay from the very first run)
+- Fast, visible ROI
 
 ## Developer Tool Specific Requirements
 
 ### Project-Type Overview
 
-SDK_AI_Agents est un SDK/package TypeScript/Node.js pour développeurs backend et tech leads. C'est une infrastructure conceptuelle avant d'être multi-langages ou multi-IDE. Le MVP se concentre sur TypeScript/Node.js pour valider le paradigme avant d'étendre à d'autres langages.
+SDK_AI_Agents is a TypeScript/Node.js SDK/package for backend developers and tech leads. It is a conceptual infrastructure before being multi-language or multi-IDE. The MVP focuses on TypeScript/Node.js to validate the paradigm before extending to other languages.
 
-**Décision stratégique clé :**
-SDK_AI_Agents est d'abord une infrastructure conceptuelle avant d'être multi-langages ou multi-IDE.
+**Key strategic decision:**
+SDK_AI_Agents is first and foremost a conceptual infrastructure before being multi-language or multi-IDE.
 
 ### Language Support Matrix
 
-#### MVP - TypeScript/Node.js (Priorité Absolue)
+#### MVP - TypeScript/Node.js (Top Priority)
 
-**Décision :** Support exclusif TypeScript/Node.js pour le MVP.
+**Decision:** Exclusive TypeScript/Node.js support for the MVP.
 
-**Justification :**
-- Écosystème dominant pour les outils agents
-- DX exceptionnelle (typing, autocomplétion, ergonomie)
-- Cohérent avec la cible (backend/fullstack/platform engineers)
-- Accélère le feedback des early adopters
+**Justification:**
+- Dominant ecosystem for agent tooling
+- Exceptional DX (typing, autocomplete, ergonomics)
+- Consistent with the target audience (backend/fullstack/platform engineers)
+- Speeds up early adopter feedback
 
-**Spécifications techniques :**
-- TypeScript 5.x avec mode strict
+**Technical specifications:**
+- TypeScript 5.x with strict mode
 - Node.js 20+ (LTS)
-- Support ESM et CommonJS
-- Type-safety complet pour toute l'API
+- ESM and CommonJS support
+- Complete type-safety across the entire API
 
-**Aucun autre langage dans le MVP.** C'est une décision stratégique, pas un manque.
+**No other language in the MVP.** This is a strategic decision, not a gap.
 
 #### Post-MVP - Python
 
-**Timing :** Après validation du paradigme et PMF.
+**Timing:** After paradigm validation and PMF.
 
-**Justification :**
-- Python est très orienté ML/recherche
-- Le paradigme vise l'industrialisation, pas l'expérimentation
-- Risque de dilution trop tôt
+**Justification:**
+- Python is heavily ML/research-oriented
+- The paradigm targets industrialization, not experimentation
+- Risk of premature dilution
 
-**Approche :**
-- Python doit hériter du design, pas l'influencer
-- Migration progressive après stabilisation de l'API TypeScript
-- Support pip + poetry si nécessaire
+**Approach:**
+- Python must inherit the design, not influence it
+- Gradual migration after the TypeScript API stabilizes
+- pip + poetry support if needed
 
-#### Autres Langages (Go, Rust, etc.)
+#### Other Languages (Go, Rust, etc.)
 
-**Décision :** Pas à court/moyen terme.
+**Decision:** Not in the short/medium term.
 
-**Justification :**
-- Complexité inutile
-- Faible ROI initial
-- Risque de fragmentation de l'API mentale
+**Justification:**
+- Unnecessary complexity
+- Low initial ROI
+- Risk of fragmenting the mental API
 
-**Envisagé uniquement si :** SDK_AI_Agents devient un standard mature.
+**Considered only if:** SDK_AI_Agents becomes a mature standard.
 
 ### Installation Methods
 
 #### MVP - npm (Standard)
 
-**Méthode principale :**
+**Primary method:**
 ```bash
 npm install @sdk-ai-agents/core
 ```
 
-**Compatibilité :**
-- Compatible yarn et pnpm automatiquement (pas besoin de choix explicite)
-- Ne jamais mentionner "support yarn/pnpm" : c'est implicite, pas un argument produit
+**Compatibility:**
+- Automatically compatible with yarn and pnpm (no explicit choice needed)
+- Never mention "yarn/pnpm support": it's implicit, not a product argument
 
-**Spécifications :**
-- Package publié sur npm registry
-- Versioning sémantique strict
-- Support des workspaces monorepo
+**Specifications:**
+- Package published on the npm registry
+- Strict semantic versioning
+- Monorepo workspace support
 
 #### Post-MVP - Python
 
-**Méthodes :**
+**Methods:**
 - pip (standard)
-- poetry (si besoin)
+- poetry (if needed)
 
-**Timing :** Uniquement après PMF et validation du paradigme.
+**Timing:** Only after PMF and paradigm validation.
 
 ### API Surface
 
-#### Principes de Design API
+#### API Design Principles
 
-**API claire et typée :**
-- TypeScript strict pour type-safety complet
-- Autocomplétion native via types
-- API minimale mais puissante
+**Clear and typed API:**
+- Strict TypeScript for complete type-safety
+- Native autocomplete via types
+- Minimal but powerful API
 
-**Structure API MVP :**
+**MVP API Structure:**
 
-**Core SDK :**
-- `createSDK()` - Initialisation du SDK
-- `createAgent()` - Création d'un agent
-- `defineTool()` - Définition d'une capability/tool
-- `agent.run()` - Exécution d'un agent
+**Core SDK:**
+- `createSDK()` - SDK initialization
+- `createAgent()` - Agent creation
+- `defineTool()` - Defining a capability/tool
+- `agent.run()` - Running an agent
 
-**Replay & Observabilité :**
-- `sdk.replay(runId)` - Rejouer une exécution
-- `sdk.compare(runId1, runId2)` - Comparer deux runs
-- `sdk.getTrace(runId)` - Récupérer la trace complète
+**Replay & Observability:**
+- `sdk.replay(runId)` - Replay an execution
+- `sdk.compare(runId1, runId2)` - Compare two runs
+- `sdk.getTrace(runId)` - Retrieve the complete trace
 
-**Policies :**
-- `sdk.definePolicy()` - Définition d'une policy globale
-- Policies intégrées : budgets, timeouts, allowlists
+**Policies:**
+- `sdk.definePolicy()` - Defining a global policy
+- Built-in policies: budgets, timeouts, allowlists
 
-**Caractéristiques API :**
-- Peu de concepts, mais solides
-- Type-safe, documentée, prévisible
-- API stable et minimaliste
+**API characteristics:**
+- Few concepts, but solid ones
+- Type-safe, documented, predictable
+- Stable and minimal API
 
-#### Documentation API
+#### API Documentation
 
-**Via TypeDoc :**
-- Documentation complète générée depuis les types
-- Exemples intégrés dans la documentation
-- Navigation facile entre concepts
+**Via TypeDoc:**
+- Complete documentation generated from types
+- Examples embedded in the documentation
+- Easy navigation between concepts
 
 ### Code Examples
 
-#### MVP - 3 Exemples Obligatoires (Pas Plus)
+#### MVP - 3 Required Examples (No More)
 
-**Exemple 1 - Quick Start Minimal**
+**Example 1 - Minimal Quick Start**
 
-**Objectif :**
-- Créer un agent
-- Déclarer 1 tool
-- Exécuter
-- Voir les events
-- Rejouer
+**Objective:**
+- Create an agent
+- Declare 1 tool
+- Run it
+- View the events
+- Replay it
 
-**Spécifications :**
-- 1 fichier, < 100 lignes
-- Fonctionnel en < 30 minutes
-- Montre les concepts fondamentaux
+**Specifications:**
+- 1 file, < 100 lines
+- Working in < 30 minutes
+- Shows the fundamental concepts
 
-**Exemple 2 - Cas Réel : Agent avec Action**
+**Example 2 - Real Case: Agent with Action**
 
-**Objectif :**
-- Montrer le tool calling contrôlé
-- Montrer les policies
-- Montrer la trace
+**Objective:**
+- Show controlled tool calling
+- Show the policies
+- Show the trace
 
-**Cas d'usage suggérés :**
-- Support client automatisé
-- Automation simple (API call)
-- Agent avec actions réelles
+**Suggested use cases:**
+- Automated customer support
+- Simple automation (API call)
+- Agent with real actions
 
-**C'est là que le "moment aha" arrive.**
+**This is where the "aha moment" happens.**
 
-**Exemple 3 - Replay & Debug**
+**Example 3 - Replay & Debug**
 
-**Objectif :**
-- Rejouer un incident
-- Comparer deux runs
-- Comprendre une décision
+**Objective:**
+- Replay an incident
+- Compare two runs
+- Understand a decision
 
-**Spécifications :**
-- Montre le replay natif
-- Montre la comparaison de runs
-- Montre l'observabilité cognitive
+**Specifications:**
+- Shows native replay
+- Shows run comparison
+- Shows cognitive observability
 
-**Cet exemple vend le produit à lui seul.**
+**This example sells the product on its own.**
 
-#### Hors MVP - Exemples de Migration
+#### Out of MVP - Migration Examples
 
-**Décision :** Pas dans le MVP.
+**Decision:** Not in the MVP.
 
-**Justification :**
-- Trop tôt
-- Risque de comparaison défavorable avant que le paradigme soit compris
-- À ajouter post-MVP quand le paradigme est adopté
+**Justification:**
+- Too early
+- Risk of an unfavorable comparison before the paradigm is understood
+- To be added post-MVP once the paradigm is adopted
 
-**Exemples futurs :**
-- Migration depuis LangChain
-- Migration depuis Semantic Kernel
-- Migration depuis autres frameworks
+**Future examples:**
+- Migration from LangChain
+- Migration from Semantic Kernel
+- Migration from other frameworks
 
 ### Documentation Structure
 
-#### MVP - Documentation Texte + Code (Pas Marketing)
+#### MVP - Text + Code Documentation (Not Marketing)
 
-**Structure recommandée :**
+**Recommended structure:**
 
-**1. Quick Start (10 minutes, 10 lignes)**
-- Premier agent fonctionnel rapidement
-- Concepts minimaux nécessaires
-- Exemple concret simple
+**1. Quick Start (10 minutes, 10 lines)**
+- A first working agent, quickly
+- Minimal concepts needed
+- Simple concrete example
 
-**2. Concepts Clés**
+**2. Key Concepts**
 - Agent ≠ LLM
 - Event log
-- Tool calling gouverné
+- Governed tool calling
 - Replay
 - Policies
 
-**Style :** Orientée "mental model", pas "how-to magique"
-- Chaque concept doit répondre à : "Pourquoi ça existe ? Quel problème ça évite ?"
-- Crucial pour faire passer le changement de paradigme
+**Style:** Oriented toward "mental model," not "magic how-to"
+- Every concept must answer: "Why does this exist? What problem does it avoid?"
+- Crucial for conveying the paradigm shift
 
 **3. API Reference**
 - Via TypeDoc
-- Documentation complète générée depuis les types
-- Exemples intégrés
+- Complete documentation generated from types
+- Embedded examples
 
-**4. Guides Pratiques**
-- "Ajouter un tool"
-- "Activer le replay"
-- "Limiter un agent"
-- "Définir des policies"
+**4. Practical Guides**
+- "Adding a tool"
+- "Enabling replay"
+- "Limiting an agent"
+- "Defining policies"
 
-**Style :**
-- Pas de vidéos, pas de blabla
-- Focus sur la compréhension conceptuelle
-- Exemples concrets et démonstratifs
+**Style:**
+- No videos, no fluff
+- Focus on conceptual understanding
+- Concrete, demonstrative examples
 
-#### Post-MVP - Documentation Avancée
+#### Post-MVP - Advanced Documentation
 
-**À ajouter plus tard :**
-- Guides de migration depuis frameworks existants
-- Cas d'usage avancés
-- Patterns et best practices
-- Troubleshooting approfondi
+**To add later:**
+- Migration guides from existing frameworks
+- Advanced use cases
+- Patterns and best practices
+- In-depth troubleshooting
 
 ### IDE Integration
 
-#### MVP - Aucune Intégration IDE Dédiée
+#### MVP - No Dedicated IDE Integration
 
-**Décision :** Aucune intégration IDE dans le MVP.
+**Decision:** No IDE integration in the MVP.
 
-**Justification :**
-- Trop tôt
-- Faible valeur sans adoption réelle
-- Détourne l'effort du core (runtime, replay, policies)
+**Justification:**
+- Too early
+- Low value without real adoption
+- Diverts effort from the core (runtime, replay, policies)
 
-**Ce qui suffit au MVP :**
-- Autocomplétion TypeScript native (via types)
-- Support TypeScript standard dans VS Code/WebStorm
-- Pas besoin d'extension dédiée
+**What's sufficient for MVP:**
+- Native TypeScript autocomplete (via types)
+- Standard TypeScript support in VS Code/WebStorm
+- No need for a dedicated extension
 
 #### Post-MVP - VS Code Extension
 
-**Timing :**
-- Quand les concepts sont stables
-- Quand l'API est figée
-- Quand les utilisateurs le demandent explicitement
+**Timing:**
+- When the concepts are stable
+- When the API is frozen
+- When users explicitly ask for it
 
-**Fonctionnalités pertinentes (plus tard) :**
-- Inspection des traces
-- Visualisation des runs
-- Replay local
-- Debugging intégré
+**Relevant features (later):**
+- Trace inspection
+- Run visualization
+- Local replay
+- Integrated debugging
 
 ### Migration Guide
 
-#### MVP - Pas de Guide de Migration
+#### MVP - No Migration Guide
 
-**Décision :** Aucun guide de migration dans le MVP.
+**Decision:** No migration guide in the MVP.
 
-**Justification :**
-- Trop tôt pour comparer avec d'autres frameworks
-- Risque de comparaison défavorable avant adoption du paradigme
-- Focus sur la validation du concept, pas sur la migration
+**Justification:**
+- Too early to compare with other frameworks
+- Risk of an unfavorable comparison before paradigm adoption
+- Focus on concept validation, not migration
 
-#### Post-MVP - Guides de Migration
+#### Post-MVP - Migration Guides
 
-**À ajouter après PMF :**
-- Migration depuis LangChain
-- Migration depuis Semantic Kernel
-- Migration depuis solutions maison
-- Patterns de migration progressive
+**To add after PMF:**
+- Migration from LangChain
+- Migration from Semantic Kernel
+- Migration from in-house solutions
+- Gradual migration patterns
 
 ### Technical Architecture Considerations
 
-#### Priorités MVP (Ordre Strict)
+#### MVP Priorities (Strict Order)
 
-1. **TypeScript/Node.js** - Support exclusif
-2. **API claire et typée** - Type-safety complet
-3. **Documentation conceptuelle forte** - Mental model avant tout
-4. **Exemples réels et démonstratifs** - 3 exemples obligatoires
-5. **Replay comme feature centrale** - Killer feature du MVP
+1. **TypeScript/Node.js** - Exclusive support
+2. **Clear and typed API** - Complete type-safety
+3. **Strong conceptual documentation** - Mental model above all
+4. **Real, demonstrative examples** - 3 required examples
+5. **Replay as a central feature** - The MVP's killer feature
 
-#### Post-MVP Priorités
+#### Post-MVP Priorities
 
 - Python support
 - VS Code extension
-- UI de visualisation
-- Exemples de migration
+- Visualization UI
+- Migration examples
 
 ### Implementation Considerations
 
-#### Principes d'Implémentation
+#### Implementation Principles
 
-**Infrastructure conceptuelle d'abord :**
-- Valider le paradigme avant d'étendre
-- TypeScript/Node.js comme fondation solide
-- API stable avant multi-langages
+**Conceptual infrastructure first:**
+- Validate the paradigm before extending
+- TypeScript/Node.js as a solid foundation
+- Stable API before multi-language
 
-**DX moderne mais prod-first :**
-- Simple à utiliser, robuste par conception
-- Type-safety partout
-- Documentation complète mais concise
+**Modern but production-first DX:**
+- Simple to use, robust by design
+- Type-safety everywhere
+- Complete but concise documentation
 
-**Focus MVP :**
+**MVP Focus:**
 - Core runtime (event-sourcing, replay, policies)
-- API minimale mais puissante
-- Exemples démonstratifs
-- Documentation conceptuelle
+- Minimal but powerful API
+- Demonstrative examples
+- Conceptual documentation
 
 ## Project Scoping & Phased Development
 
-### Principes Non Négociables
+### Non-Negotiable Principles
 
-Ces 5 principes servent de garde-fou produit, de filtre de scope et de boussole pour toutes les décisions futures.
+These 5 principles serve as a product guardrail, a scope filter, and a compass for all future decisions.
 
-**Principe #1 : Toute action est un événement**
-- Chaque action de l'agent génère un événement structuré
-- L'event log est la source de vérité unique
-- Sans événement, pas de traçabilité, pas de replay, pas de différenciation
+**Principle #1: Every action is an event**
+- Every agent action generates a structured event
+- The event log is the single source of truth
+- Without an event, there is no traceability, no replay, no differentiation
 
-**Principe #2 : Aucune action sans policy**
-- Toute action doit passer par une policy vérifiée
-- Sécurité "deny by default" : tout est interdit sauf ce qui est explicitement autorisé
-- Pas de tool sans déclaration, pas d'action sans validation
+**Principle #2: No action without a policy**
+- Every action must pass through a verified policy
+- "Deny by default" security: everything is forbidden except what is explicitly authorized
+- No tool without declaration, no action without validation
 
-**Principe #3 : Le LLM ne provoque jamais d'effet de bord**
-- Le LLM génère des intentions structurées, jamais d'actions directes
-- Séparation stricte raisonnement/action : Reasoning Engine ≠ Action Engine
-- Toutes les actions passent par un Action Engine gouverné
+**Principle #3: The LLM never causes a side effect**
+- The LLM generates structured intentions, never direct actions
+- Strict separation of reasoning/action: Reasoning Engine ≠ Action Engine
+- All actions pass through a governed Action Engine
 
-**Principe #4 : Le replay doit être possible sans LLM**
-- Replay natif à partir des événements uniquement
-- Pas besoin de recontacter le LLM pour rejouer
-- Même séquence, mêmes tool calls, déterminisme relatif
+**Principle #4: Replay must be possible without the LLM**
+- Native replay from events only
+- No need to contact the LLM again to replay
+- Same sequence, same tool calls, relative determinism
 
-**Principe #5 : La sécurité est deny-by-default**
-- Sécurité par impossibilité, pas par configuration
-- Propriété structurelle, pas feature optionnelle
-- Pas d'exécution sans trace complète
+**Principle #5: Security is deny-by-default**
+- Security through impossibility, not through configuration
+- A structural property, not an optional feature
+- No execution without a complete trace
 
-**Utilisation de ces principes :**
-- Garde-fou contre la dilution du scope
-- Filtre pour évaluer toute nouvelle feature
-- Boussole pour les décisions architecturales
-- Validation de cohérence du produit
+**How these principles are used:**
+- A guardrail against scope dilution
+- A filter for evaluating every new feature
+- A compass for architectural decisions
+- A product coherence check
 
 ### MVP Strategy & Philosophy
 
-**Approche MVP :** Problem-Solving MVP avec architecture de Platform
+**MVP Approach:** Problem-Solving MVP with Platform architecture
 
-**Justification :**
-- Résout un problème critique : comprendre, rejouer et sécuriser un agent en production
-- Pose une fondation irréversible pour l'expansion future
-- Équilibre entre valeur immédiate et architecture durable
+**Justification:**
+- Solves a critical problem: understanding, replaying, and securing an agent in production
+- Lays an irreversible foundation for future expansion
+- Balances immediate value with durable architecture
 
-**Objectif MVP :**
-Démontrer : "Je peux comprendre, rejouer et sécuriser le comportement de mon agent."
+**MVP Objective:**
+Demonstrate: "I can understand, replay, and secure my agent's behavior."
 
-**Critères de sortie MVP :**
-1. Replay fonctionnel : 100% des runs rejouables
-2. Tracing compréhensible : > 80% utilisateurs comprennent traces
-3. Policies actives : > 60% projets avec policies
-4. Time-to-first-agent : < 30 minutes
+**MVP Exit Criteria:**
+1. Working replay: 100% of runs replayable
+2. Understandable tracing: > 80% of users understand traces
+3. Active policies: > 60% of projects with policies
+4. Time-to-first-agent: < 30 minutes
 
 ### MVP Feature Set (Phase 1)
 
-#### Must-Have MVP (Non Négociables)
+#### Must-Have MVP (Non-Negotiable)
 
-**1. Runtime Événementiel (CORE)**
-- **Pourquoi must-have :** Sans ça → pas de replay, pas de différenciation
-- **Spécifications :**
-  - Exécuter un agent via une boucle simple (max steps)
-  - Émettre des événements structurés à chaque étape
-  - Persister ces événements (in-memory + file)
-  - Event schema minimal, 1 projection simple, pas de DSL
+**1. Event-Driven Runtime (CORE)**
+- **Why must-have:** Without it → no replay, no differentiation
+- **Specifications:**
+  - Execute an agent via a simple loop (max steps)
+  - Emit structured events at each step
+  - Persist these events (in-memory + file)
+  - Minimal event schema, 1 simple projection, no DSL
 
-**2. Replay Fonctionnel**
-- **Pourquoi must-have :** Killer feature, preuve immédiate
-- **Spécifications :**
-  - Rejouer un run à partir des events
-  - Sans recontacter le LLM (mode "replay")
-  - Même séquence, mêmes tool calls
-  - Déterminisme relatif
+**2. Working Replay**
+- **Why must-have:** Killer feature, immediate proof
+- **Specifications:**
+  - Replay a run from its events
+  - Without contacting the LLM again ("replay" mode)
+  - Same sequence, same tool calls
+  - Relative determinism
 
-**3. Tool Calling Contrôlé**
-- **Pourquoi must-have :** Cœur du risque réel
-- **Spécifications :**
-  - Définition explicite des tools (`defineTool`)
-  - Validation des inputs (Zod / schema)
-  - Tool registry avec allowlist
-  - Tool call visible dans les events
+**3. Controlled Tool Calling**
+- **Why must-have:** The core of the real risk
+- **Specifications:**
+  - Explicit tool definition (`defineTool`)
+  - Input validation (Zod / schema)
+  - Tool registry with allowlist
+  - Tool call visible in the events
 
-**4. Policies Simples mais Actives**
-- **Pourquoi must-have :** Gouvernance réelle, pas décorative
-- **Spécifications :**
-  - Allowlist tools (deny by default)
-  - Budget max (tokens ou steps)
+**4. Simple but Active Policies**
+- **Why must-have:** Real governance, not decorative
+- **Specifications:**
+  - Tool allowlist (deny by default)
+  - Max budget (tokens or steps)
   - Timeout / max steps
-  - Policies réellement appliquées, pas cosmétiques
+  - Policies genuinely enforced, not cosmetic
 
-**5. Tracing Structuré**
-- **Pourquoi must-have :** Compréhension humaine, pas debug à l'aveugle
-- **Spécifications :**
-  - Traces lisibles (JSON structuré)
-  - Chaque run a un `runId`
-  - Chaque décision, tool call, erreur est tracée
-  - Export possible (console + fichier)
+**5. Structured Tracing**
+- **Why must-have:** Human understanding, not blind debugging
+- **Specifications:**
+  - Readable traces (structured JSON)
+  - Every run has a `runId`
+  - Every decision, tool call, error is traced
+  - Export possible (console + file)
 
-**Si un seul de ces éléments manque, le MVP ne valide pas la promesse centrale.**
+**If even one of these elements is missing, the MVP doesn't validate the core promise.**
 
 #### Core User Journeys Supported (MVP)
 
-**Journeys essentiels pour MVP :**
-1. **Alex (Développeur)** - Premier agent en production avec replay
-2. **Sarah (Tech Lead)** - Gouvernance organisationnelle avec policies
-3. **Jordan (Product Engineer)** - Itération produit avec comparaison de runs
+**Essential journeys for MVP:**
+1. **Alex (Developer)** - First agent in production with replay
+2. **Sarah (Tech Lead)** - Organizational governance with policies
+3. **Jordan (Product Engineer)** - Product iteration with run comparison
 
 ### Post-MVP Features
 
-#### Phase 2 - Production-Ready (3-4 mois post-MVP)
+#### Phase 2 - Production-Ready (3-4 months post-MVP)
 
-**Features :**
-- Policies avancées (approval humaine, budgets complexes)
-- Observabilité cognitive (graphe raisonnement)
-- Capabilities system complet
-- Multi-providers LLM (Anthropic, autres)
-- Event Store SQL-based (scalabilité)
+**Features:**
+- Advanced policies (human approval, complex budgets)
+- Cognitive observability (reasoning graph)
+- Complete capabilities system
+- Multi-provider LLM support (Anthropic, others)
+- SQL-based Event Store (scalability)
 - Performance optimizations
 
-#### Phase 3 - Advanced Features (6-12 mois)
+#### Phase 3 - Advanced Features (6-12 months)
 
-**Features :**
-- Mémoire causale et temporelle
+**Features:**
+- Causal and temporal memory
 - Time travel debugging
 - Multi-agent orchestration
-- Conformité sectorielle (finance, santé)
-- Event Store distribué (Kafka-style)
-- Observabilité cognitive complète
+- Sector-specific compliance (finance, healthcare)
+- Distributed Event Store (Kafka-style)
+- Complete cognitive observability
 
-#### Phase 4 - Platform (12-24 mois)
+#### Phase 4 - Platform (12-24 months)
 
-**Features :**
-- Marketplace de plugins
-- UI/Dashboard web
-- Support multi-langages (Python)
-- Écosystème et communauté
-- Intégrations cloud providers
-- Outils développeurs avancés (CLI, extensions IDE)
+**Features:**
+- Plugin marketplace
+- Web UI/Dashboard
+- Multi-language support (Python)
+- Ecosystem and community
+- Cloud provider integrations
+- Advanced developer tools (CLI, IDE extensions)
 
 ### Risk Mitigation Strategy
 
-#### Risque #1 : Adoption du Nouveau Paradigme (LE PLUS CRITIQUE)
+#### Risk #1: Adoption of the New Paradigm (THE MOST CRITICAL)
 
-**Risque :**
-"Agent ≠ LLM" est une force… et un risque. Incompréhension possible, rejet par habitude, comparaison injuste avec LangChain.
+**Risk:**
+"Agent ≠ LLM" is a strength… and a risk. Possible misunderstanding, rejection out of habit, unfair comparison with LangChain.
 
-**Mitigation MVP (Indispensable) :**
-- API simple malgré le core complexe
-- Quickstart qui fonctionne sans expliquer toute la philosophie
-- Exemples orientés avant / après, pas "théorie"
-- Documentation conceptuelle mais accessible
+**MVP Mitigation (Essential):**
+- Simple API despite the complex core
+- A Quickstart that works without explaining the whole philosophy
+- Before/after oriented examples, not "theory"
+- Conceptual but accessible documentation
 
-**Critère de succès :**
-👉 **Si l'utilisateur n'atteint pas le replay en 10 minutes, tu perds.**
+**Success criterion:**
+👉 **If the user doesn't reach replay within 10 minutes, you lose.**
 
-#### Risque #2 : Complexité de l'Architecture Événementielle
+#### Risk #2: Complexity of the Event-Driven Architecture
 
-**Risque :**
-Sur-design possible, tentation d'abstraction prématurée.
+**Risk:**
+Possible over-design, temptation toward premature abstraction.
 
-**Mitigation MVP :**
-- Event schema minimal
-- 1 projection simple
-- Pas de DSL
-- Pas de config magique
-- L'event-sourcing doit être invisible côté utilisateur
+**MVP Mitigation:**
+- Minimal event schema
+- 1 simple projection
+- No DSL
+- No magic config
+- Event-sourcing must be invisible to the user
 
-#### Risque #3 : Performance de l'Event-Sourcing
+#### Risk #3: Event-Sourcing Performance
 
-**Risque :**
-Performance de l'event-sourcing (risque secondaire au MVP).
+**Risk:**
+Event-sourcing performance (secondary risk at MVP).
 
-**Mitigation MVP :**
-- Event store in-memory / file (simple)
-- Pas d'optimisation prématurée
-- Les appels LLM et tools dominent le coût
-- Le replay est offline / async
+**MVP Mitigation:**
+- In-memory / file event store (simple)
+- No premature optimization
+- LLM and tool calls dominate the cost
+- Replay is offline / async
 
-**Classement des risques (ordre réel) :**
-1. ❗ **Adoption du paradigme** (critique)
-2. ⚠️ **Complexité interne** (maîtrisable)
-3. 🟡 **Performance** (non bloquant MVP)
+**Risk ranking (real order):**
+1. ❗ **Paradigm adoption** (critical)
+2. ⚠️ **Internal complexity** (manageable)
+3. 🟡 **Performance** (non-blocking for MVP)
 
 ### Resource Requirements
 
 #### MVP Team Size & Skills
 
-**Équipe minimale recommandée :**
-- 1-2 développeurs backend TypeScript (full-time)
-- 1 architecte (part-time)
-- 1 expert sécurité (consultant)
+**Recommended minimal team:**
+- 1-2 backend TypeScript developers (full-time)
+- 1 architect (part-time)
+- 1 security expert (consultant)
 
-**Compétences requises :**
-- TypeScript/Node.js avancé
-- Event-sourcing et CQRS patterns
-- Architecture distribuée
-- LLM integration et optimization
-- Sécurité et gouvernance
+**Required skills:**
+- Advanced TypeScript/Node.js
+- Event-sourcing and CQRS patterns
+- Distributed architecture
+- LLM integration and optimization
+- Security and governance
 
-**Timeline MVP :**
-- 2-3 mois pour MVP fonctionnel
-- Focus sur validation du paradigme
+**MVP Timeline:**
+- 2-3 months for a working MVP
+- Focus on paradigm validation
 
 ### Success Gates & Decision Points
 
-#### Gate 1 : MVP Validation (Mois 3)
+#### Gate 1: MVP Validation (Month 3)
 
-**Critères de validation :**
-- ✅ Replay fonctionnel : 100% des runs rejouables
-- ✅ Tracing compréhensible : > 80% utilisateurs comprennent traces
-- ✅ Policies actives : > 60% projets avec policies
-- ✅ Time-to-first-agent : < 30 minutes
-- ✅ ≥ 3 équipes utilisent le SDK en production
-- ✅ ≥ 1 incident réel rejoué et compris
+**Validation criteria:**
+- ✅ Working replay: 100% of runs replayable
+- ✅ Understandable tracing: > 80% of users understand traces
+- ✅ Active policies: > 60% of projects with policies
+- ✅ Time-to-first-agent: < 30 minutes
+- ✅ ≥ 3 teams using the SDK in production
+- ✅ ≥ 1 real incident replayed and understood
 
-**Décision :**
-- Si critères atteints → Proceed avec Phase 2
-- Si critères non atteints → Itérer sur MVP, pas ajouter features
+**Decision:**
+- If criteria are met → Proceed with Phase 2
+- If criteria are not met → Iterate on the MVP, don't add features
 
-#### Gate 2 : Production-Ready (Mois 7)
+#### Gate 2: Production-Ready (Month 7)
 
-**Critères de validation :**
-- ✅ > 10 projets en production
-- ✅ > 70% adoption features gouvernance
-- ✅ -60% réduction incidents
-- ✅ Feedback utilisateur positif
+**Validation criteria:**
+- ✅ > 10 projects in production
+- ✅ > 70% adoption of governance features
+- ✅ -60% incident reduction
+- ✅ Positive user feedback
 
-**Décision :**
-- Si critères atteints → Proceed avec Phase 3
-- Si critères non atteints → Itérer sur Phase 2
+**Decision:**
+- If criteria are met → Proceed with Phase 3
+- If criteria are not met → Iterate on Phase 2
 
-#### Gate 3 : Traction Réelle (Mois 12)
+#### Gate 3: Real Traction (Month 12)
 
-**Critères de validation :**
-- ✅ > 100 projets actifs
-- ✅ > 80% rétention équipes
-- ✅ Adoption entreprises réglementées
-- ✅ Communauté active
+**Validation criteria:**
+- ✅ > 100 active projects
+- ✅ > 80% team retention
+- ✅ Adoption by regulated companies
+- ✅ Active community
 
-**Décision :**
-- Si critères atteints → Proceed avec Phase 4 (Platform)
-- Si critères non atteints → Focus sur adoption et amélioration
+**Decision:**
+- If criteria are met → Proceed with Phase 4 (Platform)
+- If criteria are not met → Focus on adoption and improvement
 
 ## Functional Requirements
 
-### Segmentation MVP vs Post-MVP
+### MVP vs Post-MVP Segmentation
 
-**Principe directeur :**
-Le MVP doit être jugé sur ≈ 5 promesses fondamentales, pas sur 78 FR. Ces 5 promesses sont :
-1. Je peux créer un agent simplement
-2. Je peux contrôler ce qu'il a le droit de faire
-3. Je peux voir exactement ce qu'il a fait
-4. Je peux rejouer ce qui s'est passé
-5. Je peux expliquer un incident
+**Guiding principle:**
+The MVP must be judged on ≈ 5 fundamental promises, not on 78 FRs. These 5 promises are:
+1. I can create an agent simply
+2. I can control what it is allowed to do
+3. I can see exactly what it did
+4. I can replay what happened
+5. I can explain an incident
 
-**Tout le reste est accélérateur, pas fondation.**
+**Everything else is an accelerator, not a foundation.**
 
 ### Agent Lifecycle Management
 
-**FR1:** Un développeur peut créer un agent avec une configuration minimale
-**FR2:** Un développeur peut initialiser un SDK avec des paramètres de base
-**FR3:** Un développeur peut démarrer l'exécution d'un agent avec un input initial
-**FR4:** Un développeur peut arrêter une exécution en cours
-**FR5:** Un développeur peut arrêter une exécution à partir de son runId
-**FR6:** Un développeur peut configurer un agent avec des capabilities spécifiques
-**FR7:** Un développeur peut définir des contraintes d'exécution (max steps, timeout)
+**FR1:** A developer can create an agent with a minimal configuration
+**FR2:** A developer can initialize an SDK with basic parameters
+**FR3:** A developer can start an agent's execution with an initial input
+**FR4:** A developer can stop a running execution
+**FR5:** A developer can stop an execution using its runId
+**FR6:** A developer can configure an agent with specific capabilities
+**FR7:** A developer can define execution constraints (max steps, timeout)
 
 ### Tool & Capability Management
 
-**FR8:** Un développeur peut définir un tool avec un schéma de validation
-**FR9:** Un développeur peut déclarer explicitement les tools disponibles pour un agent
-**FR10:** Un développeur peut valider les inputs d'un tool avant exécution
-**FR11:** Un développeur peut restreindre les tools autorisés via allowlist
-**FR12:** Un développeur peut organiser les tools en capabilities logiques
-**FR13:** Un développeur peut réutiliser des tools entre plusieurs agents
-**FR14:** Un développeur peut versionner des tools indépendamment
-**FR15:** Le système empêche l'exécution d'un tool non déclaré (deny by default)
+**FR8:** A developer can define a tool with a validation schema
+**FR9:** A developer can explicitly declare the tools available to an agent
+**FR10:** A developer can validate a tool's inputs before execution
+**FR11:** A developer can restrict authorized tools via an allowlist
+**FR12:** A developer can organize tools into logical capabilities
+**FR13:** A developer can reuse tools across multiple agents
+**FR14:** A developer can version tools independently
+**FR15:** The system prevents the execution of an undeclared tool (deny by default)
 
 ### Policies & Governance
 
-**FR16:** Un développeur peut définir une policy globale qui s'applique à tous les agents
-**FR17:** Un développeur peut définir une policy spécifique à un agent
-**FR18:** Un développeur peut définir un budget maximum (tokens ou steps) pour un agent
-**FR19:** Un développeur peut définir un timeout pour une exécution
-**FR20:** Un développeur peut définir une allowlist de tools autorisés
-**FR21:** Le système applique automatiquement les policies avant chaque action
-**FR22:** Le système bloque une action si elle viole une policy
-**FR23:** Un développeur peut consulter les policies appliquées à une exécution
-**FR24:** Le système trace chaque vérification de policy dans les événements
+**FR16:** A developer can define a global policy that applies to all agents
+**FR17:** A developer can define a policy specific to one agent
+**FR18:** A developer can define a maximum budget (tokens or steps) for an agent
+**FR19:** A developer can define a timeout for an execution
+**FR20:** A developer can define an allowlist of authorized tools
+**FR21:** The system automatically applies policies before each action
+**FR22:** The system blocks an action if it violates a policy
+**FR23:** A developer can review the policies applied to an execution
+**FR24:** The system traces every policy check in the events
 
-### Runtime - Séparation Raisonnement/Action
+### Runtime - Reasoning/Action Separation
 
-**FR25:** Le système sépare le raisonnement (LLM) de l'action (tool execution)
-**FR26:** Le LLM génère des intentions structurées, jamais d'actions directes
-**FR27:** Toutes les actions passent par un Action Engine gouverné
-**FR28:** Le système valide chaque intention avant exécution
-**FR29:** Le système peut rejeter une intention si elle viole une policy
-**FR30:** Le système trace chaque intention générée par le LLM
-**FR31:** Le système trace chaque action exécutée par l'Action Engine
-**FR32:** Un développeur peut comprendre pourquoi une action a été acceptée ou rejetée
-**FR33:** Le système garantit qu'aucun effet de bord ne provient directement du LLM
-**FR34:** Un développeur peut inspecter la séquence raisonnement → validation → action
+**FR25:** The system separates reasoning (LLM) from action (tool execution)
+**FR26:** The LLM generates structured intentions, never direct actions
+**FR27:** All actions pass through a governed Action Engine
+**FR28:** The system validates every intention before execution
+**FR29:** The system can reject an intention if it violates a policy
+**FR30:** The system traces every intention generated by the LLM
+**FR31:** The system traces every action executed by the Action Engine
+**FR32:** A developer can understand why an action was accepted or rejected
+**FR33:** The system guarantees that no side effect comes directly from the LLM
+**FR34:** A developer can inspect the reasoning → validation → action sequence
 
-### Tracing & Observabilité
+### Tracing & Observability
 
-**FR35:** Le système génère un événement structuré pour chaque étape d'exécution
-**FR36:** Chaque exécution a un runId unique et traçable
-**FR37:** Un développeur peut récupérer la trace complète d'une exécution via son runId
-**FR38:** Un développeur peut exporter les traces dans un format structuré (JSON)
-**FR39:** Un développeur peut consulter les traces via console ou fichier
-**FR40:** Le système trace chaque décision prise par l'agent
-**FR41:** Un développeur peut comprendre pourquoi l'agent a pris une décision spécifique *(MVP)*
-**FR42:** Un développeur peut voir les contraintes qui ont pesé sur une décision *(MVP)*
-**FR43:** Un développeur peut voir les alternatives envisagées par l'agent *(Post-MVP)*
-**FR44:** Un développeur peut visualiser le graphe de raisonnement de l'agent *(Post-MVP)*
-**FR45:** Un développeur peut analyser les patterns de décision sur plusieurs runs *(Post-MVP)*
+**FR35:** The system generates a structured event for every execution step
+**FR36:** Every execution has a unique, traceable runId
+**FR37:** A developer can retrieve the complete trace of an execution via its runId
+**FR38:** A developer can export traces in a structured format (JSON)
+**FR39:** A developer can view traces via console or file
+**FR40:** The system traces every decision made by the agent
+**FR41:** A developer can understand why the agent made a specific decision *(MVP)*
+**FR42:** A developer can see the constraints that affected a decision *(MVP)*
+**FR43:** A developer can see the alternatives considered by the agent *(Post-MVP)*
+**FR44:** A developer can visualize the agent's reasoning graph *(Post-MVP)*
+**FR45:** A developer can analyze decision patterns across multiple runs *(Post-MVP)*
 
-### Replay & Comparaison
+### Replay & Comparison
 
-**FR46:** Un développeur peut rejouer une exécution complète à partir de son runId
-**FR47:** Le replay fonctionne sans recontacter le LLM (mode replay)
-**FR48:** Le replay reproduit la même séquence d'actions et tool calls
-**FR49:** Un développeur peut comparer deux exécutions pour identifier les différences *(Post-MVP)*
-**FR50:** Un développeur peut rejouer une exécution avec des modifications de contexte
-**FR51:** Un développeur peut tester des scénarios "et si" en rejouant avec des paramètres différents
-**FR52:** Le système garantit la reproductibilité relative des replays
-**FR53:** Un développeur peut utiliser le replay pour déboguer un incident
-**FR54:** Un développeur peut analyser l'impact d'un changement avant/après déploiement *(Post-MVP)*
+**FR46:** A developer can replay a complete execution from its runId
+**FR47:** Replay works without contacting the LLM again (replay mode)
+**FR48:** Replay reproduces the same sequence of actions and tool calls
+**FR49:** A developer can compare two executions to identify differences *(Post-MVP)*
+**FR50:** A developer can replay an execution with context modifications
+**FR51:** A developer can test "what if" scenarios by replaying with different parameters
+**FR52:** The system guarantees relative reproducibility of replays
+**FR53:** A developer can use replay to debug an incident
+**FR54:** A developer can analyze the impact of a change before/after deployment *(Post-MVP)*
 
 ### Event Sourcing & Persistence
 
-**FR55:** Le système persiste tous les événements d'une exécution
-**FR56:** L'event log est la source de vérité unique pour une exécution
-**FR57:** Un développeur peut reconstruire l'état complet d'une exécution à partir des événements
-**FR58:** Le système persiste les événements au minimum en mémoire et fichier
-**FR59:** Un développeur peut exporter l'event log complet d'une exécution
-**FR60:** Le système garantit qu'aucun événement n'est perdu pendant une exécution
-**FR61:** Un développeur peut interroger les événements par runId
-**FR62:** Le système peut filtrer les événements par type ou critère
+**FR55:** The system persists all events of an execution
+**FR56:** The event log is the single source of truth for an execution
+**FR57:** A developer can rebuild the complete state of an execution from its events
+**FR58:** The system persists events at minimum in memory and file
+**FR59:** A developer can export the complete event log of an execution
+**FR60:** The system guarantees that no event is lost during an execution
+**FR61:** A developer can query events by runId
+**FR62:** The system can filter events by type or criteria
 
 ### Testing & Quality Assurance
 
-**FR63:** Un développeur peut filtrer les événements par critères avancés *(Post-MVP)*
-**FR64:** Un développeur peut créer des tests basés sur des traces (golden traces)
-**FR65:** Un développeur peut valider qu'un agent se comporte de manière attendue via replay
-**FR66:** Un développeur peut détecter des régressions en comparant des traces
-**FR67:** Un développeur peut exécuter des tests de non-régression sur des agents
-**FR68:** Le système supporte l'intégration de tests dans un pipeline CI/CD
-**FR69:** Un développeur peut définir des assertions sur le comportement d'un agent
+**FR63:** A developer can filter events by advanced criteria *(Post-MVP)*
+**FR64:** A developer can create trace-based tests (golden traces)
+**FR65:** A developer can validate that an agent behaves as expected via replay
+**FR66:** A developer can detect regressions by comparing traces
+**FR67:** A developer can run non-regression tests on agents
+**FR68:** The system supports test integration in a CI/CD pipeline
+**FR69:** A developer can define assertions on an agent's behavior
 
 ### Developer Experience & Quick Start
 
-**FR70:** Un développeur peut créer son premier agent fonctionnel en moins de 30 minutes
-**FR71:** Un développeur peut utiliser le SDK avec une API minimale (< 10 lignes pour Quick Start)
-**FR72:** L'API est entièrement typée avec TypeScript (type-safety complet)
-**FR73:** Un développeur peut comprendre les concepts clés via la documentation
-**FR74:** Le SDK fournit au moins un exemple complet fonctionnel
-**FR75:** Un développeur peut installer le SDK via npm avec une seule commande
+**FR70:** A developer can create their first working agent in under 30 minutes
+**FR71:** A developer can use the SDK with a minimal API (< 10 lines for the Quick Start)
+**FR72:** The API is fully typed with TypeScript (complete type-safety)
+**FR73:** A developer can understand the key concepts via the documentation
+**FR74:** The SDK provides at least one complete working example
+**FR75:** A developer can install the SDK via npm with a single command
 
 ### Run Lifecycle Management
 
-**FR76:** Le système peut exposer l'état courant d'une exécution (pending, running, completed, failed, cancelled)
-**FR77:** Un développeur peut interroger l'état d'un run à partir de son runId
+**FR76:** The system can expose an execution's current state (pending, running, completed, failed, cancelled)
+**FR77:** A developer can query a run's state using its runId
 
 ### Versioning & Audit
 
-**FR78:** Un développeur peut associer une version (ou hash de configuration) à un agent ou à une exécution
+**FR78:** A developer can associate a version (or configuration hash) with an agent or an execution
 
 ### MVP Scope Summary
 
-#### 🟢 MVP - Must-Have Absolus (≈ 40 FR)
+#### 🟢 MVP - Absolute Must-Haves (≈ 40 FRs)
 
-Ces FR doivent fonctionner parfaitement, sans compromis :
+These FRs must work perfectly, with no compromise:
 
-**Agent lifecycle basique:** FR1-FR7
+**Basic agent lifecycle:** FR1-FR7
 **Tool & capability management:** FR8-FR15
-**Policies simples mais actives:** FR16-FR24
-**Runtime séparation raisonnement/action:** FR25-FR34
-**Tracing structuré lisible:** FR35-FR40, FR41-FR42
-**Replay fonctionnel sans LLM:** FR46-FR48, FR50-FR53
-**Event sourcing comme source de vérité:** FR55-FR62
-**DX minimale + Quick Start:** FR70-FR75
+**Simple but active policies:** FR16-FR24
+**Reasoning/action separation runtime:** FR25-FR34
+**Readable structured tracing:** FR35-FR40, FR41-FR42
+**Working replay without LLM:** FR46-FR48, FR50-FR53
+**Event sourcing as source of truth:** FR55-FR62
+**Minimal DX + Quick Start:** FR70-FR75
 **Run lifecycle management:** FR76-FR77
-**Versioning basique:** FR78
+**Basic versioning:** FR78
 
-👉 **Si ces FR sont solides → le MVP est validé.**
+👉 **If these FRs are solid → the MVP is validated.**
 
 #### 🟡 Post-MVP (Phase 1.5 / V1)
 
-Ces FR sont extrêmement puissants, mais peuvent venir ensuite :
+These FRs are extremely powerful, but can come later:
 
-**Observabilité cognitive avancée:** FR43-FR45
-**Comparaison détaillée:** FR49, FR54
-**Filtrage avancé d'événements:** FR63
-**Testing avancé, golden traces à grande échelle:** FR64-FR69
+**Advanced cognitive observability:** FR43-FR45
+**Detailed comparison:** FR49, FR54
+**Advanced event filtering:** FR63
+**Advanced testing, golden traces at scale:** FR64-FR69
 
-👉 **Ils transforment le SDK en plateforme mature, mais ne sont pas requis pour prouver la valeur.**
+👉 **They turn the SDK into a mature platform, but are not required to prove value.**
 
 ### Validation Checklist
 
-**Checklist de validation (honnête et exacte) :**
+**Validation checklist (honest and accurate):**
 
-✔️ Toutes les capacités du MVP sont couvertes
-✔️ Les user journeys critiques sont bien adressés
-✔️ Les innovations clés ne sont pas "marketing", mais fonctionnelles
-✔️ Les principes non négociables sont respectés structurellement
-✔️ La liste est implementation-agnostic (excellent point)
+✔️ All MVP capabilities are covered
+✔️ Critical user journeys are properly addressed
+✔️ Key innovations are not "marketing," but functional
+✔️ Non-negotiable principles are respected structurally
+✔️ The list is implementation-agnostic (excellent point)
 
-👉 **Ce document est déjà un socle d'architecture, pas juste une liste de features.**
-
+👉 **This document is already an architectural foundation, not just a feature list.**

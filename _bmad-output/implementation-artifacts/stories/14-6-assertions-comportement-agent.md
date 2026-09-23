@@ -1,4 +1,4 @@
-# Story 14.6: Assertions sur le Comportement d'un Agent
+# Story 14.6: Assertions on Agent Behavior
 
 **Epic:** Epic 14 - Testing & Quality Assurance  
 **Status:** completed  
@@ -7,37 +7,37 @@
 
 ## Description
 
-Permettre à un développeur de définir des assertions sur le comportement d'un agent pour valider des aspects spécifiques de son fonctionnement.
+Allow a developer to define assertions about an agent's behavior in order to validate specific aspects of its operation.
 
-## Contexte
+## Context
 
-Les assertions permettent de valider des aspects spécifiques du comportement d'un agent au-delà de la simple comparaison avec une golden trace, comme la présence de certains événements, l'ordre des actions, ou des contraintes sur les valeurs.
+Assertions make it possible to validate specific aspects of an agent's behavior beyond a simple comparison with a golden trace, such as the presence of certain events, the order of actions, or constraints on values.
 
 ## Acceptance Criteria
 
-### AC1: Définir des Assertions
-**Given** un développeur veut valider le comportement  
-**When** il appelle `sdk.defineAssertion(name, condition, options)`  
-**Then** une assertion est créée et peut être utilisée dans les tests
+### AC1: Define Assertions
+**Given** a developer wants to validate the behavior  
+**When** they call `sdk.defineAssertion(name, condition, options)`  
+**Then** an assertion is created and can be used in tests
 
-### AC2: Types d'Assertions Supportés
-**Given** des assertions sont définies  
-**When** elles sont évaluées  
-**Then** les types suivants sont supportés :
-- Présence d'événements (certain type doit apparaître)
-- Ordre des événements (événement A doit précéder B)
-- Valeurs dans les événements (valeur doit être dans une plage)
-- Nombre d'occurrences (événement doit apparaître N fois)
-- Absence d'événements (certain type ne doit pas apparaître)
+### AC2: Supported Assertion Types
+**Given** assertions are defined  
+**When** they are evaluated  
+**Then** the following types are supported:
+- Presence of events (a given type must appear)
+- Order of events (event A must precede B)
+- Values within events (value must be within a range)
+- Number of occurrences (event must appear N times)
+- Absence of events (a given type must not appear)
 
-### AC3: Évaluer des Assertions
-**Given** des assertions existent et une trace est disponible  
-**When** un développeur appelle `sdk.evaluateAssertions(runId, assertionIds)`  
-**Then** chaque assertion est évaluée et un rapport est retourné
+### AC3: Evaluate Assertions
+**Given** assertions exist and a trace is available  
+**When** a developer calls `sdk.evaluateAssertions(runId, assertionIds)`  
+**Then** each assertion is evaluated and a report is returned
 
 ## Technical Details
 
-### Types à créer
+### Types to Create
 
 ```typescript
 type AssertionType = 
@@ -95,7 +95,7 @@ interface AssertionEvaluationReport {
 }
 ```
 
-### Méthodes SDK
+### SDK Methods
 
 - `defineAssertion(name: string, condition: AssertionCondition, options?: { description?: string; severity?: 'error' | 'warning'; tags?: string[] }): Promise<Assertion>`
 - `getAssertions(agentId?: string, tags?: string[]): Promise<Assertion[]>`
@@ -104,14 +104,13 @@ interface AssertionEvaluationReport {
 
 ## Tests
 
-- Créer une assertion de présence d'événement
-- Créer une assertion d'ordre d'événements
-- Créer une assertion de valeur
-- Évaluer des assertions sur une trace valide
-- Évaluer des assertions sur une trace invalide
-- Gérer les erreurs d'évaluation
+- Create an event-presence assertion
+- Create an event-order assertion
+- Create a value assertion
+- Evaluate assertions on a valid trace
+- Evaluate assertions on an invalid trace
+- Handle evaluation errors
 
 ## Dependencies
 
-- Epic 7: Tracing & Observability (accès aux événements)
-
+- Epic 7: Tracing & Observability (access to events)

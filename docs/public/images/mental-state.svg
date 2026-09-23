@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 480" width="760" height="480" role="img" aria-labelledby="title">
+<title id="title">A mental state rebuilt from events: goal, facts, unknowns, hypotheses with support, trail and decision</title>
+<defs>
+  <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#4F46E5"/><stop offset="0.55" stop-color="#7C3AED"/><stop offset="1" stop-color="#C026D3"/>
+  </linearGradient>
+  <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#0D9488"/><stop offset="1" stop-color="#0284C7"/>
+  </linearGradient>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0 0 L10 5 L0 10 z" fill="#94A3B8"/>
+  </marker>
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+    <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.25"/>
+  </filter>
+</defs>
+<g font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+<rect x="10" y="10" width="740" height="460" rx="20" fill="#0F172A" filter="url(#shadow)"/>
+<rect x="10" y="10" width="740" height="460" rx="20" fill="none" stroke="#334155"/>
+<circle cx="36" cy="36" r="5.5" fill="#F87171"/>
+<circle cx="54" cy="36" r="5.5" fill="#FBBF24"/>
+<circle cx="72" cy="36" r="5.5" fill="#34D399"/>
+<text x="100" y="41" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#94A3B8">sdk.getMentalState(runId)</text>
+<text x="730" y="41" text-anchor="end" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#94A3B8">step 7 · confidence 0.80</text>
+<line x1="10" y1="58" x2="750" y2="58" stroke="#334155"/>
+<text x="34" y="92" font-size="12" font-weight="700" letter-spacing="1.5" fill="#94A3B8">GOAL</text>
+<text x="34" y="116" font-size="17" font-weight="700" fill="#fff">Should we build or buy the analytics module?</text>
+<text x="34" y="156" font-size="12" font-weight="700" letter-spacing="1.5" fill="#94A3B8">FACTS</text>
+<rect x="34" y="170" width="330" height="26" rx="8" fill="#1E293B"/>
+<text x="46" y="188" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12.5" font-weight="700" fill="#A5B4FC">F1</text>
+<text x="78" y="188" font-size="13.5" fill="#E2E8F0">Budget is 10k EUR</text>
+<text x="352" y="188" text-anchor="end" font-size="11.5" fill="#94A3B8">input</text>
+<rect x="34" y="204" width="330" height="26" rx="8" fill="#1E293B"/>
+<text x="46" y="222" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12.5" font-weight="700" fill="#A5B4FC">F2</text>
+<text x="78" y="222" font-size="13.5" fill="#E2E8F0">Must ship before Q4</text>
+<text x="352" y="222" text-anchor="end" font-size="11.5" fill="#94A3B8">input</text>
+<rect x="34" y="238" width="330" height="26" rx="8" fill="#1E293B"/>
+<text x="46" y="256" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12.5" font-weight="700" fill="#A5B4FC">F3</text>
+<text x="78" y="256" font-size="13.5" fill="#E2E8F0">Monthly churn is 4%</text>
+<text x="352" y="256" text-anchor="end" font-size="11.5" fill="#94A3B8">tool</text>
+<text x="34" y="300" font-size="12" font-weight="700" letter-spacing="1.5" fill="#94A3B8">UNKNOWNS</text>
+<rect x="34" y="314" width="330" height="26" rx="8" fill="#1E293B"/>
+<text x="46" y="332" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12.5" font-weight="700" fill="#FCD34D">U1</text>
+<text x="78" y="332" font-size="13.5" fill="#E2E8F0">Current churn? → resolved by a tool</text>
+<rect x="34" y="348" width="330" height="26" rx="8" fill="#1E293B"/>
+<text x="46" y="366" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12.5" font-weight="700" fill="#FCD34D">U2</text>
+<text x="78" y="366" font-size="13.5" fill="#E2E8F0">Vendor exit cost? → still open</text>
+<text x="34" y="420" font-size="12" font-weight="700" letter-spacing="1.5" fill="#94A3B8">TRAIL</text>
+<rect x="104.0" y="406" width="74.6" height="22" rx="11" fill="#4F46E5"/>
+<text x="141.3" y="421" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff">represent</text>
+<rect x="184.6" y="406" width="89.4" height="22" rx="11" fill="#7C3AED"/>
+<text x="229.3" y="421" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff">hypothesize</text>
+<rect x="280.0" y="406" width="67.2" height="22" rx="11" fill="#C026D3"/>
+<text x="313.6" y="421" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff">simulate</text>
+<rect x="353.2" y="406" width="67.2" height="22" rx="11" fill="#E11D48"/>
+<text x="386.8" y="421" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff">critique</text>
+<rect x="426.4" y="406" width="37.6" height="22" rx="11" fill="#D97706"/>
+<text x="445.2" y="421" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff">seek</text>
+<rect x="470.0" y="406" width="59.8" height="22" rx="11" fill="#0D9488"/>
+<text x="499.9" y="421" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff">compare</text>
+<rect x="535.8" y="406" width="52.4" height="22" rx="11" fill="#0284C7"/>
+<text x="562.0" y="421" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff">decide</text>
+<text x="396" y="156" font-size="12" font-weight="700" letter-spacing="1.5" fill="#94A3B8">HYPOTHESES</text>
+<rect x="396" y="170" width="330" height="52" rx="10" fill="#1E293B"/>
+<text x="410" y="191" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12.5" font-weight="700" fill="#C4B5FD">H1</text>
+<text x="442" y="191" font-size="14" font-weight="600" fill="#E2E8F0">Build in-house</text>
+<text x="712" y="191" text-anchor="end" font-size="11.5" font-weight="700" fill="#94A3B8">critiqued</text>
+<rect x="410" y="202" width="250" height="8" rx="4" fill="#334155"/>
+<rect x="410" y="202" width="62.5" height="8" rx="4" fill="#94A3B8"/>
+<text x="712" y="211" text-anchor="end" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#94A3B8">0.25</text>
+<rect x="396" y="232" width="330" height="52" rx="10" fill="#1E293B"/>
+<text x="410" y="253" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12.5" font-weight="700" fill="#C4B5FD">H2</text>
+<text x="442" y="253" font-size="14" font-weight="600" fill="#E2E8F0">Buy a SaaS tool</text>
+<text x="712" y="253" text-anchor="end" font-size="11.5" font-weight="700" fill="#34D399">selected</text>
+<rect x="410" y="264" width="250" height="8" rx="4" fill="#334155"/>
+<rect x="410" y="264" width="200.0" height="8" rx="4" fill="#34D399"/>
+<text x="712" y="273" text-anchor="end" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#94A3B8">0.80</text>
+<rect x="396" y="294" width="330" height="52" rx="10" fill="#1E293B"/>
+<text x="410" y="315" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12.5" font-weight="700" fill="#C4B5FD">H3</text>
+<text x="442" y="315" font-size="14" font-weight="600" fill="#E2E8F0" text-decoration="line-through">Wait until next year</text>
+<text x="712" y="315" text-anchor="end" font-size="11.5" font-weight="700" fill="#F87171">rejected</text>
+<rect x="410" y="326" width="250" height="8" rx="4" fill="#334155"/>
+<rect x="410" y="326" width="25.0" height="8" rx="4" fill="#F87171"/>
+<text x="712" y="335" text-anchor="end" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#94A3B8">0.10</text>
+<text x="396" y="364" font-size="12" font-weight="700" letter-spacing="1.5" fill="#94A3B8">DECISION</text>
+<text x="396" y="388" font-size="14" font-weight="600" fill="#34D399">H2 — run a two-week pilot, then roll out</text>
+<line x1="10" y1="400" x2="750" y2="400" stroke="#334155" stroke-dasharray="4 6"/>
+</g>
+</svg>

@@ -1,4 +1,4 @@
-# Story 7.4: Consulter les traces via console ou fichier
+# Story 7.4: View traces via console or file
 
 **Story ID:** 7.4  
 **Epic:** 7 - Tracing & Observability  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** consulter les traces via console ou fichier,
-**So that** je peux voir rapidement ce qui s'est passé.
+**As a** developer,
+**I want** view traces via console or file,
+**So that** I can quickly see what happened.
 
 ## Acceptance Criteria
 
-**Given** une exécution a été effectuée
-**When** je consulte les traces
-**Then** je peux les voir dans la console (format lisible)
-**And** je peux les exporter dans un fichier
-**And** le format console est optimisé pour la lisibilité humaine
-**And** le format fichier est structuré pour l'analyse
+**Given** an execution has been performed
+**When** I view the traces
+**Then** I can see them in the console (readable format)
+**And** I can export them to a file
+**And** the console format is optimized for human readability
+**And** the file format is structured for analysis
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current state:**
+- Complete implementation in the codebase
+- Functionality tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files concerned:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Functionality implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Functionality validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested

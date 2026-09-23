@@ -1,4 +1,4 @@
-# Story 8.5: Tester des scénarios "et si" en rejouant avec des paramètres différents
+# Story 8.5: Test "what if" scenarios by replaying with different parameters
 
 **Story ID:** 8.5  
 **Epic:** 8 - Replay & Debugging  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** tester des scénarios "et si" en rejouant avec des paramètres différents,
-**So that** je peux explorer différentes possibilités sans réexécuter complètement.
+**As a** developer,
+**I want** test "what if" scenarios by replaying with different parameters,
+**So that** I can explore different possibilities without fully re-executing.
 
 ## Acceptance Criteria
 
-**Given** un runId existe
-**When** je rejoue avec des paramètres différents (inputs, policies, etc.)
-**Then** le replay utilise les nouveaux paramètres
-**And** je peux comparer les résultats avec l'original
-**And** les différences sont clairement visibles
-**And** le replay est rapide car il réutilise les événements
+**Given** a runId exists
+**When** I replay with different parameters (inputs, policies, etc.)
+**Then** the replay uses the new parameters
+**And** I can compare the results with the original
+**And** the differences are clearly visible
+**And** the replay is fast because it reuses the events
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current state:**
+- Complete implementation in the codebase
+- Functionality tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files concerned:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Functionality implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Functionality validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested

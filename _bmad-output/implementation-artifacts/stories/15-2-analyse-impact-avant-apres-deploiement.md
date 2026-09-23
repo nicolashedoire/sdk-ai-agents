@@ -1,4 +1,4 @@
-# Story 15.2: Analyse d'Impact Avant/Après Déploiement
+# Story 15.2: Before/After Deployment Impact Analysis
 
 **Epic:** Epic 15 - Advanced Observability & Comparison  
 **Status:** completed  
@@ -7,40 +7,40 @@
 
 ## Description
 
-Permettre à un développeur d'analyser l'impact d'un changement (nouvelle version d'agent, modification de policy, etc.) en comparant le comportement avant et après le déploiement.
+Allow a developer to analyze the impact of a change (new agent version, policy modification, etc.) by comparing behavior before and after the deployment.
 
-## Contexte
+## Context
 
-L'analyse d'impact permet de comprendre les effets d'un changement avant de le déployer en production, en comparant des exécutions avec différentes versions ou configurations.
+Impact analysis makes it possible to understand the effects of a change before deploying it to production, by comparing executions across different versions or configurations.
 
 ## Acceptance Criteria
 
-### AC1: Analyser Impact d'un Changement
-**Given** des traces avant et après un changement existent  
-**When** un développeur appelle `sdk.analyzeImpact(beforeRunIds, afterRunIds, options)`  
-**Then** un rapport d'impact détaillé est retourné
+### AC1: Analyze the Impact of a Change
+**Given** traces before and after a change exist  
+**When** a developer calls `sdk.analyzeImpact(beforeRunIds, afterRunIds, options)`  
+**Then** a detailed impact report is returned
 
-### AC2: Rapport d'Impact Détaillé
-**Given** une analyse d'impact est effectuée  
-**When** le rapport est généré  
-**Then** il contient :
-- Métriques comparatives (durée, coût, qualité)
-- Changements de comportement identifiés
-- Impact sur les résultats (amélioration, dégradation, neutre)
-- Recommandations basées sur l'analyse
+### AC2: Detailed Impact Report
+**Given** an impact analysis is performed  
+**When** the report is generated  
+**Then** it contains:
+- Comparative metrics (duration, cost, quality)
+- Identified behavior changes
+- Impact on results (improvement, degradation, neutral)
+- Recommendations based on the analysis
 
-### AC3: Groupement par Version/Configuration
-**Given** plusieurs runs avant et après existent  
-**When** une analyse est effectuée  
-**Then** les runs peuvent être groupés par :
-- Version de l'agent
-- Configuration utilisée
-- Période de temps
-- Utilisateur ou session
+### AC3: Grouping by Version/Configuration
+**Given** several before and after runs exist  
+**When** an analysis is performed  
+**Then** the runs can be grouped by:
+- Agent version
+- Configuration used
+- Time period
+- User or session
 
 ## Technical Details
 
-### Types à créer
+### Types to Create
 
 ```typescript
 interface ImpactAnalysisOptions {
@@ -96,7 +96,7 @@ interface ImpactAnalysis {
 }
 ```
 
-### Méthodes SDK
+### SDK Methods
 
 - `analyzeImpact(beforeRunIds: string[], afterRunIds: string[], options?: ImpactAnalysisOptions): Promise<ImpactAnalysis>`
 - `getImpactAnalysis(analysisId: string): Promise<ImpactAnalysis>`
@@ -104,14 +104,13 @@ interface ImpactAnalysis {
 
 ## Tests
 
-- Analyser l'impact avec amélioration
-- Analyser l'impact avec dégradation
-- Analyser l'impact neutre
-- Grouper par version
-- Générer des recommandations
+- Analyze impact with improvement
+- Analyze impact with degradation
+- Analyze neutral impact
+- Group by version
+- Generate recommendations
 
 ## Dependencies
 
-- Story 15.1: Comparaison de Deux Exécutions
-- Epic 9: Versioning & Audit (versions d'agents)
-
+- Story 15.1: Comparison of Two Executions
+- Epic 9: Versioning & Audit (agent versions)

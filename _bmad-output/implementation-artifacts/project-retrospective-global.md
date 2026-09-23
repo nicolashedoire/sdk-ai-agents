@@ -1,406 +1,405 @@
-# Rétrospective Globale - SDK_AI_Agents
-## Projet Complet - Phase MVP, Phase 2 et Post-MVP
+# Global Retrospective - SDK_AI_Agents
+## Complete Project - MVP Phase, Phase 2 and Post-MVP
 
 **Date:** 2026-01-06  
-**Facilitateur:** Bob (Scrum Master)  
-**Participants:** Équipe complète du projet SDK_AI_Agents
+**Facilitator:** Bob (Scrum Master)  
+**Participants:** Full SDK_AI_Agents project team
 
 ---
 
-## 📊 Vue d'Ensemble du Projet
+## 📊 Project Overview
 
-### Statistiques Globales
+### Overall Statistics
 
-**Epics Complétés:**
-- **MVP (Epic 1-9):** 9 epics, 65 stories - ✅ 100% complété
-- **Phase 2 (Epic 10-13):** 4 epics, 17 stories - ✅ 100% complété (en review)
-- **Post-MVP (Epic 14-15):** 2 epics, 9 stories - ✅ 100% complété
+**Completed Epics:**
+- **MVP (Epic 1-9):** 9 epics, 65 stories - ✅ 100% complete
+- **Phase 2 (Epic 10-13):** 4 epics, 17 stories - ✅ 100% complete (in review)
+- **Post-MVP (Epic 14-15):** 2 epics, 9 stories - ✅ 100% complete
 
 **Total:**
-- **15 Epics** au total
-- **91 Stories** au total
-- **100% de complétion** des stories
-- **86.7% des epics** complétés (13/15 en done/review)
+- **15 Epics** in total
+- **91 Stories** in total
+- **100% story completion**
+- **86.7% of epics** completed (13/15 done/review)
 
-### Phases du Projet
+### Project Phases
 
-#### Phase 1: MVP (Epic 1-9) - ✅ Complété
-Fondations du SDK avec toutes les fonctionnalités de base pour créer, exécuter et tracer des agents IA.
+#### Phase 1: MVP (Epic 1-9) - ✅ Complete
+Foundations of the SDK with all core features to create, run, and trace AI agents.
 
-#### Phase 2: Extensions Avancées (Epic 10-13) - ✅ Complété
-- Multi-providers LLM
-- Policies avancées
-- Event Store SQL-based
-- Observabilité cognitive
+#### Phase 2: Advanced Extensions (Epic 10-13) - ✅ Complete
+- Multi-provider LLM
+- Advanced policies
+- SQL-based Event Store
+- Cognitive observability
 
-#### Post-MVP: Qualité & Observabilité (Epic 14-15) - ✅ Complété
+#### Post-MVP: Quality & Observability (Epic 14-15) - ✅ Complete
 - Testing & Quality Assurance
 - Advanced Observability & Comparison
 
 ---
 
-## 🎯 Ce Qui a Bien Fonctionné
+## 🎯 What Went Well
 
-### 1. Architecture Solide et Évolutive
+### 1. Solid and Evolvable Architecture
 
-**Bob (Scrum Master):** "L'architecture mise en place dès le MVP s'est révélée très solide."
+**Bob (Scrum Master):** "The architecture put in place from the MVP onward proved to be very solid."
 
-**Charlie (Senior Dev):** "Oui, la séparation entre Reasoning Engine et Action Engine a permis d'ajouter facilement les multi-providers et les policies avancées sans refactoring majeur."
+**Charlie (Senior Dev):** "Yes, the separation between the Reasoning Engine and the Action Engine made it easy to add multi-providers and advanced policies without major refactoring."
 
-**Points forts:**
-- Architecture modulaire qui a facilité l'extension
-- Event Sourcing comme source de vérité unique
-- Abstraction des providers LLM bien conçue
-- Pattern Strategy pour les providers extensible
+**Strengths:**
+- Modular architecture that made extension easier
+- Event Sourcing as the single source of truth
+- Well-designed LLM provider abstraction
+- Extensible Strategy pattern for providers
 
-### 2. Qualité du Code et Tests
+### 2. Code Quality and Tests
 
-**Dana (QA Engineer):** "Le niveau de test coverage est excellent. Chaque feature a ses tests unitaires et d'intégration."
+**Dana (QA Engineer):** "The test coverage level is excellent. Every feature has its unit and integration tests."
 
-**Charlie (Senior Dev):** "L'utilisation de TypeScript strict a évité beaucoup de bugs à la compilation."
+**Charlie (Senior Dev):** "Using strict TypeScript avoided a lot of bugs at compile time."
 
-**Points forts:**
-- Tests unitaires pour chaque composant
-- Tests d'intégration pour les workflows
-- TypeScript strict pour la sécurité de type
-- Code review systématique
+**Strengths:**
+- Unit tests for every component
+- Integration tests for workflows
+- Strict TypeScript for type safety
+- Systematic code review
 
-### 3. Documentation et Traçabilité
+### 3. Documentation and Traceability
 
-**Alice (Product Owner):** "La documentation est complète et les traces permettent de comprendre exactement ce qui s'est passé."
+**Alice (Product Owner):** "The documentation is complete and the traces make it possible to understand exactly what happened."
 
-**Points forts:**
-- Event sourcing pour traçabilité complète
-- Documentation des concepts clés
-- Exemples fonctionnels
-- Interface de démonstration (Next.js)
+**Strengths:**
+- Event sourcing for full traceability
+- Documentation of key concepts
+- Working examples
+- Demo interface (Next.js)
 
-### 4. Gestion des Policies et Governance
+### 4. Policy and Governance Management
 
-**Elena (Junior Dev):** "Le système de policies est vraiment puissant. On peut contrôler finement le comportement des agents."
+**Elena (Junior Dev):** "The policy system is really powerful. We can finely control agent behavior."
 
-**Points forts:**
-- Policies globales et par agent
-- Budgets complexes (par tool, agent, période)
-- Approbation humaine pour actions critiques
-- Audit trail complet
+**Strengths:**
+- Global and per-agent policies
+- Complex budgets (per tool, agent, period)
+- Human approval for critical actions
+- Complete audit trail
 
-### 5. Observabilité Avancée
+### 5. Advanced Observability
 
-**Charlie (Senior Dev):** "Les fonctionnalités d'observabilité cognitive sont impressionnantes. On peut vraiment comprendre le raisonnement des agents."
+**Charlie (Senior Dev):** "The cognitive observability features are impressive. We can really understand agents' reasoning."
 
-**Points forts:**
-- Graphe de raisonnement visualisable
-- Analyse des alternatives envisagées
-- Patterns de décision sur plusieurs runs
-- Comparaison d'exécutions
-
----
-
-## 🚧 Défis et Difficultés Rencontrées
-
-### 1. Complexité Croissante
-
-**Charlie (Senior Dev):** "Au fur et à mesure qu'on ajoutait des features, la complexité a augmenté. Certaines stories ont pris plus de temps que prévu."
-
-**Exemples:**
-- Story 11.2 (Budgets Complexes): Gestion de budgets multi-dimensionnels
-- Story 12.2 (Migration PostgreSQL): Adaptation des requêtes SQL
-- Story 13.1 (Graphe de Raisonnement): Structure de données complexe
-
-**Leçons:**
-- Découper les stories en sous-tâches plus petites
-- Faire des spikes techniques pour les features complexes
-- Valider l'architecture avant d'implémenter
-
-### 2. Gestion des Types TypeScript
-
-**Elena (Junior Dev):** "Parfois, les types TypeScript étaient très complexes, surtout pour les filtres avancés d'événements."
-
-**Exemples:**
-- Types génériques pour les providers LLM
-- Types conditionnels pour les policies
-- Types récursifs pour les graphes de raisonnement
-
-**Leçons:**
-- Créer des types utilitaires réutilisables
-- Documenter les types complexes
-- Utiliser des alias de types pour la lisibilité
-
-### 3. Tests de Non-Régression
-
-**Dana (QA Engineer):** "Les golden traces sont puissants mais nécessitent une maintenance régulière."
-
-**Challenges:**
-- Mise à jour des golden traces lors de changements légitimes
-- Gestion des différences acceptables vs régressions
-- Performance des comparaisons sur de gros volumes
-
-**Leçons:**
-- Automatiser la détection de changements légitimes
-- Créer des stratégies de comparaison flexibles
-- Optimiser les algorithmes de comparaison
-
-### 4. Interface de Démonstration
-
-**Alice (Product Owner):** "L'interface Next.js a nécessité plusieurs itérations pour être vraiment utilisable."
-
-**Challenges:**
-- Intégration SDK côté serveur Next.js
-- Gestion des états React complexes
-- Visualisation des traces et graphes
-
-**Leçons:**
-- Prototyper rapidement l'UI avant l'implémentation complète
-- Utiliser des bibliothèques de visualisation éprouvées
-- Séparer la logique métier de la présentation
+**Strengths:**
+- Visualizable reasoning graph
+- Analysis of alternatives considered
+- Decision patterns across multiple runs
+- Execution comparison
 
 ---
 
-## 💡 Apprentissages Clés
+## 🚧 Challenges and Difficulties Encountered
 
-### 1. Architecture Event Sourcing
+### 1. Growing Complexity
 
-**Charlie (Senior Dev):** "L'Event Sourcing s'est révélé être le bon choix. Il permet non seulement la traçabilité mais aussi le replay, l'analyse, et même le debugging."
+**Charlie (Senior Dev):** "As we added features, complexity increased. Some stories took longer than expected."
+
+**Examples:**
+- Story 11.2 (Complex Budgets): Managing multi-dimensional budgets
+- Story 12.2 (PostgreSQL Migration): Adapting SQL queries
+- Story 13.1 (Reasoning Graph): Complex data structure
+
+**Lessons:**
+- Break stories down into smaller sub-tasks
+- Do technical spikes for complex features
+- Validate architecture before implementing
+
+### 2. TypeScript Type Management
+
+**Elena (Junior Dev):** "Sometimes the TypeScript types were very complex, especially for advanced event filters."
+
+**Examples:**
+- Generic types for LLM providers
+- Conditional types for policies
+- Recursive types for reasoning graphs
+
+**Lessons:**
+- Create reusable utility types
+- Document complex types
+- Use type aliases for readability
+
+### 3. Non-Regression Tests
+
+**Dana (QA Engineer):** "Golden traces are powerful but require regular maintenance."
+
+**Challenges:**
+- Updating golden traces when legitimate changes occur
+- Managing acceptable differences vs. regressions
+- Comparison performance on large volumes
+
+**Lessons:**
+- Automate detection of legitimate changes
+- Create flexible comparison strategies
+- Optimize comparison algorithms
+
+### 4. Demo Interface
+
+**Alice (Product Owner):** "The Next.js interface required several iterations to become truly usable."
+
+**Challenges:**
+- SDK integration on the Next.js server side
+- Managing complex React state
+- Visualization of traces and graphs
+
+**Lessons:**
+- Prototype the UI quickly before full implementation
+- Use proven visualization libraries
+- Separate business logic from presentation
+
+---
+
+## 💡 Key Learnings
+
+### 1. Event Sourcing Architecture
+
+**Charlie (Senior Dev):** "Event Sourcing proved to be the right choice. It enables not only traceability but also replay, analysis, and even debugging."
 
 **Impact:**
-- Toutes les fonctionnalités d'observabilité reposent sur l'event store
-- Le replay permet de tester des scénarios "what-if"
-- L'analyse de patterns est possible grâce à l'historique complet
+- All observability features rely on the event store
+- Replay makes it possible to test "what-if" scenarios
+- Pattern analysis is possible thanks to the complete history
 
-### 2. Abstraction des Providers LLM
+### 2. LLM Provider Abstraction
 
-**Charlie (Senior Dev):** "L'abstraction LLMProvider a permis d'ajouter facilement de nouveaux providers sans toucher au code existant."
-
-**Impact:**
-- Support facile de nouveaux providers (OpenAI, Anthropic, etc.)
-- Fallback automatique entre providers
-- Configuration flexible par provider
-
-### 3. Système de Policies Extensible
-
-**Elena (Junior Dev):** "Le système de policies est vraiment bien pensé. On peut ajouter de nouveaux types de policies facilement."
+**Charlie (Senior Dev):** "The LLMProvider abstraction made it easy to add new providers without touching existing code."
 
 **Impact:**
-- Policies conditionnelles
-- Budgets complexes
-- Approbation humaine
-- Audit trail complet
+- Easy support for new providers (OpenAI, Anthropic, etc.)
+- Automatic fallback between providers
+- Flexible per-provider configuration
 
-### 4. Testing avec Golden Traces
+### 3. Extensible Policy System
 
-**Dana (QA Engineer):** "Les golden traces changent complètement la façon de tester les agents. On teste le comportement, pas juste le code."
+**Elena (Junior Dev):** "The policy system is really well thought out. We can easily add new types of policies."
 
 **Impact:**
-- Détection automatique de régressions
-- Tests basés sur le comportement réel
+- Conditional policies
+- Complex budgets
+- Human approval
+- Complete audit trail
+
+### 4. Testing with Golden Traces
+
+**Dana (QA Engineer):** "Golden traces completely change the way agents are tested. We test behavior, not just code."
+
+**Impact:**
+- Automatic regression detection
+- Tests based on actual behavior
 - Validation via replay
 
-### 5. Observabilité Cognitive
+### 5. Cognitive Observability
 
-**Alice (Product Owner):** "Pouvoir voir le raisonnement de l'agent est un game-changer pour comprendre et améliorer son comportement."
+**Alice (Product Owner):** "Being able to see the agent's reasoning is a game-changer for understanding and improving its behavior."
 
 **Impact:**
-- Compréhension du processus de décision
-- Identification des patterns de décision
-- Amélioration continue basée sur les données
+- Understanding of the decision-making process
+- Identification of decision patterns
+- Continuous improvement based on data
 
 ---
 
-## 🔄 Patterns Récurrents Identifiés
+## 🔄 Recurring Patterns Identified
 
-### Patterns Techniques
+### Technical Patterns
 
-1. **Factory Pattern:** Utilisé pour les providers LLM, les event stores, les reasoning engines
-2. **Strategy Pattern:** Pour les providers LLM, les policies, les condition evaluators
-3. **Observer Pattern:** Pour l'event sourcing et le tracing
-4. **Builder Pattern:** Pour la construction d'agents et de configurations
+1. **Factory Pattern:** Used for LLM providers, event stores, reasoning engines
+2. **Strategy Pattern:** For LLM providers, policies, condition evaluators
+3. **Observer Pattern:** For event sourcing and tracing
+4. **Builder Pattern:** For building agents and configurations
 
-### Patterns de Développement
+### Development Patterns
 
-1. **Test-Driven Development:** Tests écrits avant l'implémentation pour les features critiques
-2. **Code Review Systématique:** Chaque story passe par une review avant d'être marquée done
-3. **Documentation Continue:** Documentation mise à jour au fur et à mesure
-4. **Refactoring Continu:** Code nettoyé régulièrement pour maintenir la qualité
-
----
-
-## 📈 Métriques de Performance
-
-### Vélocité
-
-- **MVP:** ~7 stories par epic en moyenne
-- **Phase 2:** ~4 stories par epic en moyenne
-- **Post-MVP:** ~4-5 stories par epic
-
-### Qualité
-
-- **Test Coverage:** Excellent (tests unitaires + intégration)
-- **Type Safety:** 100% TypeScript strict
-- **Code Review:** 100% des stories reviewées
-- **Documentation:** Complète pour toutes les features
-
-### Complexité
-
-- **Lignes de code:** ~15,000+ lignes
-- **Composants:** ~50+ classes/interfaces
-- **Tests:** ~100+ tests unitaires
-- **Stories complétées:** 91/91 (100%)
+1. **Test-Driven Development:** Tests written before implementation for critical features
+2. **Systematic Code Review:** Every story goes through review before being marked done
+3. **Continuous Documentation:** Documentation updated as work progresses
+4. **Continuous Refactoring:** Code regularly cleaned up to maintain quality
 
 ---
 
-## 🎯 Action Items pour la Suite
+## 📈 Performance Metrics
 
-### Court Terme
+### Velocity
 
-1. **Finaliser les Reviews (Epic 10-13)**
-   - Owner: Équipe Dev
-   - Priorité: Haute
-   - Marquer les epics 10-13 comme "done" après validation finale
+- **MVP:** ~7 stories per epic on average
+- **Phase 2:** ~4 stories per epic on average
+- **Post-MVP:** ~4-5 stories per epic
 
-2. **Mettre à jour les Statuts**
-   - Owner: Scrum Master
-   - Priorité: Moyenne
-   - Marquer Epic 14-15 comme "done" (toutes les stories sont completed)
+### Quality
 
-3. **Documentation Finale**
-   - Owner: Tech Writer
-   - Priorité: Moyenne
-   - Compléter la documentation des features Post-MVP
+- **Test Coverage:** Excellent (unit + integration tests)
+- **Type Safety:** 100% strict TypeScript
+- **Code Review:** 100% of stories reviewed
+- **Documentation:** Complete for all features
 
-### Moyen Terme
+### Complexity
 
-4. **Optimisation Performance**
-   - Owner: Senior Dev
-   - Priorité: Moyenne
-   - Optimiser les requêtes SQL pour les gros volumes
-   - Améliorer les performances de comparaison de traces
+- **Lines of code:** ~15,000+ lines
+- **Components:** ~50+ classes/interfaces
+- **Tests:** ~100+ unit tests
+- **Completed stories:** 91/91 (100%)
 
-5. **Interface de Démonstration**
-   - Owner: UX Designer + Dev
-   - Priorité: Moyenne
-   - Améliorer l'UX de l'interface Next.js
-   - Ajouter plus de visualisations
+---
 
-6. **Tests E2E**
-   - Owner: QA Engineer
-   - Priorité: Moyenne
-   - Ajouter des tests end-to-end complets
-   - Automatiser les tests de régression
+## 🎯 Action Items Going Forward
 
-### Long Terme
+### Short Term
 
-7. **Nouveaux Providers LLM**
+1. **Finalize Reviews (Epic 10-13)**
    - Owner: Dev Team
-   - Priorité: Basse
-   - Ajouter support pour d'autres providers (Google, Cohere, etc.)
+   - Priority: High
+   - Mark epics 10-13 as "done" after final validation
 
-8. **Features Avancées**
+2. **Update Statuses**
+   - Owner: Scrum Master
+   - Priority: Medium
+   - Mark Epic 14-15 as "done" (all stories are completed)
+
+3. **Final Documentation**
+   - Owner: Tech Writer
+   - Priority: Medium
+   - Complete documentation of Post-MVP features
+
+### Medium Term
+
+4. **Performance Optimization**
+   - Owner: Senior Dev
+   - Priority: Medium
+   - Optimize SQL queries for large volumes
+   - Improve trace comparison performance
+
+5. **Demo Interface**
+   - Owner: UX Designer + Dev
+   - Priority: Medium
+   - Improve the UX of the Next.js interface
+   - Add more visualizations
+
+6. **E2E Tests**
+   - Owner: QA Engineer
+   - Priority: Medium
+   - Add complete end-to-end tests
+   - Automate regression tests
+
+### Long Term
+
+7. **New LLM Providers**
+   - Owner: Dev Team
+   - Priority: Low
+   - Add support for other providers (Google, Cohere, etc.)
+
+8. **Advanced Features**
    - Owner: Product Owner + Dev Team
-   - Priorité: Basse
-   - Streaming de réponses LLM
-   - Cache des réponses LLM
-   - Multi-agents collaboration
+   - Priority: Low
+   - LLM response streaming
+   - LLM response caching
+   - Multi-agent collaboration
 
 ---
 
-## 🏆 Célébrations et Reconnaissances
+## 🏆 Celebrations and Recognition
 
-**Bob (Scrum Master):** "Je veux prendre un moment pour reconnaître le travail exceptionnel de l'équipe."
+**Bob (Scrum Master):** "I want to take a moment to recognize the exceptional work of the team."
 
-**Alice (Product Owner):** "91 stories complétées, 15 epics livrés. C'est un accomplissement remarquable."
+**Alice (Product Owner):** "91 stories completed, 15 epics delivered. That's a remarkable achievement."
 
-**Charlie (Senior Dev):** "L'architecture est solide, le code est propre, et les tests sont complets. On peut être fiers."
+**Charlie (Senior Dev):** "The architecture is solid, the code is clean, and the tests are complete. We can be proud."
 
-**Dana (QA Engineer):** "La qualité est au rendez-vous. Les tests de régression fonctionnent parfaitement."
+**Dana (QA Engineer):** "Quality is there. The regression tests work perfectly."
 
-**Elena (Junior Dev):** "J'ai appris énormément sur l'architecture, les patterns, et les bonnes pratiques."
+**Elena (Junior Dev):** "I learned an enormous amount about architecture, patterns, and best practices."
 
 ---
 
-## 📝 Recommandations pour les Prochains Projets
+## 📝 Recommendations for Future Projects
 
 ### Architecture
 
-1. **Commencer avec Event Sourcing** si la traçabilité est importante
-2. **Abstraire tôt** les dépendances externes (LLM, databases, etc.)
-3. **Penser extensibilité** dès la conception initiale
+1. **Start with Event Sourcing** if traceability is important
+2. **Abstract early** external dependencies (LLM, databases, etc.)
+3. **Think extensibility** from the initial design
 
-### Développement
+### Development
 
-1. **TypeScript strict** dès le début
-2. **Tests dès le début** (TDD pour les features critiques)
-3. **Code review systématique** pour maintenir la qualité
-4. **Refactoring continu** pour éviter la dette technique
+1. **Strict TypeScript** from the start
+2. **Tests from the start** (TDD for critical features)
+3. **Systematic code review** to maintain quality
+4. **Continuous refactoring** to avoid technical debt
 
 ### Process
 
-1. **Découper les stories** en sous-tâches gérables
-2. **Faire des spikes** pour les features complexes
-3. **Documenter au fur et à mesure** plutôt qu'à la fin
-4. **Rétrospectives régulières** pour apprendre et s'améliorer
+1. **Break stories down** into manageable sub-tasks
+2. **Do spikes** for complex features
+3. **Document as you go** rather than at the end
+4. **Regular retrospectives** to learn and improve
 
 ---
 
-## 🎓 Leçons pour l'Équipe
+## 🎓 Lessons for the Team
 
-### Ce qu'on ferait différemment
+### What we would do differently
 
-1. **Spikes techniques plus tôt** pour les features complexes
-2. **Prototypes UI plus tôt** pour valider l'approche
-3. **Plus de tests d'intégration** dès le début
-4. **Documentation des décisions architecturales** en temps réel
+1. **Earlier technical spikes** for complex features
+2. **Earlier UI prototypes** to validate the approach
+3. **More integration tests** from the start
+4. **Real-time documentation of architectural decisions**
 
-### Ce qu'on garde absolument
+### What we absolutely keep
 
-1. **Architecture modulaire** - a permis l'extension facile
-2. **Event Sourcing** - source de vérité unique et traçabilité
-3. **TypeScript strict** - sécurité de type et moins de bugs
-4. **Code review systématique** - maintien de la qualité
-5. **Tests complets** - confiance dans les changements
+1. **Modular architecture** - enabled easy extension
+2. **Event Sourcing** - single source of truth and traceability
+3. **Strict TypeScript** - type safety and fewer bugs
+4. **Systematic code review** - maintained quality
+5. **Complete tests** - confidence in changes
 
 ---
 
-## 🚀 Prochaines Étapes
+## 🚀 Next Steps
 
-### Immédiat
+### Immediate
 
-1. Finaliser les reviews des Epic 10-13
-2. Mettre à jour les statuts dans sprint-status.yaml
-3. Créer les rétrospectives individuelles pour Epic 10-15
+1. Finalize reviews of Epic 10-13
+2. Update statuses in sprint-status.yaml
+3. Create individual retrospectives for Epic 10-15
 
-### Court Terme
+### Short Term
 
-1. Optimiser les performances
-2. Améliorer l'interface de démonstration
-3. Ajouter des tests E2E
+1. Optimize performance
+2. Improve the demo interface
+3. Add E2E tests
 
-### Long Terme
+### Long Term
 
-1. Évaluer les besoins utilisateurs
-2. Planifier les prochaines features
-3. Maintenir et améliorer le SDK
+1. Assess user needs
+2. Plan next features
+3. Maintain and improve the SDK
 
 ---
 
 ## ✅ Conclusion
 
-**Bob (Scrum Master):** "Cette rétrospective globale montre un projet exceptionnellement bien exécuté."
+**Bob (Scrum Master):** "This global retrospective shows an exceptionally well-executed project."
 
-**Alice (Product Owner):** "100% des stories complétées, architecture solide, qualité au rendez-vous. C'est un succès."
+**Alice (Product Owner):** "100% of stories completed, solid architecture, quality delivered. This is a success."
 
-**Charlie (Senior Dev):** "Le code est maintenable, extensible, et bien testé. On a construit quelque chose de solide."
+**Charlie (Senior Dev):** "The code is maintainable, extensible, and well tested. We built something solid."
 
-**Dana (QA Engineer):** "Les tests de régression fonctionnent, la qualité est là. On peut déployer en confiance."
+**Dana (QA Engineer):** "The regression tests work, quality is there. We can deploy with confidence."
 
-**Elena (Junior Dev):** "J'ai grandi énormément sur ce projet. Merci à toute l'équipe."
-
----
-
-**Rétrospective complétée le:** 2026-01-06  
-**Prochaine rétrospective:** À planifier selon les besoins
+**Elena (Junior Dev):** "I grew enormously on this project. Thanks to the whole team."
 
 ---
 
-*Ce document synthétise l'ensemble du projet SDK_AI_Agents et servira de référence pour les futurs projets.*
+**Retrospective completed on:** 2026-01-06  
+**Next retrospective:** To be scheduled as needed
 
+---
+
+*This document summarizes the entire SDK_AI_Agents project and will serve as a reference for future projects.*

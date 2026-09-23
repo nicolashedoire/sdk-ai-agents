@@ -1,66 +1,66 @@
-# Story 5.1: Séparer le raisonnement (LLM) de l'action (tool execution)
+# Story 5.1: Separating reasoning (LLM) from action (tool execution)
 
 **Story ID:** 5.1  
-**Epic:** 5 - Runtime Architecture - Séparation Raisonnement/Action  
+**Epic:** 5 - Runtime Architecture - Reasoning/Action Separation  
 **Status:** done  
 **Created:** 2026-01-06
 
 ## User Story
 
-**As a** système,
-**I want** séparer le raisonnement (LLM) de l'action (tool execution),
-**So that** la sécurité est garantie par architecture, pas par configuration..
+**As a** system,
+**I want** to separate reasoning (LLM) from action (tool execution),
+**So that** security is guaranteed by architecture, not by configuration..
 
 ## Acceptance Criteria
 
-**Given** un agent est configuré
-**When** l'agent exécute une tâche
-**Then** le LLM génère uniquement des intentions structurées
-**And** les intentions sont traitées par un Action Engine séparé
-**And** le LLM n'a jamais d'accès direct aux tools
-**And** toutes les actions passent par l'Action Engine
+**Given** an agent is configured
+**When** the agent executes a task
+**Then** the LLM generates only structured intentions
+**And** the intentions are processed by a separate Action Engine
+**And** the LLM never has direct access to the tools
+**And** all actions go through the Action Engine
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current State:**
+- Complete implementation in the codebase
+- Feature tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files Involved:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Feature implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Feature validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested

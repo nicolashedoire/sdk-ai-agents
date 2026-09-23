@@ -8,7 +8,7 @@ export interface RunInput {
   providerSettings?: {
     openai?: ProviderSettings;
     anthropic?: ProviderSettings;
-    default?: ProviderSettings; // Settings par défaut pour tous les providers
+    default?: ProviderSettings; // Default settings for every provider
   };
 }
 
@@ -49,6 +49,11 @@ export interface ActionContext {
   agentId: string;
   mode?: 'normal' | 'replay';
   abortSignal?: AbortSignal;
+  /**
+   * Tools this caller may use. When set, any other tool is denied before execution, even
+   * if it is registered in the SDK. Cognitive agents and the MCP server always set it.
+   */
+  allowedTools?: string[];
 }
 
 export interface ActionResult {

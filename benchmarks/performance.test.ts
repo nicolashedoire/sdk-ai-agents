@@ -1,9 +1,9 @@
 /**
- * Tests de Performance - SDK_AI_Agents
- * 
- * Mesure l'overhead du SDK et valide les critères de performance MVP :
- * - Overhead SDK : < 10ms par événement
- * - Latence acceptable pour les opérations courantes
+ * Performance Tests - SDK_AI_Agents
+ *
+ * Measures SDK overhead and validates MVP performance criteria:
+ * - SDK overhead: < 10ms per event
+ * - Acceptable latency for common operations
  */
 
 import { describe, it, expect } from 'vitest';
@@ -38,10 +38,10 @@ describe('Performance Benchmarks', () => {
     const iterations = 100;
     const startTime = Date.now();
 
-    // Simuler la création de 100 événements
+    // Simulate the creation of 100 events
     for (let i = 0; i < iterations; i++) {
-      // Simuler l'overhead d'un événement
-      // Dans un vrai test, on utiliserait l'event store
+      // Simulate the overhead of an event
+      // In a real test, we would use the event store
     }
 
     const endTime = Date.now();
@@ -49,10 +49,10 @@ describe('Performance Benchmarks', () => {
     const avgTimePerEvent = totalTime / iterations;
 
     console.log(`Average time per event simulation: ${avgTimePerEvent}ms`);
-    
-    // Objectif MVP: < 10ms par événement
-    // Note: Ce test est simplifié, un vrai benchmark nécessiterait
-    // de mesurer l'overhead réel de l'event store
+
+    // MVP goal: < 10ms per event
+    // Note: This test is simplified, a real benchmark would need
+    // to measure the actual overhead of the event store
     expect(avgTimePerEvent).toBeLessThan(10);
   });
 
@@ -65,8 +65,8 @@ describe('Performance Benchmarks', () => {
     const initTime = endTime - startTime;
 
     console.log(`SDK initialization time: ${initTime}ms`);
-    
-    // Objectif: < 100ms pour l'initialisation
+
+    // Goal: < 100ms for initialization
     expect(initTime).toBeLessThan(100);
     expect(testSdk).toBeDefined();
   });
@@ -82,8 +82,8 @@ describe('Performance Benchmarks', () => {
     const creationTime = endTime - startTime;
 
     console.log(`Agent creation time: ${creationTime}ms`);
-    
-    // Objectif: < 50ms pour la création d'agent
+
+    // Goal: < 50ms for agent creation
     expect(creationTime).toBeLessThan(50);
     expect(testAgent).toBeDefined();
   });
@@ -100,15 +100,15 @@ describe('Performance Benchmarks', () => {
     const definitionTime = endTime - startTime;
 
     console.log(`Tool definition time: ${definitionTime}ms`);
-    
-    // Objectif: < 10ms pour la définition d'un tool
+
+    // Goal: < 10ms for defining a tool
     expect(definitionTime).toBeLessThan(10);
     expect(tool).toBeDefined();
   });
 
   it('should measure trace retrieval time', async () => {
-    // Note: Ce test nécessite un run réel pour fonctionner
-    // Pour l'instant, on vérifie juste que la méthode existe
+    // Note: This test requires a real run to work
+    // For now, we just verify the method exists
     expect(typeof sdk.getTrace).toBe('function');
   });
 
@@ -132,12 +132,12 @@ describe('Performance Benchmarks', () => {
       const creationTime = endTime - startTime;
 
       console.log(`Capability creation time: ${creationTime}ms`);
-      
-      // Objectif: < 20ms pour la création d'une capability
+
+      // Goal: < 20ms for creating a capability
       expect(creationTime).toBeLessThan(20);
       expect(capability).toBeDefined();
     } catch (error) {
-      // Si la capability existe déjà, c'est OK pour ce test de performance
+      // If the capability already exists, that's fine for this performance test
       const endTime = Date.now();
       const creationTime = endTime - startTime;
       console.log(`Capability creation time (with error): ${creationTime}ms`);
@@ -148,12 +148,12 @@ describe('Performance Benchmarks', () => {
 
 describe('Performance Criteria Validation', () => {
   it('should meet MVP performance criteria', () => {
-    // Critères MVP selon BMAD:
-    // - Overhead SDK : < 10ms par événement
-    // - Time-to-first-agent : < 30 minutes (mesuré manuellement)
-    // - API intuitive : < 10 lignes pour Quick Start (vérifié dans docs)
-    
-    // Ce test sert de rappel des critères
+    // MVP criteria per BMAD:
+    // - SDK overhead: < 10ms per event
+    // - Time-to-first-agent: < 30 minutes (measured manually)
+    // - Intuitive API: < 10 lines for Quick Start (verified in docs)
+
+    // This test serves as a reminder of the criteria
     const criteria = {
       eventOverhead: '< 10ms',
       timeToFirstAgent: '< 30 minutes',
@@ -164,4 +164,3 @@ describe('Performance Criteria Validation', () => {
     console.log('MVP Performance Criteria:', criteria);
   });
 });
-

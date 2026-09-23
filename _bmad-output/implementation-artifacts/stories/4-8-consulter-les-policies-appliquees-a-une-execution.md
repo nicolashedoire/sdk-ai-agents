@@ -1,4 +1,4 @@
-# Story 4.8: Consulter les policies appliquées à une exécution
+# Story 4.8: Consulting the policies applied to an execution
 
 **Story ID:** 4.8  
 **Epic:** 4 - Policies & Governance  
@@ -7,59 +7,59 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** consulter les policies appliquées à une exécution,
-**So that** je peux comprendre pourquoi certaines actions ont été autorisées ou bloquées..
+**As a** developer,
+**I want** to consult the policies applied to an execution,
+**So that** I can understand why certain actions were authorized or blocked.
 
 ## Acceptance Criteria
 
-**Given** une exécution a été effectuée
-**When** j'interroge les policies appliquées avec `sdk.getRunPolicies(runId)`
-**Then** je reçois la liste complète des policies actives pendant l'exécution
-**And** chaque policy inclut sa source (globale ou spécifique)
-**And** les vérifications de policy sont associées aux actions correspondantes
+**Given** an execution has taken place
+**When** I query the applied policies with `sdk.getRunPolicies(runId)`
+**Then** I receive the full list of policies active during the execution
+**And** each policy includes its source (global or specific)
+**And** the policy checks are associated with the corresponding actions
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current State:**
+- Complete implementation in the codebase
+- Feature tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files Involved:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Feature implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Feature validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested

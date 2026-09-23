@@ -1,24 +1,27 @@
 /**
  * LLM Provider Abstraction
  * 
- * Interface commune pour tous les providers LLM (OpenAI, Anthropic, etc.)
- * Permet d'abstraire les différences entre providers et normaliser les réponses.
+ * Common interface for every LLM provider (OpenAI, Anthropic, etc.)
+ * Abstracts provider differences and normalizes responses.
  */
 
 /**
- * Requête normalisée pour générer une completion LLM
+ * Normalized request to generate an LLM completion
  */
 export interface LLMRequest {
-  /** Modèle à utiliser (ex: "gpt-4", "claude-3-opus") */
+  /** Run the request belongs to, used to trace retries and costs (optional). */
+  runId?: string;
+
+  /** Model to use (e.g. "gpt-4", "claude-3-opus") */
   model: string;
   
-  /** Messages de la conversation */
+  /** Conversation messages */
   messages: Array<{
     role: 'system' | 'user' | 'assistant';
     content: string;
   }>;
   
-  /** Tools disponibles pour le LLM (optionnel) */
+  /** Tools available to the LLM (optional) */
   tools?: Array<{
     type: 'function';
     function: {
@@ -28,31 +31,31 @@ export interface LLMRequest {
     };
   }>;
   
-  /** Température pour la génération (optionnel) */
+  /** Sampling temperature (optional) */
   temperature?: number;
   
-  /** Nombre maximum de tokens à générer (optionnel) */
+  /** Maximum number of tokens to generate (optional) */
   maxTokens?: number;
   
-  /** Settings par provider (pour FallbackProvider) - priorité sur temperature/maxTokens si fourni */
+  /** Per-provider settings (for FallbackProvider); take precedence over temperature/maxTokens when set */
   providerSettings?: {
     openai?: { temperature?: number; maxTokens?: number };
     anthropic?: { temperature?: number; maxTokens?: number };
     default?: { temperature?: number; maxTokens?: number };
   };
   
-  /** Signal d'annulation pour interrompre la requête (optionnel) */
+  /** Abort signal to cancel the request (optional) */
   abortSignal?: AbortSignal;
 }
 
 /**
- * Réponse normalisée d'un provider LLM
+ * Normalized response from an LLM provider
  */
 export interface LLMResponse {
-  /** Contenu textuel de la réponse (null si tool calls uniquement) */
+  /** Text content of the response (null when there are only tool calls) */
   content: string | null;
   
-  /** Tool calls demandés par le LLM (optionnel) */
+  /** Tool calls requested by the LLM (optional) */
   toolCalls?: Array<{
     function: {
       name: string;
@@ -60,10 +63,10 @@ export interface LLMResponse {
     };
   }>;
   
-  /** Modèle utilisé pour générer la réponse */
+  /** Model that generated the response */
   model: string;
   
-  /** Usage des tokens (optionnel) */
+  /** Token usage (optional) */
   usage?: {
     promptTokens?: number;
     completionTokens?: number;
@@ -72,33 +75,33 @@ export interface LLMResponse {
 }
 
 /**
- * Interface commune pour tous les providers LLM
+ * Common interface for every LLM provider
  * 
- * Cette interface abstrait les différences entre providers (OpenAI, Anthropic, etc.)
- * et normalise les formats de requête et réponse.
+ * It abstracts the differences between providers (OpenAI, Anthropic, etc.)
+ * and normalizes request and response formats.
  */
 export interface LLMProvider {
   /**
-   * Génère une completion LLM selon la requête fournie
+   * Generates an LLM completion for the given request
    * 
-   * @param request - Requête normalisée LLMRequest
-   * @returns Promise résolue avec réponse normalisée LLMResponse
-   * @throws LLMProviderError en cas d'erreur du provider
+   * @param request - Normalized LLMRequest
+   * @returns Promise resolved with a normalized LLMResponse
+   * @throws LLMProviderError when the provider fails
    */
   generateCompletion(request: LLMRequest): Promise<LLMResponse>;
   
   /**
-   * Vérifie si le provider supporte un modèle donné
+   * Checks whether the provider supports a model
    * 
-   * @param model - Nom du modèle (ex: "gpt-4", "claude-3-opus")
-   * @returns true si le modèle est supporté, false sinon
+   * @param model - Model name (e.g. "gpt-4", "claude-3-opus")
+   * @returns true when the model is supported, false otherwise
    */
   supportsModel(model: string): boolean;
   
   /**
-   * Retourne le nom du provider (ex: "openai", "anthropic")
+   * Returns the provider name (e.g. "openai", "anthropic")
    * 
-   * @returns Nom du provider
+   * @returns Provider name
    */
   getProviderName(): string;
 }

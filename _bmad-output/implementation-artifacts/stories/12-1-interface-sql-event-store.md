@@ -1,4 +1,4 @@
-# Story 12.1: Interface SQL Event Store
+# Story 12.1: SQL Event Store Interface
 
 **Story ID:** 12.1  
 **Epic:** 12 - Event Store SQL-Based  
@@ -7,62 +7,62 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** utiliser un Event Store SQL,
-**So that** je peux scaler et faire des requêtes avancées.
+**As a** developer,
+**I want** to use a SQL Event Store,
+**So that** I can scale and perform advanced queries.
 
 ## Acceptance Criteria
 
-**Given** une interface SQL Event Store
-**When** je configure le SDK
-**Then** je peux choisir entre FileEventStore et SQLEventStore
-**And** l'interface IEventStore est respectée
-**And** la migration est transparente
+**Given** a SQL Event Store interface
+**When** I configure the SDK
+**Then** I can choose between FileEventStore and SQLEventStore
+**And** the IEventStore interface is respected
+**And** the migration is transparent
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Feature**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events traced
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current state:**
+- Complete implementation in the codebase
+- Tested and validated functionality
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files concerned:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Feature implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events traced
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Functionality validated
 
 ## Story Completion Status
 
 **Status:** review  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested
 
 ## Implementation Details
 

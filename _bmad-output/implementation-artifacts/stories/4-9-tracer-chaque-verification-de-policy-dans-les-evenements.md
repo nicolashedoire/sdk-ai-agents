@@ -1,4 +1,4 @@
-# Story 4.9: Tracer chaque vérification de policy dans les événements
+# Story 4.9: Tracking every policy check in the events
 
 **Story ID:** 4.9  
 **Epic:** 4 - Policies & Governance  
@@ -7,59 +7,59 @@
 
 ## User Story
 
-**As a** système,
-**I want** tracer chaque vérification de policy dans les événements,
-**So that** l'audit et la traçabilité sont complets..
+**As a** system,
+**I want** to track every policy check in the events,
+**So that** auditing and traceability are complete..
 
 ## Acceptance Criteria
 
-**Given** des policies sont actives
-**When** une vérification de policy est effectuée
-**Then** un événement est généré avec la policy vérifiée, le résultat, et la raison
-**And** l'événement est persisté dans l'event log
-**And** l'événement est consultable via les traces
+**Given** policies are active
+**When** a policy check is performed
+**Then** an event is generated with the policy checked, the result, and the reason
+**And** the event is persisted in the event log
+**And** the event can be viewed through the traces
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current State:**
+- Complete implementation in the codebase
+- Feature tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files Involved:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Feature implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Feature validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested

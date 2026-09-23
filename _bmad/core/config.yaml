@@ -5,5 +5,5 @@
 
 user_name: Nicolashedoire
 communication_language: français
-document_output_language: français
+document_output_language: English
 output_folder: "{project-root}/_bmad-output"

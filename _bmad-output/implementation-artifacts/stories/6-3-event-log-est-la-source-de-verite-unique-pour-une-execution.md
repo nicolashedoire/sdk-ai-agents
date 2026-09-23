@@ -1,4 +1,4 @@
-# Story 6.3: Event log est la source de vérité unique pour une exécution
+# Story 6.3: The event log is the single source of truth for an execution
 
 **Story ID:** 6.3  
 **Epic:** 6 - Event Sourcing & Persistence  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** système,
-**I want** que l'event log soit la source de vérité unique pour une exécution,
-**So that** la cohérence et la traçabilité sont garanties.
+**As a** system,
+**I want** the event log to be the single source of truth for an execution,
+**So that** consistency and traceability are guaranteed.
 
 ## Acceptance Criteria
 
-**Given** une exécution est effectuée
-**When** je consulte l'état ou l'historique d'une exécution
-**Then** toutes les informations proviennent de l'event log
-**And** aucune logique "cachée" ne modifie l'état sans événement
-**And** l'état peut être reconstruit uniquement à partir des événements
-**And** l'event log est immuable (append-only)
+**Given** an execution is performed
+**When** I consult the state or history of an execution
+**Then** all information comes from the event log
+**And** no "hidden" logic modifies the state without an event
+**And** the state can be reconstructed solely from the events
+**And** the event log is immutable (append-only)
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current state:**
+- Complete implementation in the codebase
+- Functionality tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files concerned:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Functionality implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Functionality validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested

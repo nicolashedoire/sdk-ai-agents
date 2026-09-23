@@ -1,176 +1,107 @@
-# SDK_AI_Agents Documentation Index
+---
+layout: home
 
-**Type:** Monolith (single cohesive codebase)
-**Primary Language:** TypeScript
-**Architecture:** Event-Sourcing with Separation of Concerns
-**Last Updated:** 2026-01-06
+hero:
+  name: SDK AI Agents
+  text: Governed agents that think before they act
+  tagline: Explicit reasoning with a mental state you can inspect, typed decisions with Jev, MCP connectors — on top of event sourcing, replay, costs, retries and incident alerts.
+  image:
+    src: /images/reasoning-loop.svg
+    alt: The cognitive loop around an explicit mental state
+  actions:
+    - theme: brand
+      text: Get started
+      link: /guide/getting-started
+    - theme: alt
+      text: How agents think
+      link: /guide/cognitive-agents
+    - theme: alt
+      text: View on GitHub
+      link: https://github.com/nicolashedoire/sdk-ai-agents
 
-## Project Overview
-
-SDK_AI_Agents est une infrastructure de gouvernance des agents IA avec event-sourcing natif, replay et sécurité by design. Le SDK transforme les agents IA d'outils expérimentaux en systèmes décisionnels gouvernables, explicables et prêts pour la production.
-
-## Quick Reference
-
-- **Tech Stack:** TypeScript 5.3.2+, Node.js 20+, Vitest, Biome
-- **Entry Point:** `src/index.ts`
-- **Architecture Pattern:** Event-Sourcing with Separation of Concerns
-- **Database:** File-based (MVP) → SQL (Production) → Distributed (Future)
-- **Deployment:** npm package (`@sdk-ai-agents/core`)
-
-## Generated Documentation
-
-### Core Documentation
-
-- [Project Overview](./project-overview.md) - Executive summary and high-level architecture
-- [Source Tree Analysis](./source-tree-analysis.md) - Annotated directory structure
-- [Architecture](./architecture.md) - Detailed technical architecture
-- [Development Guide](./development-guide.md) - Local setup and development workflow
-
-### Existing Documentation
-
-- [Quick Start Guide](./QUICKSTART.md) - Créer votre premier agent en < 30 minutes
-- [Concepts Clés](./CONCEPTS.md) - Guide complet des concepts fondamentaux
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 20.0.0+ (LTS)
-- npm ou équivalent
-- TypeScript 5.3.2+ (installé localement)
-
-### Setup
-
-```bash
-# Installation
-npm install
-
-# Build
-npm run build
-
-# Tests
-npm test
-```
-
-### Run Locally
-
-```bash
-# Watch mode
-npm run dev
-
-# Examples
-npm run example:quick-start
-npm run example:complete
-```
-
-### Run Tests
-
-```bash
-# All tests
-npm test
-
-# Watch mode
-npm run test:watch
-
-# Coverage
-npm run test:coverage
-```
-
-## For AI-Assisted Development
-
-This documentation was generated specifically to enable AI agents to understand and extend this codebase.
-
-### When Planning New Features:
-
-**Core SDK features:**
-→ Reference: `architecture.md`, `source-tree-analysis.md`
-
-**Event Store features:**
-→ Reference: `architecture.md` (Event Store section), `src/stores/`
-
-**LLM Provider features:**
-→ Reference: `architecture.md` (LLM Provider section), `src/providers/`
-
-**Policy/Governance features:**
-→ Reference: `architecture.md` (Policy Engine section), `src/engines/policy-engine.ts`
-
-**Testing features:**
-→ Reference: `architecture.md` (Testing Strategy section), `src/managers/`
-
-**Deployment changes:**
-→ Reference: `development-guide.md`, `package.json`
-
-## Project Structure
-
-```
-SDK_AI_Agents/
-├── src/                    # Source code principal
-│   ├── agent.ts           # Agent implementation
-│   ├── sdk.ts             # SDK main implementation
-│   ├── engines/            # Core engines
-│   ├── stores/            # Event store implementations
-│   ├── providers/         # LLM provider implementations
-│   ├── managers/          # Manager classes
-│   ├── registry/          # Registry classes
-│   ├── types/             # TypeScript type definitions
-│   ├── utils/             # Utility functions
-│   └── __tests__/         # Tests unitaires
-├── dist/                   # Compiled output
-├── docs/                   # Documentation
-├── examples/               # Example code
-└── demo/                   # Next.js demo application
-```
-
-## Key Components
-
-### Engines
-
-- **ReasoningEngine**: Génère intentions depuis LLM
-- **ActionEngine**: Exécute intentions après validation
-- **PolicyEngine**: Valide intentions selon policies
-- **ReplayEngine**: Rejoue exécutions depuis événements
-
-### Stores
-
-- **IEventStore**: Interface commune
-- **FileEventStore**: Implémentation file-based
-- **SQLEventStore**: Implémentation SQL générique
-- **SQLiteEventStore**: Implémentation SQLite
-- **PostgreSQLEventStore**: Implémentation PostgreSQL
-
-### Providers
-
-- **LLMProvider**: Interface commune
-- **OpenAIProvider**: Implémentation OpenAI
-- **AnthropicProvider**: Implémentation Anthropic
-- **FallbackProvider**: Provider avec fallback
-
-### Managers
-
-- **ApprovalManager**: Gestion approbations humaines
-- **BudgetTracker**: Suivi budgets et usage
-- **GoldenTraceManager**: Gestion golden traces
-- **RegressionTestManager**: Gestion suites tests
-- **AssertionManager**: Gestion assertions
-- **ImpactAnalysisManager**: Gestion analyses d'impact
-
-## Development Workflow
-
-1. **Make Changes**: Modifier le code dans `src/`
-2. **Build**: `npm run build`
-3. **Test**: `npm test`
-4. **Lint**: `npm run lint`
-5. **Format**: `npm run format`
-
-## Resources
-
-- **GitHub**: https://github.com/nicolashedoire/SDK_AI_Agents
-- **Documentation**: `docs/`
-- **Examples**: `examples/`
-- **Type Definitions**: `src/types/`
-
+features:
+  - icon: 🧠
+    title: Reasoning, not just prompting
+    details: Represent, hypothesize, simulate, critique, seek information, compare, decide. Each step is an operation on an explicit mental state, chosen by a controller and recorded as an event.
+    link: /guide/cognitive-agents
+    linkText: The cognitive loop
+  - icon: 🪞
+    title: Thinks the way you do
+    details: Explain a few topics in your own words, distill your reasoning into a profile, then correct the agent run after run. Lessons are kept and applied.
+    link: /guide/thinker-profiles
+    linkText: Thinker profiles
+  - icon: 🎯
+    title: Typed decisions with Jev
+    details: Inject any context, ask yes/no, single or multiple choice and rating questions, and get calibrated probabilities your code can act on.
+    link: /guide/typed-decisions
+    linkText: Decide with confidence
+  - icon: 🔌
+    title: MCP in both directions
+    details: Expose your governed tools to Claude Desktop, IDEs and other agents, and import any MCP server as tools your agents can use.
+    link: /guide/mcp
+    linkText: Connect your systems
+  - icon: 🛡️
+    title: Governance by design
+    details: The model proposes, the engine disposes. Policies, allowlists, budgets and human approvals are checked before every action.
+    link: /guide/governed-agents
+    linkText: Governed agents
+  - icon: 🎞️
+    title: Everything is an event
+    details: Replay runs without calling the LLM, rebuild the mental state of any run, compare runs and turn them into golden tests.
+    link: /guide/observability
+    linkText: Traceability & replay
+  - icon: 💸
+    title: Costs you can see
+    details: Token usage of every LLM call and typed decision is recorded and priced per run and per model.
+    link: /guide/costs
+    linkText: API costs
+  - icon: 🔁
+    title: Retries that do not stack
+    details: One retry policy per provider before failover, retries for idempotent tools, and every retry written to the trace.
+    link: /guide/resilience
+    linkText: Retries & fallback
+  - icon: 🚨
+    title: Incidents that reach you
+    details: Failed runs, blocked actions and provider failovers become incidents with their timeline, sent by email or webhook.
+    link: /guide/incidents
+    linkText: Incident alerts
 ---
 
-_Documentation generated by BMAD Method `document-project` workflow_
+<div class="vp-doc" style="max-width: 1152px; margin: 0 auto; padding: 48px 24px 0;">
 
+## From a prompt to a decision you can audit
 
+A classic LLM call goes straight from question to answer. A cognitive agent builds an explicit picture of the problem, explores several options, stresses them, checks facts with governed tools and only then commits — and you can read every step afterwards.
+
+```ts
+import { createSDK } from '@sdk-ai-agents/core';
+
+const sdk = createSDK({ apiKey: process.env.OPENAI_API_KEY, jev: { apiKey: process.env.TYPESAFE_API_KEY } });
+
+const lookupMetric = sdk.defineTool({ /* name, description, zod schema, handler */ });
+const analyst = sdk.createCognitiveAgent({ name: 'analyst', model: 'gpt-4o', tools: [lookupMetric] });
+const { answer, decision, state, runId } = await analyst.think({
+  problem: 'Should we build or buy our analytics module?',
+});
+
+console.log(answer);                          // the decision, in plain words
+console.log(state.hypotheses);                // every option considered, with its support
+console.log(await sdk.getRunCost(runId));     // what it cost, per model
+```
+
+![A mental state rebuilt from the event log](/images/mental-state.svg){.illustration}
+
+## One SDK, every layer
+
+![Architecture of the SDK](/images/architecture.svg){.illustration}
+
+| You need | A raw LLM API | SDK AI Agents |
+| --- | --- | --- |
+| Reason before answering | One-shot generation | Hypotheses, simulation and critique on an explicit state |
+| Reason like a given person | A long system prompt | A versioned thinker profile, refined by feedback |
+| Fast, calibrated decisions | Parse free text | Typed answers with probabilities and confidence (Jev) |
+| Connect company tools | Custom glue per tool | MCP server and client, governed by policies |
+| Know what happened | Logs, if any | Event log, replay, mental state rebuild |
+| Control risk and spend | Hope | Policies, approvals, budgets, per-run costs, incident alerts |
+
+</div>

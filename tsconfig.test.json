@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["node", "vitest/globals"]
+  },
+  "include": [
+    "src/__tests__/support/*.ts",
+    "src/__tests__/cognition-core.test.ts",
+    "src/__tests__/cognition-guards.test.ts",
+    "src/__tests__/cognitive-agent.test.ts",
+    "src/__tests__/decision-service.test.ts",
+    "src/__tests__/file-event-store-flush.test.ts",
+    "src/__tests__/incidents.test.ts",
+    "src/__tests__/jev-client.test.ts",
+    "src/__tests__/mcp.test.ts",
+    "src/__tests__/resilience.test.ts",
+    "src/__tests__/sdk-cognition.test.ts",
+    "examples/cognitive-agent.ts",
+    "examples/mcp-server.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

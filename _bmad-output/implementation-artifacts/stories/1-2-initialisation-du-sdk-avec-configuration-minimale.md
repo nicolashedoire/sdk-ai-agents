@@ -1,4 +1,4 @@
-# Story 1.2: Initialisation du SDK avec configuration minimale
+# Story 1.2: Initializing the SDK with a minimal configuration
 
 **Story ID:** 1.2  
 **Epic:** 1 - Quick Start & SDK Foundation  
@@ -7,77 +7,77 @@
 
 ## User Story
 
-**As a** développeur,  
-**I want** initialiser le SDK avec des paramètres de base,  
-**So that** je peux commencer à utiliser le SDK immédiatement.
+**As a** developer,  
+**I want** to initialize the SDK with basic parameters,  
+**So that** I can start using the SDK immediately.
 
 ## Acceptance Criteria
 
-**Given** le SDK est installé  
-**When** j'appelle `createSDK({ apiKey: '...' })`  
-**Then** une instance SDK est créée  
-**And** l'API est entièrement typée (type-safety complet)  
-**And** la configuration minimale est validée  
-**And** les erreurs de configuration sont claires et explicites
+**Given** the SDK is installed  
+**When** I call `createSDK({ apiKey: '...' })`  
+**Then** an SDK instance is created  
+**And** the API is fully typed (complete type-safety)  
+**And** the minimal configuration is validated  
+**And** configuration errors are clear and explicit
 
 ## Business Value
 
-- **Simplicité**: Configuration minimale requise (seulement apiKey)
-- **Type-safety**: API entièrement typée pour meilleure DX
-- **Validation**: Erreurs claires si configuration invalide
-- **Rapidité**: Démarrage immédiat sans configuration complexe
+- **Simplicity**: Minimal configuration required (only apiKey)
+- **Type-safety**: Fully typed API for a better DX
+- **Validation**: Clear errors if configuration is invalid
+- **Speed**: Immediate startup without complex configuration
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- `createSDK()` fonction dans `src/index.ts`
-- `SDKImpl` classe dans `src/sdk.ts`
-- `SDKConfig` interface dans `src/types/sdk.ts`
-- Validation de configuration dans constructeur
+**Current State:**
+- `createSDK()` function in `src/index.ts`
+- `SDKImpl` class in `src/sdk.ts`
+- `SDKConfig` interface in `src/types/sdk.ts`
+- Configuration validation in the constructor
 
-**Fichiers concernés:**
-- `src/index.ts` - Export fonction `createSDK()`
-- `src/sdk.ts` - Implémentation SDK
-- `src/types/sdk.ts` - Types et interfaces
+**Files Involved:**
+- `src/index.ts` - Exports the `createSDK()` function
+- `src/sdk.ts` - SDK implementation
+- `src/types/sdk.ts` - Types and interfaces
 
-### Implémentation
+### Implementation
 
-**Configuration Minimale:**
+**Minimal Configuration:**
 ```typescript
 interface SDKConfig {
-  apiKey: string;  // Requis
-  provider?: 'openai' | 'anthropic';  // Optionnel
-  eventStore?: IEventStore;  // Optionnel
-  defaultPolicies?: Policy[];  // Optionnel
+  apiKey: string;  // Required
+  provider?: 'openai' | 'anthropic';  // Optional
+  eventStore?: IEventStore;  // Optional
+  defaultPolicies?: Policy[];  // Optional
 }
 ```
 
 **Validation:**
-- `apiKey` requis
-- Erreurs claires si manquant
-- Configuration par défaut intelligente
+- `apiKey` required
+- Clear errors if missing
+- Sensible default configuration
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Simplicité**: Configuration minimale
-2. **Type-safety**: TypeScript strict
-3. **Validation**: Erreurs claires
-4. **Defaults**: Valeurs par défaut intelligentes
+1. **Simplicity**: Minimal configuration
+2. **Type-safety**: Strict TypeScript
+3. **Validation**: Clear errors
+4. **Defaults**: Sensible default values
 
 ## Testing Requirements
 
-- ✅ SDK créé avec apiKey uniquement
-- ✅ Types corrects
-- ✅ Erreur si apiKey manquant
-- ✅ Configuration par défaut appliquée
+- ✅ SDK created with apiKey only
+- ✅ Correct types
+- ✅ Error if apiKey is missing
+- ✅ Default configuration applied
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète dans `src/sdk.ts`
+**Implementation:** Complete in `src/sdk.ts`
 
 

@@ -1,84 +1,84 @@
-# Story 13.3: Patterns de Décision sur Plusieurs Runs
+# Story 13.3: Decision Patterns Across Multiple Runs
 
 **Story ID:** 13.3  
-**Epic:** 13 - Observabilité Cognitive  
+**Epic:** 13 - Cognitive Observability  
 **Status:** review  
 **Created:** 2026-01-06
 
 ## User Story
 
 **As a** product engineer,
-**I want** analyser les patterns de décision sur plusieurs runs,
-**So that** je peux identifier les tendances et améliorer l'agent.
+**I want** to analyze decision patterns across multiple runs,
+**So that** I can identify trends and improve the agent.
 
 ## Acceptance Criteria
 
-**Given** plusieurs runs d'un agent
-**When** j'analyse les patterns
-**Then** je peux voir les décisions récurrentes
-**And** les patterns sont identifiés automatiquement
-**And** les insights sont présentés de manière compréhensible
+**Given** several agent runs
+**When** I analyze the patterns
+**Then** I can see recurring decisions
+**And** patterns are identified automatically
+**And** insights are presented in an understandable way
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events traced
 
 ## Technical Requirements
 
-### Stack Front-End
+### Front-End Stack
 
-**Technologies requises:**
-- **Storybook 10**: Pour le développement et la documentation des composants UI
-- **Tailwind CSS**: Pour le styling et le design system
-- **shadcn/ui**: Composants UI réutilisables basés sur Radix UI
+**Required technologies:**
+- **Storybook 10**: For UI component development and documentation
+- **Tailwind CSS**: For styling and the design system
+- **shadcn/ui**: Reusable UI components based on Radix UI
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- À implémenter avec composants React/TypeScript
-- Analyse de patterns sur plusieurs runs
-- Visualisation des tendances et insights
+**Current state:**
+- To be implemented with React/TypeScript components
+- Pattern analysis across multiple runs
+- Visualization of trends and insights
 
-**Fichiers concernés:**
-- Composants React dans `src/components/patterns-analyzer/`
-- Stories Storybook dans `.storybook/`
-- Styles Tailwind CSS
-- Composants shadcn/ui pour l'interface
+**Files concerned:**
+- React components in `src/components/patterns-analyzer/`
+- Storybook stories in `.storybook/`
+- Tailwind CSS styles
+- shadcn/ui components for the interface
 
-### Implémentation
+### Implementation
 
-**Composants à créer:**
-- `PatternsAnalyzer` - Composant principal
-- `PatternChart` - Graphiques de patterns
-- `InsightsPanel` - Panel d'insights
-- `RunComparison` - Comparaison de runs
+**Components to create:**
+- `PatternsAnalyzer` - Main component
+- `PatternChart` - Pattern charts
+- `InsightsPanel` - Insights panel
+- `RunComparison` - Run comparison
 
-**Bibliothèques recommandées:**
-- `recharts` ou `@visx/visx` pour les graphiques
-- Composants shadcn/ui: Card, Tabs, Table, etc.
-- Tailwind CSS pour le styling
+**Recommended libraries:**
+- `recharts` or `@visx/visx` for charts
+- shadcn/ui components: Card, Tabs, Table, etc.
+- Tailwind CSS for styling
 
 ## Library & Framework Requirements
 
-### Dépendances Front-End Requises
+### Required Front-End Dependencies
 
 **Storybook:**
 - `@storybook/react` v10.x
 - `@storybook/addon-essentials` v10.x
-- `@storybook/addon-interactions` pour tests interactifs
+- `@storybook/addon-interactions` for interactive tests
 
 **Tailwind CSS:**
-- `tailwindcss` dernière version stable
-- Configuration avec thème personnalisé
+- `tailwindcss` latest stable version
+- Configuration with a custom theme
 
 **shadcn/ui:**
-- Composants nécessaires: Card, Tabs, Table, Badge, etc.
+- Required components: Card, Tabs, Table, Badge, etc.
 
-**Bibliothèques de visualisation:**
-- `recharts` pour graphiques simples
-- `@visx/visx` pour visualisations avancées (optionnel)
+**Visualization libraries:**
+- `recharts` for simple charts
+- `@visx/visx` for advanced visualizations (optional)
 
 ### Installation
 
@@ -94,9 +94,9 @@ npx tailwindcss init -p
 npx shadcn-ui@latest init
 npx shadcn-ui@latest add card tabs table badge
 
-# Bibliothèques de visualisation
+# Visualization libraries
 npm install recharts
-# ou
+# or
 npm install @visx/visx
 ```
 
@@ -106,104 +106,104 @@ npm install @visx/visx
 src/
   components/
     patterns-analyzer/
-      PatternsAnalyzer.tsx    # Composant principal
-      PatternChart.tsx        # Graphiques de patterns
-      InsightsPanel.tsx       # Panel d'insights
-      RunComparison.tsx       # Comparaison de runs
+      PatternsAnalyzer.tsx    # Main component
+      PatternChart.tsx        # Pattern charts
+      InsightsPanel.tsx       # Insights panel
+      RunComparison.tsx       # Run comparison
       index.ts                # Exports
-  ui/                         # Composants shadcn/ui
+  ui/                         # shadcn/ui components
     card.tsx
     tabs.tsx
     table.tsx
     badge.tsx
     ...
 .storybook/
-  main.ts                     # Configuration Storybook 10
-  preview.ts                  # Configuration preview
+  main.ts                     # Storybook 10 configuration
+  preview.ts                  # Preview configuration
 stories/
-  PatternsAnalyzer.stories.tsx  # Stories Storybook
+  PatternsAnalyzer.stories.tsx  # Storybook stories
   PatternChart.stories.tsx
   ...
 ```
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events traced
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires des composants React
-- ✅ Tests Storybook avec interactions
-- ✅ Tests d'intégration avec données réelles
-- ✅ Tests de performance avec grandes quantités de données
-- ✅ Tests d'accessibilité (a11y)
+- ✅ Unit tests for React components
+- ✅ Storybook tests with interactions
+- ✅ Integration tests with real data
+- ✅ Performance tests with large amounts of data
+- ✅ Accessibility tests (a11y)
 
 ## Story Completion Status
 
 **Status:** review  
-**Implementation:** Backend complété - Analyse des patterns de décision sur plusieurs runs  
-**Notes:** Partie backend implémentée. La visualisation frontend (React/Storybook) peut être ajoutée séparément.
+**Implementation:** Backend completed - Analysis of decision patterns across multiple runs  
+**Notes:** Backend part implemented. Frontend visualization (React/Storybook) can be added separately.
 
 ## Implementation Details (Backend)
 
 ### Components Created
 
 1. **Decision Patterns Types** (`src/types/decision-patterns.ts`)
-   - `DecisionPattern`: Représente un pattern de décision récurrent
-   - `PatternInsight`: Insight généré automatiquement (frequent_choice, trending_up, trending_down, anomaly, recommendation)
-   - `DecisionPatternAnalysis`: Analyse complète avec patterns, insights et statistiques
+   - `DecisionPattern`: Represents a recurring decision pattern
+   - `PatternInsight`: Automatically generated insight (frequent_choice, trending_up, trending_down, anomaly, recommendation)
+   - `DecisionPatternAnalysis`: Complete analysis with patterns, insights, and statistics
 
 2. **PatternAnalyzer** (`src/utils/pattern-analyzer.ts`)
-   - `analyzePatterns()`: Analyse les patterns de décision sur plusieurs runs
-   - Identifie les patterns de tool choices
-   - Détecte les violations de policies récurrentes
-   - Analyse les demandes d'approbation fréquentes
-   - Identifie les types d'intentions récurrents
-   - Analyse les raisons de rejet
-   - Calcule les tendances (increasing, decreasing, stable)
-   - Génère des insights automatiques
+   - `analyzePatterns()`: Analyzes decision patterns across multiple runs
+   - Identifies tool choice patterns
+   - Detects recurring policy violations
+   - Analyzes frequent approval requests
+   - Identifies recurring intention types
+   - Analyzes rejection reasons
+   - Computes trends (increasing, decreasing, stable)
+   - Generates automatic insights
 
 3. **SDK Method** (`src/sdk.ts`)
-   - `getDecisionPatterns(options)`: Analyse les patterns avec filtres (agentId, userId, sessionId, time range, minFrequency)
+   - `getDecisionPatterns(options)`: Analyzes patterns with filters (agentId, userId, sessionId, time range, minFrequency)
 
-### Pattern Types Supported
+### Supported Pattern Types
 
-- **tool_choice**: Choix d'outils récurrents
-- **policy_violation**: Violations de policies fréquentes
-- **approval_request**: Demandes d'approbation fréquentes
-- **intention_type**: Types d'intentions récurrents
-- **rejection_reason**: Raisons de rejet fréquentes
+- **tool_choice**: Recurring tool choices
+- **policy_violation**: Frequent policy violations
+- **approval_request**: Frequent approval requests
+- **intention_type**: Recurring intention types
+- **rejection_reason**: Frequent rejection reasons
 
 ### Insights Generated
 
-- **frequent_choice**: Pattern le plus fréquent (>50% des runs)
-- **trending_up**: Pattern en augmentation
-- **trending_down**: Pattern en diminution
-- **anomaly**: Violations de policies fréquentes (>20%)
-- **recommendation**: Demandes d'approbation fréquentes (>30%)
+- **frequent_choice**: Most frequent pattern (>50% of runs)
+- **trending_up**: Pattern on the rise
+- **trending_down**: Pattern in decline
+- **anomaly**: Frequent policy violations (>20%)
+- **recommendation**: Frequent approval requests (>30%)
 
 ### Tests
 
 - **Unit Tests**: `src/__tests__/pattern-analyzer.test.ts` (8 tests, all passing)
-  - Tests pour analyse de patterns sur plusieurs runs
-  - Tests pour identification de tool choices
-  - Tests pour violations de policies
-  - Tests pour demandes d'approbation
-  - Tests pour calcul de tendances
-  - Tests pour génération d'insights
-  - Tests pour filtrage par fréquence minimale
-  - Tests pour runs vides
+  - Tests for pattern analysis across multiple runs
+  - Tests for tool choice identification
+  - Tests for policy violations
+  - Tests for approval requests
+  - Tests for trend calculation
+  - Tests for insight generation
+  - Tests for filtering by minimum frequency
+  - Tests for empty runs
 
 - **Integration Tests**: `src/__tests__/sdk-patterns.test.ts` (4 tests, all passing)
-  - Tests pour `getDecisionPatterns()` via SDK
-  - Tests pour filtrage par fréquence minimale
-  - Tests pour filtrage par time range
-  - Tests pour runs vides
+  - Tests for `getDecisionPatterns()` via SDK
+  - Tests for filtering by minimum frequency
+  - Tests for filtering by time range
+  - Tests for empty runs
 
 ### Usage Example
 
@@ -242,9 +242,9 @@ for (const pattern of analysis.patterns) {
 
 ### Next Steps (Frontend)
 
-La partie backend est complète. Pour la visualisation frontend :
-- Utiliser les données JSON de l'analyse des patterns
-- Créer des graphiques avec recharts ou @visx/visx
-- Afficher les insights de manière visuelle
-- Comparer les patterns entre différentes périodes
-- Intégrer avec Storybook pour la documentation
+The backend part is complete. For frontend visualization:
+- Use the pattern analysis JSON data
+- Create charts with recharts or @visx/visx
+- Display insights visually
+- Compare patterns across different periods
+- Integrate with Storybook for documentation

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { AgentImpl } from './agent.js';
 import { ActionEngine } from './engines/action-engine.js';
@@ -7,9 +8,31 @@ import { ReasoningEngine } from './engines/reasoning-engine.js';
 import { ReplayEngine } from './engines/replay-engine.js';
 import { ApprovalManager } from './managers/approval-manager.js';
 import { BudgetTracker } from './managers/budget-tracker.js';
-import { FallbackProvider } from './providers/fallback-provider.js';
-import { ProviderFactory } from './providers/provider-factory.js';
 import type { LLMProvider } from './providers/llm-provider.js';
+import { createLLMProvider } from './providers/create-llm-provider.js';
+import { FallbackProvider } from './providers/fallback-provider.js';
+import { DEFAULT_RETRY_POLICY } from './resilience/retry.js';
+import { RetryingLLMProvider, type ProviderRetryInfo } from './resilience/retrying-provider.js';
+import type { CognitiveAgent } from './cognition/cognitive-agent.js';
+import { assembleCognitiveAgent, type CognitiveAgentConfig } from './cognition/create-cognitive-agent.js';
+import type { MentalState } from './cognition/mental-state.js';
+import {
+  buildControllerDataset,
+  rebuildMentalState,
+  toJsonLines,
+  type ControllerTrainingExample,
+} from './cognition/mental-state-replay.js';
+import { distillThinkerProfile, type DistillProfileInput } from './cognition/profile-distiller.js';
+import type { ThinkerProfile } from './cognition/thinker-profile.js';
+import { DEFAULT_PRICING, type PricingTable } from './costs/pricing.js';
+import { computeRunCost, type RunCostReport } from './costs/run-cost.js';
+import { DecisionService } from './decisions/decision-service.js';
+import { JevClient } from './decisions/jev-client.js';
+import type { TypedDecisionClient } from './decisions/typed-decisions.js';
+import { LLMProviderError, ValidationError } from './errors/index.js';
+import { incidentSchema, type Incident } from './incidents/incident.js';
+import { MonitoredEventStore } from './incidents/monitored-event-store.js';
+import { deriveRunStatus } from './utils/run-status.js';
 import { CapabilityRegistry } from './registry/capability-registry.js';
 import { ToolRegistry } from './registry/tool-registry.js';
 import type { IEventStore } from './stores/event-store.js';
@@ -54,7 +77,7 @@ import type { AdvancedEventFilter, AdvancedEventQueryResult, EventStatistics } f
 
 export interface SDK {
   createAgent(config: AgentConfig): AgentImpl;
-  defineTool(definition: ToolDefinition): Tool;
+  defineTool<Schema extends z.ZodSchema>(definition: ToolDefinition<Schema>): Tool;
   defineCapability(definition: {
     name: string;
     description: string;
@@ -86,6 +109,24 @@ export interface SDK {
   validateAgainstGoldenTrace(runId: string, goldenTraceId: string, options?: ValidationOptions): Promise<ValidationResult>;
   replayAndValidate(runId: string, goldenTraceId: string, options?: ValidationOptions): Promise<ValidationResult>;
   detectRegressions(newRunId: string, goldenTraceId: string, options?: import('./types/regression.js').RegressionDetectionOptions): Promise<import('./types/regression.js').RegressionReport>;
+  /** Creates an agent that reasons explicitly (hypotheses, simulation, critique) before answering. */
+  createCognitiveAgent(config: CognitiveAgentConfig): CognitiveAgent;
+  /** Rebuilds the mental state of a cognitive run from its events. */
+  getMentalState(runId: string): Promise<MentalState>;
+  /** Exports cognitive runs as JSON Lines (state → chosen operation) to train a controller. */
+  exportControllerDataset(runIds?: string[]): Promise<string>;
+  /** Extracts a thinker profile from topics explained in someone's own words. */
+  distillThinkerProfile(input: DistillProfileInput): Promise<ThinkerProfile>;
+  /** Typed decisions (Jev): context injection, single/multiple choice, checks, ratings. */
+  readonly decisions: DecisionService;
+  /** Token usage and cost of a run, per model. */
+  getRunCost(runId: string): Promise<RunCostReport>;
+  /** Incidents raised during a run. */
+  getIncidents(runId: string): Promise<Incident[]>;
+  /** Every registered tool (used to expose them over MCP). */
+  listTools(): Tool[];
+  /** Executes a tool through the governed pipeline (policies, approvals, budgets, events). */
+  executeTool(name: string, parameters: Record<string, unknown>, options?: { agentId?: string; runId?: string; allowedTools?: string[] }): Promise<unknown>;
 }
 
 export class SDKImpl implements SDK {
@@ -100,13 +141,20 @@ export class SDKImpl implements SDK {
   private replayEngine: ReplayEngine;
   private agents: Map<string, Agent> = new Map();
   private activeAgentInstances: Map<string, AgentImpl> = new Map();
+  private cognitiveAgents: Map<string, CognitiveAgent> = new Map();
   private goldenTraceManager: GoldenTraceManager;
   private regressionTestManager: RegressionTestManager;
   private assertionManager: AssertionManager;
   private impactAnalysisManager: ImpactAnalysisManager;
 
+  private pricing: PricingTable;
+  private decisionClient?: TypedDecisionClient;
+  private decisionService?: DecisionService;
+
   constructor(config: SDKConfig) {
-    this.eventStore = config.eventStore || new FileEventStore();
+    const baseStore = config.eventStore || new FileEventStore();
+    this.eventStore = config.incidents ? new MonitoredEventStore(baseStore, config.incidents) : baseStore;
+    this.pricing = { ...DEFAULT_PRICING, ...config.pricing };
     this.toolRegistry = new ToolRegistry();
     this.capabilityRegistry = new CapabilityRegistry();
     this.policyEngine = new PolicyEngine();
@@ -118,7 +166,29 @@ export class SDKImpl implements SDK {
     this.policyEngine.setEventStore(this.eventStore);
     
     // Create provider once (shared, stateless)
-    this.provider = this.createProvider(config);
+    const retryPolicy = config.retry === false ? undefined : { ...DEFAULT_RETRY_POLICY, ...config.retry };
+    const onRetry = (info: ProviderRetryInfo) => this.recordProviderRetry(info);
+    if (config.llmProvider) {
+      // Injected providers are used as given unless `retry` is set explicitly. A fallback
+      // chain is never wrapped: it has to stay visible to the reasoning engine.
+      const wrap =
+        config.retry && retryPolicy && !(config.llmProvider instanceof FallbackProvider);
+      this.provider = wrap
+        ? new RetryingLLMProvider(config.llmProvider, retryPolicy, onRetry)
+        : config.llmProvider;
+    } else {
+      this.provider = createLLMProvider(config, retryPolicy ? { retryPolicy, onRetry } : {});
+    }
+
+    this.decisionClient =
+      config.decisionClient ??
+      (config.jev
+        ? new JevClient({
+            ...(retryPolicy ? { maxRetries: retryPolicy.maxRetries, retryBaseDelayMs: retryPolicy.initialDelayMs } : {}),
+            ...config.jev,
+          })
+        : undefined);
+    this.decisionService = this.decisionClient ? new DecisionService(this.decisionClient, this.eventStore) : undefined;
     
     // ActionEngine and ReplayEngine are shared (stateless)
     // ApprovalManager is passed to ActionEngine for approval workflow
@@ -136,49 +206,128 @@ export class SDKImpl implements SDK {
     }
   }
 
-  private createProvider(config: SDKConfig): LLMProvider {
-    const provider = config.provider || 'openai';
-    
-    // Create primary provider
-    let primaryProvider: LLMProvider;
-    
-    if (provider === 'anthropic') {
-      const anthropicConfig = config.providerConfig?.anthropic;
-      const apiKey = anthropicConfig?.apiKey || config.apiKey;
-      const defaultModel = anthropicConfig?.defaultModel || 'claude-3-5-sonnet-20241022';
-      primaryProvider = ProviderFactory.createProvider({
-        provider: 'anthropic',
-        apiKey,
-        defaultModel,
-      });
-    } else {
-      const openaiConfig = config.providerConfig?.openai;
-      const apiKey = openaiConfig?.apiKey || config.apiKey;
-      const defaultModel = openaiConfig?.defaultModel || 'gpt-4';
-      primaryProvider = ProviderFactory.createProvider({
-        provider: 'openai',
-        apiKey,
-        defaultModel,
-      });
+  createCognitiveAgent(config: CognitiveAgentConfig): CognitiveAgent {
+    const agentId = uuidv4();
+    for (const tool of config.tools ?? []) {
+      if (!this.toolRegistry.getTool(tool.name)) {
+        this.toolRegistry.registerTool(tool);
+      }
     }
+    for (const policy of config.policies ?? []) {
+      this.policyEngine.applyAgentPolicy(agentId, policy);
+    }
+    const agent = assembleCognitiveAgent(config, {
+      agentId,
+      provider: this.provider,
+      eventStore: this.eventStore,
+      actionEngine: this.actionEngine,
+      ...(this.decisionClient ? { decisionClient: this.decisionClient } : {}),
+    });
+    this.cognitiveAgents.set(agentId, agent);
+    return agent;
+  }
 
-    // Create fallback providers if configured
-    if (config.fallbackProviders && config.fallbackProviders.length > 0) {
-      const fallbackProviders = config.fallbackProviders.map((fallbackConfig) => {
-        const fallbackApiKey = fallbackConfig.config?.apiKey || config.apiKey;
-        const fallbackDefaultModel = fallbackConfig.config?.defaultModel;
-        
-        return ProviderFactory.createProvider({
-          provider: fallbackConfig.provider,
-          apiKey: fallbackApiKey,
-          defaultModel: fallbackDefaultModel,
-        });
+  async getMentalState(runId: string): Promise<MentalState> {
+    return rebuildMentalState(await this.eventStore.getEvents(runId));
+  }
+
+  async exportControllerDataset(runIds?: string[]): Promise<string> {
+    const ids = runIds ?? (await this.eventStore.getRunIds());
+    const examples: ControllerTrainingExample[] = [];
+    for (const runId of ids) {
+      const events = await this.eventStore.getEvents(runId);
+      if (!events.some((event) => event.type === 'cognition.started')) continue;
+      try {
+        examples.push(...buildControllerDataset(runId, events));
+      } catch (error) {
+        // One damaged run must not block the export of all the others.
+        console.warn(`Skipping run ${runId} in the controller dataset:`, error instanceof Error ? error.message : error);
+      }
+    }
+    return toJsonLines(examples);
+  }
+
+  distillThinkerProfile(input: DistillProfileInput): Promise<ThinkerProfile> {
+    return distillThinkerProfile(this.provider, input);
+  }
+
+  get decisions(): DecisionService {
+    if (!this.decisionService) {
+      throw new ValidationError('decisions', 'configure `jev` or `decisionClient` to use typed decisions');
+    }
+    return this.decisionService;
+  }
+
+  async getRunCost(runId: string): Promise<RunCostReport> {
+    return computeRunCost(runId, await this.eventStore.getEvents(runId), this.pricing);
+  }
+
+  async getIncidents(runId: string): Promise<Incident[]> {
+    const events = await this.eventStore.getEvents(runId, { type: 'incident.reported' });
+    return events.flatMap((event) => {
+      const parsed = incidentSchema.safeParse(event.data.incident);
+      return parsed.success ? [parsed.data] : [];
+    });
+  }
+
+  listTools(): Tool[] {
+    return this.toolRegistry.getAllTools();
+  }
+
+  async executeTool(
+    name: string,
+    parameters: Record<string, unknown>,
+    options: { agentId?: string; runId?: string; allowedTools?: string[] } = {}
+  ): Promise<unknown> {
+    const runId = options.runId ?? `tool_${uuidv4()}`;
+    const agentId = options.agentId ?? 'external';
+    const log = (type: Event['type'], data: Record<string, unknown>) =>
+      this.eventStore.append(runId, {
+        id: uuidv4(),
+        runId,
+        type,
+        timestamp: Date.now(),
+        data,
+        metadata: { agentId },
       });
 
-      return new FallbackProvider(primaryProvider, fallbackProviders);
+    if (!options.runId) {
+      await log('run.started', { input: { message: `tool ${name}`, context: { parameters } }, mode: 'tool' });
     }
+    try {
+      const result = await this.actionEngine.executeIntention(
+        { type: 'tool_call', toolName: name, parameters },
+        { runId, agentId, ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}) }
+      );
+      if (!options.runId) {
+        await log('run.completed', { output: result.result });
+      }
+      return result.result;
+    } catch (error) {
+      if (!options.runId) {
+        await log('run.failed', { error: error instanceof Error ? error.message : String(error) });
+      }
+      throw error;
+    }
+  }
 
-    return primaryProvider;
+  private async recordProviderRetry(info: ProviderRetryInfo): Promise<void> {
+    if (!info.runId) {
+      return;
+    }
+    await this.eventStore.append(info.runId, {
+      id: uuidv4(),
+      runId: info.runId,
+      type: 'provider.retry',
+      timestamp: Date.now(),
+      data: {
+        provider: info.provider,
+        model: info.model,
+        retry: info.retry,
+        delayMs: info.delayMs,
+        error: describeRetryError(info.error),
+      },
+    });
   }
 
   createAgent(config: AgentConfig): AgentImpl {
@@ -244,7 +393,7 @@ export class SDKImpl implements SDK {
     return agentImpl;
   }
 
-  defineTool(definition: ToolDefinition): Tool {
+  defineTool<Schema extends z.ZodSchema>(definition: ToolDefinition<Schema>): Tool {
     return this.toolRegistry.registerTool(definition);
   }
 
@@ -781,6 +930,7 @@ export class SDKImpl implements SDK {
       if (agentImpl) {
         await agentImpl.stopRun(runId);
       }
+      await this.cognitiveAgents.get(agentId)?.stop(runId);
     }
     // Cancel any pending approvals for this run
     this.approvalManager.cancelAllForRun(runId);
@@ -908,12 +1058,7 @@ export class SDKImpl implements SDK {
   }
 
   private getStatusFromEvents(events: Event[]): string {
-    const lastEvent = events[events.length - 1];
-    if (lastEvent.type === 'run.completed') return 'completed';
-    if (lastEvent.type === 'run.failed') return 'failed';
-    if (lastEvent.type === 'run.cancelled') return 'cancelled';
-    if (events.some((e) => e.type === 'run.started')) return 'running';
-    return 'pending';
+    return deriveRunStatus(events);
   }
 
   private formatTraceAsText(trace: Trace): string {
@@ -964,7 +1109,7 @@ export function createSDK(config: SDKConfig): SDK {
 // Module-level SDK instance for convenience functions
 let moduleSDK: SDKImpl | null = null;
 
-export function defineTool(definition: ToolDefinition): Tool {
+export function defineTool<Schema extends z.ZodSchema>(definition: ToolDefinition<Schema>): Tool {
   if (!moduleSDK) {
     // Create a temporary SDK instance for module-level functions
     // This is a convenience function, so we use a dummy key
@@ -972,4 +1117,12 @@ export function defineTool(definition: ToolDefinition): Tool {
     moduleSDK = new SDKImpl({ apiKey: 'dummy-key-for-module-functions' });
   }
   return moduleSDK.defineTool(definition);
+}
+
+/** The vendor's message, not the generic "LLM provider error" of the wrapper. */
+function describeRetryError(error: unknown): string {
+  if (error instanceof LLMProviderError) {
+    return `${error.provider}: ${error.originalError.message}`;
+  }
+  return error instanceof Error ? error.message : String(error);
 }

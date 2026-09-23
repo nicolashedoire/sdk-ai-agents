@@ -1,69 +1,69 @@
-# Story 11.2: Budgets Complexes (par Tool, par Agent, par Période)
+# Story 11.2: Complex Budgets (per Tool, per Agent, per Period)
 
 **Story ID:** 11.2  
-**Epic:** 11 - Policies Avancées  
+**Epic:** 11 - Advanced Policies  
 **Status:** backlog  
 **Created:** 2026-01-06
 
 ## User Story
 
 **As a** tech lead,
-**I want** définir des budgets complexes (par tool, par agent, par période),
-**So that** je peux contrôler finement les coûts et l'utilisation.
+**I want** define complex budgets (per tool, per agent, per period),
+**So that** I can finely control costs and usage.
 
 ## Acceptance Criteria
 
-**Given** des budgets complexes configurés
-**When** un agent exécute des actions
-**Then** les budgets sont vérifiés (par tool, par agent, par période)
-**And** les violations de budget sont détectées
-**And** les actions sont bloquées si budget dépassé
-**And** les budgets sont tracés et consultables
+**Given** complex budgets configured
+**When** an agent executes actions
+**Then** the budgets are checked (per tool, per agent, per period)
+**And** budget violations are detected
+**And** actions are blocked if the budget is exceeded
+**And** budgets are tracked and queryable
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current state:**
+- Complete implementation in the codebase
+- Functionality tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files concerned:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Functionality implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Functionality validated
 
 ## Story Completion Status
 
 **Status:** review  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested
 
 ## Implementation Details
 

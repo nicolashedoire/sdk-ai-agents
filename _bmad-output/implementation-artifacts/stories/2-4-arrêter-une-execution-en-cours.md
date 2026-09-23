@@ -1,4 +1,4 @@
-# Story 2.4: Arrêter une exécution en cours
+# Story 2.4: Stopping an execution in progress
 
 **Story ID:** 2.4  
 **Epic:** 2 - Agent Lifecycle & Execution Management  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** arrêter une exécution en cours,
-**So that** je peux interrompre un agent qui prend trop de temps ou qui déraille.
+**As a** developer,
+**I want** to stop an execution in progress,
+**So that** I can interrupt an agent that is taking too long or going off track.
 
 ## Acceptance Criteria
 
-**Given** une exécution est en cours (état "running")
-**When** j'appelle `agent.stop()` ou `sdk.stopRun(runId)`
-**Then** l'exécution s'arrête proprement
-**And** l'état passe à "cancelled"
-**And** tous les événements jusqu'à l'arrêt sont persistés
-**And** aucun tool call n'est exécuté après l'arrêt
+**Given** an execution is in progress (state "running")
+**When** I call `agent.stop()` or `sdk.stopRun(runId)`
+**Then** the execution stops cleanly
+**And** the state changes to "cancelled"
+**And** all events up to the stop are persisted
+**And** no tool call is executed after the stop
 
 ## Business Value
 
-- **Contrôle**: Arrêt propre et immédiat
-- **Sécurité**: Aucun effet de bord après arrêt
-- **Traçabilité**: Événements persistés
+- **Control**: Clean and immediate stop
+- **Security**: No side effects after stopping
+- **Traceability**: Events persisted
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase MVP
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current State:**
+- Complete implementation in the MVP codebase
+- Feature tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files Involved:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée dans le MVP. Voir les fichiers sources pour les détails d'implémentation.
+Feature implemented and tested in the MVP. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Followed
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Feature validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète dans le MVP  
-**Notes:** Story MVP complétée et testée
+**Implementation:** Complete in the MVP  
+**Notes:** MVP story completed and tested

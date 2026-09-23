@@ -1,95 +1,95 @@
-# Story 13.4: Visualisation des Traces
+# Story 13.4: Trace Visualization
 
 **Story ID:** 13.4  
-**Epic:** 13 - Observabilité Cognitive  
+**Epic:** 13 - Cognitive Observability  
 **Status:** review  
 **Created:** 2026-01-06
 
 ## User Story
 
-**As a** développeur,
-**I want** visualiser les traces de manière interactive,
-**So that** je peux explorer facilement ce qui s'est passé.
+**As a** developer,
+**I want** to visualize traces interactively,
+**So that** I can easily explore what happened.
 
 ## Acceptance Criteria
 
-**Given** une trace d'exécution
-**When** je la visualise
-**Then** je peux naviguer dans la timeline
-**And** les événements sont groupés logiquement
-**And** les détails sont accessibles facilement
+**Given** an execution trace
+**When** I visualize it
+**Then** I can navigate the timeline
+**And** events are grouped logically
+**And** details are easily accessible
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events traced
 
 ## Technical Requirements
 
-### Stack Front-End
+### Front-End Stack
 
-**Technologies requises:**
-- **Storybook 10**: Pour le développement et la documentation des composants UI
-- **Tailwind CSS**: Pour le styling et le design system
-- **shadcn/ui**: Composants UI réutilisables basés sur Radix UI
+**Required technologies:**
+- **Storybook 10**: For UI component development and documentation
+- **Tailwind CSS**: For styling and the design system
+- **shadcn/ui**: Reusable UI components based on Radix UI
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- À implémenter avec composants React/TypeScript
-- Visualisation interactive des traces
-- Navigation dans la timeline
-- Groupement logique des événements
+**Current state:**
+- To be implemented with React/TypeScript components
+- Interactive trace visualization
+- Timeline navigation
+- Logical event grouping
 
-**Fichiers concernés:**
-- Composants React dans `src/components/trace-viewer/`
-- Stories Storybook dans `.storybook/`
-- Styles Tailwind CSS
-- Composants shadcn/ui pour l'interface
+**Files concerned:**
+- React components in `src/components/trace-viewer/`
+- Storybook stories in `.storybook/`
+- Tailwind CSS styles
+- shadcn/ui components for the interface
 
-### Implémentation
+### Implementation
 
-**Composants à créer:**
-- `TraceViewer` - Composant principal de visualisation
-- `Timeline` - Timeline interactive des événements
-- `EventGroup` - Groupe d'événements logiques
-- `EventCard` - Carte d'événement individuel
-- `TraceFilters` - Filtres de recherche
-- `TraceNavigation` - Navigation dans la trace
+**Components to create:**
+- `TraceViewer` - Main visualization component
+- `Timeline` - Interactive event timeline
+- `EventGroup` - Logical event group
+- `EventCard` - Individual event card
+- `TraceFilters` - Search filters
+- `TraceNavigation` - Trace navigation
 
-**Bibliothèques recommandées:**
-- Composants shadcn/ui: Tabs, Accordion, Card, Badge, etc.
-- Tailwind CSS pour le styling
-- `react-virtualized` ou `@tanstack/react-virtual` pour performance avec grandes traces
+**Recommended libraries:**
+- shadcn/ui components: Tabs, Accordion, Card, Badge, etc.
+- Tailwind CSS for styling
+- `react-virtualized` or `@tanstack/react-virtual` for performance with large traces
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
-2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+1. **Separation of concerns**: Architecture respected
+2. **Type-safety**: Strict TypeScript
+3. **Event-sourcing**: Events traced
+4. **Security**: Deny-by-default respected
 
 ## Library & Framework Requirements
 
-### Dépendances Front-End Requises
+### Required Front-End Dependencies
 
 **Storybook:**
 - `@storybook/react` v10.x
 - `@storybook/addon-essentials` v10.x
-- `@storybook/addon-interactions` pour tests interactifs
+- `@storybook/addon-interactions` for interactive tests
 
 **Tailwind CSS:**
-- `tailwindcss` dernière version stable
-- Configuration avec thème personnalisé
+- `tailwindcss` latest stable version
+- Configuration with a custom theme
 
 **shadcn/ui:**
-- Composants nécessaires: Tabs, Accordion, Card, Badge, ScrollArea, etc.
+- Required components: Tabs, Accordion, Card, Badge, ScrollArea, etc.
 
-**Bibliothèques de performance:**
-- `@tanstack/react-virtual` pour virtualisation de listes longues
+**Performance libraries:**
+- `@tanstack/react-virtual` for virtualizing long lists
 
 ### Installation
 
@@ -115,14 +115,14 @@ npm install @tanstack/react-virtual
 src/
   components/
     trace-viewer/
-      TraceViewer.tsx         # Composant principal
-      Timeline.tsx            # Timeline interactive
-      EventGroup.tsx          # Groupe d'événements
-      EventCard.tsx           # Carte événement
-      TraceFilters.tsx        # Filtres
+      TraceViewer.tsx         # Main component
+      Timeline.tsx            # Interactive timeline
+      EventGroup.tsx          # Event group
+      EventCard.tsx           # Event card
+      TraceFilters.tsx        # Filters
       TraceNavigation.tsx      # Navigation
       index.ts                # Exports
-  ui/                         # Composants shadcn/ui
+  ui/                         # shadcn/ui components
     tabs.tsx
     accordion.tsx
     card.tsx
@@ -130,90 +130,90 @@ src/
     scroll-area.tsx
     ...
 .storybook/
-  main.ts                     # Configuration Storybook 10
-  preview.ts                  # Configuration preview
+  main.ts                     # Storybook 10 configuration
+  preview.ts                  # Preview configuration
 stories/
-  TraceViewer.stories.tsx     # Stories Storybook
+  TraceViewer.stories.tsx     # Storybook stories
   Timeline.stories.tsx
   ...
 ```
 
 ## Testing Requirements
 
-- ✅ Tests unitaires des composants React
-- ✅ Tests Storybook avec interactions
-- ✅ Tests d'intégration avec données réelles
-- ✅ Tests de performance avec grandes traces
-- ✅ Tests d'accessibilité (a11y)
+- ✅ Unit tests for React components
+- ✅ Storybook tests with interactions
+- ✅ Integration tests with real data
+- ✅ Performance tests with large traces
+- ✅ Accessibility tests (a11y)
 
 ## Story Completion Status
 
 **Status:** review  
-**Implementation:** Backend complété - Visualisation des traces avec groupement logique  
-**Notes:** Partie backend implémentée. La visualisation frontend (React/Storybook) peut être ajoutée séparément.
+**Implementation:** Backend completed - Trace visualization with logical grouping  
+**Notes:** Backend part implemented. Frontend visualization (React/Storybook) can be added separately.
 
 ## Implementation Details (Backend)
 
 ### Components Created
 
 1. **Trace Visualization Types** (`src/types/trace-visualization.ts`)
-   - `EventGroup`: Groupe d'événements logiques avec métadonnées
-   - `TraceVisualization`: Structure complète pour visualisation avec groupes, timeline et résumé
+   - `EventGroup`: Logical event group with metadata
+   - `TraceVisualization`: Complete structure for visualization with groups, timeline, and summary
 
 2. **TraceVisualizer** (`src/utils/trace-visualizer.ts`)
-   - `visualize()`: Crée une structure optimisée pour visualisation depuis une trace
-   - Groupe les événements logiquement (run_lifecycle, reasoning_cycle, tool_execution, policy_check, approval_workflow, error)
-   - Construit une timeline plate avec références aux groupes
-   - Calcule les métriques clés et statistiques
+   - `visualize()`: Creates an optimized structure for visualization from a trace
+   - Groups events logically (run_lifecycle, reasoning_cycle, tool_execution, policy_check, approval_workflow, error)
+   - Builds a flat timeline with references to groups
+   - Computes key metrics and statistics
 
 3. **SDK Method** (`src/sdk.ts`)
-   - `getTraceVisualization(runId)`: Récupère la visualisation optimisée pour un run
+   - `getTraceVisualization(runId)`: Retrieves the optimized visualization for a run
 
 ### Event Group Types
 
-- **run_lifecycle**: Événements de cycle de vie du run (started, completed, failed, cancelled)
-- **reasoning_cycle**: Cycle de raisonnement (intention generation, execution)
-- **tool_execution**: Exécution d'outil (tool calls, actions)
-- **policy_check**: Vérifications de policies
-- **approval_workflow**: Workflow d'approbation (requested, approved, rejected)
-- **error**: Erreurs et échecs
+- **run_lifecycle**: Run lifecycle events (started, completed, failed, cancelled)
+- **reasoning_cycle**: Reasoning cycle (intention generation, execution)
+- **tool_execution**: Tool execution (tool calls, actions)
+- **policy_check**: Policy checks
+- **approval_workflow**: Approval workflow (requested, approved, rejected)
+- **error**: Errors and failures
 
 ### Grouping Logic
 
-- Les événements sont groupés par type logique
-- Les groupes de tool_execution sont séparés par outil
-- Les cycles de raisonnement sont séparés s'il y a un gap temporel > 5 secondes
-- Chaque groupe contient ses métadonnées (toolName, policyId, intentionType, status)
+- Events are grouped by logical type
+- tool_execution groups are separated by tool
+- Reasoning cycles are separated when there is a temporal gap > 5 seconds
+- Each group contains its metadata (toolName, policyId, intentionType, status)
 
 ### Timeline Structure
 
-- Timeline plate avec tous les événements dans l'ordre chronologique
-- Chaque entrée référence son groupe parent
-- Descriptions lisibles pour chaque événement
-- Accès direct à l'événement complet si nécessaire
+- Flat timeline with all events in chronological order
+- Each entry references its parent group
+- Readable descriptions for each event
+- Direct access to the full event when needed
 
 ### Summary Metrics
 
-- Total d'événements et groupes
-- Répartition par type de groupe
-- Métriques clés : intentions, actions, tools, policies, approvals, errors
+- Total events and groups
+- Breakdown by group type
+- Key metrics: intentions, actions, tools, policies, approvals, errors
 
 ### Tests
 
 - **Unit Tests**: `src/__tests__/trace-visualizer.test.ts` (7 tests, all passing)
-  - Tests pour création de visualisation
-  - Tests pour groupement logique
-  - Tests pour timeline plate
-  - Tests pour métriques
-  - Tests pour workflows d'approbation
-  - Tests pour erreurs
-  - Tests pour événements vides
+  - Tests for visualization creation
+  - Tests for logical grouping
+  - Tests for flat timeline
+  - Tests for metrics
+  - Tests for approval workflows
+  - Tests for errors
+  - Tests for empty events
 
 - **Integration Tests**: `src/__tests__/sdk-trace-visualization.test.ts` (4 tests, all passing)
-  - Tests pour `getTraceVisualization()` via SDK
-  - Tests pour groupement logique
-  - Tests pour métriques
-  - Tests de gestion d'erreurs
+  - Tests for `getTraceVisualization()` via SDK
+  - Tests for logical grouping
+  - Tests for metrics
+  - Tests for error handling
 
 ### Usage Example
 
@@ -258,10 +258,10 @@ console.log(`  Policies: ${visualization.summary.keyMetrics.policiesChecked}`);
 
 ### Next Steps (Frontend)
 
-La partie backend est complète. Pour la visualisation frontend :
-- Utiliser les données JSON de la visualisation
-- Créer des composants React pour la timeline interactive
-- Afficher les groupes d'événements de manière visuelle
-- Implémenter la navigation et les filtres
-- Utiliser @tanstack/react-virtual pour performance avec grandes traces
-- Intégrer avec Storybook pour la documentation
+The backend part is complete. For frontend visualization:
+- Use the visualization's JSON data
+- Create React components for the interactive timeline
+- Display event groups visually
+- Implement navigation and filters
+- Use @tanstack/react-virtual for performance with large traces
+- Integrate with Storybook for documentation

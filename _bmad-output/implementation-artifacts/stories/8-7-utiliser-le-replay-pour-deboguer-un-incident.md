@@ -1,4 +1,4 @@
-# Story 8.7: Utiliser le replay pour déboguer un incident
+# Story 8.7: Use replay to debug an incident
 
 **Story ID:** 8.7  
 **Epic:** 8 - Replay & Debugging  
@@ -7,60 +7,60 @@
 
 ## User Story
 
-**As a** développeur,
-**I want** utiliser le replay pour déboguer un incident,
-**So that** je peux comprendre rapidement ce qui a causé un problème.
+**As a** developer,
+**I want** use replay to debug an incident,
+**So that** I can quickly understand what caused a problem.
 
 ## Acceptance Criteria
 
-**Given** un incident s'est produit (runId avec état "failed")
-**When** je rejoue l'exécution
-**Then** je peux voir exactement où et pourquoi l'échec s'est produit
-**And** je peux inspecter l'état à chaque étape
-**And** je peux identifier la cause racine rapidement
-**And** le replay me permet de tester des corrections
+**Given** an incident occurred (runId with "failed" state)
+**When** I replay the execution
+**Then** I can see exactly where and why the failure occurred
+**And** I can inspect the state at each step
+**And** I can identify the root cause quickly
+**And** the replay lets me test fixes
 
 ## Business Value
 
-- **Fonctionnalité**: Feature implémentée
-- **Qualité**: Testée et validée
-- **Traçabilité**: Événements tracés
+- **Functionality**: Feature implemented
+- **Quality**: Tested and validated
+- **Traceability**: Events tracked
 
 ## Technical Requirements
 
-### Architecture Actuelle
+### Current Architecture
 
-**État actuel:**
-- Implémentation complète dans le codebase
-- Fonctionnalité testée et validée
-- Code dans `src/` avec tests dans `src/__tests__/`
+**Current state:**
+- Complete implementation in the codebase
+- Functionality tested and validated
+- Code in `src/` with tests in `src/__tests__/`
 
-**Fichiers concernés:**
-- Code source dans `src/`
-- Tests dans `src/__tests__/`
-- Types dans `src/types/`
+**Files concerned:**
+- Source code in `src/`
+- Tests in `src/__tests__/`
+- Types in `src/types/`
 
-### Implémentation
+### Implementation
 
-Fonctionnalité implémentée et testée. Voir les fichiers sources pour les détails d'implémentation.
+Functionality implemented and tested. See the source files for implementation details.
 
 ## Architecture Compliance
 
-### Principes Respectés
+### Principles Respected
 
-1. **Séparation des responsabilités**: Architecture respectée
+1. **Separation of concerns**: Architecture respected
 2. **Type-safety**: TypeScript strict
-3. **Event-sourcing**: Événements tracés
-4. **Sécurité**: Deny-by-default respecté
+3. **Event-sourcing**: Events tracked
+4. **Security**: Deny-by-default respected
 
 ## Testing Requirements
 
-- ✅ Tests unitaires présents
-- ✅ Tests d'intégration présents
-- ✅ Fonctionnalité validée
+- ✅ Unit tests present
+- ✅ Integration tests present
+- ✅ Functionality validated
 
 ## Story Completion Status
 
 **Status:** done  
-**Implementation:** Complète  
-**Notes:** Story complétée et testée
+**Implementation:** Complete  
+**Notes:** Story completed and tested
