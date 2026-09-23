@@ -46,8 +46,9 @@ export interface CognitiveController {
 
 /**
  * Deterministic controller: a fixed order of attention that needs no model call.
- * represent → hypothesize → simulate → critique → seek information → compare → decide,
- * exploring an alternative hypothesis while confidence stays below the threshold.
+ * represent → revise → compare observations → hypothesize → simulate → test predictions →
+ * critique → seek information → compare → decide, exploring an alternative hypothesis
+ * while confidence stays below the threshold.
  */
 export class HeuristicController implements CognitiveController {
   readonly name = 'heuristic';
@@ -76,6 +77,15 @@ export class HeuristicController implements CognitiveController {
     if (can('represent') && state.contradictions.some((item) => !item.resolved)) {
       return { operation: 'represent', rationale: 'unresolved contradiction: reframe the problem' };
     }
+    if (can('revise')) {
+      return { operation: 'revise', rationale: 'a hypothesis was contradicted by evidence' };
+    }
+    if (can('compare_observations')) {
+      return {
+        operation: 'compare_observations',
+        rationale: 'new observations to relate before explaining them',
+      };
+    }
 
     const active = activeHypotheses(state);
     if (active.length === 0 && can('hypothesize')) {
@@ -83,6 +93,9 @@ export class HeuristicController implements CognitiveController {
     }
     if (can('simulate')) {
       return { operation: 'simulate', rationale: 'a hypothesis has not been simulated' };
+    }
+    if (can('test_prediction')) {
+      return { operation: 'test_prediction', rationale: 'a recorded prediction can be tested' };
     }
     if (can('critique')) {
       return { operation: 'critique', rationale: 'a hypothesis has not been critiqued' };

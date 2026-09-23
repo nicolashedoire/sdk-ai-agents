@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Evidence loop** (observe → compare → deduce → verify → revise) in cognitive agents, with three new operations:
+  - `compare_observations` records similarities, differences, evolutions, incompatibilities and counterexamples;
+  - `test_prediction` runs your `OutcomeEvaluator` (no LLM call) and records a `cognition.evaluated` event;
+  - `revise` turns a refuted or contradicted hypothesis into a variant with `parentId`, scope and a required `difference`.
+- **Observations with provenance**: `think({ observations })`, tool results and test results become observations (`O1…`) with source, event id, time, context, fingerprint and origin group; repeated evidence is marked as a duplicate and adds no weight; facts cite the observations they come from, are not added twice, and can be retracted or superseded.
+- **Hypotheses** state their `kind` (proposal, rule, explanation), inference, premises and scope; **predictions** (`P1…`) carry an expected result, a falsifier and test parameters, are recorded before they are tested and tested once. A refuted prediction rejects its hypothesis and is logged as a resolved `refuted_prediction` contradiction; an inconclusive or failed test, or a refutation that reports no observation, never rejects anything.
+- **Evidence kept apart from preferences**: `support` (evidence) and `preferenceFit` (thinker fit, proposals only) are separate scores; only proposals are ranked with preferences (`limits.preferenceWeight`); the state's confidence is the evidence support of the best-ranked hypothesis.
+- **Stale assessments**: an `evidenceRevision` counter makes earlier assessments stale when the evidence changes; a comparison must reassess every hypothesis in play (the LLM is asked to repair an incomplete one), and one that fails or skips a hypothesis does not count.
+- **Conclusion guard**: `decide` is offered only when a hypothesis is critiqued, freshly assessed, free of unresolved contradictions in its scope, has no untested prediction while tests are possible, and reaches `decisionThreshold`. A decision that is not ready, or selects no hypothesis, is deferred while the budget lasts; a forced decision becomes `provisional` with `missing`, or an `abstain` (confidence 0) — also when the model cannot produce a decision at all. Decision confidence is capped by evidence support.
+- Contradictions have a category and are resolved once, only with cited observations or facts; the resolution and its action are kept. Engine-found contradictions are not duplicated.
+- Thinker feedback accepts `agreement` (share the thinker agreed with) and `wrongAbout` (where the reasoning went wrong); both are kept with corrections and `agreement` is exported with the controller dataset.
+- Options `evaluator`, `generator` and a custom `HypothesisAssessor` for `assessment`; limits `maxPredictionTests` and `preferenceWeight`.
+- Building blocks exported: `assembleThought`, `admitProposal`, `settleDecision`, `assessReadiness`, `rankHypotheses`, `PredictionTester`, observation builders and their types.
+- Documentation: *Evidence & verification* guide, new evidence-loop illustration, updated loop and architecture illustrations, `examples/rule-discovery.ts`.
+
+### Changed
+- Every thought enters the state through `assembleThought`: fields are restricted per operation, engine-only fields (observations, test results, failures, decision status) are stripped from proposals, and an invalid thought from a custom component is recorded as a failed operation instead of stopping the run. Components receive a copy of the state.
+- A step that changed nothing it was meant to change (no new hypothesis, nothing newly simulated or critiqued, no comparison recorded), an incomplete comparison and a deferred decision count as failed attempts of their operation; `compare_observations`, `hypothesize`, `simulate`, `revise`, `critique`, `compare` and `decide` are no longer offered after two failed attempts in a row, until another step brings new evidence (a step that succeeded, or a tool or test result recorded by the engine). Deferrals and steps without effect are recorded as failed (`cognition.thought.failed`, `cognition.operation_failed`) but do not count toward `maxConsecutiveFailures`, which counts failures of the model or its tools (an incomplete comparison after repair included).
+- A repeated observation counts as the same evidence as its original (facts and test results reference the original), and the same model contradiction is not recorded twice.
+- Proposals that restate an existing hypothesis (rejected or still in play) or a variant without `difference` are removed before the `maxHypotheses` cap, so they cannot take a valid proposal's place; a known fact read again gains the new source instead of being duplicated.
+- `TypedHypothesisAssessor` asks evidence questions without the thinker's profile and fit questions in a second request, proposals only (the `evidenceWeight` option is removed); a missing evidence answer makes it fall back to the LLM comparison.
+- `cognition.started` records `schemaVersion: 2`, initial observations and commit rules; runs without a version are rebuilt with their original rules (decision on a rejected hypothesis kept without its reference, patch confidence used, no evidence rules).
+- `ActionEngine.executeIntention` returns the `tool.called` and `action.executed` events it recorded (the `events` field used to be empty).
+- Public types gained required fields: `CognitiveLimits` (`maxPredictionTests`, `preferenceWeight`), `MentalState` (`schemaVersion`, `observations`, `comparisons`, `predictions`, `evidenceRevision`, `observationsCompared`, `commitRules`), `Hypothesis` (`kind`, `premiseRefs`, `evidenceRefs`, `counterEvidenceRefs`), `Fact` (`observationRefs`, `status`) and profile corrections (`wrongAbout`). `ThoughtRequest.observation` is a `ToolObservation` with an `observationId`. The patch `confidence` is only used by legacy runs, and `ALLOWED_FIELDS` no longer lists it.
+- `describeMentalState` omits empty collections and adds readiness and ranking, so the `state` of exported controller datasets changes shape, for older runs too.
+- `ReasoningFeedback` is the schema's input type (`wrongAbout` optional) and `refineProfile` validates it; `thoughtPatchSchema` and patch types live in `thought-patch.ts`, `describeMentalState` in `mental-state-view.ts` (both still exported from the package entry).
+
 ## [0.2.0] - 2026-09-23
 
 ### Added

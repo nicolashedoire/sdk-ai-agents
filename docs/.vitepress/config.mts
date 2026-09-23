@@ -43,6 +43,7 @@ export default withMermaid(
           text: 'Agents that think',
           items: [
             { text: 'Cognitive agents', link: '/guide/cognitive-agents' },
+          { text: 'Evidence & verification', link: '/guide/evidence-and-verification' },
             { text: 'Thinker profiles', link: '/guide/thinker-profiles' },
             { text: 'Governed agents', link: '/guide/governed-agents' },
           ],

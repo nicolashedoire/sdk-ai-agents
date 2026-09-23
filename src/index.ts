@@ -60,16 +60,70 @@ export { applyThought } from './cognition/mental-state-reducer.js';
 export {
   activeHypotheses,
   createMentalState,
-  describeMentalState,
-  thoughtPatchSchema,
+  CURRENT_SCHEMA_VERSION,
+  DEFAULT_COMMIT_RULES,
 } from './cognition/mental-state.js';
 export type {
-  Decision,
+  CommitRules,
+  Contradiction,
+  Fact,
   Hypothesis,
   MentalState,
+  Observation,
+  ObservationComparison,
+  Prediction,
+  PredictionEvaluation,
+  SchemaVersion,
+} from './cognition/mental-state.js';
+export { describeMentalState } from './cognition/mental-state-view.js';
+export { thoughtPatchSchema } from './cognition/thought-patch.js';
+export type {
+  Decision,
+  DecisionStatus,
+  HypothesisKind,
+  InferenceKind,
+  ObservationRecord,
+  OutcomeVerdict,
   ThoughtPatch,
   ThoughtPatchInput,
-} from './cognition/mental-state.js';
+} from './cognition/thought-patch.js';
+export {
+  abstention,
+  assessReadiness,
+  describeBlocker,
+  missingForCommitment,
+  rankHypotheses,
+  readyHypothesis,
+  settleDecision,
+} from './cognition/decision-readiness.js';
+export type {
+  DecisionBlocker,
+  DecisionReadiness,
+  DecisionSettlement,
+} from './cognition/decision-readiness.js';
+export { PredictionTester, outcomeReportSchema } from './cognition/outcome-evaluator.js';
+export type { OutcomeEvaluator, OutcomeReport } from './cognition/outcome-evaluator.js';
+export {
+  fingerprint,
+  observationFromInput,
+  observationFromTest,
+  observationFromTool,
+  observationInputSchema,
+} from './cognition/observation-records.js';
+export type { ObservationInput } from './cognition/observation-records.js';
+export {
+  admitProposal,
+  assembleThought,
+  unassessedHypotheses,
+} from './cognition/patch-admission.js';
+export type { AdmittedProposal, AssembledThought } from './cognition/patch-admission.js';
+export type {
+  EngineRecord,
+  OperationOutcome,
+  ProposedThought,
+} from './cognition/operation-outcome.js';
+export type { GeneratedOperation } from './cognition/thought-fields.js';
+export type { ToolObservation } from './cognition/thought-prompts.js';
 export {
   buildControllerDataset,
   rebuildMentalState,

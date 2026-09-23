@@ -1,14 +1,14 @@
 import { ThoughtGenerationError, type ModelUsage } from '../errors/index.js';
 import type { LLMProvider, LLMRequest, LLMResponse } from '../providers/llm-provider.js';
-import { thoughtPatchSchema, type MentalState, type ThoughtPatch } from './mental-state.js';
+import type { MentalState } from './mental-state.js';
+import { unassessedHypotheses } from './patch-admission.js';
 import type { ThinkerProfile } from './thinker-profile.js';
+import { ALLOWED_FIELDS, REQUIRED_FIELD, type GeneratedOperation } from './thought-fields.js';
+import { thoughtPatchSchema, type ThoughtPatch } from './thought-patch.js';
 import {
-  ALLOWED_FIELDS,
-  REQUIRED_FIELD,
   buildOperationPrompt,
   buildSystemPrompt,
-  type GeneratedOperation,
-  type Observation,
+  type ToolObservation,
 } from './thought-prompts.js';
 
 export interface ThoughtRequest {
@@ -17,7 +17,7 @@ export interface ThoughtRequest {
   operation: GeneratedOperation;
   state: MentalState;
   profile: ThinkerProfile;
-  observation?: Observation;
+  observation?: ToolObservation;
   abortSignal?: AbortSignal;
 }
 
@@ -108,7 +108,7 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
       model = response.model;
 
       const content = response.content ?? '';
-      const parsed = parseThought(request.operation, content);
+      const parsed = checkCompleteness(request, parseThought(request.operation, content));
       if (parsed.ok) {
         return {
           patch: parsed.patch,
@@ -177,6 +177,20 @@ export function parseThought(operation: GeneratedOperation, text: string): Parse
   }
 
   return { ok: true, patch: result.data, ignoredFields };
+}
+
+/** A comparison must judge every hypothesis in play; the model is asked to repair it otherwise. */
+function checkCompleteness(request: ThoughtRequest, parsed: ParsedThought): ParsedThought {
+  if (!parsed.ok || request.operation !== 'compare' || request.state.schemaVersion < 2) {
+    return parsed;
+  }
+  const skipped = unassessedHypotheses(request.state, parsed.patch);
+  return skipped.length === 0
+    ? parsed
+    : {
+        ok: false,
+        error: `"hypothesisUpdates" must give a support to every active hypothesis (missing: ${skipped.join(', ')})`,
+      };
 }
 
 /** Parses the first JSON object in a reply, tolerating Markdown fences and surrounding prose. */

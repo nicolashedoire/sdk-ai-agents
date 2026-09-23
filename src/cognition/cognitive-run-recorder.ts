@@ -2,10 +2,11 @@ import type { IEventStore } from '../stores/event-store.js';
 import type { Event } from '../types/events.js';
 import { generateEventId } from '../utils/id.js';
 import type { DecisionEvaluationRecord } from './cognitive-controller.js';
-import type { Decision, MentalState, ThoughtPatch } from './mental-state.js';
+import type { MentalState } from './mental-state.js';
 import type { OperationOutcome } from './operation-outcome.js';
 import type { OperationSelection } from './operation-selector.js';
 import type { ThinkerProfile } from './thinker-profile.js';
+import type { Decision, ThoughtPatch } from './thought-patch.js';
 
 /**
  * Writes the events of a cognitive run. Keeping the event shapes in one place keeps them
@@ -18,10 +19,12 @@ export class CognitiveRunRecorder {
     private readonly currentProfile: () => ThinkerProfile
   ) {}
 
-  async record(runId: string, type: Event['type'], data: Record<string, unknown>): Promise<void> {
+  /** Appends an event and returns its id, so observations can point to their source. */
+  async record(runId: string, type: Event['type'], data: Record<string, unknown>): Promise<string> {
     const profile = this.currentProfile();
+    const id = generateEventId();
     await this.eventStore.append(runId, {
-      id: generateEventId(),
+      id,
       runId,
       type,
       timestamp: Date.now(),
@@ -33,6 +36,7 @@ export class CognitiveRunRecorder {
         profileVersion: profile.version,
       },
     });
+    return id;
   }
 
   async evaluations(
@@ -54,6 +58,7 @@ export class CognitiveRunRecorder {
       controller: decision.controller,
       available,
       stepsRemaining,
+      ...(selection.forced ? { forced: true } : {}),
       ...(decision.confidence !== undefined ? { confidence: decision.confidence } : {}),
       ...(decision.probabilities ? { probabilities: decision.probabilities } : {}),
       ...(decision.rationale ? { rationale: decision.rationale } : {}),
@@ -68,6 +73,8 @@ export class CognitiveRunRecorder {
       operation: string;
       patch: ThoughtPatch;
       issues: string[];
+      failed: boolean;
+      ignoredFields: string[];
       outcome: OperationOutcome;
     }
   ): Promise<void> {
@@ -77,10 +84,8 @@ export class CognitiveRunRecorder {
       operation: thought.operation,
       patch: thought.patch,
       issues: thought.issues,
-      failed: outcome.failure !== undefined || !outcome.patch,
-      ...(outcome.ignoredFields && outcome.ignoredFields.length > 0
-        ? { ignoredFields: outcome.ignoredFields }
-        : {}),
+      failed: thought.failed,
+      ...(thought.ignoredFields.length > 0 ? { ignoredFields: thought.ignoredFields } : {}),
       ...(outcome.model ? { model: outcome.model } : {}),
       ...(outcome.requestedModel ? { requestedModel: outcome.requestedModel } : {}),
       ...(outcome.usage ? { usage: outcome.usage } : {}),
@@ -96,13 +101,25 @@ export class CognitiveRunRecorder {
     });
     await this.record(runId, 'cognition.concluded', {
       decision,
+      ...(decision.status ? { status: decision.status } : {}),
       confidence: state.confidence,
       steps: state.step,
+      evidenceRevision: state.evidenceRevision,
       hypotheses: state.hypotheses.map((hypothesis) => ({
         id: hypothesis.id,
+        kind: hypothesis.kind,
         statement: hypothesis.statement,
         status: hypothesis.status,
         support: hypothesis.support,
+        ...(hypothesis.preferenceFit !== undefined
+          ? { preferenceFit: hypothesis.preferenceFit }
+          : {}),
+        ...(hypothesis.parentId ? { parentId: hypothesis.parentId } : {}),
+      })),
+      predictions: state.predictions.map((prediction) => ({
+        id: prediction.id,
+        hypothesisId: prediction.hypothesisId,
+        status: prediction.status,
       })),
     });
     await this.record(runId, 'run.completed', { output: decision.answer, decision });

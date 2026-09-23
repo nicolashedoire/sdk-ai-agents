@@ -11,12 +11,13 @@ import { CognitiveAgent } from './cognitive-agent.js';
 import { HeuristicController, type CognitiveController } from './cognitive-controller.js';
 import { TypedHypothesisAssessor, type HypothesisAssessor } from './hypothesis-assessor.js';
 import { InformationSeeker } from './information-seeker.js';
-import { LLMThoughtGenerator } from './llm-thought-generator.js';
+import { LLMThoughtGenerator, type ThoughtGenerator } from './llm-thought-generator.js';
 import {
   DEFAULT_COGNITIVE_LIMITS,
   cognitiveLimitsSchema,
   type CognitiveLimits,
 } from './operation-selector.js';
+import type { OutcomeEvaluator } from './outcome-evaluator.js';
 import {
   DEFAULT_THINKER_PROFILE,
   defineThinkerProfile,
@@ -48,8 +49,21 @@ export interface CognitiveAgentConfig {
    */
   controller?: 'auto' | 'heuristic' | 'typed' | CognitiveController;
   controllerOptions?: TypedDecisionControllerOptions;
-  /** Who compares hypotheses: `auto` (default) uses the typed-decision client when configured. */
-  assessment?: 'auto' | 'llm' | 'typed';
+  /**
+   * Who judges hypotheses during `compare`: `auto` (default) uses the typed-decision client
+   * when configured, else the LLM; or your own `HypothesisAssessor`.
+   */
+  assessment?: 'auto' | 'llm' | 'typed' | HypothesisAssessor;
+  /**
+   * Produces the thoughts, observation comparisons included. Defaults to an LLM generator on
+   * `model`; whatever it returns still goes through the engine's admission rules.
+   */
+  generator?: ThoughtGenerator;
+  /**
+   * Confronts predictions with real tests (a simulator, a measurement, a test suite). Enables
+   * the `test_prediction` operation; without it, predictions are recorded but stay untested.
+   */
+  evaluator?: OutcomeEvaluator;
   temperature?: number;
   maxTokens?: number;
   providerSettings?: {
@@ -85,12 +99,14 @@ export function assembleCognitiveAgent(
     );
   }
   const limits = parsedLimits.data;
-  const generator = new LLMThoughtGenerator(environment.provider, {
-    model: config.model,
-    ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
-    ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
-    ...(config.systemPrompt ? { systemPrompt: config.systemPrompt } : {}),
-  });
+  const generator =
+    config.generator ??
+    new LLMThoughtGenerator(environment.provider, {
+      model: config.model,
+      ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
+      ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
+      ...(config.systemPrompt ? { systemPrompt: config.systemPrompt } : {}),
+    });
 
   return new CognitiveAgent({
     identity: {
@@ -105,6 +121,7 @@ export function assembleCognitiveAgent(
     generator,
     controller: resolveController(config, environment.decisionClient),
     ...optionalAssessor(config, environment.decisionClient),
+    ...(config.evaluator ? { evaluator: config.evaluator } : {}),
     seeker: new InformationSeeker({
       agentId: environment.agentId,
       model: config.model,
@@ -145,6 +162,9 @@ function optionalAssessor(
   client: TypedDecisionClient | undefined
 ): { assessor?: HypothesisAssessor } {
   const mode = config.assessment ?? 'auto';
+  if (typeof mode === 'object') {
+    return { assessor: mode };
+  }
   if (mode === 'llm') {
     return {};
   }

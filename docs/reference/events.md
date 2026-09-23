@@ -40,12 +40,13 @@ interface Event {
 
 | Type | Data |
 | --- | --- |
-| `cognition.started` | `goal`, `context?`, `profile`, `controller`, `assessor`, `allowedTools`, `limits` |
-| `cognition.operation_selected` | `step`, `operation`, `controller`, `available`, `stepsRemaining`, `confidence?`, `probabilities?`, `rationale?`, `fallbackFrom?` |
+| `cognition.started` | `schemaVersion` (2; absent on older runs), `goal`, `context?`, `observations` (given with the problem), `commitRules`, `profile`, `controller`, `assessor`, `evaluator?`, `allowedTools`, `limits` |
+| `cognition.operation_selected` | `step`, `operation`, `controller`, `available`, `stepsRemaining`, `forced?` (the engine imposed a decision), `confidence?`, `probabilities?`, `rationale?`, `fallbackFrom?` |
 | `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`) |
 | `cognition.operation_failed` | `step`, `operation`, `error`, `recovery?` |
-| `cognition.concluded` | `decision`, `confidence`, `steps`, `hypotheses` |
-| `cognition.feedback` | `feedback`, `profileId`, `profileVersionBefore`, `profileVersionAfter` |
+| `cognition.evaluated` | `step`, `predictionId`, `hypothesisId`, `evaluator` (`id`, `version`), `verdict`, `observed?`, `summary?`, `context?`, `metrics?`, `causeCandidates?`, `reason?`, `durationMs` — the full report of a prediction test |
+| `cognition.concluded` | `decision`, `status` (`committed`, `provisional`, `abstain`), `confidence`, `steps`, `evidenceRevision`, `hypotheses`, `predictions` |
+| `cognition.feedback` | `feedback` (`verdict`, `agreement?`, `wrongAbout?`, …), `profileId`, `profileVersionBefore`, `profileVersionAfter` |
 | `decision.evaluated` | `client`, `purpose` (`operation_selection`, `hypothesis_assessment`, `direct`), `model`, `state`, `questions`, `answers`, `usage`, `step?` |
 
 ## Operations
@@ -55,4 +56,4 @@ interface Event {
 | `incident.reported` | `incident`, `deliveries`, `suppressed?` (`throttled`, `below minimum severity`) |
 | `error.occurred` | `error` |
 
-The mental state of a cognitive run is the fold of its `cognition.thought` patches in `step` order, starting from the goal of `cognition.started`.
+The mental state of a cognitive run is the fold of its `cognition.thought` patches in `step` order, starting from the goal and observations of `cognition.started`. Observations produced during the run are carried by the thought patches, with `sourceEventId` pointing to the `action.executed` or `cognition.evaluated` event that holds the full payload. Runs without `schemaVersion` are rebuilt with the rules they were recorded with.
