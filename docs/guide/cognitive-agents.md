@@ -75,7 +75,7 @@ Rules enforced in code, whatever the model says:
 - provenance (observations, test results) and the decision status are written by the engine: a model reply that contains them is stripped;
 - references to unknown ids are ignored and reported as `issues` on the thought event;
 - at most `maxHypotheses` hypotheses are in play: extra proposals are dropped and reported;
-- an unknown is no longer investigated after two unsuccessful attempts, and reframing (`represent` on a contradiction) is offered at most three times;
+- an unknown is no longer investigated after two unsuccessful attempts, or at once when no available tool can answer it, and reframing (`represent` on a contradiction) is offered at most three times;
 - a failed operation is recorded as failed and does not count as done;
 - the **last step is always a decision attempt**: an answer that does not pass the conclusion guard becomes `provisional` (with what is missing) or an `abstain`; if the model cannot produce a decision at all, the engine abstains and records why.
 

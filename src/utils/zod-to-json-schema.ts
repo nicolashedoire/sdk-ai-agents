@@ -1,64 +1,24 @@
-import type { z } from 'zod';
+import type { ZodTypeAny } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
-export function zodSchemaToJsonSchema(schema: z.ZodSchema): Record<string, unknown> {
-  if (typeof schema !== 'object' || schema === null) {
-    return {
-      type: 'object',
-      properties: {},
-    };
-  }
+type Converter = (
+  schema: ZodTypeAny,
+  options: { $refStrategy: 'none'; target: 'jsonSchema7' }
+) => Record<string, unknown>;
 
-  const zodSchema = schema as {
-    _def?: { typeName?: string; shape?: () => Record<string, unknown> };
-  };
+// The library's generic signature makes TypeScript give up (TS2589, "excessively deep")
+// even on assignment, so it is viewed through the narrower signature the SDK uses.
+const convert = zodToJsonSchema as unknown as Converter;
 
-  if (zodSchema._def?.typeName === 'ZodObject') {
-    const shape = zodSchema._def.shape?.() || {};
-    const properties: Record<string, unknown> = {};
-    const required: string[] = [];
-
-    for (const [key, value] of Object.entries(shape)) {
-      const zodValue = value as {
-        _def?: { typeName?: string; innerType?: { _def?: { typeName?: string } } };
-      };
-      const typeName = zodValue._def?.typeName || '';
-
-      if (typeName === 'ZodOptional') {
-        const innerType = zodValue._def?.innerType?._def?.typeName || '';
-        properties[key] = {
-          type: zodTypeToJsonType(innerType),
-        };
-      } else {
-        properties[key] = {
-          type: zodTypeToJsonType(typeName),
-        };
-        required.push(key);
-      }
-    }
-
-    return {
-      type: 'object',
-      properties,
-      required,
-    };
-  }
-
-  return {
-    type: 'object',
-    properties: {},
-  };
-}
-
-function zodTypeToJsonType(typeName: string): string {
-  const typeMap: Record<string, string> = {
-    ZodString: 'string',
-    ZodNumber: 'number',
-    ZodBoolean: 'boolean',
-    ZodArray: 'array',
-    ZodObject: 'object',
-    ZodEnum: 'string',
-    ZodLiteral: 'string',
-  };
-
-  return typeMap[typeName] || 'string';
+/**
+ * JSON Schema of a tool's parameters, as sent to LLM providers and MCP clients. Enum values,
+ * descriptions, nested objects and array items are kept: without them a model has to guess
+ * valid arguments. References are inlined because function-calling APIs do not resolve them.
+ */
+export function zodSchemaToJsonSchema(schema: ZodTypeAny): Record<string, unknown> {
+  const { $schema: _dialect, ...json } = convert(schema, {
+    $refStrategy: 'none',
+    target: 'jsonSchema7',
+  });
+  return json.type === 'object' ? json : { type: 'object', properties: {} };
 }

@@ -74,12 +74,13 @@ export class InformationSeeker {
     );
 
     if (intention.type !== 'tool_call' || !intention.toolName) {
+      // Asking again with the same tools would get the same answer: the unknown is dropped
+      // (it stays in the state, with the reason) so the other open questions get their turn.
+      const reason = `no available tool can answer it: ${intention.reasoning ?? 'no explanation given'}`;
       return {
         engine: {
           summary: `No tool can answer ${unknown.id}`,
-          failures: [
-            `No tool selected for ${unknown.id}: ${intention.reasoning ?? 'no explanation given'}`,
-          ],
+          dropUnknowns: [{ unknownId: unknown.id, reason: truncate(reason) }],
           investigatedUnknownId: unknown.id,
         },
       };

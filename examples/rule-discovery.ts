@@ -11,49 +11,65 @@ const sdk = createSDK({
   apiKey: process.env.OPENAI_API_KEY,
   eventStore: new FileEventStore('./events'),
   // Illustrative prices: use your provider's current prices or your contract.
-  pricing: { 'gpt-4o-mini': { inputPerMillion: 0.15, outputPerMillion: 0.6 } },
+  pricing: {
+    'gpt-4o-mini': { inputPerMillion: 0.15, outputPerMillion: 0.6 },
+    'gpt-4o': { inputPerMillion: 2.5, outputPerMillion: 10 },
+  },
 });
 
-const benchTest = z.object({
+const ball = z.object({
   material: z.enum(['steel', 'glass', 'wood', 'rubber']),
   massKg: z.number().positive(),
-  expectedSeconds: z.number().positive(),
 });
 
-/**
- * Stands in for a real measurement: a ball rolling without slipping down a 2 m, 30° plane.
- * Mass does not matter; a soft ball loses energy to rolling resistance.
- */
+/** A prediction compares two balls: do they take the same time or not? */
+const benchTest = z.object({
+  roll: ball,
+  against: ball,
+  expect: z.enum(['same time', 'different time']),
+});
+
+/** Stands in for a measurement: a ball rolling without slipping down a 2 m, 30° plane. */
+function rollingTime(material: z.infer<typeof ball>['material']): number {
+  const rollingResistance = { steel: 0, glass: 0, wood: 0.02, rubber: 0.2 }[material];
+  const angle = Math.PI / 6;
+  const acceleration = (5 / 7) * 9.81 * (Math.sin(angle) - rollingResistance * Math.cos(angle));
+  return Math.round(Math.sqrt(4 / acceleration) * 100) / 100;
+}
+
+/** Rolls both balls; times within 5% of each other count as the same. */
 const bench: OutcomeEvaluator = {
   id: 'inclined-plane-bench',
-  version: '1.0.0',
+  version: '2.0.0',
   async evaluate({ prediction }) {
     const test = benchTest.safeParse(prediction.test);
     if (!test.success) {
-      return { verdict: 'inconclusive', reason: 'the prediction does not say which ball to roll' };
+      return { verdict: 'inconclusive', reason: 'the prediction does not say which two balls to roll' };
     }
-    const { material, massKg, expectedSeconds } = test.data;
-    const rollingResistance = { steel: 0, glass: 0, wood: 0.02, rubber: 0.2 }[material];
-    const angle = Math.PI / 6;
-    const acceleration = (5 / 7) * 9.81 * (Math.sin(angle) - rollingResistance * Math.cos(angle));
-    const seconds = Math.round(Math.sqrt(4 / acceleration) * 100) / 100;
-    const refuted = Math.abs(seconds - expectedSeconds) / expectedSeconds > 0.1;
+    const { roll, against, expect } = test.data;
+    const [first, second] = [rollingTime(roll.material), rollingTime(against.material)];
+    const same = Math.abs(first - second) / Math.max(first, second) <= 0.05;
+    const describe = (b: z.infer<typeof ball>, seconds: number) =>
+      `${b.material} ${b.massKg * 1000} g: ${seconds} s`;
     return {
-      verdict: refuted ? 'refuted' : 'confirmed',
-      observed: { material, massKg, seconds },
-      summary: `${material} ball, ${massKg * 1000} g: ${seconds} s`,
-      metrics: { seconds },
+      verdict: same === (expect === 'same time') ? 'confirmed' : 'refuted',
+      observed: { roll: { ...roll, seconds: first }, against: { ...against, seconds: second } },
+      summary: `${describe(roll, first)} vs ${describe(against, second)}`,
+      metrics: { rollSeconds: first, againstSeconds: second },
     };
   },
 };
 
 const physicist = sdk.createCognitiveAgent({
   name: 'physicist',
-  model: 'gpt-4o-mini',
+  model: process.env.MODEL ?? 'gpt-4o-mini',
   evaluator: bench,
-  systemPrompt:
-    'When you predict the result of rolling a ball, put { "material", "massKg", "expectedSeconds" } in the prediction "test". Materials: steel, glass, wood, rubber.',
-  limits: { maxSteps: 14, maxPredictionTests: 4 },
+  systemPrompt: [
+    'Predictions are tested on a bench that rolls two balls down the plane and times them.',
+    'Put in each prediction "test": { "roll": { "material", "massKg" }, "against": { "material", "massKg" }, "expect": "same time" | "different time" }.',
+    'Materials: steel, glass, wood, rubber.',
+  ].join('\n'),
+  limits: { maxSteps: 18, maxPredictionTests: 5 },
 });
 
 const result = await physicist.think({

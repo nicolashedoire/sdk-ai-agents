@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { availableOperations } from '../cognition/cognitive-operations.js';
+import { availableOperations, nextUnknownToInvestigate } from '../cognition/cognitive-operations.js';
 import { applyThought } from '../cognition/mental-state-reducer.js';
 import { createMentalState, type MentalState } from '../cognition/mental-state.js';
 import { observationFromInput, observationFromTool } from '../cognition/observation-records.js';
@@ -8,7 +8,7 @@ import { thoughtPatchSchema, type ThoughtPatchInput } from '../cognition/thought
 import type { Event } from '../types/events.js';
 import { InMemoryDecisionClient, level } from './support/in-memory-decision-client.js';
 import { json } from './support/scripted-llm-provider.js';
-import { createTestSDK, scriptBuildOrBuy, type TestSDK } from './support/test-sdk.js';
+import { createTestSDK, lookupMetricDefinition, scriptBuildOrBuy, type TestSDK } from './support/test-sdk.js';
 
 const context = { maxHypotheses: 3, canSeekInformation: false };
 
@@ -134,6 +134,23 @@ describe('attempts that unlock themselves', () => {
     expect(availableOperations(state, context)).not.toContain('critique');
   });
 
+  it('move on to the next open question when one cannot be investigated', () => {
+    let state = think(critiqued(), 'represent', { summary: 'r', addUnknowns: [{ question: 'What would buying cost?' }, { question: 'What is churn?' }] }).state;
+    const seeking = { maxHypotheses: 3, canSeekInformation: true };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const failed = think(state, 'seek_information', {
+        summary: 'tool failed',
+        investigatedUnknownId: 'U1',
+        addFailures: [{ description: 'tool lookup failed' }],
+      });
+      expect(failed.noEffect).toBe('seek_information brought no observation and settled no unknown');
+      state = failed.state;
+    }
+    // U1 used its two attempts; U2 still gets its turn.
+    expect(availableOperations(state, seeking)).toContain('seek_information');
+    expect(nextUnknownToInvestigate(state)?.id).toBe('U2');
+  });
+
   it('are unlocked by a tool result the engine recorded, even in a failed step', () => {
     let state = critiqued();
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -210,6 +227,28 @@ describe('runs reach a conclusion', () => {
     expect(result.decision).toMatchObject({ hypothesisId: 'H1', status: 'provisional' });
     const errors = eventsOf(await env.sdk.getEvents(result.runId), 'cognition.operation_failed').map((event) => String(event.data.error));
     expect(errors.filter((error) => error.includes('deferred'))).toHaveLength(2);
+  });
+
+  it('drops a question no tool can answer and investigates the next one', async () => {
+    env = createTestSDK();
+    scriptBuildOrBuy(env.provider)
+      .always('represent', json({
+        summary: 'framed',
+        addFacts: [{ statement: 'Budget is 10k EUR', source: 'input' }],
+        addUnknowns: [{ question: 'What would a SaaS licence cost?' }, { question: 'What is the current monthly churn?' }],
+      }))
+      .enqueue('tool-selection', { content: 'No available tool gives licence prices.' }, { toolCall: { name: 'lookup_metric', arguments: { metric: 'churn' } } })
+      .always('integrate', json({ summary: 'Churn measured', addFacts: [{ statement: 'Monthly churn is 4%', source: 'tool' }], resolveUnknowns: [{ unknownId: 'U2', resolution: '4% monthly' }] }));
+    const agent = env.sdk.createCognitiveAgent({ name: 'a', model: 'test-model', tools: [env.sdk.defineTool(lookupMetricDefinition)] });
+
+    const result = await agent.think({ problem: 'Build or buy?' });
+
+    expect(result.state.unknowns).toEqual([
+      expect.objectContaining({ id: 'U1', status: 'dropped', attempts: 1, resolution: expect.stringContaining('no available tool can answer it') }),
+      expect.objectContaining({ id: 'U2', status: 'resolved', attempts: 1 }),
+    ]);
+    const called = eventsOf(await env.sdk.getEvents(result.runId), 'tool.called');
+    expect(called).toHaveLength(1);
   });
 
   it('accepts a context the engine cannot clone', async () => {

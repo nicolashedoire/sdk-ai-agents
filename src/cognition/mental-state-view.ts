@@ -82,6 +82,23 @@ export function describeMentalState(state: MentalState): Record<string, unknown>
     'hypotheses',
     state.hypotheses.map((hypothesis) => describeHypothesis(state, hypothesis))
   );
+  // Tests already run and what they showed, so the same experiment is not proposed again.
+  add(
+    'experiments',
+    state.predictions
+      .filter((prediction) => prediction.evaluation)
+      .map((prediction) => {
+        const observed = state.observations.find(
+          (observation) => observation.id === prediction.evaluation?.observationId
+        );
+        return {
+          prediction: prediction.id,
+          ...(prediction.test ? { test: prediction.test } : {}),
+          verdict: prediction.status,
+          ...(observed ? { observed: observed.summary } : {}),
+        };
+      })
+  );
   add(
     'contradictions',
     unresolvedContradictions(state).map((contradiction) => ({

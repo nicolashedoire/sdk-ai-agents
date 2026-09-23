@@ -17,6 +17,8 @@ export interface EngineRecord {
   /** Unknown investigated by the operation, counted even when it failed. */
   investigatedUnknownId?: string;
   failures?: string[];
+  /** Unknowns the engine established cannot be investigated (no tool can answer them). */
+  dropUnknowns?: Array<{ unknownId: string; reason: string }>;
 }
 
 /** Result of performing one cognitive operation, before it is applied to the state. */

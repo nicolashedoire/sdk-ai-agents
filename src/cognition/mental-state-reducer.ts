@@ -152,9 +152,26 @@ function missingEffect(
       return state.comparisons.length > previous.comparisons.length
         ? undefined
         : 'compare_observations recorded no comparison';
+    case 'seek_information':
+      return learnedSomething(previous, state)
+        ? undefined
+        : 'seek_information brought no observation and settled no unknown';
     default:
       return undefined;
   }
+}
+
+/** A new (non-repeated) observation, a new fact, or an unknown settled. */
+function learnedSomething(previous: MentalState, state: MentalState): boolean {
+  const observed = state.observations
+    .slice(previous.observations.length)
+    .some((observation) => !observation.duplicateOf);
+  const settled = state.unknowns.some(
+    (unknown) =>
+      unknown.status !== 'open' &&
+      previous.unknowns.find((before) => before.id === unknown.id)?.status === 'open'
+  );
+  return observed || settled || state.facts.length > previous.facts.length;
 }
 
 /** True when a hypothesis that had none of something (simulation, critique) now has one. */

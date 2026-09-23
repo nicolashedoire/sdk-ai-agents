@@ -2,7 +2,9 @@
  * A cognitive agent that reasons before answering, with typed decisions when a TypeSafe
  * key is available, cost reporting and incident alerts in the console.
  *
- * Run: OPENAI_API_KEY=... [TYPESAFE_API_KEY=...] npm run example:cognitive
+ * Run: OPENAI_API_KEY=... [TYPESAFE_API_KEY=... | AI_GATEWAY_API_KEY=...] npm run example:cognitive
+ *
+ * Jev is reached directly with a TypeSafe key, or through Vercel AI Gateway with a gateway key.
  */
 import { z } from 'zod';
 import { FileEventStore, createSDK, type IncidentNotifier } from '../src/index.js';
@@ -16,10 +18,21 @@ const consoleNotifier: IncidentNotifier = {
 
 const eventStore = new FileEventStore('./events');
 
+function jevConfig() {
+  if (process.env.TYPESAFE_API_KEY) {
+    return { jev: { apiKey: process.env.TYPESAFE_API_KEY } };
+  }
+  if (process.env.AI_GATEWAY_API_KEY) {
+    const baseUrl = 'https://ai-gateway.vercel.sh/typesafe';
+    return { jev: { apiKey: process.env.AI_GATEWAY_API_KEY, baseUrl, model: 'typesafe-ai/jev' } };
+  }
+  return {};
+}
+
 const sdk = createSDK({
   apiKey: process.env.OPENAI_API_KEY,
   eventStore,
-  ...(process.env.TYPESAFE_API_KEY ? { jev: { apiKey: process.env.TYPESAFE_API_KEY } } : {}),
+  ...jevConfig(),
   // Illustrative prices: use your provider's current prices or your contract.
   pricing: { 'gpt-4o-mini': { inputPerMillion: 0.15, outputPerMillion: 0.6 } },
   incidents: { notifiers: [consoleNotifier] },
@@ -59,8 +72,9 @@ const result = await analyst.think({
   context: { deadline: 'before Q4', team: 'two developers, already busy' },
 });
 
-console.log(`\nStatus: ${result.status}`);
+console.log(`\nStatus: ${result.status}, decision ${result.decision?.status ?? 'none'}`);
 console.log(`Answer: ${result.answer ?? result.error?.message}`);
+for (const missing of result.decision?.missing ?? []) console.log(`  missing: ${missing}`);
 for (const hypothesis of result.state.hypotheses) {
   console.log(`  ${hypothesis.id} [${hypothesis.status}] ${hypothesis.support.toFixed(2)} — ${hypothesis.statement}`);
 }

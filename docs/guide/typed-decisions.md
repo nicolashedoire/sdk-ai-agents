@@ -28,6 +28,23 @@ const sdk = createSDK({
 | `maxRetries` | `2` | On 408, 429, 5xx, 529 and network errors, honoring `retry-after` |
 | `fetch` | global `fetch` | Inject a proxy-aware transport |
 
+### Through Vercel AI Gateway
+
+Jev is also served by [Vercel AI Gateway](https://vercel.com/docs/ai-gateway/sdks-and-apis/typesafe) under the name `typesafe-ai/jev`, with a TypeSafe-compatible API. Use an AI Gateway key instead of a TypeSafe key; requests are billed on your Vercel account at the same price ($0.042 per million input tokens, output free). AI Gateway also has a free tier with a monthly credit for a subset of models: see [its pricing](https://vercel.com/docs/ai-gateway/pricing) for whether Jev is included.
+
+```ts
+const sdk = createSDK({
+  apiKey: process.env.OPENAI_API_KEY,
+  jev: {
+    apiKey: process.env.AI_GATEWAY_API_KEY,
+    baseUrl: 'https://ai-gateway.vercel.sh/typesafe',
+    model: 'typesafe-ai/jev',
+  },
+});
+```
+
+Nothing else changes: `sdk.decisions`, the typed controller and the typed assessor work the same way, and costs are reported under `typesafe-ai/jev`.
+
 Or bring any backend implementing `TypedDecisionClient` with `decisionClient`.
 
 ## Inject your context

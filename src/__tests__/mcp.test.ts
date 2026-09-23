@@ -54,7 +54,7 @@ describe('MCP connectors', () => {
       {
         name: 'lookup_customer',
         description: 'Returns the plan and churn risk of a customer',
-        inputSchema: { type: 'object', properties: { customerId: { type: 'string' } }, required: ['customerId'] },
+        inputSchema: { type: 'object', properties: { customerId: { type: 'string' } }, required: ['customerId'], additionalProperties: false },
       },
     ]);
 
