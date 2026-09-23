@@ -30,7 +30,7 @@ const sdk = createSDK({
 
 ### Through Vercel AI Gateway
 
-Jev is also served by [Vercel AI Gateway](https://vercel.com/docs/ai-gateway/sdks-and-apis/typesafe) under the name `typesafe-ai/jev`, with a TypeSafe-compatible API. Use an AI Gateway key instead of a TypeSafe key; requests are billed on your Vercel account at the same price ($0.042 per million input tokens, output free), and the gateway's monthly free credit applies:
+Jev is also served by [Vercel AI Gateway](https://vercel.com/docs/ai-gateway/sdks-and-apis/typesafe) under the name `typesafe-ai/jev`, with a TypeSafe-compatible API. Use an AI Gateway key instead of a TypeSafe key; requests are billed on your Vercel account at the same price ($0.042 per million input tokens, output free). AI Gateway also has a free tier with a monthly credit for a subset of models: see [its pricing](https://vercel.com/docs/ai-gateway/pricing) for whether Jev is included.
 
 ```ts
 const sdk = createSDK({

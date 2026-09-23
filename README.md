@@ -139,11 +139,11 @@ const tools = crm.tools.map((tool) => sdk.defineTool(tool));
 Not on npm yet — install from GitHub (the package builds itself on install):
 
 ```sh
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 npm install @modelcontextprotocol/sdk   # only for MCP connectors
 ```
 
-Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25; zod 4 is not supported yet).
+Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet).
 
 ## Documentation
 

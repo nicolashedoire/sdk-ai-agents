@@ -7,20 +7,20 @@ The package is not published on npm yet. Install it from GitHub — it builds it
 ::: code-group
 
 ```sh [npm]
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ```sh [pnpm]
-pnpm add github:nicolashedoire/sdk-ai-agents zod@^3.25
+pnpm add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ```sh [yarn]
-yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25
+yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 :::
 
-Requirements: **Node.js 20+**, TypeScript 5+ and **zod 3.25 or later within v3** — zod 4 schemas are not supported yet. MCP connectors additionally need the official MCP SDK:
+Requirements: **Node.js 20+**, TypeScript 5+ and **zod 3.25.28 or later within v3** — zod 4 schemas are not supported yet. MCP connectors additionally need the official MCP SDK:
 
 ```sh
 npm install @modelcontextprotocol/sdk

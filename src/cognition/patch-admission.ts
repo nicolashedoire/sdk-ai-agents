@@ -148,6 +148,7 @@ export function assembleThought(input: {
     ...admitted.patch,
     ...engineFields,
     addFailures: (engine.failures ?? []).map((description) => ({ description })),
+    ...(engine.dropUnknowns ? { dropUnknowns: engine.dropUnknowns } : {}),
   };
   const issues: string[] = [];
 

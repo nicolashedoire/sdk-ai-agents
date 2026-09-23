@@ -110,11 +110,7 @@ export function availableOperations(
   if (active.some((hypothesis) => hypothesis.critiques.length === 0) && canRetry('critique')) {
     available.push('critique');
   }
-  if (
-    context.canSeekInformation &&
-    nextUnknownToInvestigate(state) &&
-    canRetry('seek_information')
-  ) {
+  if (context.canSeekInformation && nextUnknownToInvestigate(state)) {
     available.push('seek_information');
   }
   if (needsComparison(state) && canRetry('compare')) {
