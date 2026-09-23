@@ -69,8 +69,9 @@ const result = await analyst.think({
 });
 
 console.log(result.status);        // 'completed'
-console.log(result.answer);        // the decision in plain words
-console.log(result.decision);      // { hypothesisId, answer, rationale, confidence, nextActions }
+console.log(result.answer);        // the answer in plain words
+console.log(result.decision);      // { hypothesisId, answer, rationale, confidence, nextActions, status, missing }
+console.log(result.decision?.status); // 'committed', 'provisional' (see `missing`) or 'abstain'
 console.log(result.state.hypotheses.map((h) => [h.id, h.status, h.support]));
 ```
 

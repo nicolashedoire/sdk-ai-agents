@@ -10,6 +10,7 @@ import { z } from 'zod';
  */
 
 const requiredText = z.string().trim().min(1);
+const unitInterval = z.number().min(0).max(1);
 
 export const MAX_PROFILE_EXAMPLES = 10;
 export const MAX_PROFILE_CORRECTIONS = 20;
@@ -40,6 +41,10 @@ export const thinkerProfileSchema = z.object({
         expected: requiredText,
         lesson: requiredText,
         verdict: z.enum(['partial', 'mismatch']),
+        /** Share of the run the thinker agreed with, in [0, 1]. */
+        agreement: unitInterval.optional(),
+        /** Where the reasoning went wrong, in the thinker's words. */
+        wrongAbout: z.array(requiredText).default([]),
         runId: z.string().optional(),
       })
     )
@@ -49,24 +54,31 @@ export const thinkerProfileSchema = z.object({
 export type ThinkerProfileInput = z.input<typeof thinkerProfileSchema>;
 export type ThinkerProfile = z.output<typeof thinkerProfileSchema>;
 
+const disagreement = {
+  expected: requiredText,
+  lesson: z.string().optional(),
+  /** Where the reasoning went wrong ("overestimated demand", "ignored the free option"). */
+  wrongAbout: z.array(requiredText).default([]),
+  /** Share of the run the thinker agreed with: 0.8 means "80% right". */
+  agreement: unitInterval.optional(),
+  notes: z.string().optional(),
+};
+
 export const reasoningFeedbackSchema = z.discriminatedUnion('verdict', [
-  z.object({ verdict: z.literal('match'), notes: z.string().optional() }),
   z.object({
-    verdict: z.literal('partial'),
-    expected: requiredText,
-    lesson: z.string().optional(),
+    verdict: z.literal('match'),
+    agreement: unitInterval.optional(),
     notes: z.string().optional(),
   }),
-  z.object({
-    verdict: z.literal('mismatch'),
-    expected: requiredText,
-    lesson: z.string().optional(),
-    notes: z.string().optional(),
-  }),
+  z.object({ verdict: z.literal('partial'), ...disagreement }),
+  z.object({ verdict: z.literal('mismatch'), ...disagreement }),
 ]);
 
-/** Feedback on a finished run: did it reason the way the thinker would have? */
-export type ReasoningFeedback = z.infer<typeof reasoningFeedbackSchema>;
+/**
+ * Feedback on a finished run: did it reason the way the thinker would have? This measures
+ * fidelity to the thinker, not truth: use an outcome evaluator for the latter.
+ */
+export type ReasoningFeedback = z.input<typeof reasoningFeedbackSchema>;
 
 /** Validates a profile and fills defaults. */
 export function defineThinkerProfile(input: ThinkerProfileInput): ThinkerProfile {
@@ -108,8 +120,9 @@ export interface RunForFeedback {
 export function refineProfile(
   profile: ThinkerProfile,
   run: RunForFeedback,
-  feedback: ReasoningFeedback
+  input: ReasoningFeedback
 ): ThinkerProfile {
+  const feedback = reasoningFeedbackSchema.parse(input);
   if (feedback.verdict === 'match') {
     return {
       ...profile,
@@ -132,6 +145,8 @@ export function refineProfile(
         expected: feedback.expected,
         lesson: feedback.lesson?.trim() || feedback.expected,
         verdict: feedback.verdict,
+        ...(feedback.agreement !== undefined ? { agreement: feedback.agreement } : {}),
+        wrongAbout: feedback.wrongAbout,
         runId: run.runId,
       },
     ].slice(-MAX_PROFILE_CORRECTIONS),
@@ -193,6 +208,12 @@ export function renderProfile(profile: ThinkerProfile): string {
         `- Topic: ${correction.topic}`,
         `  You concluded: ${correction.modelConclusion}`,
         `  They expected: ${correction.expected}`,
+        ...(correction.agreement !== undefined
+          ? [`  They agreed with ${Math.round(correction.agreement * 100)}% of it`]
+          : []),
+        ...(correction.wrongAbout.length > 0
+          ? [`  Wrong about: ${correction.wrongAbout.join('; ')}`]
+          : []),
         `  Lesson: ${correction.lesson}`
       );
     }

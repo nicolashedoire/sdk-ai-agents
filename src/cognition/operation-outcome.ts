@@ -1,14 +1,32 @@
 import { ThoughtGenerationError, type ModelUsage } from '../errors/index.js';
-import type { ThoughtPatch } from './mental-state.js';
+import type { GeneratedOperation } from './thought-fields.js';
+import type { EvaluationRecord, ObservationRecord, ThoughtPatch } from './thought-patch.js';
+
+/** A thought proposed by a generator or an assessor, under the contract of one operation. */
+export interface ProposedThought {
+  contract: GeneratedOperation;
+  patch: ThoughtPatch;
+}
+
+/** What only the engine may write into a thought. */
+export interface EngineRecord {
+  /** Summary of a thought the engine wrote alone (no proposal). */
+  summary?: string;
+  observations?: ObservationRecord[];
+  evaluations?: EvaluationRecord[];
+  /** Unknown investigated by the operation, counted even when it failed. */
+  investigatedUnknownId?: string;
+  failures?: string[];
+}
 
 /** Result of performing one cognitive operation, before it is applied to the state. */
 export interface OperationOutcome {
-  patch?: ThoughtPatch;
+  proposal?: ProposedThought;
+  engine?: EngineRecord;
   failure?: Error;
-  /** Unknown investigated by the operation, counted even when it failed. */
-  investigatedUnknownId?: string;
   /** True when a tool was actually executed (counts against the tool-call budget). */
   toolCalled?: boolean;
+  /** Fields the generator dropped from the model reply. */
   ignoredFields?: string[];
   model?: string;
   requestedModel?: string;

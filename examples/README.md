@@ -15,6 +15,14 @@ npm run build
 node dist/examples/quick-start.js
 ```
 
+## More examples
+
+| Script | What it shows |
+| --- | --- |
+| `npm run example:cognitive` | A cognitive agent with a governed tool, typed decisions (with a TypeSafe key), costs and incident alerts |
+| `npm run example:rules` | The evidence loop: a rule induced from measurements, predictions tested on a simulated bench, a refuted rule revised |
+| `npm run example:mcp` | Governed tools exposed as an MCP server over stdio |
+
 ## What the Example Does
 
 1. Creates an SDK instance

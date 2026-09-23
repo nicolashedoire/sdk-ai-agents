@@ -6,8 +6,21 @@ import {
   type ControllerInput,
   type DecisionEvaluationRecord,
 } from './cognitive-controller.js';
-import { isCognitiveOperation, OPERATION_DESCRIPTIONS } from './cognitive-operations.js';
-import { activeHypotheses, openUnknowns, unresolvedContradictions } from './mental-state.js';
+import {
+  hasUncomparedObservations,
+  isCognitiveOperation,
+  nextRevisionTarget,
+  OPERATION_DESCRIPTIONS,
+} from './cognitive-operations.js';
+import { missingForCommitment, readyHypothesis } from './decision-readiness.js';
+import {
+  activeFacts,
+  activeHypotheses,
+  comparableObservations,
+  openUnknowns,
+  pendingPredictions,
+  unresolvedContradictions,
+} from './mental-state.js';
 import { describeThinker } from './typed-decision-state.js';
 
 export interface TypedDecisionControllerOptions {
@@ -24,11 +37,14 @@ export interface TypedDecisionControllerOptions {
 /** Operation criteria written for literal readers: each option states when it applies. */
 const OPERATION_CRITERIA: Record<string, string> = {
   represent: `${OPERATION_DESCRIPTIONS.represent} Choose it when \`contradictions\` is not empty or the problem is poorly framed.`,
+  compare_observations: `${OPERATION_DESCRIPTIONS.compare_observations} Choose it when \`observations.uncompared\` is true.`,
+  test_prediction: `${OPERATION_DESCRIPTIONS.test_prediction} Choose it when \`pendingPredictions\` is not empty.`,
+  revise: `${OPERATION_DESCRIPTIONS.revise} Choose it when \`contradictedHypotheses\` is not empty.`,
   hypothesize: `${OPERATION_DESCRIPTIONS.hypothesize} Choose it when \`hypotheses\` is empty or every hypothesis is weak.`,
   simulate: `${OPERATION_DESCRIPTIONS.simulate} Choose it when a hypothesis has \`simulated: false\`.`,
   critique: `${OPERATION_DESCRIPTIONS.critique} Choose it when a hypothesis has \`critiqued: false\`.`,
   seek_information: `${OPERATION_DESCRIPTIONS.seek_information} Choose it when an entry of \`openUnknowns\` matters for the conclusion.`,
-  compare: `${OPERATION_DESCRIPTIONS.compare} Choose it when several hypotheses were critiqued and must be ranked.`,
+  compare: `${OPERATION_DESCRIPTIONS.compare} Choose it when several hypotheses were critiqued and must be ranked, or a hypothesis has \`assessmentStale: true\`.`,
   decide: `${OPERATION_DESCRIPTIONS.decide} Choose it when the examined hypotheses are enough to answer \`goal\`, or \`progress.stepsRemaining\` is small.`,
 };
 
@@ -154,6 +170,7 @@ export class TypedDecisionController implements CognitiveController {
 
   private buildState(input: ControllerInput): Record<string, unknown> {
     const { state } = input;
+    const revisionTarget = nextRevisionTarget(state);
     return {
       goal: state.goal,
       thinker: describeThinker(input.profile),
@@ -163,16 +180,27 @@ export class TypedDecisionController implements CognitiveController {
         decisionThreshold: input.decisionThreshold,
         recentOperations: state.trail.slice(-5).map((entry) => entry.operation),
       },
-      facts: state.facts.slice(-30).map((fact) => fact.statement),
+      facts: activeFacts(state)
+        .slice(-30)
+        .map((fact) => fact.statement),
+      observations: {
+        count: comparableObservations(state).length,
+        uncompared: hasUncomparedObservations(state),
+      },
       openUnknowns: openUnknowns(state).map((unknown) => unknown.question),
       hypotheses: activeHypotheses(state).map((hypothesis) => ({
         id: hypothesis.id,
+        kind: hypothesis.kind,
         statement: hypothesis.statement,
         support: hypothesis.support,
         simulated: hypothesis.simulations.length > 0,
         critiqued: hypothesis.critiques.length > 0,
+        assessmentStale: (hypothesis.assessedAtRevision ?? -1) < state.evidenceRevision,
       })),
+      pendingPredictions: pendingPredictions(state).map((prediction) => prediction.expected),
+      contradictedHypotheses: revisionTarget ? [revisionTarget.id] : [],
       contradictions: unresolvedContradictions(state).map((item) => item.description),
+      missingForCommitment: readyHypothesis(state) ? [] : missingForCommitment(state),
     };
   }
 }

@@ -22,9 +22,14 @@ hero:
 features:
   - icon: 🧠
     title: Reasoning, not just prompting
-    details: Represent, hypothesize, simulate, critique, seek information, compare, decide. Each step is an operation on an explicit mental state, chosen by a controller and recorded as an event.
+    details: Represent, compare observations, hypothesize, simulate, test, revise, critique, seek information, compare, decide. Each step is an operation on an explicit mental state, chosen by a controller and recorded as an event.
     link: /guide/cognitive-agents
     linkText: The cognitive loop
+  - icon: 🔬
+    title: Believes what it can justify
+    details: Observations keep their provenance, rules come with falsifiable predictions, your own evaluator tests them, refuted rules are revised — and an answer is committed only when the evidence holds.
+    link: /guide/evidence-and-verification
+    linkText: Evidence & verification
   - icon: 🪞
     title: Thinks the way you do
     details: Explain a few topics in your own words, distill your reasoning into a profile, then correct the agent run after run. Lessons are kept and applied.
