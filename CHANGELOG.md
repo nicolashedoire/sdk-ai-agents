@@ -30,10 +30,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `apiKey` is optional when `llmProvider` is given; `pg` and `@modelcontextprotocol/sdk` are optional peer dependencies; `zod` (^3.25, zod 4 not supported yet) is a peer dependency. `createMcpServer` requires the explicit list of tools to expose. The Jev API key is kept in a private field.
 - All documentation, planning artifacts and code comments are in English.
 
+### Fixed
+- Policy engine: built-in rules (`maxSteps`, `maxTokens`, `budgetLimit`, `maxDuration`, `allowedTools`) were read as missing fields by the generic condition evaluator and never applied — budget, timeout and allowlist policies now deny as documented.
+- Regression detector: an event that became a failure (e.g. `action.executed` → `action.failed`) is now a critical regression.
+- Trace validator: with `compareStructureOnly`, value differences are reported and give a `partial` status instead of a silent `pass`.
+- Golden trace YAML export always quotes strings, so values like `true`, `null` or `123` keep their type.
+- The package-level `defineTool` builds a tool without registering it in a hidden module-wide SDK (which also opened an event store on `./events`); the SDK registers it when an agent uses it.
+- Approval workflow tests now drive a real agent run through an injected LLM provider instead of calling the OpenAI API with a fake key.
+- Lint: 177 Biome errors in older modules fixed (`noStaticOnlyClass` turned off: the static utility classes are part of the tested API); sources formatted; CI uses a valid `npm run format:check`.
+
 ### Known issues
-- 15 tests that already failed before this release still fail (policy budget/timeout/allowlist denials, approval workflow, action-engine policy check, golden-trace YAML export, regression severity, trace validator, Anthropic SDK tests). They are unrelated to the new modules and tracked for a fix.
 - The built-in OpenAI and Anthropic providers do not cancel a request already in flight: timeouts and stops apply between model calls.
-- `npm run lint` and the format check report existing findings in files predating this release; the new modules are clean.
 
 ## [0.1.0] - 2026-01-06
 

@@ -219,25 +219,26 @@ The LLM generates intentions, never direct actions. All actions go through the A
 Nothing is authorized by default. All tools must be explicitly declared (registered) before anything can run them.
 
 ::: warning Scope of a governed agent
-A governed agent can execute **any tool registered in the SDK** that the model names: the agent's `tools` list decides what the model is offered, not what it may call. To keep an agent away from a sensitive tool, register that tool in a separate SDK instance, or deny it with a `custom` policy whose condition matches the tool and whose validator refuses it:
+A governed agent can execute **any tool registered in the SDK** that the model names: the agent's `tools` list decides what the model is offered, not what it may call. Restrict it with an `allowlist` policy — any other tool is denied before execution:
 
 ```ts
-agent.setPolicy({
-  id: 'no-deletes',
-  type: 'custom',
-  scope: 'agent',
-  enabled: true,
-  rules: [
+const agent = sdk.createAgent({
+  name: 'support',
+  model: 'gpt-4o',
+  tools: [lookupCustomer],
+  policies: [
     {
-      condition: { type: 'condition', conditions: [{ field: 'intention.toolName', operator: 'eq', value: 'delete_customer' }] },
-      action: 'deny',
-      metadata: { validator: () => false, reason: 'deletions are not allowed for this agent' },
+      id: 'support-tools',
+      type: 'allowlist',
+      scope: 'agent',
+      enabled: true,
+      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
     },
   ],
 });
 ```
 
-Cognitive agents and MCP servers are stricter: they can only run the tools they were given.
+Cognitive agents and MCP servers are restricted to their tool list automatically.
 :::
 
 ### 3. Native Event-Sourcing

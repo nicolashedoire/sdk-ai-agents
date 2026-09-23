@@ -113,8 +113,13 @@ export class RegressionDetector {
     } else if (diff.type === 'event_modified') {
       type = 'behavioral';
       const eventType = diff.eventType || diff.expected?.type;
+      // An event that became a failure (e.g. action.executed → action.failed) is critical.
+      const actualType = diff.actual?.type;
 
-      if (RegressionDetector.isCriticalEventType(eventType, options)) {
+      if (
+        RegressionDetector.isCriticalEventType(eventType, options) ||
+        RegressionDetector.isCriticalEventType(actualType, options)
+      ) {
         severity = 'critical';
         impact = 'result';
       } else if (RegressionDetector.isResultAffectingEvent(eventType)) {
