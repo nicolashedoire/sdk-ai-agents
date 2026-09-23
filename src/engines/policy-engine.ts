@@ -1,4 +1,11 @@
-import type { Policy, PolicyContext, PolicyValidationResult, PolicyRule, BudgetLimit, ConditionExpression } from '../types/policy.js';
+import type {
+  Policy,
+  PolicyContext,
+  PolicyValidationResult,
+  PolicyRule,
+  BudgetLimit,
+  ConditionExpression,
+} from '../types/policy.js';
 import type { Intention } from '../types/run.js';
 import type { BudgetTracker } from '../managers/budget-tracker.js';
 import type { PolicyAuditEntry } from '../types/audit.js';
@@ -70,7 +77,7 @@ export class PolicyEngine {
     for (const policy of policies) {
       // Evaluate conditions and log audit entry
       const conditionResult = this.evaluatePolicyConditions(policy, intention, context);
-      
+
       // Log audit entry for this policy evaluation
       await this.logPolicyAudit(policy, intention, context, conditionResult);
 
@@ -83,10 +90,13 @@ export class PolicyEngine {
       if (!result.allowed) {
         violatedPolicies.push(policy.id);
       }
-      
+
       // Check if any rule requires approval
       for (const rule of policy.rules) {
-        if (rule.action === 'require_approval' && this.ruleMatches(rule, policy, intention, context)) {
+        if (
+          rule.action === 'require_approval' &&
+          this.ruleMatches(rule, policy, intention, context)
+        ) {
           approvalRequiredPolicies.push({ policyId: policy.id, rule });
         }
       }
@@ -116,22 +126,30 @@ export class PolicyEngine {
     policy: Policy,
     intention: Intention,
     context: PolicyContext
-  ): { conditionsMet: boolean; evaluatedConditions: Array<{ condition: unknown; result: boolean }> } {
+  ): {
+    conditionsMet: boolean;
+    evaluatedConditions: Array<{ condition: unknown; result: boolean }>;
+  } {
     const evaluatedConditions: Array<{ condition: unknown; result: boolean }> = [];
 
     for (const rule of policy.rules) {
       let conditionResult = true;
 
       if (typeof rule.condition !== 'string' || this.isConditionExpression(rule.condition)) {
-        const conditionExpr = typeof rule.condition === 'string'
-          ? this.parseConditionExpression(rule.condition)
-          : rule.condition as ConditionExpression;
+        const conditionExpr =
+          typeof rule.condition === 'string'
+            ? this.parseConditionExpression(rule.condition)
+            : (rule.condition as ConditionExpression);
 
         if (conditionExpr) {
           conditionResult = this.conditionEvaluator.evaluate(conditionExpr, intention, context);
           evaluatedConditions.push({ condition: conditionExpr, result: conditionResult });
         }
-      } else if (rule.condition !== 'allowedTools' && rule.condition !== 'maxSteps' && rule.condition !== 'maxTokens') {
+      } else if (
+        rule.condition !== 'allowedTools' &&
+        rule.condition !== 'maxSteps' &&
+        rule.condition !== 'maxTokens'
+      ) {
         // Simple string condition (skip built-in conditions)
         conditionResult = this.conditionEvaluator.evaluate(rule.condition, intention, context);
         evaluatedConditions.push({ condition: rule.condition, result: conditionResult });
@@ -153,10 +171,13 @@ export class PolicyEngine {
     policy: Policy,
     intention: Intention,
     context: PolicyContext,
-    conditionResult: { conditionsMet: boolean; evaluatedConditions: Array<{ condition: unknown; result: boolean }> }
+    conditionResult: {
+      conditionsMet: boolean;
+      evaluatedConditions: Array<{ condition: unknown; result: boolean }>;
+    }
   ): Promise<void> {
     const validationResult = await this.validatePolicy(policy, intention, context);
-    
+
     const auditEntry: PolicyAuditEntry = {
       id: generateEventId(),
       runId: context.runId,
@@ -165,22 +186,22 @@ export class PolicyEngine {
       policyId: policy.id,
       policyType: policy.type,
       intention,
-      conditionEvaluated: conditionResult.evaluatedConditions.length > 0
-        ? {
-            condition: conditionResult.evaluatedConditions[0].condition,
-            result: conditionResult.evaluatedConditions[0].result,
-          }
-        : undefined,
+      conditionEvaluated:
+        conditionResult.evaluatedConditions.length > 0
+          ? {
+              condition: conditionResult.evaluatedConditions[0].condition,
+              result: conditionResult.evaluatedConditions[0].result,
+            }
+          : undefined,
       validationResult,
       applied: conditionResult.conditionsMet && !validationResult.allowed,
       reason: validationResult.reason,
     };
 
     // Store in memory
-    if (!this.auditEntries.has(context.runId)) {
-      this.auditEntries.set(context.runId, []);
-    }
-    this.auditEntries.get(context.runId)!.push(auditEntry);
+    const entries = this.auditEntries.get(context.runId) ?? [];
+    entries.push(auditEntry);
+    this.auditEntries.set(context.runId, entries);
 
     // Log to event store if available
     if (this.eventStore) {
@@ -230,9 +251,10 @@ export class PolicyEngine {
   ): boolean {
     // Evaluate condition expression if present
     if (typeof rule.condition !== 'string' || this.isConditionExpression(rule.condition)) {
-      const conditionExpr = typeof rule.condition === 'string'
-        ? this.parseConditionExpression(rule.condition)
-        : rule.condition as ConditionExpression;
+      const conditionExpr =
+        typeof rule.condition === 'string'
+          ? this.parseConditionExpression(rule.condition)
+          : (rule.condition as ConditionExpression);
 
       if (conditionExpr) {
         const matches = this.conditionEvaluator.evaluate(conditionExpr, intention, context);
@@ -289,11 +311,7 @@ export class PolicyEngine {
     policy: Policy | undefined,
     violatedPolicies: string[]
   ): string {
-    if (
-      policy?.type === 'allowlist' &&
-      intention.type === 'tool_call' &&
-      intention.toolName
-    ) {
+    if (policy?.type === 'allowlist' && intention.type === 'tool_call' && intention.toolName) {
       return `Tool "${intention.toolName}" not in allowlist`;
     }
 
@@ -374,7 +392,10 @@ export class PolicyEngine {
     }
   }
 
-  private async validateBudgetPolicy(policy: Policy, context: PolicyContext): Promise<PolicyValidationResult> {
+  private async validateBudgetPolicy(
+    policy: Policy,
+    context: PolicyContext
+  ): Promise<PolicyValidationResult> {
     // Check basic budget rules (maxSteps, maxTokens)
     for (const rule of policy.rules) {
       if (rule.condition === 'maxSteps') {

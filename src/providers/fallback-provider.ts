@@ -3,7 +3,7 @@ import type { LLMProvider, LLMRequest, LLMResponse } from './llm-provider.js';
 
 /**
  * Provider wrapper that implements fallback logic between multiple providers.
- * 
+ *
  * When a request fails with the primary provider, it automatically tries
  * the fallback providers in order until one succeeds or all fail.
  */
@@ -20,7 +20,7 @@ export class FallbackProvider implements LLMProvider {
 
   /**
    * Creates a FallbackProvider with a primary provider and optional fallback providers.
-   * 
+   *
    * @param primaryProvider - The primary provider to use
    * @param fallbackProviders - Array of fallback providers to try if primary fails
    */
@@ -42,7 +42,7 @@ export class FallbackProvider implements LLMProvider {
    */
   async generateCompletionWithFallback(request: LLMRequest): Promise<FallbackResult> {
     let lastError: Error | null = null;
-    let attemptedProviders: string[] = [];
+    const attemptedProviders: string[] = [];
 
     for (let i = 0; i < this.providers.length; i++) {
       const provider = this.providers[i];
@@ -52,10 +52,10 @@ export class FallbackProvider implements LLMProvider {
       try {
         // Resolve settings for this specific provider if providerSettings is provided
         const providerRequest = this.resolveProviderSettings(request, providerName);
-        
+
         const response = await provider.generateCompletion(providerRequest);
         const wasFallback = i > 0; // i > 0 means we used a fallback provider
-        
+
         return {
           response,
           usedProvider: providerName,
@@ -64,51 +64,44 @@ export class FallbackProvider implements LLMProvider {
         };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        
+
         // If this is not the last provider, continue to next fallback
         if (i < this.providers.length - 1) {
           continue;
         }
-        
+
         // This was the last provider, throw the error
         throw this.wrapError(lastError, attemptedProviders);
       }
     }
 
     // Should never reach here, but TypeScript needs this
-    throw this.wrapError(
-      lastError || new Error('All providers failed'),
-      attemptedProviders
-    );
+    throw this.wrapError(lastError || new Error('All providers failed'), attemptedProviders);
   }
 
   /**
    * Resolves provider-specific settings from request.
    * Priority: provider-specific > default > direct temperature/maxTokens
    */
-  private resolveProviderSettings(
-    request: LLMRequest,
-    providerName: string
-  ): LLMRequest {
+  private resolveProviderSettings(request: LLMRequest, providerName: string): LLMRequest {
     if (!request.providerSettings) {
       return request; // No provider settings, use direct temperature/maxTokens
     }
 
     const defaultSettings = request.providerSettings.default || {};
-    const providerSpecificSettings = providerName === 'openai'
-      ? request.providerSettings.openai
-      : providerName === 'anthropic'
-      ? request.providerSettings.anthropic
-      : undefined;
+    const providerSpecificSettings =
+      providerName === 'openai'
+        ? request.providerSettings.openai
+        : providerName === 'anthropic'
+          ? request.providerSettings.anthropic
+          : undefined;
 
     // Merge settings: provider-specific > default > direct
-    const temperature = providerSpecificSettings?.temperature
-      ?? defaultSettings.temperature
-      ?? request.temperature;
-    
-    const maxTokens = providerSpecificSettings?.maxTokens
-      ?? defaultSettings.maxTokens
-      ?? request.maxTokens;
+    const temperature =
+      providerSpecificSettings?.temperature ?? defaultSettings.temperature ?? request.temperature;
+
+    const maxTokens =
+      providerSpecificSettings?.maxTokens ?? defaultSettings.maxTokens ?? request.maxTokens;
 
     // Return new request with resolved settings
     return {
@@ -166,4 +159,3 @@ export class FallbackProvider implements LLMProvider {
     );
   }
 }
-

@@ -19,7 +19,11 @@ export class ReplayEngine {
     const intentions = this.extractIntentions(originalEvents);
     await this.logReplayStart(newRunId, originalEvents, runId, modifications);
 
-    const result = await this.executeIntentions(newRunId, intentions, recordedAllowedTools(originalEvents));
+    const result = await this.executeIntentions(
+      newRunId,
+      intentions,
+      recordedAllowedTools(originalEvents)
+    );
 
     if (result.hasError && result.error) {
       await this.logReplayFailure(newRunId, result.error, runId);
@@ -152,9 +156,7 @@ export class ReplayEngine {
     };
   }
 
-  private extractIntentions(
-    events: Event[]
-  ): Array<{
+  private extractIntentions(events: Event[]): Array<{
     type: string;
     data: { intention: Intention };
     metadata?: Record<string, unknown>;
@@ -165,11 +167,15 @@ export class ReplayEngine {
         // Intentions are stored differently depending on how they were generated
         // so the intention is rebuilt from the event data
         let intention: Intention;
-        
+
         if (e.data?.intention) {
           // The intention is already in data.intention
           intention = e.data.intention as Intention;
-        } else if (e.data?.toolCalls && Array.isArray(e.data.toolCalls) && e.data.toolCalls.length > 0) {
+        } else if (
+          e.data?.toolCalls &&
+          Array.isArray(e.data.toolCalls) &&
+          e.data.toolCalls.length > 0
+        ) {
           // Tool calls: build a tool_call intention
           const toolCall = e.data.toolCalls[0];
           try {
@@ -214,5 +220,7 @@ export class ReplayEngine {
 function recordedAllowedTools(events: Event[]): string[] | undefined {
   const started = events.find((event) => event.type === 'cognition.started');
   const tools = started?.data.allowedTools;
-  return Array.isArray(tools) && tools.every((tool) => typeof tool === 'string') ? tools : undefined;
+  return Array.isArray(tools) && tools.every((tool) => typeof tool === 'string')
+    ? tools
+    : undefined;
 }

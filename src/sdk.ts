@@ -14,7 +14,10 @@ import { FallbackProvider } from './providers/fallback-provider.js';
 import { DEFAULT_RETRY_POLICY } from './resilience/retry.js';
 import { RetryingLLMProvider, type ProviderRetryInfo } from './resilience/retrying-provider.js';
 import type { CognitiveAgent } from './cognition/cognitive-agent.js';
-import { assembleCognitiveAgent, type CognitiveAgentConfig } from './cognition/create-cognitive-agent.js';
+import {
+  assembleCognitiveAgent,
+  type CognitiveAgentConfig,
+} from './cognition/create-cognitive-agent.js';
 import type { MentalState } from './cognition/mental-state.js';
 import {
   buildControllerDataset,
@@ -68,12 +71,24 @@ import { ComparisonReportGenerator } from './utils/comparison-report-generator.j
 import { ImpactAnalyzer } from './utils/impact-analyzer.js';
 import { ImpactAnalysisManager } from './managers/impact-analysis-manager.js';
 import { AdvancedEventFilterEvaluator } from './utils/advanced-event-filter.js';
-import type { RegressionTestSuite, RegressionTestOptions, RegressionTestSuiteResult } from './types/regression-test.js';
+import type {
+  RegressionTestSuite,
+  RegressionTestOptions,
+  RegressionTestSuiteResult,
+} from './types/regression-test.js';
 import type { TestResultsExportOptions } from './types/test-results-export.js';
-import type { Assertion, AssertionCondition, AssertionEvaluationReport } from './types/assertion.js';
+import type {
+  Assertion,
+  AssertionCondition,
+  AssertionEvaluationReport,
+} from './types/assertion.js';
 import type { ComparisonOptions, RunComparison } from './types/comparison.js';
 import type { ImpactAnalysisOptions, ImpactAnalysis } from './types/impact-analysis.js';
-import type { AdvancedEventFilter, AdvancedEventQueryResult, EventStatistics } from './types/advanced-event-filter.js';
+import type {
+  AdvancedEventFilter,
+  AdvancedEventQueryResult,
+  EventStatistics,
+} from './types/advanced-event-filter.js';
 
 export interface SDK {
   createAgent(config: AgentConfig): AgentImpl;
@@ -93,22 +108,77 @@ export interface SDK {
   stopRun(runId: string): Promise<void>;
   approveAction(approvalId: string, approvedBy: string, reason?: string): void;
   rejectAction(approvalId: string, rejectedBy: string, reason?: string): void;
-  getPendingApprovals(runId?: string): Array<{ id: string; runId: string; agentId: string; intention: unknown; policyId: string; requestedAt: number }>;
-  getBudgetUsage(limit: { agentId?: string; toolName?: string; period: 'hour' | 'day' | 'week' | 'month' | 'all' }): Promise<{ agentId?: string; toolName?: string; period: string; periodStart: number; periodEnd: number; tokensUsed: number; toolCallsCount: number; lastUpdated: number }>;
-  getPolicyAuditTrail(runId: string): Array<{ id: string; runId: string; agentId: string; timestamp: number; policyId: string; policyType: string; intention: unknown; conditionEvaluated?: { condition: unknown; result: boolean }; validationResult: { allowed: boolean; reason?: string; violatedPolicies?: string[] }; applied: boolean; reason?: string }>;
+  getPendingApprovals(
+    runId?: string
+  ): Array<{
+    id: string;
+    runId: string;
+    agentId: string;
+    intention: unknown;
+    policyId: string;
+    requestedAt: number;
+  }>;
+  getBudgetUsage(limit: {
+    agentId?: string;
+    toolName?: string;
+    period: 'hour' | 'day' | 'week' | 'month' | 'all';
+  }): Promise<{
+    agentId?: string;
+    toolName?: string;
+    period: string;
+    periodStart: number;
+    periodEnd: number;
+    tokensUsed: number;
+    toolCallsCount: number;
+    lastUpdated: number;
+  }>;
+  getPolicyAuditTrail(
+    runId: string
+  ): Array<{
+    id: string;
+    runId: string;
+    agentId: string;
+    timestamp: number;
+    policyId: string;
+    policyType: string;
+    intention: unknown;
+    conditionEvaluated?: { condition: unknown; result: boolean };
+    validationResult: { allowed: boolean; reason?: string; violatedPolicies?: string[] };
+    applied: boolean;
+    reason?: string;
+  }>;
   getReasoningGraph(runId: string): Promise<ReasoningGraph>;
   exportReasoningGraph(runId: string, format?: 'json' | 'graphviz'): Promise<string>;
   getAlternatives(runId: string): Promise<AlternativesAnalysis>;
-  getDecisionPatterns(options?: { agentId?: string; userId?: string; sessionId?: string; since?: number; until?: number; minFrequency?: number }): Promise<DecisionPatternAnalysis>;
+  getDecisionPatterns(options?: {
+    agentId?: string;
+    userId?: string;
+    sessionId?: string;
+    since?: number;
+    until?: number;
+    minFrequency?: number;
+  }): Promise<DecisionPatternAnalysis>;
   getTraceVisualization(runId: string): Promise<TraceVisualization>;
   createGoldenTrace(runId: string, config: GoldenTraceConfig): Promise<GoldenTrace>;
   getGoldenTraces(agentId?: string): Promise<GoldenTrace[]>;
   getGoldenTrace(goldenTraceId: string): Promise<GoldenTrace>;
   deleteGoldenTrace(goldenTraceId: string): Promise<void>;
   exportGoldenTrace(goldenTraceId: string, format?: 'json' | 'yaml'): Promise<string>;
-  validateAgainstGoldenTrace(runId: string, goldenTraceId: string, options?: ValidationOptions): Promise<ValidationResult>;
-  replayAndValidate(runId: string, goldenTraceId: string, options?: ValidationOptions): Promise<ValidationResult>;
-  detectRegressions(newRunId: string, goldenTraceId: string, options?: import('./types/regression.js').RegressionDetectionOptions): Promise<import('./types/regression.js').RegressionReport>;
+  validateAgainstGoldenTrace(
+    runId: string,
+    goldenTraceId: string,
+    options?: ValidationOptions
+  ): Promise<ValidationResult>;
+  replayAndValidate(
+    runId: string,
+    goldenTraceId: string,
+    options?: ValidationOptions
+  ): Promise<ValidationResult>;
+  detectRegressions(
+    newRunId: string,
+    goldenTraceId: string,
+    options?: import('./types/regression.js').RegressionDetectionOptions
+  ): Promise<import('./types/regression.js').RegressionReport>;
   /** Creates an agent that reasons explicitly (hypotheses, simulation, critique) before answering. */
   createCognitiveAgent(config: CognitiveAgentConfig): CognitiveAgent;
   /** Rebuilds the mental state of a cognitive run from its events. */
@@ -126,7 +196,11 @@ export interface SDK {
   /** Every registered tool (used to expose them over MCP). */
   listTools(): Tool[];
   /** Executes a tool through the governed pipeline (policies, approvals, budgets, events). */
-  executeTool(name: string, parameters: Record<string, unknown>, options?: { agentId?: string; runId?: string; allowedTools?: string[] }): Promise<unknown>;
+  executeTool(
+    name: string,
+    parameters: Record<string, unknown>,
+    options?: { agentId?: string; runId?: string; allowedTools?: string[] }
+  ): Promise<unknown>;
 }
 
 export class SDKImpl implements SDK {
@@ -153,26 +227,28 @@ export class SDKImpl implements SDK {
 
   constructor(config: SDKConfig) {
     const baseStore = config.eventStore || new FileEventStore();
-    this.eventStore = config.incidents ? new MonitoredEventStore(baseStore, config.incidents) : baseStore;
+    this.eventStore = config.incidents
+      ? new MonitoredEventStore(baseStore, config.incidents)
+      : baseStore;
     this.pricing = { ...DEFAULT_PRICING, ...config.pricing };
     this.toolRegistry = new ToolRegistry();
     this.capabilityRegistry = new CapabilityRegistry();
     this.policyEngine = new PolicyEngine();
     this.approvalManager = new ApprovalManager();
     this.budgetTracker = new BudgetTracker(this.eventStore);
-    
+
     // Connect BudgetTracker and EventStore to PolicyEngine
     this.policyEngine.setBudgetTracker(this.budgetTracker);
     this.policyEngine.setEventStore(this.eventStore);
-    
+
     // Create provider once (shared, stateless)
-    const retryPolicy = config.retry === false ? undefined : { ...DEFAULT_RETRY_POLICY, ...config.retry };
+    const retryPolicy =
+      config.retry === false ? undefined : { ...DEFAULT_RETRY_POLICY, ...config.retry };
     const onRetry = (info: ProviderRetryInfo) => this.recordProviderRetry(info);
     if (config.llmProvider) {
       // Injected providers are used as given unless `retry` is set explicitly. A fallback
       // chain is never wrapped: it has to stay visible to the reasoning engine.
-      const wrap =
-        config.retry && retryPolicy && !(config.llmProvider instanceof FallbackProvider);
+      const wrap = config.retry && retryPolicy && !(config.llmProvider instanceof FallbackProvider);
       this.provider = wrap
         ? new RetryingLLMProvider(config.llmProvider, retryPolicy, onRetry)
         : config.llmProvider;
@@ -184,15 +260,25 @@ export class SDKImpl implements SDK {
       config.decisionClient ??
       (config.jev
         ? new JevClient({
-            ...(retryPolicy ? { maxRetries: retryPolicy.maxRetries, retryBaseDelayMs: retryPolicy.initialDelayMs } : {}),
+            ...(retryPolicy
+              ? { maxRetries: retryPolicy.maxRetries, retryBaseDelayMs: retryPolicy.initialDelayMs }
+              : {}),
             ...config.jev,
           })
         : undefined);
-    this.decisionService = this.decisionClient ? new DecisionService(this.decisionClient, this.eventStore) : undefined;
-    
+    this.decisionService = this.decisionClient
+      ? new DecisionService(this.decisionClient, this.eventStore)
+      : undefined;
+
     // ActionEngine and ReplayEngine are shared (stateless)
     // ApprovalManager is passed to ActionEngine for approval workflow
-    this.actionEngine = new ActionEngine(this.policyEngine, this.toolRegistry, this.eventStore, this.approvalManager, this.budgetTracker);
+    this.actionEngine = new ActionEngine(
+      this.policyEngine,
+      this.toolRegistry,
+      this.eventStore,
+      this.approvalManager,
+      this.budgetTracker
+    );
     this.replayEngine = new ReplayEngine(this.eventStore, this.actionEngine);
     this.goldenTraceManager = new GoldenTraceManager(config.goldenTracesDir);
     this.regressionTestManager = new RegressionTestManager(config.regressionTestSuitesDir);
@@ -241,7 +327,10 @@ export class SDKImpl implements SDK {
         examples.push(...buildControllerDataset(runId, events));
       } catch (error) {
         // One damaged run must not block the export of all the others.
-        console.warn(`Skipping run ${runId} in the controller dataset:`, error instanceof Error ? error.message : error);
+        console.warn(
+          `Skipping run ${runId} in the controller dataset:`,
+          error instanceof Error ? error.message : error
+        );
       }
     }
     return toJsonLines(examples);
@@ -253,7 +342,10 @@ export class SDKImpl implements SDK {
 
   get decisions(): DecisionService {
     if (!this.decisionService) {
-      throw new ValidationError('decisions', 'configure `jev` or `decisionClient` to use typed decisions');
+      throw new ValidationError(
+        'decisions',
+        'configure `jev` or `decisionClient` to use typed decisions'
+      );
     }
     return this.decisionService;
   }
@@ -292,7 +384,10 @@ export class SDKImpl implements SDK {
       });
 
     if (!options.runId) {
-      await log('run.started', { input: { message: `tool ${name}`, context: { parameters } }, mode: 'tool' });
+      await log('run.started', {
+        input: { message: `tool ${name}`, context: { parameters } },
+        mode: 'tool',
+      });
     }
     try {
       const result = await this.actionEngine.executeIntention(
@@ -511,14 +606,16 @@ export class SDKImpl implements SDK {
     return AlternativesExtractor.extractFromEvents(runId, events);
   }
 
-  async getDecisionPatterns(options: {
-    agentId?: string;
-    userId?: string;
-    sessionId?: string;
-    since?: number;
-    until?: number;
-    minFrequency?: number;
-  } = {}): Promise<DecisionPatternAnalysis> {
+  async getDecisionPatterns(
+    options: {
+      agentId?: string;
+      userId?: string;
+      sessionId?: string;
+      since?: number;
+      until?: number;
+      minFrequency?: number;
+    } = {}
+  ): Promise<DecisionPatternAnalysis> {
     // Get run IDs based on filters
     const runIds = await this.eventStore.getRunIds({
       since: options.since,
@@ -531,7 +628,7 @@ export class SDKImpl implements SDK {
 
     // Get events for each run
     const runs: Array<{ runId: string; events: Event[] }> = [];
-    
+
     for (const runId of runIds) {
       const events = await this.eventStore.getEvents(runId, {
         agentId: options.agentId,
@@ -540,13 +637,14 @@ export class SDKImpl implements SDK {
       });
 
       // Filter by time range if specified
-      const filteredEvents = options.since || options.until
-        ? events.filter((e) => {
-            if (options.since && e.timestamp < options.since) return false;
-            if (options.until && e.timestamp > options.until) return false;
-            return true;
-          })
-        : events;
+      const filteredEvents =
+        options.since || options.until
+          ? events.filter((e) => {
+              if (options.since && e.timestamp < options.since) return false;
+              if (options.until && e.timestamp > options.until) return false;
+              return true;
+            })
+          : events;
 
       if (filteredEvents.length > 0) {
         runs.push({ runId, events: filteredEvents });
@@ -590,7 +688,10 @@ export class SDKImpl implements SDK {
     }
   }
 
-  async exportGoldenTrace(goldenTraceId: string, format: 'json' | 'yaml' = 'json'): Promise<string> {
+  async exportGoldenTrace(
+    goldenTraceId: string,
+    format: 'json' | 'yaml' = 'json'
+  ): Promise<string> {
     return this.goldenTraceManager.exportGoldenTrace(goldenTraceId, format);
   }
 
@@ -769,10 +870,7 @@ export class SDKImpl implements SDK {
     runId2: string,
     options?: ComparisonOptions
   ): Promise<RunComparison> {
-    const [trace1, trace2] = await Promise.all([
-      this.getTrace(runId1),
-      this.getTrace(runId2),
-    ]);
+    const [trace1, trace2] = await Promise.all([this.getTrace(runId1), this.getTrace(runId2)]);
 
     return RunComparator.compare(trace1, trace2, options || {});
   }
@@ -872,7 +970,9 @@ export class SDKImpl implements SDK {
       throw new Error('Advanced event filtering requires queryEvents support in event store');
     }
 
-    const filteredEvents = allEvents.filter((e) => AdvancedEventFilterEvaluator.evaluate(e, filter));
+    const filteredEvents = allEvents.filter((e) =>
+      AdvancedEventFilterEvaluator.evaluate(e, filter)
+    );
 
     const limitedEvents = filter.limit ? filteredEvents.slice(0, filter.limit) : filteredEvents;
 
@@ -924,7 +1024,7 @@ export class SDKImpl implements SDK {
 
     const firstEvent = events[0];
     const agentId = firstEvent.metadata?.agentId as string | undefined;
-    
+
     if (agentId) {
       const agentImpl = this.activeAgentInstances.get(agentId);
       if (agentImpl) {
@@ -1036,22 +1136,24 @@ export class SDKImpl implements SDK {
     const descriptions: Record<string, (event: Event) => string> = {
       'run.started': () => 'Run started',
       'run.completed': () => 'Run completed',
-      'run.failed': (e) => `Run failed: ${e.data?.error as string || 'Unknown error'}`,
+      'run.failed': (e) => `Run failed: ${(e.data?.error as string) || 'Unknown error'}`,
       'run.cancelled': () => 'Run cancelled',
       'run.stopped': () => 'Run stopped',
       'intention.generated': (e) => {
         const intention = e.data?.intention as { type?: string } | undefined;
         return `Intention generated: ${intention?.type || 'unknown'}`;
       },
-      'intention.rejected': (e) => `Intention rejected: ${e.data?.reason as string || 'Unknown reason'}`,
-      'action.executing': (e) => `Action executing: ${e.data?.toolName as string || 'unknown'}`,
-      'action.executed': (e) => `Action executed: ${e.data?.toolName as string || 'unknown'}`,
-      'action.failed': (e) => `Action failed: ${e.data?.toolName as string || 'unknown'}`,
+      'intention.rejected': (e) =>
+        `Intention rejected: ${(e.data?.reason as string) || 'Unknown reason'}`,
+      'action.executing': (e) => `Action executing: ${(e.data?.toolName as string) || 'unknown'}`,
+      'action.executed': (e) => `Action executed: ${(e.data?.toolName as string) || 'unknown'}`,
+      'action.failed': (e) => `Action failed: ${(e.data?.toolName as string) || 'unknown'}`,
       'policy.checked': () => 'Policy checked',
-      'policy.violated': (e) => `Policy violated: ${e.data?.reason as string || 'Unknown reason'}`,
-      'tool.called': (e) => `Tool called: ${e.data?.toolName as string || 'unknown'}`,
-      'tool.failed': (e) => `Tool failed: ${e.data?.toolName as string || 'unknown'}`,
-      'error.occurred': (e) => `Error occurred: ${e.data?.error as string || 'Unknown error'}`,
+      'policy.violated': (e) =>
+        `Policy violated: ${(e.data?.reason as string) || 'Unknown reason'}`,
+      'tool.called': (e) => `Tool called: ${(e.data?.toolName as string) || 'unknown'}`,
+      'tool.failed': (e) => `Tool failed: ${(e.data?.toolName as string) || 'unknown'}`,
+      'error.occurred': (e) => `Error occurred: ${(e.data?.error as string) || 'Unknown error'}`,
     };
 
     return descriptions[event.type]?.(event) || event.type;

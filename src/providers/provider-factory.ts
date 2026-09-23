@@ -34,9 +34,7 @@ export class ProviderFactory {
       return new OpenAIProvider(apiKey, defaultModel);
     }
     throw new Error(
-      `Cannot determine provider for model: ${model}. ` +
-        `Supported models: Claude (claude-*), OpenAI (gpt-*, o1-*). ` +
-        `Please specify the provider explicitly or use a recognized model name.`
+      `Cannot determine provider for model: ${model}. Supported models: Claude (claude-*), OpenAI (gpt-*, o1-*). Please specify the provider explicitly or use a recognized model name.`
     );
   }
 }

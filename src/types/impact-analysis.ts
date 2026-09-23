@@ -49,5 +49,3 @@ export interface ImpactAnalysis {
     description: string;
   }>;
 }
-
-

@@ -1,14 +1,23 @@
 import type { SQLConnection, SQLEventStoreConfig } from './sql-event-store.js';
 import { SQLEventStore } from './sql-event-store.js';
 
+/** The subset of a better-sqlite3 `Database` the store uses (a real database satisfies it). */
+export interface SQLiteDatabase {
+  prepare(sql: string): {
+    all(...params: unknown[]): unknown[];
+    run(...params: unknown[]): unknown;
+  };
+  close(): void;
+}
+
 /**
  * SQLite-specific connection wrapper for SQLEventStore.
  * This uses better-sqlite3 for SQLite support.
  */
 export class SQLiteConnection implements SQLConnection {
-  private db: any; // better-sqlite3 Database instance
+  private db: SQLiteDatabase;
 
-  constructor(db: any) {
+  constructor(db: SQLiteDatabase) {
     this.db = db;
   }
 
@@ -32,7 +41,9 @@ export class SQLiteConnection implements SQLConnection {
  * Uses better-sqlite3 for SQLite database access.
  */
 export class SQLiteEventStore extends SQLEventStore {
-  constructor(config: Omit<SQLEventStoreConfig, 'connection'> & { db: any; tableName?: string }) {
+  constructor(
+    config: Omit<SQLEventStoreConfig, 'connection'> & { db: SQLiteDatabase; tableName?: string }
+  ) {
     const connection = new SQLiteConnection(config.db);
     super({
       connection,
@@ -40,4 +51,3 @@ export class SQLiteEventStore extends SQLEventStore {
     });
   }
 }
-

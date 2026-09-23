@@ -1,6 +1,10 @@
 import { promises as fs } from 'node:fs';
 import type { RegressionTestSuiteResult } from '../types/regression-test.js';
-import type { TestResultsExportOptions, JUnitTestSuite, TestResultsJSON } from '../types/test-results-export.js';
+import type {
+  TestResultsExportOptions,
+  JUnitTestSuite,
+  TestResultsJSON,
+} from '../types/test-results-export.js';
 
 export class TestResultsExporter {
   static async export(
@@ -12,13 +16,13 @@ export class TestResultsExporter {
 
     switch (format) {
       case 'junit':
-        content = this.exportJUnit(results);
+        content = TestResultsExporter.exportJUnit(results);
         break;
       case 'json':
-        content = this.exportJSON(results, options.includeDetails ?? true);
+        content = TestResultsExporter.exportJSON(results, options.includeDetails ?? true);
         break;
       case 'json-summary':
-        content = this.exportJSONSummary(results);
+        content = TestResultsExporter.exportJSONSummary(results);
         break;
       default:
         throw new Error(`Unsupported export format: ${format}`);
@@ -41,7 +45,13 @@ export class TestResultsExporter {
       time: results.duration / 1000,
       testCases: results.results.map((result) => {
         const status: 'pass' | 'fail' | 'error' | 'skipped' =
-          result.status === 'timeout' ? 'error' : result.status === 'pass' ? 'pass' : result.status === 'fail' ? 'fail' : 'error';
+          result.status === 'timeout'
+            ? 'error'
+            : result.status === 'pass'
+              ? 'pass'
+              : result.status === 'fail'
+                ? 'fail'
+                : 'error';
 
         const testCase: JUnitTestSuite['testCases'][0] = {
           name: result.goldenTraceId,
@@ -54,14 +64,15 @@ export class TestResultsExporter {
           const criticalRegressions = result.regressionReport.regressions.filter(
             (r) => r.severity === 'critical'
           );
-          const message = criticalRegressions.length > 0
-            ? `${criticalRegressions.length} critical regression(s) detected`
-            : 'Regression detected';
+          const message =
+            criticalRegressions.length > 0
+              ? `${criticalRegressions.length} critical regression(s) detected`
+              : 'Regression detected';
 
           testCase.failure = {
             message,
             type: 'behavioral',
-            details: this.formatRegressionDetails(result.regressionReport),
+            details: TestResultsExporter.formatRegressionDetails(result.regressionReport),
           };
         } else if (result.status === 'error' && result.error) {
           testCase.failure = {
@@ -75,25 +86,27 @@ export class TestResultsExporter {
       }),
     };
 
-    return this.generateJUnitXML(suite);
+    return TestResultsExporter.generateJUnitXML(suite);
   }
 
   private static generateJUnitXML(suite: JUnitTestSuite): string {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="${this.escapeXML(suite.name)}" tests="${suite.tests}" failures="${suite.failures}" errors="${suite.errors}" skipped="${suite.skipped}" time="${suite.time.toFixed(3)}">
-${suite.testCases.map((tc) => {
-      const testCaseXML = `    <testcase name="${this.escapeXML(tc.name)}" classname="${this.escapeXML(tc.classname)}" time="${tc.time.toFixed(3)}">`;
-      if (tc.failure) {
-        return `${testCaseXML}
-      <failure message="${this.escapeXML(tc.failure.message)}" type="${this.escapeXML(tc.failure.type)}">
-${this.escapeXML(tc.failure.details)}
+  <testsuite name="${TestResultsExporter.escapeXML(suite.name)}" tests="${suite.tests}" failures="${suite.failures}" errors="${suite.errors}" skipped="${suite.skipped}" time="${suite.time.toFixed(3)}">
+${suite.testCases
+  .map((tc) => {
+    const testCaseXML = `    <testcase name="${TestResultsExporter.escapeXML(tc.name)}" classname="${TestResultsExporter.escapeXML(tc.classname)}" time="${tc.time.toFixed(3)}">`;
+    if (tc.failure) {
+      return `${testCaseXML}
+      <failure message="${TestResultsExporter.escapeXML(tc.failure.message)}" type="${TestResultsExporter.escapeXML(tc.failure.type)}">
+${TestResultsExporter.escapeXML(tc.failure.details)}
       </failure>
     </testcase>`;
-      }
-      return `${testCaseXML}
+    }
+    return `${testCaseXML}
     </testcase>`;
-    }).join('\n')}
+  })
+  .join('\n')}
   </testsuite>
 </testsuites>`;
 
@@ -120,17 +133,18 @@ ${this.escapeXML(tc.failure.details)}
         runId: result.runId,
         status: result.status,
         duration: result.duration,
-        regressionReport: includeDetails && result.regressionReport
-          ? {
-              status: result.regressionReport.status,
-              regressions: result.regressionReport.regressions.map((r) => ({
-                type: r.type,
-                severity: r.severity,
-                impact: r.impact,
-                description: r.description,
-              })),
-            }
-          : undefined,
+        regressionReport:
+          includeDetails && result.regressionReport
+            ? {
+                status: result.regressionReport.status,
+                regressions: result.regressionReport.regressions.map((r) => ({
+                  type: r.type,
+                  severity: r.severity,
+                  impact: r.impact,
+                  description: r.description,
+                })),
+              }
+            : undefined,
         error: result.error,
       })),
     };
@@ -158,7 +172,9 @@ ${this.escapeXML(tc.failure.details)}
     return JSON.stringify(summary, null, 2);
   }
 
-  private static formatRegressionDetails(regressionReport: RegressionTestSuiteResult['results'][0]['regressionReport']): string {
+  private static formatRegressionDetails(
+    regressionReport: RegressionTestSuiteResult['results'][0]['regressionReport']
+  ): string {
     if (!regressionReport) return '';
 
     const lines: string[] = [];
@@ -199,4 +215,3 @@ ${this.escapeXML(tc.failure.details)}
     return 0;
   }
 }
-

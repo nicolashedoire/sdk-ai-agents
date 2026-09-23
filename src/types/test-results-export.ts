@@ -55,4 +55,3 @@ export interface TestResultsJSON {
     error?: string;
   }>;
 }
-

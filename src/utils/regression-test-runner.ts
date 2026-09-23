@@ -1,5 +1,10 @@
 import type { AgentImpl } from '../agent.js';
-import type { RegressionTestSuite, RegressionTestOptions, RegressionTestResult, RegressionTestSuiteResult } from '../types/regression-test.js';
+import type {
+  RegressionTestSuite,
+  RegressionTestOptions,
+  RegressionTestResult,
+  RegressionTestSuiteResult,
+} from '../types/regression-test.js';
 import type { RegressionReport } from '../types/regression.js';
 
 export class RegressionTestRunner {
@@ -14,21 +19,27 @@ export class RegressionTestRunner {
 
     let goldenTraces = suite.goldenTraces;
 
-    if (options.filterTags && options.filterTags.length > 0) {
-      goldenTraces = goldenTraces.filter((gt) =>
-        gt.tags?.some((tag) => options.filterTags!.includes(tag))
-      );
+    const filterTags = options.filterTags;
+    if (filterTags && filterTags.length > 0) {
+      goldenTraces = goldenTraces.filter((gt) => gt.tags?.some((tag) => filterTags.includes(tag)));
     }
 
-    if (options.excludeTags && options.excludeTags.length > 0) {
+    const excludeTags = options.excludeTags;
+    if (excludeTags && excludeTags.length > 0) {
       goldenTraces = goldenTraces.filter(
-        (gt) => !gt.tags?.some((tag) => options.excludeTags!.includes(tag))
+        (gt) => !gt.tags?.some((tag) => excludeTags.includes(tag))
       );
     }
 
     if (options.parallel) {
       const testPromises = goldenTraces.map((gt) =>
-        this.runSingleTest(gt.goldenTraceId, gt.input, agent, detectRegressions, options)
+        RegressionTestRunner.runSingleTest(
+          gt.goldenTraceId,
+          gt.input,
+          agent,
+          detectRegressions,
+          options
+        )
       );
 
       const testResults = await Promise.allSettled(testPromises);
@@ -50,7 +61,7 @@ export class RegressionTestRunner {
       }
     } else {
       for (const gt of goldenTraces) {
-        const result = await this.runSingleTest(
+        const result = await RegressionTestRunner.runSingleTest(
           gt.goldenTraceId,
           gt.input,
           agent,
@@ -66,7 +77,7 @@ export class RegressionTestRunner {
     }
 
     const duration = Date.now() - startTime;
-    const summary = this.calculateSummary(results);
+    const summary = RegressionTestRunner.calculateSummary(results);
 
     return {
       suiteId: suite.id,
@@ -148,4 +159,3 @@ export class RegressionTestRunner {
     };
   }
 }
-

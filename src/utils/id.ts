@@ -11,4 +11,3 @@ export function generateRunId(): string {
 export function generateEventId(): string {
   return `evt_${uuidv4()}`;
 }
-

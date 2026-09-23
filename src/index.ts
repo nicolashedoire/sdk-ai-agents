@@ -18,9 +18,16 @@ export * from './agent.js';
 export { CognitiveAgent } from './cognition/cognitive-agent.js';
 export { learnFromRun, summarizeReasoning } from './cognition/profile-learning.js';
 export type { ProfileLesson } from './cognition/profile-learning.js';
-export type { CognitiveAgentDependencies, CognitiveRunResult, ThinkInput } from './cognition/cognitive-agent.js';
+export type {
+  CognitiveAgentDependencies,
+  CognitiveRunResult,
+  ThinkInput,
+} from './cognition/cognitive-agent.js';
 export { assembleCognitiveAgent } from './cognition/create-cognitive-agent.js';
-export type { CognitiveAgentConfig, CognitiveAgentEnvironment } from './cognition/create-cognitive-agent.js';
+export type {
+  CognitiveAgentConfig,
+  CognitiveAgentEnvironment,
+} from './cognition/create-cognitive-agent.js';
 export { HeuristicController } from './cognition/cognitive-controller.js';
 export type {
   CognitiveController,
@@ -39,8 +46,16 @@ export { TypedDecisionController } from './cognition/typed-decision-controller.j
 export type { TypedDecisionControllerOptions } from './cognition/typed-decision-controller.js';
 export { TypedHypothesisAssessor } from './cognition/hypothesis-assessor.js';
 export type { HypothesisAssessment, HypothesisAssessor } from './cognition/hypothesis-assessor.js';
-export { LLMThoughtGenerator, extractJsonObject, parseThought } from './cognition/llm-thought-generator.js';
-export type { GeneratedThought, ThoughtGenerator, ThoughtRequest } from './cognition/llm-thought-generator.js';
+export {
+  LLMThoughtGenerator,
+  extractJsonObject,
+  parseThought,
+} from './cognition/llm-thought-generator.js';
+export type {
+  GeneratedThought,
+  ThoughtGenerator,
+  ThoughtRequest,
+} from './cognition/llm-thought-generator.js';
 export { applyThought } from './cognition/mental-state-reducer.js';
 export {
   activeHypotheses,
@@ -55,7 +70,11 @@ export type {
   ThoughtPatch,
   ThoughtPatchInput,
 } from './cognition/mental-state.js';
-export { buildControllerDataset, rebuildMentalState, toJsonLines } from './cognition/mental-state-replay.js';
+export {
+  buildControllerDataset,
+  rebuildMentalState,
+  toJsonLines,
+} from './cognition/mental-state-replay.js';
 export type { ControllerTrainingExample } from './cognition/mental-state-replay.js';
 export { DEFAULT_COGNITIVE_LIMITS } from './cognition/operation-selector.js';
 export type { CognitiveLimits } from './cognition/operation-selector.js';
@@ -69,7 +88,11 @@ export {
   renderProfile,
   thinkerProfileSchema,
 } from './cognition/thinker-profile.js';
-export type { ReasoningFeedback, ThinkerProfile, ThinkerProfileInput } from './cognition/thinker-profile.js';
+export type {
+  ReasoningFeedback,
+  ThinkerProfile,
+  ThinkerProfileInput,
+} from './cognition/thinker-profile.js';
 
 // Typed decisions (TypeSafe Jev and compatible backends)
 export { DecisionService } from './decisions/decision-service.js';
@@ -82,7 +105,14 @@ export type {
 } from './decisions/decision-service.js';
 export { JevClient, JEV_DEFAULT_BASE_URL, JEV_DEFAULT_MODEL } from './decisions/jev-client.js';
 export type { JevClientConfig, JevModel } from './decisions/jev-client.js';
-export { choice, noul, score, normalizeScore, parseAnswers, assertValidQuestions } from './decisions/typed-decisions.js';
+export {
+  choice,
+  noul,
+  score,
+  normalizeScore,
+  parseAnswers,
+  assertValidQuestions,
+} from './decisions/typed-decisions.js';
 export type {
   AnswerFor,
   ChoiceAnswer,
@@ -110,7 +140,12 @@ export type { RetryAttemptInfo, RetryOptions, RetryPolicy } from './resilience/r
 export { RetryingLLMProvider } from './resilience/retrying-provider.js';
 export type { ProviderRetryInfo } from './resilience/retrying-provider.js';
 export { DEFAULT_INCIDENT_RULES, incidentSchema, summarizeEvent } from './incidents/incident.js';
-export type { Incident, IncidentNotifier, IncidentRule, IncidentSeverity } from './incidents/incident.js';
+export type {
+  Incident,
+  IncidentNotifier,
+  IncidentRule,
+  IncidentSeverity,
+} from './incidents/incident.js';
 export {
   EmailIncidentNotifier,
   ResendEmailTransport,

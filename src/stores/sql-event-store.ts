@@ -1,4 +1,10 @@
-import type { Event, EventFilters, EventLog, EventAggregation, EventQueryResult } from '../types/events.js';
+import type {
+  Event,
+  EventFilters,
+  EventLog,
+  EventAggregation,
+  EventQueryResult,
+} from '../types/events.js';
 import type { IEventStore, BackupData } from './event-store.js';
 import { deriveRunStatus } from '../utils/run-status.js';
 
@@ -52,7 +58,7 @@ export class SQLEventStore implements IEventStore {
     for (const indexSQL of createIndexesSQL) {
       try {
         await this.connection.execute(indexSQL);
-      } catch (error) {
+      } catch {
         // Ignore errors if index already exists (some databases may throw)
         // This is safe because we use IF NOT EXISTS where supported
       }
@@ -145,9 +151,10 @@ export class SQLEventStore implements IEventStore {
     const firstEvent = events[0];
 
     const agentId = firstEvent.metadata?.agentId as string | undefined;
-    const version = firstEvent.metadata?.agentVersion as string | undefined || '1.0.0';
+    const version = (firstEvent.metadata?.agentVersion as string | undefined) || '1.0.0';
 
-    const startedAt = events.find((e) => e.type === 'run.started')?.timestamp || firstEvent.timestamp;
+    const startedAt =
+      events.find((e) => e.type === 'run.started')?.timestamp || firstEvent.timestamp;
     const completedAt = events.find((e) =>
       ['run.completed', 'run.failed', 'run.cancelled'].includes(e.type)
     )?.timestamp;
@@ -206,7 +213,12 @@ export class SQLEventStore implements IEventStore {
    * Applies filters to SQL query (helper method).
    * Returns the modified SQL string and updated params.
    */
-  protected applyFiltersToSQL(sql: string, params: unknown[], filters?: EventFilters, paramPlaceholder = '?'): { sql: string; params: unknown[] } {
+  protected applyFiltersToSQL(
+    sql: string,
+    params: unknown[],
+    filters?: EventFilters,
+    paramPlaceholder = '?'
+  ): { sql: string; params: unknown[] } {
     if (!filters) return { sql, params };
 
     let resultSQL = sql;
@@ -255,7 +267,7 @@ export class SQLEventStore implements IEventStore {
     if (filters.dataQuery) {
       const { field, operator, value } = filters.dataQuery;
       const jsonPath = `JSON_EXTRACT(data, '$.${field}')`;
-      
+
       switch (operator) {
         case 'eq':
           resultSQL += ` AND ${jsonPath} = ${paramPlaceholder}`;
@@ -295,7 +307,7 @@ export class SQLEventStore implements IEventStore {
     if (filters.metadataQuery) {
       const { field, operator, value } = filters.metadataQuery;
       const jsonPath = `JSON_EXTRACT(metadata, '$.${field}')`;
-      
+
       switch (operator) {
         case 'eq':
           resultSQL += ` AND ${jsonPath} = ${paramPlaceholder}`;
@@ -337,11 +349,18 @@ export class SQLEventStore implements IEventStore {
   /**
    * Advanced query method - queries events across all runs.
    */
-  async queryEvents(filters?: EventFilters, aggregation?: EventAggregation): Promise<EventQueryResult> {
+  async queryEvents(
+    filters?: EventFilters,
+    aggregation?: EventAggregation
+  ): Promise<EventQueryResult> {
     let sql = `SELECT * FROM ${this.tableName} WHERE 1=1`;
     const params: unknown[] = [];
 
-    const { sql: filteredSQL, params: filteredParams } = this.applyFiltersToSQL(sql, params, filters);
+    const { sql: filteredSQL, params: filteredParams } = this.applyFiltersToSQL(
+      sql,
+      params,
+      filters
+    );
     sql = filteredSQL;
     params.push(...filteredParams);
 
@@ -378,7 +397,10 @@ export class SQLEventStore implements IEventStore {
   /**
    * Gets events by agent ID.
    */
-  async getEventsByAgent(agentId: string, filters?: Omit<EventFilters, 'agentId'>): Promise<Event[]> {
+  async getEventsByAgent(
+    agentId: string,
+    filters?: Omit<EventFilters, 'agentId'>
+  ): Promise<Event[]> {
     return this.queryEvents({ ...filters, agentId }).then((result) => result.events);
   }
 
@@ -392,7 +414,10 @@ export class SQLEventStore implements IEventStore {
   /**
    * Gets events by session ID.
    */
-  async getEventsBySession(sessionId: string, filters?: Omit<EventFilters, 'sessionId'>): Promise<Event[]> {
+  async getEventsBySession(
+    sessionId: string,
+    filters?: Omit<EventFilters, 'sessionId'>
+  ): Promise<Event[]> {
     return this.queryEvents({ ...filters, sessionId }).then((result) => result.events);
   }
 
@@ -403,7 +428,11 @@ export class SQLEventStore implements IEventStore {
     let sql = `SELECT COUNT(*) as count FROM ${this.tableName} WHERE 1=1`;
     const params: unknown[] = [];
 
-    const { sql: filteredSQL, params: filteredParams } = this.applyFiltersToSQL(sql, params, filters);
+    const { sql: filteredSQL, params: filteredParams } = this.applyFiltersToSQL(
+      sql,
+      params,
+      filters
+    );
     sql = filteredSQL;
     params.push(...filteredParams);
 
@@ -422,7 +451,7 @@ export class SQLEventStore implements IEventStore {
       return [];
     }
 
-    let sql = `SELECT `;
+    let sql = 'SELECT ';
     const params: unknown[] = [];
 
     // Determine GROUP BY field
@@ -450,7 +479,11 @@ export class SQLEventStore implements IEventStore {
     }
 
     sql += ' WHERE 1=1';
-    const { sql: filteredSQL, params: filteredParams } = this.applyFiltersToSQL(sql, params, filters);
+    const { sql: filteredSQL, params: filteredParams } = this.applyFiltersToSQL(
+      sql,
+      params,
+      filters
+    );
     sql = filteredSQL;
     params.push(...filteredParams);
     sql += ' GROUP BY key ORDER BY count DESC';
@@ -494,10 +527,11 @@ export class SQLEventStore implements IEventStore {
           case 'day':
             key = new Date(event.timestamp).toISOString().split('T')[0];
             break;
-          case 'hour':
+          case 'hour': {
             const date = new Date(event.timestamp);
             key = `${date.toISOString().split('T')[0]} ${date.getHours()}:00:00`;
             break;
+          }
           default:
             key = 'unknown';
         }
@@ -575,7 +609,11 @@ export class SQLEventStore implements IEventStore {
           // Try SQLite syntax first (INSERT OR IGNORE)
           await this.connection.execute(
             'INSERT OR IGNORE INTO runs (id, agent_id, created_at) VALUES (?, ?, ?)',
-            [run.id, run.agentId || null, run.createdAt ? new Date(run.createdAt).toISOString() : null]
+            [
+              run.id,
+              run.agentId || null,
+              run.createdAt ? new Date(run.createdAt).toISOString() : null,
+            ]
           );
         } catch {
           // Runs table might not exist or use different syntax, ignore
@@ -588,7 +626,7 @@ export class SQLEventStore implements IEventStore {
     const batchSize = 100;
     for (let i = 0; i < backupData.events.length; i += batchSize) {
       const batch = backupData.events.slice(i, i + batchSize);
-      
+
       for (const { runId, event } of batch) {
         await this.append(runId, event);
       }
@@ -602,4 +640,3 @@ export class SQLEventStore implements IEventStore {
     await this.connection.close();
   }
 }
-

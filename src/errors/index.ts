@@ -110,9 +110,18 @@ export class ThoughtGenerationError extends SDKError {
   constructor(
     public operation: string,
     public detail: string,
-    options: { originalError?: Error; usage?: ModelUsage; model?: string; requestedModel?: string } = {}
+    options: {
+      originalError?: Error;
+      usage?: ModelUsage;
+      model?: string;
+      requestedModel?: string;
+    } = {}
   ) {
-    super(`Thought generation failed (${operation}): ${detail}`, 'THOUGHT_ERROR', options.originalError);
+    super(
+      `Thought generation failed (${operation}): ${detail}`,
+      'THOUGHT_ERROR',
+      options.originalError
+    );
     this.name = 'ThoughtGenerationError';
     this.usage = options.usage;
     this.model = options.model;

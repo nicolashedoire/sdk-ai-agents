@@ -10,7 +10,18 @@ export interface ConditionExpression {
   type: 'condition' | 'and' | 'or' | 'not';
   conditions?: Array<{
     field: string;
-    operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'notIn' | 'contains' | 'matches' | 'exists';
+    operator:
+      | 'eq'
+      | 'ne'
+      | 'gt'
+      | 'gte'
+      | 'lt'
+      | 'lte'
+      | 'in'
+      | 'notIn'
+      | 'contains'
+      | 'matches'
+      | 'exists';
     value: unknown;
   }>;
   expressions?: ConditionExpression[];

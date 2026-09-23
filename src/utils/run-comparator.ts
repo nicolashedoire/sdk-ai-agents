@@ -1,19 +1,19 @@
 import type { Trace } from '../types/sdk.js';
 import type { Event, EventType } from '../types/events.js';
-import type { ComparisonOptions, RunComparison, ComparisonDifference } from '../types/comparison.js';
+import type {
+  ComparisonOptions,
+  RunComparison,
+  ComparisonDifference,
+} from '../types/comparison.js';
 
 export class RunComparator {
-  static compare(
-    trace1: Trace,
-    trace2: Trace,
-    options: ComparisonOptions = {}
-  ): RunComparison {
-    const filteredEvents1 = this.filterEvents(trace1.events, options);
-    const filteredEvents2 = this.filterEvents(trace2.events, options);
+  static compare(trace1: Trace, trace2: Trace, options: ComparisonOptions = {}): RunComparison {
+    const filteredEvents1 = RunComparator.filterEvents(trace1.events, options);
+    const filteredEvents2 = RunComparator.filterEvents(trace2.events, options);
 
-    const metrics = this.calculateMetrics(trace1, trace2);
-    const differences = this.findDifferences(filteredEvents1, filteredEvents2, options);
-    const summary = this.generateSummary(differences);
+    const metrics = RunComparator.calculateMetrics(trace1, trace2);
+    const differences = RunComparator.findDifferences(filteredEvents1, filteredEvents2, options);
+    const summary = RunComparator.generateSummary(differences);
 
     return {
       runId1: trace1.runId,
@@ -27,8 +27,9 @@ export class RunComparator {
   private static filterEvents(events: Event[], options: ComparisonOptions): Event[] {
     let filtered = [...events];
 
-    if (options.ignoreEventTypes && options.ignoreEventTypes.length > 0) {
-      filtered = filtered.filter((e) => !options.ignoreEventTypes!.includes(e.type));
+    const ignored = options.ignoreEventTypes;
+    if (ignored && ignored.length > 0) {
+      filtered = filtered.filter((e) => !ignored.includes(e.type));
     }
 
     if (options.focusAspects && options.focusAspects.length > 0) {
@@ -103,10 +104,10 @@ export class RunComparator {
           eventType: event1.type,
           run1: event1,
           details: `Event ${event1.id} (${event1.type}) present in run1 but not in run2`,
-          severity: this.determineSeverity(event1.type, 'removed'),
+          severity: RunComparator.determineSeverity(event1.type, 'removed'),
         });
       } else {
-        const diff = this.compareEventData(event1, event2, options);
+        const diff = RunComparator.compareEventData(event1, event2, options);
         if (diff) {
           differences.push(diff);
         }
@@ -121,11 +122,11 @@ export class RunComparator {
         eventType: event2.type,
         run2: event2,
         details: `Event ${event2.id} (${event2.type}) present in run2 but not in run1`,
-        severity: this.determineSeverity(event2.type, 'added'),
+        severity: RunComparator.determineSeverity(event2.type, 'added'),
       });
     }
 
-    const sequenceDiff = this.checkSequence(events1, events2);
+    const sequenceDiff = RunComparator.checkSequence(events1, events2);
     if (sequenceDiff) {
       differences.push(sequenceDiff);
     }
@@ -153,7 +154,7 @@ export class RunComparator {
       return null;
     }
 
-    const dataDiff = this.compareData(event1.data, event2.data);
+    const dataDiff = RunComparator.compareData(event1.data, event2.data);
     if (dataDiff) {
       return {
         type: 'data_changed',
@@ -162,12 +163,12 @@ export class RunComparator {
         run1: event1,
         run2: event2,
         details: `Event ${event1.id} data differs: ${dataDiff}`,
-        severity: this.determineSeverity(event1.type, 'modified'),
+        severity: RunComparator.determineSeverity(event1.type, 'modified'),
       };
     }
 
     if (options.includeMetadata) {
-      const metadataDiff = this.compareData(event1.metadata, event2.metadata);
+      const metadataDiff = RunComparator.compareData(event1.metadata, event2.metadata);
       if (metadataDiff) {
         return {
           type: 'data_changed',
@@ -264,4 +265,3 @@ export class RunComparator {
     };
   }
 }
-

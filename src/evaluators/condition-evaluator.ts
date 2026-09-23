@@ -1,7 +1,18 @@
 import type { PolicyContext } from '../types/policy.js';
 import type { Intention } from '../types/run.js';
 
-export type ConditionOperator = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'notIn' | 'contains' | 'matches' | 'exists';
+export type ConditionOperator =
+  | 'eq'
+  | 'ne'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'in'
+  | 'notIn'
+  | 'contains'
+  | 'matches'
+  | 'exists';
 
 export interface Condition {
   field: string;
@@ -70,7 +81,11 @@ export class ConditionEvaluator {
   /**
    * Evaluates a single condition.
    */
-  private evaluateCondition(condition: Condition, intention: Intention, context: PolicyContext): boolean {
+  private evaluateCondition(
+    condition: Condition,
+    intention: Intention,
+    context: PolicyContext
+  ): boolean {
     const fieldValue = this.getFieldValue(condition.field, intention, context);
 
     switch (condition.operator) {
@@ -211,7 +226,7 @@ export class ConditionEvaluator {
     const numA = typeof a === 'number' ? a : Number(a);
     const numB = typeof b === 'number' ? b : Number(b);
 
-    if (isNaN(numA) || isNaN(numB)) {
+    if (Number.isNaN(numA) || Number.isNaN(numB)) {
       return 0;
     }
 
@@ -260,4 +275,3 @@ export class ConditionEvaluator {
     return Boolean(fieldValue);
   }
 }
-

@@ -3,7 +3,11 @@ import { TraceValidator } from './trace-validator.js';
 import type { Trace } from '../types/sdk.js';
 import type { Event, EventType } from '../types/events.js';
 import type { ValidationDifference } from '../types/validation.js';
-import type { RegressionDetectionOptions, Regression, RegressionReport } from '../types/regression.js';
+import type {
+  RegressionDetectionOptions,
+  Regression,
+  RegressionReport,
+} from '../types/regression.js';
 
 export class RegressionDetector {
   static detect(
@@ -25,18 +29,18 @@ export class RegressionDetector {
       validationOptions
     );
 
-    const regressions = this.classifyDifferences(
+    const regressions = RegressionDetector.classifyDifferences(
       validationResult.differences,
       expectedTrace,
       actualTrace,
       options
     );
 
-    const filteredRegressions = this.applyTolerance(regressions, options);
+    const filteredRegressions = RegressionDetector.applyTolerance(regressions, options);
 
-    const metrics = this.calculateMetrics(expectedTrace, actualTrace);
-    const status = this.determineStatus(filteredRegressions, metrics, options);
-    const summary = this.calculateSummary(filteredRegressions);
+    const metrics = RegressionDetector.calculateMetrics(expectedTrace, actualTrace);
+    const status = RegressionDetector.determineStatus(filteredRegressions, metrics, options);
+    const summary = RegressionDetector.calculateSummary(filteredRegressions);
 
     return {
       runId: actualTrace.runId,
@@ -58,13 +62,18 @@ export class RegressionDetector {
     const regressions: Regression[] = [];
 
     for (const diff of differences) {
-      const regression = this.classifyDifference(diff, expectedTrace, actualTrace, options);
+      const regression = RegressionDetector.classifyDifference(
+        diff,
+        expectedTrace,
+        actualTrace,
+        options
+      );
       if (regression) {
         regressions.push(regression);
       }
     }
 
-    const performanceRegression = this.detectPerformanceRegression(
+    const performanceRegression = RegressionDetector.detectPerformanceRegression(
       expectedTrace,
       actualTrace,
       options
@@ -91,10 +100,10 @@ export class RegressionDetector {
       type = 'behavioral';
       const eventType = diff.eventType || diff.expected?.type || diff.actual?.type;
 
-      if (this.isCriticalEventType(eventType, options)) {
+      if (RegressionDetector.isCriticalEventType(eventType, options)) {
         severity = 'critical';
         impact = 'result';
-      } else if (this.isResultAffectingEvent(eventType)) {
+      } else if (RegressionDetector.isResultAffectingEvent(eventType)) {
         severity = 'high';
         impact = 'result';
       } else {
@@ -105,10 +114,10 @@ export class RegressionDetector {
       type = 'behavioral';
       const eventType = diff.eventType || diff.expected?.type;
 
-      if (this.isCriticalEventType(eventType, options)) {
+      if (RegressionDetector.isCriticalEventType(eventType, options)) {
         severity = 'critical';
         impact = 'result';
-      } else if (this.isResultAffectingEvent(eventType)) {
+      } else if (RegressionDetector.isResultAffectingEvent(eventType)) {
         severity = 'high';
         impact = 'result';
       } else {
@@ -149,7 +158,7 @@ export class RegressionDetector {
       return null;
     }
 
-    const severity = this.determinePerformanceSeverity(durationDiff, options);
+    const severity = RegressionDetector.determinePerformanceSeverity(durationDiff, options);
     if (severity === null) {
       return null;
     }
@@ -259,7 +268,10 @@ export class RegressionDetector {
     const eventCountDiff = actualTrace.summary.totalEvents - expectedTrace.summary.totalEvents;
 
     const totalEvents = Math.max(expectedTrace.events.length, actualTrace.events.length);
-    const commonEvents = this.countCommonEvents(expectedTrace.events, actualTrace.events);
+    const commonEvents = RegressionDetector.countCommonEvents(
+      expectedTrace.events,
+      actualTrace.events
+    );
     const similarityScore = totalEvents > 0 ? commonEvents / totalEvents : 1;
 
     return {
@@ -320,4 +332,3 @@ export class RegressionDetector {
     };
   }
 }
-

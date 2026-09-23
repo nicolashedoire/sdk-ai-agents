@@ -65,7 +65,11 @@ export class ActionEngine {
         throw new Error('Tool name is required for tool_call intention');
       }
 
-      const result = await this.executeWithRetry(intention.toolName, intention.parameters || {}, context);
+      const result = await this.executeWithRetry(
+        intention.toolName,
+        intention.parameters || {},
+        context
+      );
 
       // Record tool call usage in budget tracker
       if (this.budgetTracker && intention.toolName) {
@@ -201,19 +205,18 @@ export class ActionEngine {
           });
           // Approval granted, continue execution
           return;
-        } else {
-          await this.logEvent(context, 'approval.rejected', {
-            approvalId,
-            intention,
-            policyId: validation.violatedPolicies?.[0],
-          });
-          // Approval rejected, throw error
-          throw new PolicyViolationError(
-            validation.violatedPolicies?.[0] || 'unknown',
-            intention,
-            validation.reason || 'Approval rejected'
-          );
         }
+        await this.logEvent(context, 'approval.rejected', {
+          approvalId,
+          intention,
+          policyId: validation.violatedPolicies?.[0],
+        });
+        // Approval rejected, throw error
+        throw new PolicyViolationError(
+          validation.violatedPolicies?.[0] || 'unknown',
+          intention,
+          validation.reason || 'Approval rejected'
+        );
       }
 
       // No approval manager or not requires approval - treat as violation

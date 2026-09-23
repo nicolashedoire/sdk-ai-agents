@@ -30,4 +30,3 @@ export interface PolicyAuditTrail {
     policiesAllowed: number;
   };
 }
-

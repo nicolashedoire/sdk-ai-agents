@@ -4,11 +4,11 @@ export class ComparisonReportGenerator {
   static generate(comparison: RunComparison, format: 'json' | 'html' | 'text' = 'text'): string {
     switch (format) {
       case 'json':
-        return this.generateJSON(comparison);
+        return ComparisonReportGenerator.generateJSON(comparison);
       case 'html':
-        return this.generateHTML(comparison);
+        return ComparisonReportGenerator.generateHTML(comparison);
       case 'text':
-        return this.generateText(comparison);
+        return ComparisonReportGenerator.generateText(comparison);
       default:
         throw new Error(`Unsupported format: ${format}`);
     }
@@ -23,7 +23,7 @@ export class ComparisonReportGenerator {
       .map(
         ([key, value]) => `
       <tr>
-        <td><strong>${this.formatKey(key)}</strong></td>
+        <td><strong>${ComparisonReportGenerator.formatKey(key)}</strong></td>
         <td>${value.run1}</td>
         <td>${value.run2}</td>
         <td class="${value.diff === 0 ? '' : value.diff > 0 ? 'positive' : 'negative'}">${value.diff > 0 ? '+' : ''}${value.diff}</td>
@@ -38,7 +38,7 @@ export class ComparisonReportGenerator {
         <td>${diff.type}</td>
         <td>${diff.eventType || '-'}</td>
         <td>${diff.eventId || '-'}</td>
-        <td>${this.escapeHTML(diff.details)}</td>
+        <td>${ComparisonReportGenerator.escapeHTML(diff.details)}</td>
       </tr>`
       )
       .join('');
@@ -84,7 +84,7 @@ export class ComparisonReportGenerator {
   
   <h2>Main Differences</h2>
   <ul>
-    ${comparison.summary.mainDifferences.map((d) => `<li>${this.escapeHTML(d)}</li>`).join('')}
+    ${comparison.summary.mainDifferences.map((d) => `<li>${ComparisonReportGenerator.escapeHTML(d)}</li>`).join('')}
   </ul>
   
   <h2>All Differences</h2>
@@ -115,7 +115,7 @@ export class ComparisonReportGenerator {
     lines.push('METRICS:');
     lines.push('-'.repeat(80));
     for (const [key, value] of Object.entries(comparison.metrics)) {
-      lines.push(`${this.formatKey(key)}:`);
+      lines.push(`${ComparisonReportGenerator.formatKey(key)}:`);
       lines.push(`  Run 1: ${value.run1}`);
       lines.push(`  Run 2: ${value.run2}`);
       lines.push(`  Diff:  ${value.diff > 0 ? '+' : ''}${value.diff}`);
@@ -168,5 +168,3 @@ export class ComparisonReportGenerator {
       .replace(/'/g, '&apos;');
   }
 }
-
-
