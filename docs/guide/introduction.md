@@ -57,7 +57,7 @@ What it imitates is a **way of reasoning**: it does not know what you never wrot
 ## What you get
 
 - **Explicit reasoning** — ten operations on a mental state, with invariants enforced in code (a rejected hypothesis cannot be selected, a fatal critique rejects a hypothesis, the last step always concludes).
-- **Evidence you can audit** — observations with provenance, predictions tested by your own evaluator, refuted rules revised into scoped variants, preferences kept apart from evidence, and a conclusion guard that answers `committed`, `provisional` or `abstain`.
+- **Evidence you can audit** — observations with provenance, predictions tested by your own evaluator, refuted rules revised into scoped variants, preferences kept apart from evidence, and a conclusion guard that answers `committed`, `provisional` or `abstain`; with a knowledge store, what the tests answered is remembered for the next runs.
 - **Reasoning like a given person**: distill a thinker profile from topics explained in your own words, then correct the agent with `match`, `partial` or `mismatch` verdicts and a percentage of agreement.
 - **Typed decisions** — [TypeSafe Jev](https://docs.typesafe.ai) or any compatible backend answers Noul, Choice and Score questions with calibrated probabilities.
 - **MCP connectors** — expose your tools as an MCP server, import any MCP server as governed tools.

@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LLMProviderError` messages include the vendor's message (`LLM provider error: openai: 429 You have no credits remaining…`), with any API key fragment masked (`redactApiKeys`), and a cognitive run that stops after consecutive failures says what the last one was.
 
 ### Added
+- **Memory across runs.** `createCognitiveAgent({ knowledge: { store, scope } })`: at the end of a run, every rule or explanation with a prediction the outcome evaluator confirmed or refuted is recorded in the scope's journal; at the start of the next run, the most relevant items are recalled as `knowledge` (`M1`…), recorded in `cognition.started` so a rebuild never reads the store. A hypothesis restating a refuted item is refused; one restating a verified item is linked to its earlier tests. Stores: `FileKnowledgeStore` (JSONL journal per scope) and `InMemoryKnowledgeStore`, or your own `KnowledgeStore`. New event `cognition.knowledge_recorded`. A failing store never stops a run. Guide: *Memory across runs*; `examples/rule-discovery.ts` uses it.
 - **Evidence loop** (observe → compare → deduce → verify → revise) in cognitive agents, with three new operations:
   - `compare_observations` records similarities, differences, evolutions, incompatibilities and counterexamples;
   - `test_prediction` runs your `OutcomeEvaluator` (no LLM call) and records a `cognition.evaluated` event;

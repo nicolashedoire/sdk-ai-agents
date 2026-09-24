@@ -1,11 +1,13 @@
 /**
  * A cognitive agent that induces a rule from measurements, predicts, tests its predictions
- * on a (simulated) physics bench and revises the rule when a test refutes it.
+ * on a (simulated) physics bench and revises the rule when a test refutes it. What the bench
+ * confirmed or refuted is kept in ./knowledge: run it twice, and the second run starts with
+ * what the first one established.
  *
  * Run: OPENAI_API_KEY=... npm run example:rules
  */
 import { z } from 'zod';
-import { FileEventStore, createSDK, type OutcomeEvaluator } from '../src/index.js';
+import { FileEventStore, FileKnowledgeStore, createSDK, type OutcomeEvaluator } from '../src/index.js';
 
 const sdk = createSDK({
   apiKey: process.env.OPENAI_API_KEY,
@@ -64,6 +66,7 @@ const physicist = sdk.createCognitiveAgent({
   name: 'physicist',
   model: process.env.MODEL ?? 'gpt-4o-mini',
   evaluator: bench,
+  knowledge: { store: new FileKnowledgeStore('./knowledge'), scope: 'inclined-plane' },
   systemPrompt: [
     'Predictions are tested on a bench that rolls two balls down the plane and times them.',
     'Put in each prediction "test": { "roll": { "material", "massKg" }, "against": { "material", "massKg" }, "expect": "same time" | "different time" }.',
@@ -80,6 +83,12 @@ const result = await physicist.think({
   ],
 });
 
+if (result.state.knowledge.length > 0) {
+  console.log('\nRecalled from earlier runs:');
+  for (const item of result.state.knowledge) {
+    console.log(`  ${item.id} [${item.status}, ${item.confirmations} confirmed, ${item.refutations} refuted] ${item.statement}`);
+  }
+}
 console.log(`\n${result.decision?.status ?? result.status}: ${result.answer ?? result.error?.message}`);
 for (const missing of result.decision?.missing ?? []) console.log(`  missing: ${missing}`);
 console.log('\nHypotheses:');
