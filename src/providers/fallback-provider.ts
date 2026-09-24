@@ -1,21 +1,25 @@
 import { LLMProviderError } from '../errors/index.js';
 import type { LLMProvider, LLMRequest, LLMResponse } from './llm-provider.js';
 
+/** A completion from a fallback chain, and which provider gave it. */
+export interface FallbackResult {
+  response: LLMResponse;
+  /** Name of the provider that answered (`openai`, `anthropic`…). */
+  usedProvider: string;
+  /** True when the primary provider failed and a fallback answered. */
+  wasFallback: boolean;
+  /** Names of the providers tried, in order, up to the one that answered. */
+  attemptedProviders: string[];
+  /** Model sent to the provider that answered; absent when it used its default model. */
+  requestedModel?: string;
+}
+
 /**
  * Provider wrapper that implements fallback logic between multiple providers.
  *
  * When a request fails with the primary provider, it automatically tries
  * the fallback providers in order until one succeeds or all fail.
  */
-export interface FallbackResult {
-  response: LLMResponse;
-  usedProvider: string;
-  wasFallback: boolean;
-  attemptedProviders: string[];
-  /** Model sent to the provider that answered; absent when it used its default model. */
-  requestedModel?: string;
-}
-
 export class FallbackProvider implements LLMProvider {
   private providers: LLMProvider[];
   private fallbackProviders: LLMProvider[];
@@ -157,7 +161,7 @@ export class FallbackProvider implements LLMProvider {
   }
 
   /**
-   * Checks if a fallback occurred (i.e., if we have fallback providers configured)
+   * Whether the chain has fallback providers after its primary one.
    */
   hasFallbackProviders(): boolean {
     return this.fallbackProviders.length > 0;

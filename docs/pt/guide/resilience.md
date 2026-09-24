@@ -39,7 +39,7 @@ Só os erros **transitórios** geram novas tentativas: 408, 409, 425, 429, 5xx, 
 
 Quando a política do SDK está ativa, as novas tentativas próprias dos clientes da OpenAI e da Anthropic são desativadas — **as novas tentativas nunca se acumulam**. Cada nova tentativa é registrada como um evento `provider.retry` com o provedor, o modelo, a tentativa, a espera e o erro. Passe `retry: false` para manter os padrões do fornecedor.
 
-Um provedor que você injeta com `llmProvider` é usado como está, a menos que você defina `retry` explicitamente, e um `FallbackProvider` nunca é encapsulado, para que os seus failovers continuem visíveis no trace.
+Um provedor que você injeta com `llmProvider` é usado como está, a menos que você defina `retry` explicitamente, e um `FallbackProvider` nunca é encapsulado, para que os seus failovers continuem visíveis no trace. Os provedores dele também não são encapsulados, então `retry` não se aplica a eles: para tentar de novo um deles antes do failover, encapsule-o em `RetryingLLMProvider` e dê ao cliente dele `maxRetries: 0`. Defina o `maxRetryAfterMs` da política como o `maxDelayMs` dela, como o SDK faz quando um fallback pode assumir, para que um provedor que pede uma pausa longa seja deixado para o fallback. Essas novas tentativas não são registradas como eventos `provider.retry`.
 
 ## Ferramentas {#tools}
 
