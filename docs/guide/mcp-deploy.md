@@ -52,9 +52,10 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
   if (request.method !== 'POST') return reply(response, 405, 'Method not allowed');
 
   // Stateless: a client's cancellation arrives as a new request, which this fresh server
-  // cannot tie to a call still in progress. A pending approval then ends when the client
-  // closes the connection, or after `approvalTimeoutMs` (50 s by default) at the latest.
-  const server = createMcpServer(sdk, { name: 'docs', tools, resources });
+  // cannot tie to a call still in progress. A pending approval then ends only when the
+  // client closes the connection, or after `approvalTimeoutMs` — until then a late "yes"
+  // still runs the tool. Keep it well below the time your clients wait.
+  const server = createMcpServer(sdk, { name: 'docs', tools, resources, approvalTimeoutMs: 20_000 });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   response.on('close', () => {
     transport.close().catch(() => undefined);
@@ -189,14 +190,16 @@ Then `curl -H "X-Admin-Secret: $ADMIN_SECRET" http://127.0.0.1:4000/approvals` l
 
 To be told when an approval is waiting, add an [incident rule](./incidents#rules) on `approval.requested` with a Slack or email notifier. Pending approvals live in the memory of the process where the call waits: with several copies of an HTTP server, decide through the copy that holds it (or run a single copy for tools that need approval).
 
-::: warning Nobody can approve a call whose client has left
+::: warning How long a pending approval lasts
 Many clients cancel a call after about a minute. A pending approval is cancelled — and the tool never runs — when:
 
 - the client cancels the call (stdio, or a stateful HTTP session);
 - the connection closes: a stdio client that exits, an HTTP request that is closed;
-- nobody decided within `approvalTimeoutMs` — **50 seconds by default**, below what most clients wait. Set it on `createMcpServer`/`serveMcpOverStdio` if your client waits longer (Claude Code with a raised `MCP_TOOL_TIMEOUT`). This is the only limit for a stateless HTTP server, which cannot tie a "cancel" request to the call it cancels.
+- nobody decided within `approvalTimeoutMs` — **50 seconds by default**, below what most clients wait. Set it on `createMcpServer`/`serveMcpOverStdio` if your client waits longer (Claude Code with a raised `MCP_TOOL_TIMEOUT`).
 
-A late "yes" then fails with "already rejected", and the call is checked once more after the approval: if the client left in between, the tool does not run. Approvals through MCP suit quick decisions. For decisions that take hours, make the tool *submit a request* that your team processes later.
+**On a stateless HTTP server, only the last two apply**: it cannot tie a "cancel" request to the call it cancels. A client that gives up without closing its connection leaves the approval pending until `approvalTimeoutMs` — and a "yes" given in that window still runs the tool, although nobody is waiting for the answer. Keep `approvalTimeoutMs` well below the time your clients wait (the example uses 20 s), or serve tools that need approval over stdio or a stateful session.
+
+Once cancelled, a late "yes" fails with "already rejected", and the call is checked once more after the approval: if the client left in between, the tool does not run. Approvals through MCP suit quick decisions. For decisions that take hours, make the tool *submit a request* that your team processes later.
 :::
 
 Most MCP applications also ask the user before each tool call (Claude Desktop does by default). That confirmation happens in the application; SDK approvals happen on your server, under your rules, and are recorded. Use both for anything that changes data.

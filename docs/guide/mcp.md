@@ -93,7 +93,7 @@ You can write MCP servers with the official MCP SDK alone. This SDK sits on top 
 | Expose an agent | — | `cognitiveAgentTool(agent)` — "what would Nicolas think?" as one tool |
 | Nothing exposed by accident | Up to you | Only the tools you list in `tools` |
 | Rules before every call | Up to you | [Policies](./governed-agents), budgets, allowlists |
-| A human says yes first | Up to you | Tools marked `requiresApproval` wait for `sdk.approveAction()`; nobody can approve a call whose client has left |
+| A human says yes first | Up to you | Tools marked `requiresApproval` wait for `sdk.approveAction()`; the approval is cancelled when the client cancels or disconnects, and after `approvalTimeoutMs` (50 s by default) |
 | Know what happened | Up to you | Every call and every resource read is a run in the [event log](./observability) |
 
 ```mermaid
