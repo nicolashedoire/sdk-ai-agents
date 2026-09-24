@@ -63,6 +63,7 @@ sdk-ai-agents/
 - `sql-event-store.ts`：通用 SQL 实现
 - `sqlite-event-store.ts`：SQLite 实现
 - `postgresql-event-store.ts`：使用 JSONB 的 PostgreSQL 实现
+- `observed-event-store.ts`：将每个追加的事件实时交给它的监听器（`onEvent`、`sdk.subscribe`）
 
 **入口点：** 由 `SDKImpl` 和 `ReplayEngine` 使用
 

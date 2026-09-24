@@ -6,6 +6,7 @@ import type { ResourceProvider } from '../types/resource.js';
 import type { Tool, ToolDefinition } from '../types/tool.js';
 import { zodSchemaToJsonSchema } from '../utils/zod-to-json-schema.js';
 import type { GovernedToolHost } from './governed-tool-host.js';
+import { progressNotifier } from './mcp-progress.js';
 import { serveResources } from './mcp-resources.js';
 
 const DEFAULT_APPROVAL_TIMEOUT_MS = 50_000;
@@ -78,6 +79,14 @@ export function createMcpServer(host: GovernedToolHost, options: McpServerOption
         content: [{ type: 'text' as const, text: `Tool "${name}" is not exposed by this server` }],
       };
     }
+    // A client that sent a progress token gets a notification per event of the call, the
+    // agent runs it starts included. The call returns once they are all sent: none can
+    // arrive after the result, when the client no longer knows the token.
+    const progressToken = request.params._meta?.progressToken;
+    const onEvent =
+      progressToken === undefined
+        ? undefined
+        : progressNotifier(progressToken, (notification) => extra.sendNotification(notification));
     try {
       const result = await host.executeTool(name, args ?? {}, {
         agentId,
@@ -86,6 +95,7 @@ export function createMcpServer(host: GovernedToolHost, options: McpServerOption
         // the connection closes.
         signal: extra.signal,
         approvalTimeoutMs: options.approvalTimeoutMs ?? DEFAULT_APPROVAL_TIMEOUT_MS,
+        ...(onEvent ? { onEvent } : {}),
       });
       return { content: [{ type: 'text' as const, text: formatResult(result) }] };
     } catch (error) {

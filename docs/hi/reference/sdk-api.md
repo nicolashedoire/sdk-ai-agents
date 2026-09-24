@@ -68,7 +68,7 @@ const analyst = sdk.createAgent({
 | `defineTool(definition)` | `Tool` | एक टूल रजिस्टर करता है; handler का टाइप उसके Zod स्कीमा से निकलता है |
 | `defineCapability(definition)` | `Capability` | टूल को समूह में रखता है |
 | `listTools()` | `Tool[]` | हर रजिस्टर किया गया टूल |
-| `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs? })` | `Promise<unknown>` | एजेंट के बाहर नियंत्रित execution (MCP सर्वर इसका इस्तेमाल करता है): arguments, नीतियाँ, मंज़ूरी, बजट (कॉल शुरू होते ही गिना जाता है), फिर टूल। `signal` लंबित मंज़ूरी रद्द करता है और handler तक पहुँचता है; `approvalTimeoutMs` ऐसी मंज़ूरी रद्द करता है जिस पर किसी ने निर्णय नहीं लिया |
+| `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs?, onEvent? })` | `Promise<unknown>` | एजेंट के बाहर नियंत्रित execution (MCP सर्वर इसका इस्तेमाल करता है): arguments, नीतियाँ, मंज़ूरी, बजट (कॉल शुरू होते ही गिना जाता है), फिर टूल। `signal` लंबित मंज़ूरी रद्द करता है और handler तक पहुँचता है; `approvalTimeoutMs` ऐसी मंज़ूरी रद्द करता है जिस पर किसी ने निर्णय नहीं लिया |
 | `traceResourceRead(uri, read, { agentId? })` | `Promise<ResourceContent>` | `read()` को उसके अपने run के रूप में चलाता है: `run.started`, `resource.read` (URI, आकार, SHA-256), `run.completed` या `run.failed` |
 | `stopRun(runId)` | `Promise<void>` | किसी नियंत्रित या संज्ञानात्मक run को रोकता है |
 
@@ -187,9 +187,22 @@ interface ModelCostLine {
 | Method | |
 | --- | --- |
 | `getTrace(runId)`, `exportTrace(runId, 'json' \| 'text')`, `getEvents(runId, filters?)` | runs पढ़ें |
-| `replay(runId, modifications?)` | LLM के बिना दोबारा चलाएँ |
+| `replay(runId, modifications?, { onEvent? })` | LLM के बिना दोबारा चलाएँ |
 | `getReasoningGraph`, `exportReasoningGraph`, `getAlternatives`, `getDecisionPatterns`, `getTraceVisualization` | निर्णयों को समझें |
 | `createGoldenTrace`, `getGoldenTraces`, `validateAgainstGoldenTrace`, `replayAndValidate`, `detectRegressions` | एजेंटों को कोड की तरह टेस्ट करें |
+
+## लाइव इवेंट {#live-events}
+
+एक listener `(event: Event) => unknown` होता है। उसे एक बार में एक इवेंट मिलता है, हर run के क्रम में, जैसे ही स्टोर उसे स्वीकार कर लेता है; वह जो promise लौटाता है, उसके पूरा होने का इंतज़ार उसके अगले इवेंट से पहले किया जाता है। कोई run कभी उसका इंतज़ार नहीं करता, और उसके errors की सूचना दी जाती है, उन्हें कभी run में नहीं फेंका जाता। ज़्यादा से ज़्यादा `maxQueued` इवेंट (डिफ़ॉल्ट रूप से 10 000) उसका इंतज़ार करते हैं; उससे आगे, नए इवेंट उसके लिए छोड़ दिए जाते हैं और उनकी सूचना एक `LiveEventsDroppedError` के साथ दी जाती है। देखें [लाइव प्रगति](../guide/observability#live-progress)।
+
+| API | |
+| --- | --- |
+| `RunInput.onEvent`: `agent.run({ message, onEvent })` | run का हर इवेंट; `run()` तब resolve होता है जब listener उनमें से हर एक को निपटा चुका हो, या उससे पहले, जब run रोका या रद्द किया गया हो या `signal` abort हो (तब listener की सदस्यता खत्म कर दी जाती है)। listener दर्ज नहीं किया जाता |
+| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | संज्ञानात्मक run के लिए भी यही, जिसका `limits.timeoutMs` भी इंतज़ार खत्म करता है |
+| `replay(runId, modifications?, { onEvent })` | रीप्ले के लिए भी यही, जिसे रद्द नहीं किया जा सकता: वह हमेशा इंतज़ार करता है |
+| `executeTool(name, params, { onEvent })` | कॉल के इवेंट, और उसके टूल द्वारा शुरू किए गए runs के इवेंट, सिर्फ़ एक स्तर तक: handler को listener `context.onEvent` के रूप में मिलता है, जिसे `governedAgentTool` और `cognitiveAgentTool` अपने एजेंट को देते हैं (लाइव इवेंट के बिना वाले स्टोर पर हाथ से बनाया गया एजेंट इसके बिना चलता है)। `signal` इंतज़ार खत्म करता है |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: फ़िल्टर से मेल खाने वाले हर run का हर इवेंट (`agentId` का मतलब `metadata.agentId` है), जब तक आप लौटाया गया फ़ंक्शन कॉल नहीं करते, जो अभी तक न पहुँचाए गए इवेंट छोड़ देता है |
+| `new ObservedEventStore(store, { onListenerError? })` | वह परत जो इवेंट पहुँचाती है; SDK अपने स्टोर को ऐसी एक परत में लपेटता है, या वह परत इस्तेमाल करता है जो आप `eventStore` के रूप में देते हैं, `MonitoredEventStore` के अंदर भी (तब उसकी घटना रिपोर्ट भी पहुँचाई जाती हैं)। इसका `subscribe(listener, options?)` `{ unsubscribe(), close() }` लौटाता है: `close()` तब तक इंतज़ार करता है जब तक listener उन इवेंट्स को निपटा न ले जो वह पहले ही ले चुका है। `onListenerError` को listener के errors और इवेंट छोड़े जाने की सूचनाएँ मिलती हैं |
 
 ## टूल: `ToolDefinition` {#tools-tooldefinition}
 
@@ -197,7 +210,7 @@ interface ModelCostLine {
 | --- | --- |
 | `name`, `description` | मॉडल क्या देखता है |
 | `schema` | arguments का Zod स्कीमा; मेल न खाने वाली कॉल ठुकरा दी जाती हैं |
-| `handler(params, context?)` | सत्यापित arguments और `{ runId, agentId, signal? }` पाता है — कॉल करने वाले के हार मानने पर `signal` abort हो जाता है |
+| `handler(params, context?)` | सत्यापित arguments और `{ runId, agentId, signal?, onEvent? }` पाता है — कॉल करने वाले के हार मानने पर `signal` abort हो जाता है; `onEvent` तब सेट होता है जब कॉल करने वाला कॉल को लाइव देख रहा हो: इसे टूल द्वारा शुरू किए गए runs के `onEvent` के रूप में दें |
 | `retry` | `{ maxRetries, initialDelayMs?, maxDelayMs?, retryOn?(error) }` — सिर्फ़ idempotent टूल; अमान्य arguments पर कभी दोबारा प्रयास नहीं होता |
 | `metadata` | `{ category?, riskLevel?, requiresApproval?, readOnly? }` — `requiresApproval: true` हर कॉल को `approveAction` का इंतज़ार कराता है; `readOnly` MCP क्लाइंट को `readOnlyHint` के रूप में दिखाया जाता है |
 | `inputJsonSchema` | `schema` से निकले JSON Schema की जगह दिखाया जाने वाला JSON Schema |
@@ -239,7 +252,7 @@ interface ResourceProvider {
 
 | फ़ंक्शन | |
 | --- | --- |
-| `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | MCP `Server` जो ठीक वही उपलब्ध कराता है जो `tools` में सूचीबद्ध है: परिभाषित टूल के नाम और/या `ToolDefinition` (आपके लिए SDK पर परिभाषित; वही परिभाषा दोबारा दी जा सकती है, पहले से लिए गए नाम वाला कोई दूसरा टूल ठुकरा दिया जाता है)। `resources`: एक या कई `ResourceProvider`; हर पढ़ना ट्रेस होता है। कॉल `mcp:<name>` (या `agentId`) के रूप में चलती हैं; जिस मंज़ूरी पर `approvalTimeoutMs` (डिफ़ॉल्ट 50 000 ms) के भीतर कोई निर्णय न ले, वह रद्द हो जाती है; इनपुट के इनकार क्लाइंट को समझाए जाते हैं, दूसरे कारण सिर्फ़ `exposeErrorDetails` के साथ |
+| `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | MCP `Server` जो ठीक वही उपलब्ध कराता है जो `tools` में सूचीबद्ध है: परिभाषित टूल के नाम और/या `ToolDefinition` (आपके लिए SDK पर परिभाषित; वही परिभाषा दोबारा दी जा सकती है, पहले से लिए गए नाम वाला कोई दूसरा टूल ठुकरा दिया जाता है)। `resources`: एक या कई `ResourceProvider`; हर पढ़ना ट्रेस होता है। कॉल `mcp:<name>` (या `agentId`) के रूप में चलती हैं; जिस मंज़ूरी पर `approvalTimeoutMs` (डिफ़ॉल्ट 50 000 ms) के भीतर कोई निर्णय न ले, वह रद्द हो जाती है; इनपुट के इनकार क्लाइंट को समझाए जाते हैं, दूसरे कारण सिर्फ़ `exposeErrorDetails` के साथ। `progressToken` वाली कॉल को हर इवेंट के लिए एक `notifications/progress` मिलता है, और ये सभी परिणाम से पहले भेजे जाते हैं ([प्रगति सूचनाएँ](../guide/mcp-deploy#progress-notifications)) |
 | `serveMcpOverStdio(sdk, options)` | वही, stdin/stdout से जुड़ा; stderr पर एक "ready" लाइन लिखता है, और stdin खत्म होने पर बंद हो जाता है (चल रही कॉल abort हो जाती हैं, लंबित मंज़ूरियाँ रद्द)। `approvalTimeoutMs` का डिफ़ॉल्ट 50 000 है, `createMcpServer` की तरह |
 | `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry? })` | `{ tools, client, close() }` — किसी भी MCP सर्वर के टूल, `ToolDefinition` के रूप में |
 
@@ -247,4 +260,4 @@ interface ResourceProvider {
 
 ## बुनियादी घटक {#building-blocks}
 
-SDK के बुनियादी घटक कस्टम सेटअप के लिए एक्सपोर्ट किए गए हैं: `JevClient`, `DecisionService`, `LLMThoughtGenerator`, `HeuristicController`, `TypedDecisionController`, `TypedHypothesisAssessor`, `PredictionTester`, `applyThought`, `assembleThought`, `assessReadiness`, `rankHypotheses`, `rebuildMentalState`, `describeMentalState`, `fingerprint`, `defineThinkerProfile`, `refineProfile`, `withRetry`, `RetryingLLMProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider`, `MonitoredEventStore`, `EmailIncidentNotifier`, `WebhookIncidentNotifier`, `ResendEmailTransport`, `computeRunCost`, `FileEventStore`, `SQLiteEventStore`, `PostgreSQLEventStore`, और उनके मुख्य टाइप।
+SDK के बुनियादी घटक कस्टम सेटअप के लिए एक्सपोर्ट किए गए हैं: `JevClient`, `DecisionService`, `LLMThoughtGenerator`, `HeuristicController`, `TypedDecisionController`, `TypedHypothesisAssessor`, `PredictionTester`, `applyThought`, `assembleThought`, `assessReadiness`, `rankHypotheses`, `rebuildMentalState`, `describeMentalState`, `fingerprint`, `defineThinkerProfile`, `refineProfile`, `withRetry`, `RetryingLLMProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider`, `MonitoredEventStore`, `ObservedEventStore`, `EmailIncidentNotifier`, `WebhookIncidentNotifier`, `ResendEmailTransport`, `computeRunCost`, `FileEventStore`, `SQLiteEventStore`, `PostgreSQLEventStore`, और उनके मुख्य टाइप।

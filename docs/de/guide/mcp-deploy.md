@@ -204,6 +204,32 @@ Nach dem Abbruch schlägt ein verspätetes „Ja“ mit „already rejected“ f
 
 Die meisten MCP-Anwendungen fragen den Nutzer außerdem vor jedem Tool-Aufruf (Claude Desktop tut das standardmäßig). Diese Bestätigung geschieht in der Anwendung; SDK-Freigaben geschehen auf Ihrem Server, nach Ihren Regeln, und werden aufgezeichnet. Nutzen Sie beides für alles, was Daten verändert.
 
+## Fortschrittsbenachrichtigungen {#progress-notifications}
+
+Ein Client kann darum bitten, über den Verlauf eines Aufrufs informiert zu werden: Er sendet mit dem Aufruf ein `progressToken` (das offizielle TypeScript-SDK tut das, wenn Sie `onprogress` übergeben). Der Server sendet dann eine `notifications/progress` für jedes Ereignis des Aufrufs und des Agentenlaufs, den ein `cognitiveAgentTool` oder `governedAgentTool` startet, mit einem `progress`, der jedes Mal um eins steigt, und einer kurzen `message`:
+
+```text
+call started
+tool ask_support called
+agent started
+step 1: model chose lookup_customer
+step 1: tool lookup_customer called
+step 1: tool lookup_customer done
+step 2: model answered
+agent completed
+call completed
+```
+
+Die Meldungen nennen die Schritte, die Tools und die kognitiven Operationen: das Tool, das das Modell gewählt hat, und jedes Tool, das der Agent aufruft, einschließlich der Tools des Agenten, die der Server nicht bereitstellt. Sie enthalten nie Argumente, Ergebnisse oder Fehlertexte. Es gibt kein `total`: Niemand weiß im Voraus, wie viele Schritte ein Lauf braucht. Jede Benachrichtigung wird vor dem Ergebnis gesendet, nie danach. Über Streamable HTTP laufen sie über den Stream der Antwort (SSE); ein mit `enableJsonResponse: true` erstellter Transport antwortet in reinem JSON und verwirft sie. Ein Client, der kein `progressToken` sendet, erhält keine.
+
+Verfolgt wird nur der Agentenlauf, den ein Tool startet, eine Ebene tief: nicht die Läufe, die dieser Agent über seine eigenen Agenten-Tools startet, und auch kein Agent, der von Hand auf einem Speicher ohne Live-Ereignisse gebaut wurde. Nichts wird zusammengefasst: Jedes Ereignis ist eine Benachrichtigung, und ein langer kognitiver Lauf kann Hunderte davon senden.
+
+Was Fortschrittsbenachrichtigungen ändern und was nicht:
+
+- **Nur Clients, die ihr Timeout bei Fortschritt zurücksetzen, warten länger.** Mit dem TypeScript-SDK: `client.callTool(params, undefined, { onprogress, resetTimeoutOnProgress: true, maxTotalTimeout })`. Ein Client, der den Fortschritt anzeigt, aber ein festes Timeout behält, gibt zum selben Zeitpunkt auf wie zuvor. Prüfen Sie, was Ihre Anwendung tut, bevor Sie darauf zählen.
+- **Bei einem solchen Client zählt die längste Stille**, nicht die Dauer des Aufrufs: ein Modellaufruf, ein langsames Tool oder eine Freigabe. Während ein Tool läuft oder eine Freigabe wartet, wird nichts gesendet; die 50 s von `approvalTimeoutMs` gelten also weiterhin, und jeder einzelne Modell- oder Tool-Aufruf muss in das Timeout des Clients passen.
+- **Agenten dürfen dann länger brauchen**: Das `limits.timeoutMs` eines kognitiven Agenten kann das Timeout des Clients überschreiten, da jeder Schritt Benachrichtigungen sendet. Für andere Clients behalten Sie die kleinen Limits des [Agenten-Rezepts](./mcp-recipes#an-agent-your-reasoning-twin) bei.
+
 ## Sicherheits-Checkliste {#security-checklist}
 
 Bevor Sie einen Server teilen:
@@ -231,7 +257,7 @@ Das MCP-Projekt pflegt einen ausführlichen Leitfaden zu Angriffen und Abwehrma�
 | Ein Tool fehlt in der Liste | Es steht nicht in `tools` | Fügen Sie seinen Namen oder seine Definition zu `tools` hinzu: Sonst wird nichts bereitgestellt. |
 | `Another tool named "x" is already defined` beim Start | Zwei Quellen erzeugen denselben Tool-Namen | Geben Sie jeder Quelle ein `prefix`. |
 | `Tool execution failed: <name>` und sonst nichts | Die Ursache kann interne Details enthalten und wird daher verborgen | Lesen Sie den Lauf im Ereignisprotokoll oder setzen Sie während der Entwicklung `exposeErrorDetails: true`. |
-| Aufrufe laufen in eine Zeitüberschreitung | Das Tool ist langsam (oft ein Agent) | Kleinere `limits` für den Agenten; erhöhen Sie das Timeout des Clients (Claude Code: `MCP_TOOL_TIMEOUT`). |
+| Aufrufe laufen in eine Zeitüberschreitung | Das Tool ist langsam (oft ein Agent) | Kleinere `limits` für den Agenten; erhöhen Sie das Timeout des Clients (Claude Code: `MCP_TOOL_TIMEOUT`); oder verwenden Sie einen Client, der sein Timeout bei [Fortschrittsbenachrichtigungen](#progress-notifications) zurücksetzt. |
 | Ergebnisse sind abgeschnitten | Größenbegrenzungen (`truncated: true`) oder die eigene Begrenzung des Clients | Erhöhen Sie `maxResponseBytes`, `maxRows`, `maxFileBytes`; Claude Code: `MAX_MCP_OUTPUT_TOKENS`. |
 | Ein Schreib-Tool antwortet „Approval no decision within 50000 ms“ | Niemand hat es rechtzeitig freigegeben | Geben Sie es schneller frei (siehe [Freigaben](#approvals-a-human-says-yes-first)), erhöhen Sie `approvalTimeoutMs` oder setzen Sie bewusst `requiresApproval: false`. |
 | Ordner wie `events/` oder `golden-traces/` erscheinen an unerwarteten Orten | Kein absoluter Pfad für das Ereignisprotokoll (oder eine ältere SDK-Version) | Übergeben Sie `eventStore: new FileEventStore(<absolute path>)`. Aktuelle Versionen legen ihre anderen Ordner erst an, wenn sie gebraucht werden. |

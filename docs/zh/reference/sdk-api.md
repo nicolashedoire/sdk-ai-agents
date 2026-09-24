@@ -68,7 +68,7 @@ const analyst = sdk.createAgent({
 | `defineTool(definition)` | `Tool` | 注册一个工具；处理函数的类型根据其 Zod schema 推导 |
 | `defineCapability(definition)` | `Capability` | 对工具分组 |
 | `listTools()` | `Tool[]` | 所有已注册的工具 |
-| `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs? })` | `Promise<unknown>` | 在智能体之外进行受治理的执行（MCP 服务器会用到）：参数、策略、审批、预算（在调用开始时计数），然后是工具本身。`signal` 会取消待处理的审批并传递给处理函数；`approvalTimeoutMs` 会取消一个无人决定的审批 |
+| `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs?, onEvent? })` | `Promise<unknown>` | 在智能体之外进行受治理的执行（MCP 服务器会用到）：参数、策略、审批、预算（在调用开始时计数），然后是工具本身。`signal` 会取消待处理的审批并传递给处理函数；`approvalTimeoutMs` 会取消一个无人决定的审批 |
 | `traceResourceRead(uri, read, { agentId? })` | `Promise<ResourceContent>` | 把 `read()` 作为一次独立的运行来执行：`run.started`、`resource.read`（URI、大小、SHA-256）、`run.completed` 或 `run.failed` |
 | `stopRun(runId)` | `Promise<void>` | 停止一次受治理或认知的运行 |
 
@@ -187,9 +187,22 @@ interface ModelCostLine {
 | 方法 | |
 | --- | --- |
 | `getTrace(runId)`、`exportTrace(runId, 'json' \| 'text')`、`getEvents(runId, filters?)` | 读取运行 |
-| `replay(runId, modifications?)` | 不经过 LLM 重新执行 |
+| `replay(runId, modifications?, { onEvent? })` | 不经过 LLM 重新执行 |
 | `getReasoningGraph`、`exportReasoningGraph`、`getAlternatives`、`getDecisionPatterns`、`getTraceVisualization` | 理解决策 |
 | `createGoldenTrace`、`getGoldenTraces`、`validateAgainstGoldenTrace`、`replayAndValidate`、`detectRegressions` | 像测试代码一样测试智能体 |
+
+## 实时事件 {#live-events}
+
+监听器是一个 `(event: Event) => unknown`。它一次收到一个事件，按每次运行内的顺序，在存储接受该事件之后送达；如果它返回一个 promise，它的下一个事件会等到这个 promise 完成之后才送达。运行从不等待它，它的错误会被报告，绝不会被抛进运行中。最多有 `maxQueued` 个事件（默认 10 000 个）排队等待它；超过之后，发给它的新事件会被丢弃，并以一个 `LiveEventsDroppedError` 报告出来。参见[实时进度](../guide/observability#live-progress)。
+
+| API | |
+| --- | --- |
+| `RunInput.onEvent`：`agent.run({ message, onEvent })` | 这次运行的每一个事件；`run()` 会等到监听器处理完其中每一个事件之后才返回结果，而当运行被停止或被取消、或 `signal` 被中止时，会更早返回（此时监听器会被取消订阅）。监听器本身不会被记录 |
+| `ThinkInput.onEvent`：`agent.think({ problem, onEvent })` | 对认知运行同样如此，它的 `limits.timeoutMs` 也会结束这段等待 |
+| `replay(runId, modifications?, { onEvent })` | 对回放同样如此，回放无法被取消：它总是会等待 |
+| `executeTool(name, params, { onEvent })` | 这次调用的事件，以及它的工具所启动的运行的事件，只跟随一层：处理函数以 `context.onEvent` 的形式得到监听器，`governedAgentTool` 和 `cognitiveAgentTool` 会把它传给它们的智能体（在没有实时事件的存储上手动构建的智能体会在没有它的情况下运行）。`signal` 会结束这段等待 |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`：与过滤条件匹配的每一次运行的每一个事件（`agentId` 即 `metadata.agentId`），直到你调用返回的函数为止；调用它时，尚未送达的事件会被丢弃 |
+| `new ObservedEventStore(store, { onListenerError? })` | 负责送达这些事件的那一层；SDK 会用它包装自己的存储，或者使用你作为 `eventStore` 传入的那一个，即使它位于一个 `MonitoredEventStore` 内部也是如此（这时后者的事故报告也会被送达）。它的 `subscribe(listener, options?)` 返回 `{ unsubscribe(), close() }`：`close()` 会等到监听器处理完它已经取走的事件。`onListenerError` 会收到监听器的错误以及事件被丢弃的情况 |
 
 ## 工具：`ToolDefinition` {#tools-tooldefinition}
 
@@ -197,7 +210,7 @@ interface ModelCostLine {
 | --- | --- |
 | `name`、`description` | 模型看到的内容 |
 | `schema` | 参数的 Zod schema；不匹配的调用会被拒绝 |
-| `handler(params, context?)` | 接收经过验证的参数和 `{ runId, agentId, signal? }`——当调用方放弃时，`signal` 会被中止 |
+| `handler(params, context?)` | 接收经过验证的参数和 `{ runId, agentId, signal?, onEvent? }`——当调用方放弃时，`signal` 会被中止；当调用方实时观察这次调用时，`onEvent` 会被设置：请把它作为该工具所启动的运行的 `onEvent` 传入 |
 | `retry` | `{ maxRetries, initialDelayMs?, maxDelayMs?, retryOn?(error) }`——仅适用于幂等的工具；无效参数从不重试 |
 | `metadata` | `{ category?, riskLevel?, requiresApproval?, readOnly? }`——`requiresApproval: true` 会让每次调用都等待 `approveAction`；`readOnly` 会以 `readOnlyHint` 的形式展示给 MCP 客户端 |
 | `inputJsonSchema` | 展示出来的 JSON Schema，用于替代根据 `schema` 推导出的那一个 |
@@ -239,7 +252,7 @@ interface ResourceProvider {
 
 | 函数 | |
 | --- | --- |
-| `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | 一个 MCP `Server`，恰好暴露 `tools` 所列出的内容：已定义工具的名称和/或 `ToolDefinition`（会替你在 SDK 上定义；同一个定义可以再次传入，名称已被占用的另一个工具会被拒绝）。`resources`：一个或多个 `ResourceProvider`；每一次读取都会被追踪。调用以 `mcp:<name>`（或 `agentId`）的身份运行；在 `approvalTimeoutMs`（默认 50 000 毫秒）内无人决定的审批会被取消；对输入的拒绝会向客户端解释，其他原因只有在设置 `exposeErrorDetails` 时才会给出 |
+| `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | 一个 MCP `Server`，恰好暴露 `tools` 所列出的内容：已定义工具的名称和/或 `ToolDefinition`（会替你在 SDK 上定义；同一个定义可以再次传入，名称已被占用的另一个工具会被拒绝）。`resources`：一个或多个 `ResourceProvider`；每一次读取都会被追踪。调用以 `mcp:<name>`（或 `agentId`）的身份运行；在 `approvalTimeoutMs`（默认 50 000 毫秒）内无人决定的审批会被取消；对输入的拒绝会向客户端解释，其他原因只有在设置 `exposeErrorDetails` 时才会给出。带有 `progressToken` 的调用会为每个事件收到一条 `notifications/progress`，全部在结果之前发送（[进度通知](../guide/mcp-deploy#progress-notifications)） |
 | `serveMcpOverStdio(sdk, options)` | 同上，但连接到 stdin/stdout；向 stderr 写入一行“ready”，并在 stdin 结束时关闭（进行中的调用会被中止，待处理的审批会被取消）。`approvalTimeoutMs` 默认为 50 000，与 `createMcpServer` 相同 |
 | `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry? })` | `{ tools, client, close() }`——任何 MCP 服务器的工具，以 `ToolDefinition` 的形式提供 |
 
@@ -247,4 +260,4 @@ interface ResourceProvider {
 
 ## 构建模块 {#building-blocks}
 
-SDK 的构建模块已导出，供自定义配置使用：`JevClient`、`DecisionService`、`LLMThoughtGenerator`、`HeuristicController`、`TypedDecisionController`、`TypedHypothesisAssessor`、`PredictionTester`、`applyThought`、`assembleThought`、`assessReadiness`、`rankHypotheses`、`rebuildMentalState`、`describeMentalState`、`fingerprint`、`defineThinkerProfile`、`refineProfile`、`withRetry`、`RetryingLLMProvider`、`OpenAIProvider`、`AnthropicProvider`、`FallbackProvider`、`MonitoredEventStore`、`EmailIncidentNotifier`、`WebhookIncidentNotifier`、`ResendEmailTransport`、`computeRunCost`、`FileEventStore`、`SQLiteEventStore`、`PostgreSQLEventStore`，以及它们的主要类型。
+SDK 的构建模块已导出，供自定义配置使用：`JevClient`、`DecisionService`、`LLMThoughtGenerator`、`HeuristicController`、`TypedDecisionController`、`TypedHypothesisAssessor`、`PredictionTester`、`applyThought`、`assembleThought`、`assessReadiness`、`rankHypotheses`、`rebuildMentalState`、`describeMentalState`、`fingerprint`、`defineThinkerProfile`、`refineProfile`、`withRetry`、`RetryingLLMProvider`、`OpenAIProvider`、`AnthropicProvider`、`FallbackProvider`、`MonitoredEventStore`、`ObservedEventStore`、`EmailIncidentNotifier`、`WebhookIncidentNotifier`、`ResendEmailTransport`、`computeRunCost`、`FileEventStore`、`SQLiteEventStore`、`PostgreSQLEventStore`，以及它们的主要类型。

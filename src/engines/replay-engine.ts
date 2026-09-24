@@ -1,7 +1,14 @@
 import { PolicyViolationError, ToolExecutionError } from '../errors/index.js';
 import type { IEventStore } from '../stores/event-store.js';
+import { finishWatch, watchRun } from '../stores/observed-event-store.js';
 import type { Event } from '../types/events.js';
-import type { Intention, ReplayModifications, RunProgress, RunResult } from '../types/run.js';
+import type {
+  Intention,
+  ReplayModifications,
+  ReplayOptions,
+  RunProgress,
+  RunResult,
+} from '../types/run.js';
 import { generateEventId, generateRunId } from '../utils/id.js';
 import { type ActionEngine, TOOL_APPROVAL_POLICY } from './action-engine.js';
 
@@ -11,11 +18,31 @@ export class ReplayEngine {
     private actionEngine: ActionEngine
   ) {}
 
-  async replay(runId: string, modifications?: ReplayModifications): Promise<RunResult> {
+  async replay(
+    runId: string,
+    modifications?: ReplayModifications,
+    options: ReplayOptions = {}
+  ): Promise<RunResult> {
     const originalEvents = await this.eventStore.getEvents(runId);
     this.validateEvents(originalEvents, runId);
 
     const newRunId = generateRunId();
+    // Watched before anything is recorded, so the listener gets every event of the replay.
+    const watch = watchRun(this.eventStore, newRunId, options.onEvent);
+    try {
+      return await this.replayAs(newRunId, runId, originalEvents, modifications);
+    } finally {
+      // A replay cannot be cancelled: it waits until the listener has settled on every event.
+      await finishWatch(watch, []);
+    }
+  }
+
+  private async replayAs(
+    newRunId: string,
+    runId: string,
+    originalEvents: Event[],
+    modifications?: ReplayModifications
+  ): Promise<RunResult> {
     const intentions = this.extractIntentions(originalEvents);
     const approved = approvedIntentions(originalEvents);
     await this.logReplayStart(newRunId, originalEvents, runId, modifications);

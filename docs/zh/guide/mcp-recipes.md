@@ -476,7 +476,7 @@ claude mcp add nicolas-twin -e OPENAI_API_KEY=sk-… -e PROFILE_FILE=/path/nicol
 
 ### 值得了解 {#good-to-know}
 
-- **它需要时间。** 一次认知运行会进行多次模型调用：大约需要几十秒，有时要几分钟。许多客户端在大约一分钟后就会取消调用（官方 TypeScript SDK 的默认值是 60 秒；Claude Code 允许你用 `MCP_TOOL_TIMEOUT` 调高它）。交互式使用时请把 `limits` 设得小一些。**当客户端放弃时，运行会被停止**（认知智能体和受治理智能体都是如此），并被记录为已取消：不会再进行任何模型调用，智能体正在等待的审批也会被取消。
+- **它需要时间。** 一次认知运行会进行多次模型调用：大约需要几十秒，有时要几分钟。许多客户端在大约一分钟后就会取消调用（官方 TypeScript SDK 的默认值是 60 秒；Claude Code 允许你用 `MCP_TOOL_TIMEOUT` 调高它）。交互式使用时请把 `limits` 设得小一些，除非你的客户端会在收到[进度通知](./mcp-deploy#progress-notifications)时重置超时：智能体的每一步都会发送一条进度通知。**当客户端放弃时，运行会被停止**（认知智能体和受治理智能体都是如此），并被记录为已取消：不会再进行任何模型调用，智能体正在等待的审批也会被取消。
 - **它要花钱**：每一次咨询都是多次模型调用。请给它设置一个[预算](./mcp-deploy#governance-policies-budgets-approvals)，并查看 `sdk.getRunCost(runId)`。
 - **它模仿的是一种推理方式，而不是这个人知道的东西。** 分身知道的只是画像、问题和上下文中的内容——而不是这个人的记忆。请把它的答案看作“他们会如何着手处理这件事”，并让真正的这个人用 `learnFromFeedback` 来纠正它。
 

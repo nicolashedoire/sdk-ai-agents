@@ -68,7 +68,7 @@ const analyst = sdk.createAgent({
 | `defineTool(definition)` | `Tool` | Registra una herramienta; el manejador se tipa a partir de su esquema Zod |
 | `defineCapability(definition)` | `Capability` | Agrupa herramientas |
 | `listTools()` | `Tool[]` | Todas las herramientas registradas |
-| `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs? })` | `Promise<unknown>` | Ejecución gobernada fuera de un agente (la usa el servidor MCP): argumentos, políticas, aprobación, presupuesto (contabilizado cuando empieza la llamada), y después la herramienta. `signal` cancela una aprobación pendiente y llega al manejador; `approvalTimeoutMs` cancela una aprobación que nadie decidió |
+| `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs?, onEvent? })` | `Promise<unknown>` | Ejecución gobernada fuera de un agente (la usa el servidor MCP): argumentos, políticas, aprobación, presupuesto (contabilizado cuando empieza la llamada), y después la herramienta. `signal` cancela una aprobación pendiente y llega al manejador; `approvalTimeoutMs` cancela una aprobación que nadie decidió |
 | `traceResourceRead(uri, read, { agentId? })` | `Promise<ResourceContent>` | Ejecuta `read()` como su propia ejecución: `run.started`, `resource.read` (URI, tamaño, SHA-256), `run.completed` o `run.failed` |
 | `stopRun(runId)` | `Promise<void>` | Detiene una ejecución gobernada o cognitiva |
 
@@ -187,9 +187,22 @@ interface ModelCostLine {
 | Método | |
 | --- | --- |
 | `getTrace(runId)`, `exportTrace(runId, 'json' \| 'text')`, `getEvents(runId, filters?)` | Leer las ejecuciones |
-| `replay(runId, modifications?)` | Volver a ejecutar sin el LLM |
+| `replay(runId, modifications?, { onEvent? })` | Volver a ejecutar sin el LLM |
 | `getReasoningGraph`, `exportReasoningGraph`, `getAlternatives`, `getDecisionPatterns`, `getTraceVisualization` | Entender las decisiones |
 | `createGoldenTrace`, `getGoldenTraces`, `validateAgainstGoldenTrace`, `replayAndValidate`, `detectRegressions` | Probar los agentes como si fueran código |
+
+## Eventos en tiempo real {#live-events}
+
+Un listener es `(event: Event) => unknown`. Recibe los eventos de uno en uno, en el orden de cada ejecución, una vez que el almacén los ha aceptado; una promesa que devuelva se espera antes de su siguiente evento. Las ejecuciones nunca lo esperan, y sus errores se notifican, nunca se lanzan dentro de la ejecución. Como máximo `maxQueued` eventos (10 000 por defecto) lo esperan; por encima de esa cifra, los nuevos se descartan para él y se notifican con un `LiveEventsDroppedError`. Consulta [Progreso en tiempo real](../guide/observability#live-progress).
+
+| API | |
+| --- | --- |
+| `RunInput.onEvent`: `agent.run({ message, onEvent })` | Todos los eventos de la ejecución; `run()` se resuelve una vez que el listener ha terminado con cada uno de ellos, o antes si la ejecución se detuvo o se canceló o si `signal` se aborta (entonces se cancela la suscripción del listener). El listener no se guarda en el registro de eventos |
+| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | Lo mismo para una ejecución cognitiva, cuyo `limits.timeoutMs` también termina la espera |
+| `replay(runId, modifications?, { onEvent })` | Lo mismo para una repetición, que no se puede cancelar: siempre espera |
+| `executeTool(name, params, { onEvent })` | Los eventos de la llamada, y los de las ejecuciones que inicia su herramienta, a un solo nivel de profundidad: el manejador recibe el listener como `context.onEvent`, que `governedAgentTool` y `cognitiveAgentTool` pasan a su agente (un agente construido a mano sobre un almacén sin eventos en tiempo real se ejecuta sin él). `signal` termina la espera |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: todos los eventos de todas las ejecuciones que coinciden con el filtro (`agentId` es `metadata.agentId`), hasta que llamas a la función devuelta, que descarta los eventos aún no entregados |
+| `new ObservedEventStore(store, { onListenerError? })` | La capa que los entrega; el SDK envuelve su almacén en una, o usa la que pases como `eventStore`, también dentro de un `MonitoredEventStore` (cuyos informes de incidentes se entregan entonces también). Su `subscribe(listener, options?)` devuelve `{ unsubscribe(), close() }`: `close()` espera a que el listener haya terminado con los eventos que ya tomó. `onListenerError` recibe los errores de los listeners y los descartes de eventos |
 
 ## Herramientas: `ToolDefinition` {#tools-tooldefinition}
 
@@ -197,7 +210,7 @@ interface ModelCostLine {
 | --- | --- |
 | `name`, `description` | Lo que ve el modelo |
 | `schema` | Esquema Zod de los argumentos; las llamadas que no encajan se rechazan |
-| `handler(params, context?)` | Recibe los argumentos validados y `{ runId, agentId, signal? }` — `signal` se aborta cuando quien llama se rinde |
+| `handler(params, context?)` | Recibe los argumentos validados y `{ runId, agentId, signal?, onEvent? }` — `signal` se aborta cuando quien llama se rinde; `onEvent` está definido cuando quien llama sigue la llamada en tiempo real: pásalo como el `onEvent` de las ejecuciones que inicia la herramienta |
 | `retry` | `{ maxRetries, initialDelayMs?, maxDelayMs?, retryOn?(error) }` — solo herramientas idempotentes; los argumentos no válidos nunca se reintentan |
 | `metadata` | `{ category?, riskLevel?, requiresApproval?, readOnly? }` — `requiresApproval: true` hace que cada llamada espere a `approveAction`; `readOnly` se muestra a los clientes MCP como `readOnlyHint` |
 | `inputJsonSchema` | JSON Schema que se muestra en lugar del derivado de `schema` |
@@ -239,7 +252,7 @@ interface ResourceProvider {
 
 | Función | |
 | --- | --- |
-| `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | `Server` MCP que expone exactamente lo que enumera `tools`: nombres de herramientas definidas y/o `ToolDefinition` (definidas en el SDK por ti; se puede volver a pasar la misma definición, y se rechaza otra herramienta con un nombre ya usado). `resources`: uno o varios `ResourceProvider`; cada lectura se traza. Las llamadas se ejecutan como `mcp:<name>` (o `agentId`); una aprobación que nadie decide dentro de `approvalTimeoutMs` (50 000 ms por defecto) se cancela; los rechazos de la entrada se explican al cliente, las demás causas solo con `exposeErrorDetails` |
+| `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | `Server` MCP que expone exactamente lo que enumera `tools`: nombres de herramientas definidas y/o `ToolDefinition` (definidas en el SDK por ti; se puede volver a pasar la misma definición, y se rechaza otra herramienta con un nombre ya usado). `resources`: uno o varios `ResourceProvider`; cada lectura se traza. Las llamadas se ejecutan como `mcp:<name>` (o `agentId`); una aprobación que nadie decide dentro de `approvalTimeoutMs` (50 000 ms por defecto) se cancela; los rechazos de la entrada se explican al cliente, las demás causas solo con `exposeErrorDetails`. Una llamada con un `progressToken` recibe una notificación `notifications/progress` por evento, todas enviadas antes del resultado ([notificaciones de progreso](../guide/mcp-deploy#progress-notifications)) |
 | `serveMcpOverStdio(sdk, options)` | Lo mismo, conectado a stdin/stdout; escribe una línea "ready" en stderr y se cierra cuando termina stdin (las llamadas en curso se abortan y las aprobaciones pendientes se cancelan). `approvalTimeoutMs` vale 50 000 por defecto, como en `createMcpServer` |
 | `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry? })` | `{ tools, client, close() }` — las herramientas de cualquier servidor MCP, como `ToolDefinition` |
 
@@ -247,4 +260,4 @@ interface ResourceProvider {
 
 ## Piezas de base {#building-blocks}
 
-Las piezas del SDK se exportan para configuraciones personalizadas: `JevClient`, `DecisionService`, `LLMThoughtGenerator`, `HeuristicController`, `TypedDecisionController`, `TypedHypothesisAssessor`, `PredictionTester`, `applyThought`, `assembleThought`, `assessReadiness`, `rankHypotheses`, `rebuildMentalState`, `describeMentalState`, `fingerprint`, `defineThinkerProfile`, `refineProfile`, `withRetry`, `RetryingLLMProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider`, `MonitoredEventStore`, `EmailIncidentNotifier`, `WebhookIncidentNotifier`, `ResendEmailTransport`, `computeRunCost`, `FileEventStore`, `SQLiteEventStore`, `PostgreSQLEventStore`, y sus tipos principales.
+Las piezas del SDK se exportan para configuraciones personalizadas: `JevClient`, `DecisionService`, `LLMThoughtGenerator`, `HeuristicController`, `TypedDecisionController`, `TypedHypothesisAssessor`, `PredictionTester`, `applyThought`, `assembleThought`, `assessReadiness`, `rankHypotheses`, `rebuildMentalState`, `describeMentalState`, `fingerprint`, `defineThinkerProfile`, `refineProfile`, `withRetry`, `RetryingLLMProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider`, `MonitoredEventStore`, `ObservedEventStore`, `EmailIncidentNotifier`, `WebhookIncidentNotifier`, `ResendEmailTransport`, `computeRunCost`, `FileEventStore`, `SQLiteEventStore`, `PostgreSQLEventStore`, y sus tipos principales.

@@ -204,6 +204,32 @@ createServer((request, response) => {
 
 ほとんどの MCP アプリケーションも、ツールを呼び出す前に毎回ユーザーに確認します（Claude Desktop はデフォルトでそうします）。その確認はアプリケーションの中で行われます。SDK の承認は、あなたのサーバーで、あなたのルールのもとで行われ、記録されます。データを変更するものについては、両方を使ってください。
 
+## 進捗通知 {#progress-notifications}
+
+クライアントは、呼び出しがどう進んでいるかを知らせるよう求めることができます。そのためには、呼び出しとともに `progressToken` を送ります（公式の TypeScript SDK では、`onprogress` を渡すとそうなります）。するとサーバーは、呼び出しのイベントと、`cognitiveAgentTool` や `governedAgentTool` が開始するエージェントの実行のイベントについて、そのすべてに 1 つずつ `notifications/progress` を送ります。それぞれには、毎回 1 ずつ増える `progress` と、短い `message` が付きます。
+
+```text
+call started
+tool ask_support called
+agent started
+step 1: model chose lookup_customer
+step 1: tool lookup_customer called
+step 1: tool lookup_customer done
+step 2: model answered
+agent completed
+call completed
+```
+
+メッセージが示すのは、ステップ、ツール、認知オペレーションの名前です。名前が出るツールは、モデルが選んだツールと、エージェントが呼び出すすべてのツールで、サーバーが公開していないエージェントのツールも含まれます。引数、結果、エラーのテキストが含まれることは決してありません。`total` はありません。1 つの実行が何ステップかかるかは、誰にも前もってわからないからです。どの通知も結果より前に送られ、結果の後に送られることはありません。Streamable HTTP では、通知はレスポンスのストリーム（SSE）に乗って届きます。`enableJsonResponse: true` を指定して作成したトランスポートは、ただの JSON で応答し、通知を捨てます。`progressToken` を送らないクライアントには、通知は届きません。
+
+追跡されるのは、ツールが開始したエージェントの実行だけで、1 階層分までです。そのエージェントが自分のエージェントツールを通じて開始する実行は追跡されません。リアルタイムのイベントに対応していないストアの上に手作業で組み立てたエージェントも、追跡されません。通知はまとめられません。すべてのイベントが 1 つの通知になるので、長い認知エージェントの実行では、数百件の通知が送られることもあります。
+
+進捗通知によって変わること、変わらないことは次のとおりです。
+
+- **長く待つのは、進捗を受け取るたびにタイムアウトをリセットするクライアントだけ。** TypeScript SDK の場合：`client.callTool(params, undefined, { onprogress, resetTimeoutOnProgress: true, maxTotalTimeout })`。進捗を表示しても固定のタイムアウトを保つクライアントは、以前と同じ時点で待つのをやめます。これを当てにする前に、あなたのアプリケーションがどう動くかを確認してください。
+- **そうしたクライアントで重要なのは、呼び出しの長さではなく、最も長い沈黙** です。つまり、1 回のモデル呼び出し、1 つの遅いツール、または 1 つの承認です。ツールの実行中や承認の待機中には何も送られないので、`approvalTimeoutMs` の 50 秒は引き続き適用されます。また、モデルやツールの呼び出しは、1 回ずつがどれもクライアントのタイムアウト内に収まる必要があります。
+- **そうすれば、エージェントはもっと長くかけられる**：各ステップが通知を送るので、認知エージェントの `limits.timeoutMs` をクライアントのタイムアウトより長くできます。ほかのクライアントでは、[エージェントのレシピ](./mcp-recipes#an-agent-your-reasoning-twin) の小さな上限を保ってください。
+
 ## セキュリティのチェックリスト {#security-checklist}
 
 サーバーを共有する前に、次を確認してください。
@@ -231,7 +257,7 @@ MCP プロジェクトは、攻撃と防御についての詳しいガイドを�
 | 一覧にツールが見当たらない | そのツールが `tools` に入っていない | その名前か定義を `tools` に追加する。そうしない限り、何も公開されない。 |
 | 起動時に `Another tool named "x" is already defined` と出る | 2 つのソースが同じ名前のツールを作っている | 各ソースに `prefix` を付ける。 |
 | `Tool execution failed: <name>` とだけ表示される | 原因に内部の詳細が含まれうるので、隠されている | イベントログで実行を読むか、開発中は `exposeErrorDetails: true` を設定する。 |
-| 呼び出しがタイムアウトする | ツールが遅い（エージェントであることが多い） | エージェントの `limits` を小さくする。クライアントのタイムアウトを引き上げる（Claude Code：`MCP_TOOL_TIMEOUT`）。 |
+| 呼び出しがタイムアウトする | ツールが遅い（エージェントであることが多い） | エージェントの `limits` を小さくする。クライアントのタイムアウトを引き上げる（Claude Code：`MCP_TOOL_TIMEOUT`）。または、[進捗通知](#progress-notifications) を受け取るたびにタイムアウトをリセットするクライアントを使う。 |
 | 結果が途中で切れている | サイズの上限（`truncated: true`）、またはクライアント自身の上限 | `maxResponseBytes`、`maxRows`、`maxFileBytes` を引き上げる。Claude Code：`MAX_MCP_OUTPUT_TOKENS`。 |
 | 書き込みツールが "Approval no decision within 50000 ms" と答える | 時間内に誰も承認しなかった | もっと早く承認する（[承認](#approvals-a-human-says-yes-first) を参照）、`approvalTimeoutMs` を引き上げる、または意図して `requiresApproval: false` を設定する。 |
 | `events/` や `golden-traces/` のようなフォルダーが思わぬ場所に現れる | イベントログに絶対パスを指定していない（または SDK のバージョンが古い） | `eventStore: new FileEventStore(<absolute path>)` を渡す。現在のバージョンは、ほかのフォルダーを使うときにしか作らない。 |

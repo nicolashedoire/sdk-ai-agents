@@ -189,6 +189,7 @@ export class ActionEngine {
         runId: context.runId,
         agentId: context.agentId,
         ...(context.abortSignal ? { signal: context.abortSignal } : {}),
+        ...(context.onEvent ? { onEvent: context.onEvent } : {}),
       });
     const retry = this.toolRegistry.getTool(toolName)?.retry;
     if (!retry || retry.maxRetries <= 0) {

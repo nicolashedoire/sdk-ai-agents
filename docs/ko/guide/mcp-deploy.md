@@ -204,6 +204,32 @@ createServer((request, response) => {
 
 대부분의 MCP 애플리케이션도 도구를 호출할 때마다 사용자에게 묻습니다(Claude Desktop은 기본적으로 그렇게 합니다). 그 확인은 애플리케이션 안에서 일어나고, SDK 승인은 여러분의 서버에서, 여러분의 규칙에 따라 일어나며 기록됩니다. 데이터를 바꾸는 모든 것에는 둘 다 쓰세요.
 
+## 진행 알림 {#progress-notifications}
+
+클라이언트는 호출이 어떻게 진행되고 있는지 알려 달라고 요청할 수 있습니다. 호출과 함께 `progressToken`을 보내면 됩니다(공식 TypeScript SDK는 `onprogress`를 넘기면 그렇게 합니다). 그러면 서버는 호출의 모든 이벤트마다, 그리고 `cognitiveAgentTool`이나 `governedAgentTool`이 시작하는 에이전트 실행의 모든 이벤트마다 `notifications/progress`를 하나씩 보냅니다. 여기에는 매번 1씩 올라가는 `progress`와 짧은 `message`가 담깁니다.
+
+```text
+call started
+tool ask_support called
+agent started
+step 1: model chose lookup_customer
+step 1: tool lookup_customer called
+step 1: tool lookup_customer done
+step 2: model answered
+agent completed
+call completed
+```
+
+메시지는 단계, 도구, 인지 연산의 이름을 알려 줍니다. 모델이 고른 도구, 그리고 서버가 노출하지 않는 에이전트의 도구를 포함해 에이전트가 호출하는 모든 도구의 이름이 나옵니다. 메시지는 인자, 결과, 오류 텍스트를 절대 담지 않습니다. `total`은 없습니다. 실행이 몇 단계를 거칠지 미리 아는 사람은 없기 때문입니다. 모든 알림은 결과보다 먼저 보내지며, 결과 뒤에 보내지는 일은 없습니다. Streamable HTTP에서는 알림이 응답의 스트림(SSE)을 타고 전달됩니다. `enableJsonResponse: true`로 만든 전송 방식은 평범한 JSON으로 답하므로 알림을 버립니다. `progressToken`을 보내지 않는 클라이언트는 알림을 전혀 받지 않습니다.
+
+도구가 시작하는 에이전트 실행만, 한 단계 깊이까지만 따라갑니다. 그 에이전트가 자신의 에이전트 도구를 통해 시작하는 실행은 따라가지 않으며, 실시간 이벤트가 없는 저장소 위에 직접 만든 에이전트도 마찬가지입니다. 알림은 하나도 합쳐지지 않습니다. 이벤트 하나하나가 알림이 되므로, 긴 인지 실행은 수백 개의 알림을 보낼 수 있습니다.
+
+진행 알림으로 달라지는 것과 달라지지 않는 것은 다음과 같습니다.
+
+- **진행 알림을 받을 때 타임아웃을 초기화하는 클라이언트만 더 오래 기다립니다.** TypeScript SDK에서는 `client.callTool(params, undefined, { onprogress, resetTimeoutOnProgress: true, maxTotalTimeout })`입니다. 진행 상황을 표시하더라도 타임아웃이 고정된 클라이언트는 이전과 똑같은 시점에 포기합니다. 이에 기대기 전에 여러분의 애플리케이션이 어떻게 동작하는지 확인하세요.
+- **그런 클라이언트에서 중요한 것은 가장 긴 침묵**이지, 호출의 길이가 아닙니다. 모델 호출 한 번, 느린 도구 하나, 또는 승인 하나가 그런 침묵입니다. 도구가 실행되는 동안이나 승인을 기다리는 동안에는 아무것도 보내지 않으므로, `approvalTimeoutMs`의 50초는 여전히 적용되며, 모델 호출이나 도구 호출 하나하나가 클라이언트의 타임아웃 안에 끝나야 합니다.
+- **그러면 에이전트가 더 오래 걸려도 됩니다**: 단계마다 알림을 보내므로, 인지 에이전트의 `limits.timeoutMs`가 클라이언트의 타임아웃을 넘어도 됩니다. 다른 클라이언트에는 [에이전트 레시피](./mcp-recipes#an-agent-your-reasoning-twin)의 작은 한도를 유지하세요.
+
 ## 보안 체크리스트 {#security-checklist}
 
 서버를 공유하기 전에:
@@ -231,7 +257,7 @@ MCP 프로젝트는 공격과 방어에 대한 자세한 가이드를 관리합�
 | 목록에서 도구가 빠짐 | `tools`에 없음 | 그 이름이나 정의를 `tools`에 추가하세요. 그렇지 않으면 아무것도 노출되지 않습니다. |
 | 시작할 때 `Another tool named "x" is already defined` | 두 소스가 같은 도구 이름을 만듦 | 각 소스에 `prefix`를 주세요. |
 | `Tool execution failed: <name>`만 나오고 그 이상은 없음 | 원인에 내부 세부 정보가 있을 수 있어 숨겨짐 | 이벤트 로그에서 실행을 읽거나, 개발 중에는 `exposeErrorDetails: true`를 설정하세요. |
-| 호출이 타임아웃됨 | 도구가 느림(흔히 에이전트) | 에이전트 `limits`를 줄이고, 클라이언트의 타임아웃을 늘리세요(Claude Code: `MCP_TOOL_TIMEOUT`). |
+| 호출이 타임아웃됨 | 도구가 느림(흔히 에이전트) | 에이전트 `limits`를 줄이고, 클라이언트의 타임아웃을 늘리세요(Claude Code: `MCP_TOOL_TIMEOUT`). 또는 [진행 알림](#progress-notifications)을 받을 때 타임아웃을 초기화하는 클라이언트를 쓰세요. |
 | 결과가 잘림 | 크기 한도(`truncated: true`) 또는 클라이언트 자체 한도 | `maxResponseBytes`, `maxRows`, `maxFileBytes`를 늘리세요. Claude Code: `MAX_MCP_OUTPUT_TOKENS`. |
 | 쓰기 도구가 "Approval no decision within 50000 ms"라고 답함 | 아무도 제시간에 승인하지 않음 | 더 빨리 승인하거나([승인](#approvals-a-human-says-yes-first) 참고), `approvalTimeoutMs`를 늘리거나, 의도적으로 `requiresApproval: false`를 설정하세요. |
 | `events/`나 `golden-traces/` 같은 폴더가 예상치 못한 곳에 생김 | 이벤트 로그에 절대 경로를 쓰지 않음(또는 이전 SDK 버전) | `eventStore: new FileEventStore(<absolute path>)`를 넘기세요. 현재 버전은 다른 폴더를 쓸 때만 만듭니다. |

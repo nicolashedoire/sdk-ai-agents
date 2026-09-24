@@ -68,7 +68,7 @@ const analyst = sdk.createAgent({
 | `defineTool(definition)` | `Tool` | Регистрирует инструмент; обработчик типизируется по его схеме Zod |
 | `defineCapability(definition)` | `Capability` | Группирует инструменты |
 | `listTools()` | `Tool[]` | Все зарегистрированные инструменты |
-| `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs? })` | `Promise<unknown>` | Управляемое выполнение вне агента (используется сервером MCP): аргументы, политики, одобрение, бюджет (засчитывается в момент начала вызова), затем инструмент. `signal` отменяет ожидающее одобрение и передаётся обработчику; `approvalTimeoutMs` отменяет одобрение, по которому никто не принял решения |
+| `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs?, onEvent? })` | `Promise<unknown>` | Управляемое выполнение вне агента (используется сервером MCP): аргументы, политики, одобрение, бюджет (засчитывается в момент начала вызова), затем инструмент. `signal` отменяет ожидающее одобрение и передаётся обработчику; `approvalTimeoutMs` отменяет одобрение, по которому никто не принял решения |
 | `traceResourceRead(uri, read, { agentId? })` | `Promise<ResourceContent>` | Выполняет `read()` как отдельный запуск: `run.started`, `resource.read` (URI, размер, SHA-256), `run.completed` или `run.failed` |
 | `stopRun(runId)` | `Promise<void>` | Останавливает управляемый или когнитивный запуск |
 
@@ -187,9 +187,22 @@ interface ModelCostLine {
 | Метод | |
 | --- | --- |
 | `getTrace(runId)`, `exportTrace(runId, 'json' \| 'text')`, `getEvents(runId, filters?)` | Чтение запусков |
-| `replay(runId, modifications?)` | Повторное выполнение без LLM |
+| `replay(runId, modifications?, { onEvent? })` | Повторное выполнение без LLM |
 | `getReasoningGraph`, `exportReasoningGraph`, `getAlternatives`, `getDecisionPatterns`, `getTraceVisualization` | Понимание решений |
 | `createGoldenTrace`, `getGoldenTraces`, `validateAgainstGoldenTrace`, `replayAndValidate`, `detectRegressions` | Тестирование агентов как кода |
+
+## События в реальном времени {#live-events}
+
+Слушатель — это `(event: Event) => unknown`. Он получает по одному событию за раз, в порядке каждого запуска, после того как хранилище приняло событие; возвращённый им промис ожидается до его следующего события. Запуски никогда его не ждут, а о его ошибках сообщается, но они никогда не выбрасываются в запуск. Его ждут не более `maxQueued` событий (по умолчанию 10 000); сверх этого новые события для него отбрасываются, и об этом сообщается через `LiveEventsDroppedError`. См. [Ход выполнения в реальном времени](../guide/observability#live-progress).
+
+| API | |
+| --- | --- |
+| `RunInput.onEvent`: `agent.run({ message, onEvent })` | Каждое событие запуска; `run()` завершается, когда слушатель закончил обработку каждого из них, или раньше, если запуск был остановлен или отменён или прерывается `signal` (тогда подписка слушателя отменяется). Слушатель не записывается |
+| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | То же самое для когнитивного запуска, у которого ожидание прекращает и `limits.timeoutMs` |
+| `replay(runId, modifications?, { onEvent })` | То же самое для воспроизведения, которое нельзя отменить: оно всегда ждёт |
+| `executeTool(name, params, { onEvent })` | События вызова, а также запусков, которые начинает его инструмент, только на один уровень: обработчик получает слушателя как `context.onEvent`, и `governedAgentTool` и `cognitiveAgentTool` передают его своему агенту (агент, собранный вручную на хранилище без событий в реальном времени, работает без него). `signal` прекращает ожидание |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: каждое событие каждого запуска, подходящего под фильтр (`agentId` — это `metadata.agentId`), пока вы не вызовете возвращённую функцию, которая отбрасывает ещё не доставленные события |
+| `new ObservedEventStore(store, { onListenerError? })` | Слой, который их доставляет; SDK оборачивает в него своё хранилище или использует тот, что вы передали как `eventStore`, в том числе внутри `MonitoredEventStore` (тогда его отчёты об инцидентах тоже доставляются). Его `subscribe(listener, options?)` возвращает `{ unsubscribe(), close() }`: `close()` ждёт, пока слушатель не закончит обработку событий, которые он уже взял. `onListenerError` получает ошибки слушателей и сообщения об отброшенных событиях |
 
 ## Инструменты: `ToolDefinition` {#tools-tooldefinition}
 
@@ -197,7 +210,7 @@ interface ModelCostLine {
 | --- | --- |
 | `name`, `description` | То, что видит модель |
 | `schema` | Схема Zod аргументов; вызовы, которые ей не соответствуют, отклоняются |
-| `handler(params, context?)` | Получает проверенные аргументы и `{ runId, agentId, signal? }` — `signal` прерывается, когда вызывающая сторона сдаётся |
+| `handler(params, context?)` | Получает проверенные аргументы и `{ runId, agentId, signal?, onEvent? }` — `signal` прерывается, когда вызывающая сторона сдаётся; `onEvent` задан, когда вызывающая сторона следит за вызовом в реальном времени: передайте его как `onEvent` запусков, которые начинает инструмент |
 | `retry` | `{ maxRetries, initialDelayMs?, maxDelayMs?, retryOn?(error) }` — только для идемпотентных инструментов; некорректные аргументы никогда не повторяются |
 | `metadata` | `{ category?, riskLevel?, requiresApproval?, readOnly? }` — `requiresApproval: true` заставляет каждый вызов ждать `approveAction`; `readOnly` показывается клиентам MCP как `readOnlyHint` |
 | `inputJsonSchema` | JSON Schema, показываемая вместо той, что выводится из `schema` |
@@ -239,7 +252,7 @@ interface ResourceProvider {
 
 | Функция | |
 | --- | --- |
-| `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | `Server` MCP, открывающий ровно то, что перечислено в `tools`: имена определённых инструментов и/или `ToolDefinition` (SDK определяет их за вас; одно и то же определение можно передать повторно, а другой инструмент с уже занятым именем отклоняется). `resources`: один или несколько `ResourceProvider`; каждое чтение записывается в трассу. Вызовы выполняются от имени `mcp:<name>` (или `agentId`); одобрение, по которому никто не принял решения за `approvalTimeoutMs` (по умолчанию 50 000 мс), отменяется; отказы из-за входных данных объясняются клиенту, остальные причины — только при `exposeErrorDetails` |
+| `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | `Server` MCP, открывающий ровно то, что перечислено в `tools`: имена определённых инструментов и/или `ToolDefinition` (SDK определяет их за вас; одно и то же определение можно передать повторно, а другой инструмент с уже занятым именем отклоняется). `resources`: один или несколько `ResourceProvider`; каждое чтение записывается в трассу. Вызовы выполняются от имени `mcp:<name>` (или `agentId`); одобрение, по которому никто не принял решения за `approvalTimeoutMs` (по умолчанию 50 000 мс), отменяется; отказы из-за входных данных объясняются клиенту, остальные причины — только при `exposeErrorDetails`. Вызов с `progressToken` получает по одному `notifications/progress` на каждое событие, и все они отправляются до результата ([уведомления о ходе выполнения](../guide/mcp-deploy#progress-notifications)) |
 | `serveMcpOverStdio(sdk, options)` | То же самое, подключённое к stdin/stdout; пишет одну строку «ready» в stderr и закрывается, когда заканчивается stdin (выполняющиеся вызовы прерываются, ожидающие одобрения отменяются). `approvalTimeoutMs` по умолчанию 50 000, как и для `createMcpServer` |
 | `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry? })` | `{ tools, client, close() }` — инструменты любого сервера MCP в виде `ToolDefinition` |
 
@@ -247,4 +260,4 @@ interface ResourceProvider {
 
 ## Строительные блоки {#building-blocks}
 
-Строительные блоки SDK экспортируются для пользовательских конфигураций: `JevClient`, `DecisionService`, `LLMThoughtGenerator`, `HeuristicController`, `TypedDecisionController`, `TypedHypothesisAssessor`, `PredictionTester`, `applyThought`, `assembleThought`, `assessReadiness`, `rankHypotheses`, `rebuildMentalState`, `describeMentalState`, `fingerprint`, `defineThinkerProfile`, `refineProfile`, `withRetry`, `RetryingLLMProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider`, `MonitoredEventStore`, `EmailIncidentNotifier`, `WebhookIncidentNotifier`, `ResendEmailTransport`, `computeRunCost`, `FileEventStore`, `SQLiteEventStore`, `PostgreSQLEventStore`, а также их основные типы.
+Строительные блоки SDK экспортируются для пользовательских конфигураций: `JevClient`, `DecisionService`, `LLMThoughtGenerator`, `HeuristicController`, `TypedDecisionController`, `TypedHypothesisAssessor`, `PredictionTester`, `applyThought`, `assembleThought`, `assessReadiness`, `rankHypotheses`, `rebuildMentalState`, `describeMentalState`, `fingerprint`, `defineThinkerProfile`, `refineProfile`, `withRetry`, `RetryingLLMProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider`, `MonitoredEventStore`, `ObservedEventStore`, `EmailIncidentNotifier`, `WebhookIncidentNotifier`, `ResendEmailTransport`, `computeRunCost`, `FileEventStore`, `SQLiteEventStore`, `PostgreSQLEventStore`, а также их основные типы.

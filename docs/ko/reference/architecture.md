@@ -164,6 +164,7 @@ interface Agent {
 - `src/stores/sql-event-store.ts`: 범용 SQL 구현
 - `src/stores/sqlite-event-store.ts`: SQLite 구현
 - `src/stores/postgresql-event-store.ts`: PostgreSQL 구현
+- `src/stores/observed-event-store.ts`: 추가된 각 이벤트를 리스너에게 실시간으로 전달(`onEvent`, `sdk.subscribe`)
 
 **인터페이스:**
 ```typescript
@@ -174,6 +175,7 @@ interface IEventStore {
   queryEvents?(filters?: EventFilters): Promise<EventQueryResult>
   backup?(): Promise<BackupData>
   restore?(backupData: BackupData): Promise<void>
+  subscribe?(listener: LiveEventListener, filter?: LiveEventFilter): EventSubscription
 }
 ```
 

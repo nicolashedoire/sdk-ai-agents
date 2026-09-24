@@ -63,6 +63,7 @@ sdk-ai-agents/
 - `sql-event-store.ts`: تنفيذ SQL عام
 - `sqlite-event-store.ts`: تنفيذ لـ SQLite
 - `postgresql-event-store.ts`: تنفيذ لـ PostgreSQL مع JSONB
+- `observed-event-store.ts`: يسلّم كل حدث مُضاف إلى المستمعين مباشرةً (`onEvent`، `sdk.subscribe`)
 
 **نقاط الدخول:** يستخدمها `SDKImpl` و`ReplayEngine`
 

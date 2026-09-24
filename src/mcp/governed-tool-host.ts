@@ -1,3 +1,4 @@
+import type { LiveEventListener } from '../types/events.js';
 import type { ResourceContent } from '../types/resource.js';
 import type { Tool, ToolDefinition } from '../types/tool.js';
 
@@ -18,6 +19,8 @@ export interface GovernedToolHost {
       allowedTools?: string[];
       signal?: AbortSignal;
       approvalTimeoutMs?: number;
+      /** The call's live events, used to send progress notifications. */
+      onEvent?: LiveEventListener;
     }
   ): Promise<unknown>;
   /** Reads a resource as its own run in the event log. */

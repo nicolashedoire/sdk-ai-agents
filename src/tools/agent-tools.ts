@@ -79,6 +79,8 @@ export function cognitiveAgentTool(
         problem,
         ...(context ? { context } : {}),
         ...(call?.signal ? { signal: call.signal } : {}),
+        // A caller watching the call live (MCP progress) sees the agent's run progress too.
+        ...(call?.onEvent ? { onEvent: call.onEvent } : {}),
       });
       const decision = result.decision;
       const summary: CognitiveAgentToolResult = { runId: result.runId, status: result.status };
@@ -137,6 +139,8 @@ export function governedAgentTool(
         ...(context ? { context } : {}),
         // When the caller gives up, the run stops and a pending approval is cancelled.
         ...(call?.signal ? { signal: call.signal } : {}),
+        // A caller watching the call live (MCP progress) sees the agent's run progress too.
+        ...(call?.onEvent ? { onEvent: call.onEvent } : {}),
       });
       const summary: GovernedAgentToolResult = { runId: result.runId, status: result.status };
       if (result.output !== undefined) summary.output = result.output;

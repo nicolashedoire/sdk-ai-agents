@@ -1,4 +1,4 @@
-import type { Event, RunStatus } from './events.js';
+import type { Event, LiveEventListener, RunStatus } from './events.js';
 import type { OpenAIProviderSettings, ProviderSettings } from './agent.js';
 
 export interface RunInput {
@@ -6,6 +6,15 @@ export interface RunInput {
   context?: Record<string, unknown>;
   /** Cancels the run when aborted (e.g. the MCP client that asked gave up). Not recorded. */
   signal?: AbortSignal;
+  /**
+   * Called with every event recorded for this run, in order, once the event store has accepted
+   * it; a promise it returns is awaited before its next event. The run never waits for it.
+   * When the run is over, `run()` waits until the listener has settled on every event, unless
+   * the run was stopped or cancelled, or `signal` aborts meanwhile: the listener is then
+   * unsubscribed, and the events it had not received yet are dropped. Its errors are reported,
+   * never thrown into the run. Not recorded. A replay takes it in the options of `sdk.replay`.
+   */
+  onEvent?: LiveEventListener;
   metadata?: Record<string, unknown>;
   providerSettings?: {
     openai?: OpenAIProviderSettings;
@@ -81,6 +90,11 @@ export interface ActionContext {
    * and the action refused. Without it, an approval waits until decided or aborted.
    */
   approvalTimeoutMs?: number;
+  /**
+   * Given to the tool handler as `ToolCallContext.onEvent`: the caller watches the call live,
+   * and the runs the tool starts for it (an agent tool) are delivered to it too.
+   */
+  onEvent?: LiveEventListener;
 }
 
 export interface ActionResult {
@@ -94,4 +108,12 @@ export interface ReplayModifications {
   input?: RunInput;
   policies?: string[];
   tools?: string[];
+}
+
+export interface ReplayOptions {
+  /**
+   * Called with every event of the replay, as `RunInput.onEvent` is for a run. A replay cannot
+   * be cancelled: `replay()` waits until the listener has settled on every event.
+   */
+  onEvent?: LiveEventListener;
 }
