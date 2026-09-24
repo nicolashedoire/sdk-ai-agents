@@ -10,7 +10,7 @@ Une publication se fait en trois étapes : noter le nouveau numéro de version 
 
 | Job | Ce qu'il fait |
 | --- | --- |
-| `version` | Refuse un tag qui n'est pas `v` suivi de la version de `package.json`, un tag posé sur un commit absent de `main`, et une version sans sa section `## [x.y.z]` dans `CHANGELOG.md`. Choisit le dist-tag npm : `latest`, ou `next` pour une préversion comme `0.4.0-beta.1`. |
+| `version` | Refuse une version de `package.json` qui n'est pas `MAJOR.MINOR.PATCH` ou `MAJOR.MINOR.PATCH-PRERELEASE`, un tag qui n'est pas `v` suivi de cette version, et un tag posé sur un commit absent de `main`. Pour une version (pas une préversion), refuse aussi un `CHANGELOG.md` sans sa section `## [x.y.z]` ou avec encore quelque chose sous `## [Unreleased]`. Choisit le dist-tag npm : `latest`, ou `next` pour une préversion comme `0.4.0-beta.1`. |
 | `verify` | Sous Node.js 20, 22 et 24, les vérifications de la CI hormis la couverture et la construction de la documentation : `npm ci`, lint, vérification du formatage, build, vérification des types des tests, tests et vérification des traductions. |
 | `pack` | Installe les dépendances sans leurs scripts d'installation, reconstruit `dist/` de zéro et crée le paquet. Refuse une archive qui contient autre chose que `dist/`, `package.json`, `README.md`, `LICENSE` et `CHANGELOG.md`, ou un fichier de test, puis la conserve comme artefact de l'exécution. |
 | `publish` | Le seul job qui peut s'authentifier auprès de npm : il ne récupère pas le code, n'installe rien et n'exécute aucun script. Il vérifie que npm est en version 11.5.1 ou ultérieure, puis publie l'archive de `pack` avec `npm publish --provenance --access public --ignore-scripts`. |
@@ -50,7 +50,7 @@ Ces étapes se font une seule fois, par le propriétaire du dépôt.
    - …
    ```
 
-   Pour une version (pas une préversion), le job `version` refuse un tag dont la section manque.
+   Pour une version (pas une préversion), le job `version` refuse un tag dont la section manque, ou quand il reste quelque chose sous `## [Unreleased]`, même un titre `###` vide.
 
 4. **Changer la version** sans créer le tag tout de suite (le tag doit pointer sur le commit fusionné) :
 
@@ -59,6 +59,19 @@ Ces étapes se font une seule fois, par le propriétaire du dépôt.
    ```
 
    Cette commande met à jour `package.json` et `package-lock.json`. Changez aussi `const version` dans `docs/.vitepress/config.mts`, la version affichée dans le menu du site de documentation.
+
+   **Première publication seulement :** dans ce même commit, remplacez la section *Install* de `README.md` par le texte ci-dessous. npm affiche le README de la version publiée, qui ne doit pas dire « Not on npm yet ».
+
+   ````md
+   ## Install
+
+   ```sh
+   npm install @sdk-ai-agents/core zod@^3.25.28
+   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
+   ```
+
+   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
+   ````
 
 5. **Fusionner.** Committez (`chore(release): 0.3.0`), ouvrez une pull request, attendez la CI et fusionnez-la.
 
@@ -117,3 +130,4 @@ Le workflow ne change pas : npm 11.5.1 ou ultérieur, ce que vérifie le job `p
 - **`publish` échoue avec « Scope not found » ou une erreur 404.** L'organisation npm n'existe pas encore, ou le jeton ne peut pas y écrire.
 - **`publish` échoue avec une erreur 403 indiquant que la version a déjà été publiée.** Un numéro de version ne peut servir qu'une fois sur npm : augmentez-le et publiez à nouveau.
 - **Une version publiée est défectueuse.** Marquez-la avec `npm deprecate @sdk-ai-agents/core@0.3.0 "Broken, use 0.3.1"` et publiez un correctif. npm ne permet de retirer une version que dans les conditions de sa [politique de dépublication](https://docs.npmjs.com/policies/unpublish), et son numéro ne peut plus jamais servir.
+- **`publish` a échoué pour une raison passagère** (npm indisponible, réseau). Relancez les jobs en échec depuis la page de l'exécution : `publish` télécharge l'archive que `pack` conserve comme artefact pendant 7 jours. Au-delà, relancez tous les jobs.

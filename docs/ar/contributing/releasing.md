@@ -10,7 +10,7 @@
 
 | المهمة | ما تفعله |
 | --- | --- |
-| `version` | ترفض وسمًا لا يساوي `v` متبوعة بالنسخة المذكورة في `package.json`، ووسمًا على إيداع ليس على `main`، وإصدارًا ليس له قسمه `## [x.y.z]` في `CHANGELOG.md`. وتختار وسم التوزيع (dist-tag) في npm: `latest`، أو `next` لنسخة تمهيدية مثل `0.4.0-beta.1`. |
+| `version` | ترفض نسخة في `package.json` ليست على صيغة `MAJOR.MINOR.PATCH` أو `MAJOR.MINOR.PATCH-PRERELEASE`، ووسمًا لا يساوي `v` متبوعة بهذه النسخة، ووسمًا على إيداع ليس على `main`. وفي الإصدار العادي (لا النسخة التمهيدية)، ترفض أيضًا ملف `CHANGELOG.md` الذي ينقصه القسم `## [x.y.z]` أو الذي بقي فيه شيء تحت `## [Unreleased]`. وتختار وسم التوزيع (dist-tag) في npm: `latest`، أو `next` لنسخة تمهيدية مثل `0.4.0-beta.1`. |
 | `verify` | على Node.js 20 و22 و24، فحوص التكامل المستمر (CI) عدا قياس التغطية وبناء التوثيق: `npm ci`، والتدقيق (lint)، وفحص التنسيق، والبناء، وفحص أنواع الاختبارات، والاختبارات، وفحص الترجمات. |
 | `pack` | تثبّت الاعتماديات دون سكربتات التثبيت الخاصة بها، وتبني `dist/` من الصفر وتحزم الحزمة. وترفض أرشيفًا يحتوي على غير `dist/` و`package.json` و`README.md` و`LICENSE` و`CHANGELOG.md`، أو على ملف اختبار، ثم تحفظه ناتجًا (artifact) للتشغيل. |
 | `publish` | المهمة الوحيدة القادرة على المصادقة لدى npm: لا تجلب الشيفرة ولا تثبّت شيئًا ولا تشغّل أي سكربت. تتحقّق من أن نسخة npm هي 11.5.1 أو أحدث، ثم تنشر أرشيف `pack` بالأمر `npm publish --provenance --access public --ignore-scripts`. |
@@ -50,7 +50,7 @@
    - …
    ```
 
-   في الإصدار العادي (لا النسخة التمهيدية)، ترفض مهمة `version` الوسم إذا غاب هذا القسم.
+   في الإصدار العادي (لا النسخة التمهيدية)، ترفض مهمة `version` الوسم إذا غاب هذا القسم، أو إذا بقي شيء تحت `## [Unreleased]`، ولو عنوان `###` فارغ.
 
 4. **غيّر رقم النسخة** دون إنشاء الوسم الآن (يجب أن يشير الوسم إلى الإيداع المدموج):
 
@@ -59,6 +59,19 @@
    ```
 
    يحدّث هذا الأمر `package.json` و`package-lock.json`. وغيّر أيضًا `const version` في `docs/.vitepress/config.mts`، وهي النسخة المعروضة في قائمة موقع التوثيق.
+
+   **في الإصدار الأول فقط:** في الإيداع نفسه، استبدل قسم *Install* في `README.md` بالنص أدناه. يعرض npm ملف README الخاص بالنسخة المنشورة، ويجب ألا يقول «Not on npm yet».
+
+   ````md
+   ## Install
+
+   ```sh
+   npm install @sdk-ai-agents/core zod@^3.25.28
+   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
+   ```
+
+   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
+   ````
 
 5. **ادمج.** أنشئ الإيداع (`chore(release): 0.3.0`)، وافتح طلب سحب (pull request)، وانتظر التكامل المستمر، ثم ادمجه.
 
@@ -117,3 +130,4 @@ npm audit signatures
 - **فشلت `publish` برسالة «Scope not found» أو بالخطأ 404.** المؤسسة على npm غير موجودة بعد، أو لا يملك الرمز صلاحية الكتابة فيها.
 - **فشلت `publish` بالخطأ 403 الذي يقول إن النسخة نُشرت من قبل.** لا يُستخدم رقم النسخة على npm إلا مرة واحدة: ارفعه وأصدر من جديد.
 - **نسخة منشورة معطوبة.** علّمها بالأمر `npm deprecate @sdk-ai-agents/core@0.3.0 "Broken, use 0.3.1"` وأصدر نسخة مصحَّحة. لا يسمح npm بحذف نسخة إلا وفق شروط [سياسة إلغاء النشر](https://docs.npmjs.com/policies/unpublish) لديه، ولا يمكن استخدام رقمها مرة أخرى أبدًا.
+- **فشلت `publish` لسبب عابر** (تعذّر الوصول إلى npm، مشكلة في الشبكة). أعد تشغيل المهام الفاشلة من صفحة التشغيل: تنزّل `publish` الأرشيف الذي تحفظه `pack` ناتجًا لمدة 7 أيام. بعد ذلك، أعد تشغيل كل المهام.

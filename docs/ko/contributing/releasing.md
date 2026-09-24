@@ -10,7 +10,7 @@
 
 | 잡 | 하는 일 |
 | --- | --- |
-| `version` | `v` 뒤에 `package.json`의 버전이 붙은 형태가 아닌 태그, `main`에 없는 커밋에 붙은 태그, 그리고 `CHANGELOG.md`에 `## [x.y.z]` 섹션이 없는 릴리스를 거부합니다. npm dist-tag를 고릅니다. 보통은 `latest`, `0.4.0-beta.1` 같은 프리릴리스라면 `next`입니다. |
+| `version` | `package.json`의 버전이 `MAJOR.MINOR.PATCH`나 `MAJOR.MINOR.PATCH-PRERELEASE`가 아닌 경우, 태그가 `v` 뒤에 그 버전이 붙은 형태가 아닌 경우, 태그가 붙은 커밋이 `main`에 없는 경우를 거부합니다. 프리릴리스가 아닌 릴리스라면 `## [x.y.z]` 섹션이 없거나 `## [Unreleased]` 아래에 무언가 남아 있는 `CHANGELOG.md`도 거부합니다. npm dist-tag를 고릅니다. 보통은 `latest`, `0.4.0-beta.1` 같은 프리릴리스라면 `next`입니다. |
 | `verify` | Node.js 20, 22, 24에서 커버리지와 문서 빌드를 제외한 CI 검사를 실행합니다. `npm ci`, lint, 포맷 검사, 빌드, 테스트 타입 검사, 테스트, 번역 검사입니다. |
 | `pack` | 설치 스크립트 없이 의존성을 설치하고, `dist/`를 처음부터 빌드한 뒤 패키지를 만듭니다. `dist/`, `package.json`, `README.md`, `LICENSE`, `CHANGELOG.md` 외의 파일이나 테스트 파일이 든 아카이브는 거부하고, 문제가 없으면 실행의 아티팩트로 보관합니다. |
 | `publish` | npm에 인증할 수 있는 유일한 잡입니다. 코드를 체크아웃하지 않고, 아무것도 설치하지 않으며, 스크립트도 실행하지 않습니다. npm이 11.5.1 이상인지 확인한 뒤 `pack`의 아카이브를 `npm publish --provenance --access public --ignore-scripts`로 게시합니다. |
@@ -50,7 +50,7 @@
    - …
    ```
 
-   프리릴리스가 아닌 릴리스라면, 이 섹션이 없을 때 `version` 잡이 태그를 거부합니다.
+   프리릴리스가 아닌 릴리스라면, 이 섹션이 없거나 `## [Unreleased]` 아래에 무언가(빈 `###` 제목이라도) 남아 있을 때 `version` 잡이 태그를 거부합니다.
 
 4. **버전을 바꿉니다.** 태그는 아직 만들지 않습니다(태그는 병합된 커밋을 가리켜야 합니다).
 
@@ -59,6 +59,19 @@
    ```
 
    이 명령은 `package.json`과 `package-lock.json`을 갱신합니다. 문서 사이트 메뉴에 표시되는 버전인 `docs/.vitepress/config.mts`의 `const version`도 바꾸세요.
+
+   **첫 릴리스에만:** 같은 커밋에서 `README.md`의 *Install* 섹션을 아래 텍스트로 바꾸세요. npm은 게시된 버전의 README를 보여 주므로, 거기에 "Not on npm yet"이라고 쓰여 있으면 안 됩니다.
+
+   ````md
+   ## Install
+
+   ```sh
+   npm install @sdk-ai-agents/core zod@^3.25.28
+   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
+   ```
+
+   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
+   ````
 
 5. **병합합니다.** 커밋하고(`chore(release): 0.3.0`), 풀 리퀘스트를 연 다음, CI를 기다렸다가 병합하세요.
 
@@ -117,3 +130,4 @@ npm audit signatures
 - **`publish`가 "Scope not found" 또는 404로 실패했습니다.** npm 조직이 아직 없거나, 토큰에 그 조직에 쓸 권한이 없습니다.
 - **`publish`가 버전이 이미 게시되었다는 403으로 실패했습니다.** npm에서 버전 번호는 한 번만 쓸 수 있습니다. 번호를 올리고 다시 릴리스하세요.
 - **게시된 버전이 망가졌습니다.** `npm deprecate @sdk-ai-agents/core@0.3.0 "Broken, use 0.3.1"`로 사용 중단을 표시하고 수정 버전을 릴리스하세요. npm은 [게시 취소 정책](https://docs.npmjs.com/policies/unpublish)의 조건을 만족할 때만 버전 삭제를 허용하며, 그 번호는 다시는 쓸 수 없습니다.
+- **일시적인 이유(npm 장애, 네트워크)로 `publish`가 실패했습니다.** 실행 페이지에서 실패한 잡을 다시 실행하세요. `publish`는 `pack`이 아티팩트로 7일 동안 보관하는 아카이브를 내려받습니다. 그 기간이 지나면 모든 잡을 다시 실행하세요.

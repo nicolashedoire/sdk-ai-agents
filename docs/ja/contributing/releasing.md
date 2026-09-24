@@ -10,7 +10,7 @@
 
 | ジョブ | すること |
 | --- | --- |
-| `version` | `v` に続けて `package.json` のバージョンを書いたものでないタグ、`main` にないコミットに付いたタグ、そして `CHANGELOG.md` に `## [x.y.z]` セクションがないリリースを拒否します。npm の dist-tag を選びます。通常は `latest`、`0.4.0-beta.1` のようなプレリリースなら `next` です。 |
+| `version` | `package.json` のバージョンが `MAJOR.MINOR.PATCH` か `MAJOR.MINOR.PATCH-PRERELEASE` でない場合、タグが `v` に続けてそのバージョンを書いたものでない場合、タグの付いたコミットが `main` にない場合は拒否します。プレリリースでないリリースでは、`CHANGELOG.md` に `## [x.y.z]` セクションがない場合や、`## [Unreleased]` の下に何か残っている場合も拒否します。npm の dist-tag を選びます。通常は `latest`、`0.4.0-beta.1` のようなプレリリースなら `next` です。 |
 | `verify` | Node.js 20、22、24 で、カバレッジとドキュメントのビルドを除く CI のチェックを実行します。`npm ci`、lint、フォーマットのチェック、ビルド、テストの型チェック、テスト、翻訳のチェックです。 |
 | `pack` | 依存関係をインストールスクリプトなしでインストールし、`dist/` を一から作り直してパッケージを作ります。`dist/`、`package.json`、`README.md`、`LICENSE`、`CHANGELOG.md` 以外のファイルやテストファイルを含むアーカイブは拒否し、問題がなければ実行のアーティファクトとして保存します。 |
 | `publish` | npm で認証できる唯一のジョブです。コードのチェックアウトもインストールもせず、スクリプトも実行しません。npm が 11.5.1 以降であることを確認してから、`pack` のアーカイブを `npm publish --provenance --access public --ignore-scripts` で公開します。 |
@@ -50,7 +50,7 @@
    - …
    ```
 
-   プレリリースでないリリースでは、この見出しがないと `version` ジョブがタグを拒否します。
+   プレリリースでないリリースでは、この見出しがない場合や、`## [Unreleased]` の下に何か（空の `###` 見出しでも）残っている場合に、`version` ジョブがタグを拒否します。
 
 4. **バージョンを変える。** タグはまだ作りません（タグはマージされたコミットを指す必要があります）。
 
@@ -59,6 +59,19 @@
    ```
 
    これで `package.json` と `package-lock.json` が更新されます。ドキュメントサイトのメニューに表示されるバージョン、`docs/.vitepress/config.mts` の `const version` も変更します。
+
+   **最初のリリースだけ：** 同じコミットの中で、`README.md` の *Install* セクションを下のテキストに置き換えます。npm は公開されたバージョンの README を表示するので、そこに「Not on npm yet」と書かれていてはいけません。
+
+   ````md
+   ## Install
+
+   ```sh
+   npm install @sdk-ai-agents/core zod@^3.25.28
+   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
+   ```
+
+   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
+   ````
 
 5. **マージする。** コミット（`chore(release): 0.3.0`）し、プルリクエストを開き、CI を待ってからマージします。
 
@@ -117,3 +130,4 @@ npm audit signatures
 - **`publish` が「Scope not found」または 404 で失敗した。** npm の組織がまだ存在しないか、トークンにその組織への書き込み権限がありません。
 - **`publish` が、そのバージョンはすでに公開済みだという 403 で失敗した。** npm では同じバージョン番号は一度しか使えません。番号を上げて、もう一度リリースします。
 - **公開したバージョンが壊れている。** `npm deprecate @sdk-ai-agents/core@0.3.0 "Broken, use 0.3.1"` で非推奨にし、修正版をリリースします。npm でバージョンを削除できるのは[公開取り消しのポリシー](https://docs.npmjs.com/policies/unpublish)の条件を満たすときだけで、その番号は二度と使えません。
+- **一時的な理由（npm が使えない、ネットワークなど）で `publish` が失敗した。** 実行のページから、失敗したジョブを再実行します。`publish` は、`pack` がアーティファクトとして 7 日間保存するアーカイブをダウンロードします。それを過ぎたら、すべてのジョブを再実行します。

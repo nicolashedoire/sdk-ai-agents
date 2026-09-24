@@ -10,7 +10,7 @@
 
 | 作业 | 做什么 |
 | --- | --- |
-| `version` | 拒绝以下标签：不等于 `v` 加上 `package.json` 中版本号的标签、打在不属于 `main` 的提交上的标签，以及 `CHANGELOG.md` 中缺少 `## [x.y.z]` 一节的正式版本。选择 npm 的 dist-tag：通常是 `latest`，`0.4.0-beta.1` 这样的预发布版本则是 `next`。 |
+| `version` | 拒绝以下情况：`package.json` 中的版本号不是 `MAJOR.MINOR.PATCH` 或 `MAJOR.MINOR.PATCH-PRERELEASE`；标签不等于 `v` 加上这个版本号；标签打在不属于 `main` 的提交上。对于正式版本（非预发布版本），还拒绝缺少 `## [x.y.z]` 一节或 `## [Unreleased]` 下仍有内容的 `CHANGELOG.md`。选择 npm 的 dist-tag：通常是 `latest`，`0.4.0-beta.1` 这样的预发布版本则是 `next`。 |
 | `verify` | 在 Node.js 20、22 和 24 上运行 CI 中除覆盖率和文档构建之外的检查：`npm ci`、lint、格式检查、构建、测试的类型检查、测试和翻译检查。 |
 | `pack` | 安装依赖但不运行它们的安装脚本，从零构建 `dist/` 并打包。如果压缩包里除了 `dist/`、`package.json`、`README.md`、`LICENSE` 和 `CHANGELOG.md` 之外还有别的文件，或含有测试文件，就拒绝它；否则把它保存为本次运行的制品。 |
 | `publish` | 唯一能向 npm 认证的作业：它不检出代码、不安装任何东西，也不运行任何脚本。它先检查 npm 版本不低于 11.5.1，再用 `npm publish --provenance --access public --ignore-scripts` 发布 `pack` 生成的压缩包。 |
@@ -50,7 +50,7 @@
    - …
    ```
 
-   对于正式版本（非预发布版本），缺少这一节时 `version` 作业会拒绝该标签。
+   对于正式版本（非预发布版本），缺少这一节，或 `## [Unreleased]` 下仍有任何内容（哪怕只是一个空的 `###` 标题）时，`version` 作业会拒绝该标签。
 
 4. **修改版本号**，暂时不创建标签（标签必须指向合并后的提交）：
 
@@ -59,6 +59,19 @@
    ```
 
    这会更新 `package.json` 和 `package-lock.json`。同时修改 `docs/.vitepress/config.mts` 中的 `const version`，也就是文档站点菜单里显示的版本。
+
+   **仅限首次发布：** 在同一个提交中，把 `README.md` 的 *Install* 一节替换为下面的文本。npm 会显示已发布版本的 README，其中不能写着“Not on npm yet”。
+
+   ````md
+   ## Install
+
+   ```sh
+   npm install @sdk-ai-agents/core zod@^3.25.28
+   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
+   ```
+
+   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
+   ````
 
 5. **合并。** 提交（`chore(release): 0.3.0`），打开一个拉取请求，等待 CI 通过后合并。
 
@@ -117,3 +130,4 @@ npm audit signatures
 - **`publish` 因“Scope not found”或 404 失败。** npm 组织还不存在，或者令牌无权写入它。
 - **`publish` 因 403 失败，提示该版本已经发布过。** 一个版本号在 npm 上只能使用一次：提升版本号后重新发布。
 - **已发布的版本有问题。** 用 `npm deprecate @sdk-ai-agents/core@0.3.0 "Broken, use 0.3.1"` 将其标记为弃用，并发布一个修复版本。npm 只允许在其[撤销发布政策](https://docs.npmjs.com/policies/unpublish)规定的条件下删除版本，而且这个版本号永远不能再使用。
+- **`publish` 因暂时性原因失败**（npm 不可用、网络问题）。在运行页面上重新运行失败的作业：`publish` 会下载 `pack` 作为制品保存 7 天的压缩包。超过 7 天后，请重新运行所有作业。

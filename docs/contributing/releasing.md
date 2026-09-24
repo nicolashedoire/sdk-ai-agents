@@ -10,7 +10,7 @@ A release takes three steps: write down the new version number and what changed,
 
 | Job | What it does |
 | --- | --- |
-| `version` | Refuses a tag that is not `v` followed by the version in `package.json`, a tag on a commit that is not on `main`, and a release without its `## [x.y.z]` section in `CHANGELOG.md`. Chooses the npm dist-tag: `latest`, or `next` for a pre-release such as `0.4.0-beta.1`. |
+| `version` | Refuses a version in `package.json` that is not `MAJOR.MINOR.PATCH` or `MAJOR.MINOR.PATCH-PRERELEASE`, a tag that is not `v` followed by that version, and a tag on a commit that is not on `main`. For a release (not a pre-release), also refuses a `CHANGELOG.md` without its `## [x.y.z]` section or with anything left under `## [Unreleased]`. Chooses the npm dist-tag: `latest`, or `next` for a pre-release such as `0.4.0-beta.1`. |
 | `verify` | On Node.js 20, 22 and 24, the checks of the CI except coverage and the documentation build: `npm ci`, lint, format check, build, type-check of the tests, tests and translation check. |
 | `pack` | Installs the dependencies without their install scripts, builds `dist/` from scratch and packs the package. Refuses a tarball holding anything but `dist/`, `package.json`, `README.md`, `LICENSE` and `CHANGELOG.md`, or a test file, then keeps it as an artifact of the run. |
 | `publish` | The only job that can authenticate with npm: it checks out no code, installs nothing and runs no script. It checks that npm is 11.5.1 or later, then publishes the tarball of `pack` with `npm publish --provenance --access public --ignore-scripts`. |
@@ -50,7 +50,7 @@ These steps are done once, by the owner of the repository.
    - …
    ```
 
-   For a release (not a pre-release), the `version` job refuses a tag whose section is missing.
+   For a release (not a pre-release), the `version` job refuses a tag whose section is missing, or when `## [Unreleased]` still has anything under it, even an empty `###` heading.
 
 4. **Change the version** without creating the tag yet (the tag must point to the merged commit):
 
@@ -59,6 +59,19 @@ These steps are done once, by the owner of the repository.
    ```
 
    This updates `package.json` and `package-lock.json`. Also change `const version` in `docs/.vitepress/config.mts`, the version shown in the menu of the documentation site.
+
+   **First release only:** in this same commit, replace the *Install* section of `README.md` with the text below. npm shows the README of the published version, which must not say "Not on npm yet".
+
+   ````md
+   ## Install
+
+   ```sh
+   npm install @sdk-ai-agents/core zod@^3.25.28
+   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
+   ```
+
+   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
+   ````
 
 5. **Merge.** Commit (`chore(release): 0.3.0`), open a pull request, wait for the CI and merge it.
 
@@ -117,3 +130,4 @@ The workflow does not change: npm 11.5.1 or later, which the `publish` job check
 - **`publish` fails with "Scope not found" or a 404.** The npm organization does not exist yet, or the token cannot write to it.
 - **`publish` fails with a 403 saying the version was already published.** A version number can be used only once on npm: raise it and release again.
 - **A published version is broken.** Mark it with `npm deprecate @sdk-ai-agents/core@0.3.0 "Broken, use 0.3.1"` and release a fix. npm only allows removing a version under the conditions of its [unpublish policy](https://docs.npmjs.com/policies/unpublish), and its number can never be used again.
+- **`publish` failed for a passing reason** (npm unavailable, network). Re-run the failed jobs from the page of the run: `publish` downloads the tarball that `pack` keeps as an artifact for 7 days. After that, re-run all jobs.

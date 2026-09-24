@@ -10,7 +10,7 @@ Ein Release besteht aus drei Schritten: die neue Versionsnummer und die Änderun
 
 | Job | Was er tut |
 | --- | --- |
-| `version` | Lehnt einen Tag ab, der nicht aus `v` und der Version aus `package.json` besteht, einen Tag auf einem Commit, der nicht auf `main` liegt, und ein Release ohne seinen Abschnitt `## [x.y.z]` in `CHANGELOG.md`. Wählt den npm-Dist-Tag: `latest`, oder `next` für eine Vorabversion wie `0.4.0-beta.1`. |
+| `version` | Lehnt eine Version in `package.json` ab, die nicht `MAJOR.MINOR.PATCH` oder `MAJOR.MINOR.PATCH-PRERELEASE` ist, einen Tag, der nicht aus `v` und dieser Version besteht, und einen Tag auf einem Commit, der nicht auf `main` liegt. Bei einem Release (keiner Vorabversion) lehnt er außerdem eine `CHANGELOG.md` ohne ihren Abschnitt `## [x.y.z]` oder mit Resten unter `## [Unreleased]` ab. Wählt den npm-Dist-Tag: `latest`, oder `next` für eine Vorabversion wie `0.4.0-beta.1`. |
 | `verify` | Unter Node.js 20, 22 und 24 die Prüfungen der CI außer Coverage und Build der Dokumentation: `npm ci`, Lint, Formatprüfung, Build, Typprüfung der Tests, Tests und Prüfung der Übersetzungen. |
 | `pack` | Installiert die Abhängigkeiten ohne ihre Installationsskripte, baut `dist/` von Grund auf und packt das Paket. Lehnt ein Archiv ab, das etwas anderes als `dist/`, `package.json`, `README.md`, `LICENSE` und `CHANGELOG.md` oder eine Testdatei enthält, und bewahrt es dann als Artefakt des Laufs auf. |
 | `publish` | Der einzige Job, der sich bei npm authentifizieren kann: Er checkt keinen Code aus, installiert nichts und führt kein Skript aus. Er prüft, dass npm mindestens Version 11.5.1 hat, und veröffentlicht dann das Archiv von `pack` mit `npm publish --provenance --access public --ignore-scripts`. |
@@ -50,7 +50,7 @@ Diese Schritte erledigt der Eigentümer des Repositorys ein einziges Mal.
    - …
    ```
 
-   Bei einem Release (keiner Vorabversion) lehnt der Job `version` einen Tag ab, dessen Abschnitt fehlt.
+   Bei einem Release (keiner Vorabversion) lehnt der Job `version` einen Tag ab, dessen Abschnitt fehlt oder wenn unter `## [Unreleased]` noch etwas steht, selbst eine leere `###`-Überschrift.
 
 4. **Die Version ändern**, ohne den Tag schon zu erstellen (der Tag muss auf den gemergten Commit zeigen):
 
@@ -59,6 +59,19 @@ Diese Schritte erledigt der Eigentümer des Repositorys ein einziges Mal.
    ```
 
    Das aktualisiert `package.json` und `package-lock.json`. Ändern Sie auch `const version` in `docs/.vitepress/config.mts`, die Version, die das Menü der Dokumentationsseite anzeigt.
+
+   **Nur beim ersten Release:** Ersetzen Sie im selben Commit den Abschnitt *Install* der `README.md` durch den folgenden Text. npm zeigt die README der veröffentlichten Version, und darin darf nicht „Not on npm yet“ stehen.
+
+   ````md
+   ## Install
+
+   ```sh
+   npm install @sdk-ai-agents/core zod@^3.25.28
+   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
+   ```
+
+   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
+   ````
 
 5. **Mergen.** Committen Sie (`chore(release): 0.3.0`), öffnen Sie einen Pull Request, warten Sie auf die CI und mergen Sie ihn.
 
@@ -117,3 +130,4 @@ Der Workflow ändert sich nicht: npm 11.5.1 oder neuer, was der Job `publish` pr
 - **`publish` scheitert mit „Scope not found“ oder einem 404.** Die npm-Organisation existiert noch nicht, oder das Token darf nicht in sie schreiben.
 - **`publish` scheitert mit einem 403, laut dem die Version bereits veröffentlicht wurde.** Eine Versionsnummer lässt sich auf npm nur einmal verwenden: Erhöhen Sie sie und veröffentlichen Sie erneut.
 - **Eine veröffentlichte Version ist fehlerhaft.** Markieren Sie sie mit `npm deprecate @sdk-ai-agents/core@0.3.0 "Broken, use 0.3.1"` und veröffentlichen Sie eine Korrektur. npm erlaubt das Entfernen einer Version nur unter den Bedingungen seiner [Unpublish-Richtlinie](https://docs.npmjs.com/policies/unpublish), und ihre Nummer kann nie wieder verwendet werden.
+- **`publish` ist aus einem vorübergehenden Grund gescheitert** (npm nicht erreichbar, Netzwerk). Starten Sie die fehlgeschlagenen Jobs auf der Seite des Laufs neu: `publish` lädt das Archiv herunter, das `pack` 7 Tage lang als Artefakt aufbewahrt. Danach starten Sie alle Jobs neu.

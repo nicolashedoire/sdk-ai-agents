@@ -10,7 +10,7 @@ Publicar uma versão leva três passos: anotar o novo número de versão e o que
 
 | Job | O que faz |
 | --- | --- |
-| `version` | Recusa uma tag que não seja `v` seguido da versão do `package.json`, uma tag em um commit que não está na `main` e uma versão sem a sua seção `## [x.y.z]` no `CHANGELOG.md`. Escolhe a dist-tag do npm: `latest`, ou `next` para uma versão prévia como `0.4.0-beta.1`. |
+| `version` | Recusa uma versão do `package.json` que não seja `MAJOR.MINOR.PATCH` ou `MAJOR.MINOR.PATCH-PRERELEASE`, uma tag que não seja `v` seguido dessa versão e uma tag em um commit que não está na `main`. Para uma versão (não uma versão prévia), recusa também um `CHANGELOG.md` sem a sua seção `## [x.y.z]` ou com algo ainda sob `## [Unreleased]`. Escolhe a dist-tag do npm: `latest`, ou `next` para uma versão prévia como `0.4.0-beta.1`. |
 | `verify` | No Node.js 20, 22 e 24, as verificações da CI exceto a cobertura e o build da documentação: `npm ci`, lint, verificação da formatação, build, verificação de tipos dos testes, testes e verificação das traduções. |
 | `pack` | Instala as dependências sem os scripts de instalação delas, constrói `dist/` do zero e empacota o pacote. Recusa um arquivo que contenha algo além de `dist/`, `package.json`, `README.md`, `LICENSE` e `CHANGELOG.md`, ou um arquivo de teste, e depois o guarda como artefato da execução. |
 | `publish` | O único job que pode se autenticar no npm: ele não faz checkout do código, não instala nada e não executa nenhum script. Verifica que o npm está na versão 11.5.1 ou posterior e publica o arquivo do `pack` com `npm publish --provenance --access public --ignore-scripts`. |
@@ -50,7 +50,7 @@ Estes passos são feitos uma única vez, pelo dono do repositório.
    - …
    ```
 
-   Para uma versão (não uma versão prévia), o job `version` recusa uma tag cuja seção esteja faltando.
+   Para uma versão (não uma versão prévia), o job `version` recusa uma tag cuja seção esteja faltando, ou quando ainda resta algo sob `## [Unreleased]`, mesmo um título `###` vazio.
 
 4. **Mudar a versão** sem criar a tag ainda (a tag deve apontar para o commit do merge):
 
@@ -59,6 +59,19 @@ Estes passos são feitos uma única vez, pelo dono do repositório.
    ```
 
    Isso atualiza `package.json` e `package-lock.json`. Mude também `const version` em `docs/.vitepress/config.mts`, a versão mostrada no menu do site de documentação.
+
+   **Somente na primeira publicação:** neste mesmo commit, substitua a seção *Install* do `README.md` pelo texto abaixo. O npm mostra o README da versão publicada, que não deve dizer "Not on npm yet".
+
+   ````md
+   ## Install
+
+   ```sh
+   npm install @sdk-ai-agents/core zod@^3.25.28
+   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
+   ```
+
+   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
+   ````
 
 5. **Fazer o merge.** Faça o commit (`chore(release): 0.3.0`), abra um pull request, espere a CI e faça o merge.
 
@@ -117,3 +130,4 @@ O workflow não muda: o npm 11.5.1 ou posterior, que o job `publish` verifica, t
 - **`publish` falha com "Scope not found" ou um 404.** A organização no npm ainda não existe, ou o token não pode escrever nela.
 - **`publish` falha com um 403 dizendo que a versão já foi publicada.** Um número de versão só pode ser usado uma vez no npm: aumente-o e publique de novo.
 - **Uma versão publicada está quebrada.** Marque-a com `npm deprecate @sdk-ai-agents/core@0.3.0 "Broken, use 0.3.1"` e publique uma correção. O npm só permite remover uma versão nas condições da sua [política de despublicação](https://docs.npmjs.com/policies/unpublish), e o número dela nunca mais pode ser usado.
+- **`publish` falhou por um motivo passageiro** (npm indisponível, rede). Execute de novo os jobs que falharam na página da execução: `publish` baixa o arquivo que o `pack` guarda como artefato por 7 dias. Depois disso, execute de novo todos os jobs.

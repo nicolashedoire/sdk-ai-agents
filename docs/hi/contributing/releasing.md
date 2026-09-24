@@ -10,7 +10,7 @@ SDK npm पर `@sdk-ai-agents/core` नाम से प्रकाशित �
 
 | Job | क्या करता है |
 | --- | --- |
-| `version` | ऐसे tag को ठुकरा देता है जो `v` और उसके बाद `package.json` का वर्ज़न न हो, ऐसे commit पर लगा tag जो `main` पर नहीं है, और ऐसी रिलीज़ जिसका `## [x.y.z]` सेक्शन `CHANGELOG.md` में न हो। npm का dist-tag चुनता है: `latest`, या `0.4.0-beta.1` जैसे pre-release के लिए `next`। |
+| `version` | `package.json` के ऐसे वर्ज़न को ठुकरा देता है जो `MAJOR.MINOR.PATCH` या `MAJOR.MINOR.PATCH-PRERELEASE` न हो, ऐसे tag को जो `v` और उसके बाद यही वर्ज़न न हो, और ऐसे commit पर लगे tag को जो `main` पर नहीं है। रिलीज़ के लिए (pre-release के लिए नहीं), ऐसी `CHANGELOG.md` को भी ठुकराता है जिसमें `## [x.y.z]` सेक्शन न हो या `## [Unreleased]` के नीचे कुछ बचा हो। npm का dist-tag चुनता है: `latest`, या `0.4.0-beta.1` जैसे pre-release के लिए `next`। |
 | `verify` | Node.js 20, 22 और 24 पर coverage और दस्तावेज़ों के build को छोड़कर CI वाली जाँचें: `npm ci`, lint, format की जाँच, build, टेस्टों की type जाँच, टेस्ट और अनुवादों की जाँच। |
 | `pack` | dependencies को उनकी install scripts के बिना इंस्टॉल करता है, `dist/` को शुरू से बनाता है और पैकेज तैयार करता है। ऐसे archive को ठुकरा देता है जिसमें `dist/`, `package.json`, `README.md`, `LICENSE` और `CHANGELOG.md` के अलावा कुछ और हो, या कोई टेस्ट फ़ाइल हो, और फिर उसे run के artifact के रूप में रखता है। |
 | `publish` | अकेला job जो npm पर authenticate कर सकता है: यह कोड checkout नहीं करता, कुछ इंस्टॉल नहीं करता और कोई script नहीं चलाता। यह जाँचता है कि npm 11.5.1 या नया है, फिर `pack` का archive `npm publish --provenance --access public --ignore-scripts` से प्रकाशित करता है। |
@@ -50,7 +50,7 @@ SDK npm पर `@sdk-ai-agents/core` नाम से प्रकाशित �
    - …
    ```
 
-   रिलीज़ के लिए (pre-release के लिए नहीं), यह सेक्शन न होने पर `version` job tag को ठुकरा देता है।
+   रिलीज़ के लिए (pre-release के लिए नहीं), यह सेक्शन न होने पर, या `## [Unreleased]` के नीचे कुछ भी बचा होने पर (खाली `###` शीर्षक भी), `version` job tag को ठुकरा देता है।
 
 4. **वर्ज़न बदलें**, अभी tag बनाए बिना (tag को merge हुए commit की ओर इशारा करना चाहिए):
 
@@ -59,6 +59,19 @@ SDK npm पर `@sdk-ai-agents/core` नाम से प्रकाशित �
    ```
 
    यह `package.json` और `package-lock.json` अपडेट करता है। `docs/.vitepress/config.mts` में `const version` भी बदलें, जो दस्तावेज़ साइट के मेनू में दिखने वाला वर्ज़न है।
+
+   **सिर्फ़ पहली रिलीज़ में:** इसी commit में `README.md` के *Install* सेक्शन को नीचे दिए टेक्स्ट से बदलें। npm प्रकाशित वर्ज़न का README दिखाता है, जिसमें "Not on npm yet" नहीं लिखा होना चाहिए।
+
+   ````md
+   ## Install
+
+   ```sh
+   npm install @sdk-ai-agents/core zod@^3.25.28
+   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
+   ```
+
+   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
+   ````
 
 5. **merge करें।** commit करें (`chore(release): 0.3.0`), pull request खोलें, CI का इंतज़ार करें और उसे merge करें।
 
@@ -117,3 +130,4 @@ workflow नहीं बदलता: npm 11.5.1 या नया (जिसक
 - **`publish` "Scope not found" या 404 के साथ विफल होता है।** npm organization अभी मौजूद नहीं है, या token उसमें लिख नहीं सकता।
 - **`publish` 403 के साथ विफल होता है, जो बताता है कि वर्ज़न पहले ही प्रकाशित हो चुका है।** npm पर एक वर्ज़न नंबर सिर्फ़ एक बार इस्तेमाल हो सकता है: उसे बढ़ाएँ और फिर से रिलीज़ करें।
 - **प्रकाशित वर्ज़न खराब है।** उसे `npm deprecate @sdk-ai-agents/core@0.3.0 "Broken, use 0.3.1"` से चिह्नित करें और सुधार वाला वर्ज़न रिलीज़ करें। npm किसी वर्ज़न को सिर्फ़ अपनी [unpublish नीति](https://docs.npmjs.com/policies/unpublish) की शर्तों के तहत हटाने देता है, और उसका नंबर फिर कभी इस्तेमाल नहीं हो सकता।
+- **`publish` किसी अस्थायी कारण से विफल हुआ** (npm उपलब्ध नहीं, नेटवर्क)। run के पेज से विफल jobs दोबारा चलाएँ: `publish` वह archive डाउनलोड करता है जिसे `pack` 7 दिनों तक artifact के रूप में रखता है। उसके बाद सभी jobs दोबारा चलाएँ।

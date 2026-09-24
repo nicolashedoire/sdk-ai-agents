@@ -10,7 +10,7 @@ Publicar una versión lleva tres pasos: anotar el nuevo número de versión y lo
 
 | Job | Qué hace |
 | --- | --- |
-| `version` | Rechaza una etiqueta que no sea `v` seguida de la versión de `package.json`, una etiqueta en un commit que no está en `main` y una versión sin su sección `## [x.y.z]` en `CHANGELOG.md`. Elige el dist-tag de npm: `latest`, o `next` para una versión preliminar como `0.4.0-beta.1`. |
+| `version` | Rechaza una versión de `package.json` que no sea `MAJOR.MINOR.PATCH` o `MAJOR.MINOR.PATCH-PRERELEASE`, una etiqueta que no sea `v` seguida de esa versión y una etiqueta en un commit que no está en `main`. Para una versión (no una versión preliminar), rechaza también un `CHANGELOG.md` sin su sección `## [x.y.z]` o con algo todavía bajo `## [Unreleased]`. Elige el dist-tag de npm: `latest`, o `next` para una versión preliminar como `0.4.0-beta.1`. |
 | `verify` | En Node.js 20, 22 y 24, las comprobaciones de la CI salvo la cobertura y la construcción de la documentación: `npm ci`, lint, comprobación del formato, build, comprobación de tipos de los tests, tests y comprobación de las traducciones. |
 | `pack` | Instala las dependencias sin sus scripts de instalación, construye `dist/` desde cero y empaqueta el paquete. Rechaza un archivo que contenga algo más que `dist/`, `package.json`, `README.md`, `LICENSE` y `CHANGELOG.md`, o un archivo de test, y después lo guarda como artefacto de la ejecución. |
 | `publish` | El único job que puede autenticarse ante npm: no descarga el código, no instala nada y no ejecuta ningún script. Comprueba que npm sea la versión 11.5.1 o posterior y publica el archivo de `pack` con `npm publish --provenance --access public --ignore-scripts`. |
@@ -50,7 +50,7 @@ Estos pasos se hacen una sola vez, y los hace el propietario del repositorio.
    - …
    ```
 
-   Para una versión (no una versión preliminar), el job `version` rechaza una etiqueta cuya sección falte.
+   Para una versión (no una versión preliminar), el job `version` rechaza una etiqueta cuya sección falte, o si queda algo bajo `## [Unreleased]`, aunque sea un título `###` vacío.
 
 4. **Cambiar la versión** sin crear todavía la etiqueta (la etiqueta debe apuntar al commit fusionado):
 
@@ -59,6 +59,19 @@ Estos pasos se hacen una sola vez, y los hace el propietario del repositorio.
    ```
 
    Esto actualiza `package.json` y `package-lock.json`. Cambia también `const version` en `docs/.vitepress/config.mts`, la versión que muestra el menú del sitio de documentación.
+
+   **Solo en la primera publicación:** en este mismo commit, sustituye la sección *Install* de `README.md` por el texto de abajo. npm muestra el README de la versión publicada, que no debe decir "Not on npm yet".
+
+   ````md
+   ## Install
+
+   ```sh
+   npm install @sdk-ai-agents/core zod@^3.25.28
+   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
+   ```
+
+   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
+   ````
 
 5. **Fusionar.** Haz el commit (`chore(release): 0.3.0`), abre una pull request, espera a la CI y fusiónala.
 
@@ -117,3 +130,4 @@ El flujo de trabajo no cambia: npm 11.5.1 o posterior, que el job `publish` comp
 - **`publish` falla con "Scope not found" o un 404.** La organización de npm todavía no existe, o el token no puede escribir en ella.
 - **`publish` falla con un 403 que dice que la versión ya se publicó.** Un número de versión solo se puede usar una vez en npm: súbelo y vuelve a publicar.
 - **Una versión publicada está rota.** Márcala con `npm deprecate @sdk-ai-agents/core@0.3.0 "Broken, use 0.3.1"` y publica una corrección. npm solo permite retirar una versión en las condiciones de su [política de retirada](https://docs.npmjs.com/policies/unpublish), y su número ya no se puede volver a usar nunca.
+- **`publish` falló por un motivo pasajero** (npm no disponible, red). Vuelve a ejecutar los jobs fallidos desde la página de la ejecución: `publish` descarga el archivo que `pack` guarda como artefacto durante 7 días. Pasado ese plazo, vuelve a ejecutar todos los jobs.
