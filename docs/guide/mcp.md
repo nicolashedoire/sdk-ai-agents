@@ -89,11 +89,11 @@ You can write MCP servers with the official MCP SDK alone. This SDK sits on top 
 | --- | --- | --- |
 | Expose a web API | Write one handler per endpoint | `openApiTools({ spec })` — one tool per operation, read-only by default |
 | Expose a folder | Write path checks yourself | `folderTools({ root })` — symbolic links and `..` cannot leave the folder |
-| Expose a database | Write the SQL guard yourself | `databaseTools({ database })` — SELECT only, in a read-only transaction, with a row limit |
+| Expose a database | Write the SQL guard yourself | `databaseTools({ database })` — one SELECT, read-only at the database level (a read-only transaction on PostgreSQL, `query_only` on SQLite), with a row limit |
 | Expose an agent | — | `cognitiveAgentTool(agent)` — "what would Nicolas think?" as one tool |
 | Nothing exposed by accident | Up to you | Only the tools you list in `tools` |
 | Rules before every call | Up to you | [Policies](./governed-agents), budgets, allowlists |
-| A human says yes first | Up to you | Tools marked `requiresApproval` wait for `sdk.approveAction()` |
+| A human says yes first | Up to you | Tools marked `requiresApproval` wait for `sdk.approveAction()`; nobody can approve a call whose client has left |
 | Know what happened | Up to you | Every call and every resource read is a run in the [event log](./observability) |
 
 ```mermaid
@@ -102,14 +102,20 @@ flowchart LR
   A -- no --> X[Refused]
   A -- yes --> V{Arguments valid?}
   V -- no --> X
-  V -- yes --> P{Policies, budgets}
-  P -- denied --> X
-  P -- allowed --> R{Requires approval?}
-  R -- yes --> W[Wait for a human] --> T
-  R -- no --> T[Run the tool]
+  V -- yes --> P{Policies allow it?}
+  P -- no --> X
+  P -- yes --> R{Requires approval?}
+  R -- yes --> W{A human approves in time?}
+  W -- no --> X
+  W -- yes --> C
+  R -- no --> C{Client still there? Budget left?}
+  C -- no --> X
+  C -- yes --> T[Run the tool]
   T --> H
   A -. every step .-> E[(Event log)]
 ```
+
+In that order: a call with invalid arguments is refused before anyone is asked to approve it, and a call is counted against its budget when it starts, whatever its outcome.
 
 Every call made through MCP is recorded as its own run, with the identity `mcp:<server name>`: you can read it, price it, alert on it, exactly like an agent run.
 
@@ -156,7 +162,7 @@ Descriptions and results of imported tools reach the model word for word: a mali
 ## Good to know
 
 - MCP support lives in a separate entry point, `@sdk-ai-agents/core/mcp`, so the core package does not require `@modelcontextprotocol/sdk` unless you use it. The tool sources (`openApiTools`, `folderTools`, `databaseTools`, `cognitiveAgentTool`…) are in the core package: your agents can use them without MCP.
-- The server is built on the official MCP TypeScript SDK 1.30, which speaks the protocol revisions from 2024-11-05 to 2025-11-25. The 2026-07-28 revision is not supported yet.
+- The server is built on the official MCP TypeScript SDK 1.30, which accepts the protocol revisions 2024-10-07, 2024-11-05, 2025-03-26, 2025-06-18 and 2025-11-25 (its `SUPPORTED_PROTOCOL_VERSIONS`, checked on 2026-09-24). The MCP site also documents a 2026-07-28 revision ([architecture](https://modelcontextprotocol.io/docs/learn/architecture), checked on 2026-09-24), which this SDK does not speak yet.
 - This SDK serves **tools** and **resources**. Prompts, sampling and elicitation are not provided.
 
 Next: [build your first server](./mcp-first-server).

@@ -4,7 +4,7 @@ We will build a tiny MCP server that answers "who is in charge of billing?" from
 
 ## What you need
 
-- **Node.js 20.11 or later** — check with `node --version`. (The SQLite recipe needs 22.13+; the MCP Inspector needs 22.19+.)
+- **Node.js 20.11 or later** — check with `node --version`. (The SQLite recipe needs 22.13+. The MCP Inspector documentation asks for 22.19+.)
 - A terminal.
 - To use the server from an AI app: [Claude Desktop](https://claude.ai/download) or [Claude Code](https://code.claude.com/docs). Not needed for the first steps.
 
@@ -17,7 +17,7 @@ mkdir my-mcp-server
 cd my-mcp-server
 npm init -y
 npm pkg set type=module
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28 @modelcontextprotocol/sdk
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28 @modelcontextprotocol/sdk@^1.30.0
 npm install --save-dev tsx
 ```
 
@@ -27,7 +27,7 @@ What each line does:
 | --- | --- |
 | `npm init -y` | Creates `package.json`, the file that lists your project's dependencies. |
 | `npm pkg set type=module` | Uses modern JavaScript modules (`import`). The SDK requires it. |
-| `npm install github:nicolashedoire/sdk-ai-agents …` | Installs this SDK (not on npm yet, so from GitHub; it builds itself), zod (to describe arguments) and the official MCP SDK. |
+| `npm install github:nicolashedoire/sdk-ai-agents …` | Installs this SDK (not on npm yet, so from GitHub; it builds itself), zod (to describe arguments) and the official MCP SDK, version 1.30 or later within 1.x (the version this SDK is tested with). |
 | `npm install --save-dev tsx` | Runs TypeScript files directly, without a build step. |
 
 ## 2. Write the server
@@ -94,7 +94,7 @@ In a stdio server, standard output **is** the protocol. A `console.log` in your 
 
 ## 4. Test it with the MCP Inspector
 
-The [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) is the official test tool: a web page (or a command line) that acts as an MCP client, so you can try your server without any AI. It needs Node.js 22.19 or later.
+The [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) is the official test tool: a web page (or a command line) that acts as an MCP client, so you can try your server without any AI. Its documentation asks for Node.js 22.19 or later (checked on 2026-09-24).
 
 ```sh
 npx @modelcontextprotocol/inspector npx tsx server.ts
@@ -171,7 +171,7 @@ claude mcp add team -- npx -y tsx /Users/you/my-mcp-server/server.ts
 - Environment variables (for example an API token your server needs): `claude mcp add team -e API_TOKEN=… -- npx -y tsx /path/server.ts`.
 - Check it with `claude mcp list`, or type `/mcp` inside Claude Code.
 
-Checked with `claude mcp add --help` (Claude Code 2.1) and the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp).
+Checked on 2026-09-24 with `claude mcp add --help` (Claude Code 2.1.173) and the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp).
 
 ## 7. Other applications
 

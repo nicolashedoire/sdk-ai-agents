@@ -125,13 +125,15 @@ Works with TypeSafe's API or any compatible self-hosted clone (`jev.baseUrl`).
 
 <p align="center"><img src="docs/public/images/mcp-bridge.svg" alt="MCP in both directions" width="100%" /></p>
 
-**MCP** is the standard plug between AI applications (Claude Desktop, Claude Code, IDE assistants, agents) and your systems. Turn a web API, a folder, a database or an agent into an MCP server in one line — governed: nothing is exposed unless listed, every call is checked against your policies, writes wait for a human, and everything lands in the event log.
+**MCP** is the standard plug between AI applications (Claude Desktop, Claude Code, IDE assistants, agents) and your systems. Turn a web API, a folder, a database or an agent into an MCP server in one line — governed: nothing is exposed unless listed, every call is checked against your policies, write operations of web APIs wait for a human by default, and everything lands in the event log.
 
 ```ts
 import { createSDK, openApiTools, folderTools, folderResources, databaseTools, sqliteReadOnly, cognitiveAgentTool } from '@sdk-ai-agents/core';
 import { serveMcpOverStdio } from '@sdk-ai-agents/core/mcp';
 
 const sdk = createSDK({}); // no model key needed for tools (the guide shows where to keep the event log)
+// …except for the agent line below: an agent thinks with a model, so that server needs
+// createSDK({ apiKey: process.env.OPENAI_API_KEY })
 
 // Any web API, from its OpenAPI description: one tool per operation, GET only unless you list more
 await serveMcpOverStdio(sdk, { name: 'petstore', tools: await openApiTools({ spec: 'https://petstore3.swagger.io/api/v3/openapi.json' }) });
@@ -170,7 +172,7 @@ Not on npm yet — install from GitHub (the package builds itself on install):
 
 ```sh
 npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
-npm install @modelcontextprotocol/sdk   # only for MCP servers and clients
+npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
 ```
 
 Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet).

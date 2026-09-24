@@ -51,6 +51,9 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
   if (!sameSecret(request.headers.authorization ?? '', `Bearer ${token}`)) return reply(response, 401, 'Unauthorized');
   if (request.method !== 'POST') return reply(response, 405, 'Method not allowed');
 
+  // Stateless: a client's cancellation arrives as a new request, which this fresh server
+  // cannot tie to a call still in progress. A pending approval then ends when the client
+  // closes the connection, or after `approvalTimeoutMs` (50 s by default) at the latest.
   const server = createMcpServer(sdk, { name: 'docs', tools, resources });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   response.on('close', () => {
@@ -82,7 +85,7 @@ What each check is for:
 | `Host` header | A web page you visit could otherwise make your browser call a server on `localhost` ("DNS rebinding"). When deployed, list your public host name instead. |
 | Bearer token | Only clients that know the token get in. Compared in constant time. Generate a long random one; keep it out of your code. |
 | `POST` only | In stateless mode there is no long-lived stream to open with `GET`. |
-| A server per request | Nothing is shared between requests; tool definitions are built once and reused (defining the same definition again is allowed). |
+| A server per request | Nothing is shared between requests; tool definitions are built once and reused (defining the same definition again is allowed). The price: a client's "cancel" message arrives as another request and cannot reach the call it cancels — closing the connection, or `approvalTimeoutMs`, ends it instead. |
 
 The file listens on `127.0.0.1` only. To publish it, put it behind a reverse proxy that terminates **HTTPS** (Caddy, nginx, your cloud's load balancer), and add your host name to `allowedHosts`. Never send a bearer token over plain HTTP on a network.
 
@@ -116,7 +119,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-Call 501 of the day is refused with the policy's name, and the refusal is in the event log. Budgets are counted in the memory of the process: they start again from zero when the server restarts, and each copy of an HTTP server counts its own calls.
+Call 501 of the day is refused with the policy's name, and the refusal is in the event log. A call is counted **when it starts** — checked and counted in one step, so 20 simultaneous calls cannot all slip under a limit of 2 — and it counts **whatever its outcome**, failures included. Budgets are counted in the memory of the process: they start again from zero when the server restarts, and each copy of an HTTP server counts its own calls. Before any policy or budget, the arguments are checked: an invalid call is refused without being counted or waiting for anyone.
 
 ### Approvals: a human says yes first
 
@@ -143,35 +146,57 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-While it waits, the call appears in `sdk.getPendingApprovals()`. Your code decides with `sdk.approveAction(id, who, reason)` or `sdk.rejectAction(id, who, reason)`; both are recorded (`approval.requested`, `approval.approved` or `approval.rejected`). A stdio server cannot ask in its own terminal — standard input carries the protocol — so the decision comes from another channel. For example, a small admin endpoint on `localhost`, in the same process as the server:
+While it waits, the call appears in `sdk.getPendingApprovals()`. Your code decides with `sdk.approveAction(id, who, reason)` or `sdk.rejectAction(id, who, reason)`; both are recorded (`approval.requested`, `approval.approved` or `approval.rejected`). A stdio server cannot ask in its own terminal — standard input carries the protocol — so the decision comes from another channel. For example, a small admin endpoint on this machine, in the same process as the server.
+
+**The admin endpoint decides what runs: protect it like the MCP endpoint.** A page open in your browser could otherwise reach `localhost` (DNS rebinding) and approve for you. So it listens on `127.0.0.1` only, accepts only its own `Host`, refuses any request carrying an `Origin` (browsers add one; scripts and `curl` do not) and requires a secret header:
 
 ```ts
+import { timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 
-// Local admin endpoint: GET lists the pending approvals, POST /approve/<id> or /reject/<id> decides.
+const port = 4000;
+const secret = process.env.ADMIN_SECRET ?? '';   // a long random value
+const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
+
 createServer((request, response) => {
-  const decision = /^\/(approve|reject)\/(.+)$/.exec(request.url ?? '');
-  try {
-    if (request.method === 'POST' && decision) {
-      const [, verb, id = ''] = decision;
-      if (verb === 'approve') sdk.approveAction(id, 'admin', 'approved from the admin endpoint');
-      else sdk.rejectAction(id, 'admin', 'rejected from the admin endpoint');
-      response.end('done\n');
-      return;
-    }
-    response.setHeader('content-type', 'application/json');
-    response.end(JSON.stringify(sdk.getPendingApprovals(), null, 2));
-  } catch (error) {
-    response.statusCode = 400; // unknown or already decided approval
-    response.end(`${error instanceof Error ? error.message : error}\n`);
+  const answer = (status: number, body: unknown) => {
+    response.writeHead(status, { 'content-type': 'application/json' });
+    response.end(JSON.stringify(body));
+  };
+  if (request.headers.origin !== undefined) return answer(403, 'Forbidden origin');
+  if (!allowedHosts.has(request.headers.host ?? '')) return answer(403, 'Forbidden host');
+  const given = Buffer.from(String(request.headers['x-admin-secret'] ?? ''));
+  const expected = Buffer.from(secret);
+  if (!secret || given.length !== expected.length || !timingSafeEqual(given, expected)) {
+    return answer(401, 'Unauthorized');
   }
-}).listen(4000, '127.0.0.1');
+  const url = new URL(request.url ?? '/', 'http://localhost');
+  if (request.method === 'GET' && url.pathname === '/approvals') return answer(200, sdk.getPendingApprovals());
+  const decision = /^\/approvals\/([^/]+)\/(approve|reject)$/.exec(url.pathname);
+  if (request.method !== 'POST' || !decision) return answer(404, 'Not found');
+  const [, id = '', verb] = decision;
+  try {
+    if (verb === 'approve') sdk.approveAction(id, 'admin', 'approved from the admin endpoint');
+    else sdk.rejectAction(id, 'admin', 'rejected from the admin endpoint');
+    return answer(200, { decided: id, verb });
+  } catch (error) {
+    return answer(409, error instanceof Error ? error.message : String(error)); // unknown, decided or cancelled
+  }
+}).listen(port, '127.0.0.1');
 ```
+
+Then `curl -H "X-Admin-Secret: $ADMIN_SECRET" http://127.0.0.1:4000/approvals` lists what waits, and `curl -X POST -H "X-Admin-Secret: $ADMIN_SECRET" http://127.0.0.1:4000/approvals/<id>/approve` decides. A complete server built this way ships as [`examples/mcp-approvals.ts`](https://github.com/nicolashedoire/sdk-ai-agents/blob/main/examples/mcp-approvals.ts); it was checked end to end (a call waits, a forged `Host`, an `Origin` or a missing secret get `403`/`401`, the approval runs the tool, and the process exits when the client leaves).
 
 To be told when an approval is waiting, add an [incident rule](./incidents#rules) on `approval.requested` with a Slack or email notifier. Pending approvals live in the memory of the process where the call waits: with several copies of an HTTP server, decide through the copy that holds it (or run a single copy for tools that need approval).
 
-::: warning The client does not wait forever
-Many clients cancel a call after about a minute. **When the client gives up, the pending approval is cancelled and the tool never runs** — a late "yes" cannot trigger an action nobody is waiting for anymore (`approveAction` then fails with "already rejected"). Approvals through MCP suit quick decisions. For decisions that take hours, make the tool *submit a request* that your team processes later.
+::: warning Nobody can approve a call whose client has left
+Many clients cancel a call after about a minute. A pending approval is cancelled — and the tool never runs — when:
+
+- the client cancels the call (stdio, or a stateful HTTP session);
+- the connection closes: a stdio client that exits, an HTTP request that is closed;
+- nobody decided within `approvalTimeoutMs` — **50 seconds by default**, below what most clients wait. Set it on `createMcpServer`/`serveMcpOverStdio` if your client waits longer (Claude Code with a raised `MCP_TOOL_TIMEOUT`). This is the only limit for a stateless HTTP server, which cannot tie a "cancel" request to the call it cancels.
+
+A late "yes" then fails with "already rejected", and the call is checked once more after the approval: if the client left in between, the tool does not run. Approvals through MCP suit quick decisions. For decisions that take hours, make the tool *submit a request* that your team processes later.
 :::
 
 Most MCP applications also ask the user before each tool call (Claude Desktop does by default). That confirmation happens in the application; SDK approvals happen on your server, under your rules, and are recorded. Use both for anything that changes data.
@@ -205,13 +230,13 @@ The MCP project maintains a detailed guide of attacks and defences: [Security Be
 | `Tool execution failed: <name>` and nothing more | The cause may contain internal details, so it is hidden | Read the run in the event log, or set `exposeErrorDetails: true` while developing. |
 | Calls time out | The tool is slow (often an agent) | Smaller agent `limits`; raise the client's timeout (Claude Code: `MCP_TOOL_TIMEOUT`). |
 | Results are cut | Size limits (`truncated: true`) or the client's own limit | Raise `maxResponseBytes`, `maxRows`, `maxFileBytes`; Claude Code: `MAX_MCP_OUTPUT_TOKENS`. |
-| A write tool never answers | It waits for an approval | Approve it in time (see [approvals](#approvals-a-human-says-yes-first)), or set `requiresApproval: false` deliberately. |
+| A write tool answers "Approval no decision within 50000 ms" | Nobody approved it in time | Approve it quicker (see [approvals](#approvals-a-human-says-yes-first)), raise `approvalTimeoutMs`, or set `requiresApproval: false` deliberately. |
 | Folders such as `events/` or `golden-traces/` appear in unexpected places | No absolute path for the event log (or an older SDK version) | Pass `eventStore: new FileEventStore(<absolute path>)`. Current versions create their other folders only when used. |
 | `Cannot find module 'node:sqlite'` | Node.js older than 22.13 | Upgrade Node.js, or use `better-sqlite3`. |
 | `… is not JSON. For a YAML spec, parse it yourself` | The OpenAPI spec is YAML | Parse it (`yaml` package) and pass the object as `spec`. |
 | `cannot resolve the server URL "/v3"` | The spec has a relative server and was loaded from a file | Pass `baseUrl`. |
-| The Inspector refuses to start | It needs Node.js 22.19+ | Upgrade Node.js to run the Inspector (your server can stay on 20+). |
-| A client that only speaks the 2026-07-28 protocol cannot connect | The server speaks revisions up to 2025-11-25 (MCP TypeScript SDK 1.30) | Use a client that supports the earlier revisions (the Inspector's "legacy" mode does). |
+| The Inspector refuses to start | Its [documentation](https://modelcontextprotocol.io/docs/tools/inspector) asks for Node.js 22.19+ (checked on 2026-09-24) | Upgrade Node.js to run the Inspector (your server can stay on 20+). |
+| A client that only speaks the 2026-07-28 protocol cannot connect | The server accepts revisions 2024-10-07 to 2025-11-25 (MCP TypeScript SDK 1.30) | Use a client that supports the earlier revisions. The Inspector negotiates both "eras", legacy and 2026-07-28, according to its [documentation](https://modelcontextprotocol.io/docs/tools/inspector) (checked on 2026-09-24). |
 | With incident alerts on, every refused MCP call becomes an alert | A failed MCP call is a failed run | Filter with `when: (event) => event.metadata?.agentId !== 'mcp:docs'`, or lower its severity. |
 
 ### Reading what happened

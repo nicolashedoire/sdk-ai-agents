@@ -76,6 +76,8 @@ const replay = await sdk.replay(runId);
 
 Replay re-executes the recorded intentions through the action engine — policies included — **without calling the LLM**. Replay with modifications to test "what if" scenarios, for example after changing a policy.
 
+A replay runs the tools again, for real. Tools marked `requiresApproval` are **not** asked again: whoever starts a replay decides to re-run its actions. Approvals required by a *policy* still apply and wait for a decision.
+
 ## Understand decisions
 
 | Method | What you get |

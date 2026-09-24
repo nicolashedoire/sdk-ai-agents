@@ -28,9 +28,9 @@ interface Event {
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` — or `intention` for a cognitive final answer |
 | `intention.rejected` | `reason` |
-| `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools` when a caller used a tool it was not given) |
-| `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval` when the tool's own `metadata.requiresApproval` asked for it), `reason?` (`cancelled before a decision` when the caller gave up) |
-| `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` |
+| `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools` when a caller used a tool it was not given; the budget policy's id when its call budget is spent) |
+| `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval` when the tool's own `metadata.requiresApproval` asked for it), `reason?` (`cancelled before a decision` when the caller gave up or the run stopped, `no decision within N ms` after `approvalTimeoutMs`) |
+| `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` — `action.failed` also records a call refused for invalid arguments (before any policy) or because its caller left after an approval |
 | `tool.called` | `toolName`, `parameters` |
 | `tool.retry` | `toolName`, `retry`, `delayMs`, `error` |
 | `provider.fallback` | `primaryProvider`, `usedProvider`, `attemptedProviders` |
