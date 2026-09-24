@@ -313,6 +313,59 @@ describe('SDK with Fallback Providers', () => {
       expect(openai.requests[0]?.headers.authorization).toBe('Bearer test-openai-key');
     });
 
+    it("should not send a same-vendor fallback to the primary's gateway", async () => {
+      // Primary: OpenAI behind a gateway, with the gateway's key. Fallback: OpenAI itself, with
+      // a real key. The fallback must neither reach the gateway nor carry its key there. Its
+      // default address (the OpenAI client reads OPENAI_BASE_URL) is a local server here.
+      const gateway = new LocalHttpServer().reply(openAIError(500, 'Gateway down'));
+      const direct = new LocalHttpServer().reply(openAIChat({ content: 'Hello from OpenAI' }));
+      const [gatewayURL, directURL] = await Promise.all([gateway.start(), direct.start()]);
+      const previous = process.env.OPENAI_BASE_URL;
+      process.env.OPENAI_BASE_URL = `${directURL}/v1`;
+      try {
+        const sdk = buildSDK({
+          apiKey: undefined,
+          providerConfig: { openai: { apiKey: 'gateway-key', baseURL: `${gatewayURL}/v1` } },
+          fallbackProviders: [{ provider: 'openai', config: { apiKey: 'sk-direct-key' } }],
+        });
+
+        const result = await runAgent(sdk);
+
+        expect(result).toMatchObject({ status: 'completed', output: 'Hello from OpenAI' });
+        expect(gateway.requests.map((request) => request.headers.authorization)).toEqual([
+          'Bearer gateway-key',
+        ]);
+        expect(direct.requests.map((request) => request.headers.authorization)).toEqual([
+          'Bearer sk-direct-key',
+        ]);
+      } finally {
+        if (previous === undefined) delete process.env.OPENAI_BASE_URL;
+        else process.env.OPENAI_BASE_URL = previous;
+        await Promise.all([gateway.stop(), direct.stop()]);
+      }
+    });
+
+    it("should give a same-vendor fallback the SDK-wide key, not the primary's own", async () => {
+      const backup = new LocalHttpServer().reply(openAIChat({ content: 'From the backup' }));
+      const backupURL = `${await backup.start()}/v1`;
+      try {
+        openai.reply(openAIError(500, 'The server had an error'));
+        const sdk = buildSDK({
+          apiKey: 'sdk-wide-key',
+          providerConfig: { openai: { apiKey: 'primary-only-key', baseURL: openaiURL } },
+          fallbackProviders: [{ provider: 'openai', config: { baseURL: backupURL } }],
+        });
+
+        const result = await runAgent(sdk);
+
+        expect(result).toMatchObject({ status: 'completed', output: 'From the backup' });
+        expect(openai.requests[0]?.headers.authorization).toBe('Bearer primary-only-key');
+        expect(backup.requests[0]?.headers.authorization).toBe('Bearer sdk-wide-key');
+      } finally {
+        await backup.stop();
+      }
+    });
+
     it('should give the primary key to a fallback of the same vendor', async () => {
       const backup = new LocalHttpServer();
       const backupURL = `${await backup.start()}/v1`;

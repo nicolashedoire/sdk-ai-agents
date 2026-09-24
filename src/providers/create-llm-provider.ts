@@ -62,18 +62,19 @@ export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}):
     return primary;
   }
   const fallbacks = config.fallbackProviders.map((fallback, index) => {
-    // A fallback's own config first, then the settings of its vendor in providerConfig.
-    const vendorConfig = config.providerConfig?.[fallback.provider];
-    // The primary's key only goes to a fallback of the same vendor: an OpenAI key must never
-    // be sent to Anthropic (or to the address configured for it), nor the other way round.
+    const sameVendor = fallback.provider === primaryName;
+    // A fallback's own config first. A fallback of another vendor then takes its vendor's
+    // entry in providerConfig; one of the primary's vendor does not, since that entry is the
+    // primary's (its address is often the one that is failing, and its key is meant for it).
+    const vendorConfig = sameVendor ? undefined : config.providerConfig?.[fallback.provider];
+    // The SDK-wide key is the primary vendor's: it never goes to another vendor.
     const apiKey =
-      fallback.config?.apiKey ||
-      vendorConfig?.apiKey ||
-      (fallback.provider === primaryName ? primaryKey : undefined);
+      fallback.config?.apiKey || vendorConfig?.apiKey || (sameVendor ? config.apiKey : undefined);
     if (!apiKey) {
+      const elsewhere = sameVendor ? 'apiKey' : `providerConfig.${fallback.provider}.apiKey`;
       throw new ValidationError(
         `fallbackProviders[${index}]`,
-        `no API key for "${fallback.provider}": set fallbackProviders[${index}].config.apiKey or providerConfig.${fallback.provider}.apiKey`
+        `no API key for "${fallback.provider}": set fallbackProviders[${index}].config.apiKey or ${elsewhere}`
       );
     }
     return build(
