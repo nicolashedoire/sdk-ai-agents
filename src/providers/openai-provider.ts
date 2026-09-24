@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { LLMProviderError } from '../errors/index.js';
+import { LLMProviderError, ValidationError } from '../errors/index.js';
 import type {
   LLMMessage,
   LLMProvider,
@@ -10,9 +10,10 @@ import type {
 } from './llm-provider.js';
 
 /**
- * Model used when neither the request nor the configuration names one: a current model that
- * calls tools through Chat Completions, on OpenAI and Azure alike (`gpt-4` shuts down on
- * 2026-10-23).
+ * Model used when neither the request nor the configuration names one (`gpt-4` shuts down on
+ * 2026-10-23), on OpenAI and Azure alike. A reasoning model that calls tools through Chat
+ * Completions with its default effort, `none`: with another effort, OpenAI refuses tools there
+ * (see `reasoningEffort`).
  */
 export const DEFAULT_OPENAI_MODEL = 'gpt-5.4';
 
@@ -27,12 +28,20 @@ export interface OpenAIRequestOptions {
    * aliases), the others being detected.
    */
   reasoningModels?: boolean | readonly string[];
-  /** Reasoning effort sent to reasoning models when the request sets none (API default otherwise). */
+  /**
+   * Reasoning effort sent to reasoning models when the request sets none; the model's own
+   * default otherwise. On Chat Completions, which this provider uses, GPT-5.4 and later call
+   * tools only with the effort `none`: GPT-5.4 defaults to it, but GPT-5.5, GPT-5.6 and GPT-6
+   * Sol and Luna default to `medium`, so an agent with tools needs `none` on them, and GPT-6
+   * Astra cannot call tools there at all. The effort is sent as given, never changed.
+   */
   reasoningEffort?: OpenAIReasoningEffort;
   /**
-   * Tool calls and results in the OpenAI format (assistant `tool_calls`, `tool` messages).
-   * `false` for a compatible server that does not support them: the SDK then sends them as
-   * plain text, as to any provider without native tool messages. Default `true`.
+   * Whether the server accepts earlier tool calls and results in the conversation, in the OpenAI
+   * format (assistant `tool_calls`, `tool` messages). `false` for a compatible server that does
+   * not: they are then sent as plain text. Tools are still offered, and the tool calls of a reply
+   * still read. In a fallback chain, one provider with `false` makes the whole chain send plain
+   * text. Default `true`.
    */
   nativeToolMessages?: boolean;
 }
@@ -66,6 +75,7 @@ export class OpenAIProvider implements LLMProvider {
     if (!apiKey || apiKey.trim() === '') {
       throw new Error('OpenAI API key is required');
     }
+    assertOpenAIRequestOptions(options, 'options');
     this.client = new OpenAI({
       apiKey,
       ...(options.maxRetries !== undefined ? { maxRetries: options.maxRetries } : {}),
@@ -139,10 +149,12 @@ export class OpenAIProvider implements LLMProvider {
 
   /**
    * The Chat Completions body of a request, with the parameters its model takes. A reasoning
-   * model refuses `temperature` and `max_tokens` with a 400: it gets its output budget, reasoning
-   * included, as `max_completion_tokens`, and the reasoning effort. Other models keep
-   * `temperature` and `max_tokens`, the parameter every OpenAI-compatible server knows (some
-   * ignore `max_completion_tokens`, which would silently lift the limit).
+   * model refuses `max_tokens`, and `temperature` unless its effort is `none`, with a 400. As
+   * the default effort varies by model, it never gets a temperature (the request's is ignored);
+   * it gets its output budget, reasoning included, as `max_completion_tokens`, and the
+   * reasoning effort. Other models keep `temperature` and `max_tokens`, the parameter every
+   * OpenAI-compatible server knows (some ignore `max_completion_tokens`, which would silently
+   * lift the limit).
    */
   private requestBody(request: LLMRequest): ChatCompletionBody {
     const model = request.model || this.defaultModel;
@@ -189,15 +201,64 @@ export class OpenAIProvider implements LLMProvider {
 
 /**
  * Whether a model name is an OpenAI reasoning model: the o-series (`o1`, `o3`, `o4-mini`…) and
- * GPT-5 and later (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…), also dated (`o3-2025-04-16`) or
- * fine-tuned (`ft:o4-mini-2025-04-16:org::id`). Earlier GPT models (`gpt-4o`, `gpt-4.1`, Azure's
- * `gpt-35-turbo`) and open-weight ones served by compatible servers (`gpt-oss-20b`) are not. A
- * name that says nothing, such as an Azure deployment, cannot be detected: see
- * `reasoningModels`.
+ * GPT-5 and later (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`, `gpt-10`…), in any case, also dated
+ * (`o3-2025-04-16`) or fine-tuned (`ft:o4-mini-2025-04-16:org::id`). Earlier GPT models
+ * (`gpt-4o`, `gpt-4.1`, Azure's `gpt-35-turbo`, whose 35 is GPT-3.5) and open-weight ones served
+ * by compatible servers (`gpt-oss-20b`) are not. A name that says nothing, such as an Azure
+ * deployment, cannot be detected: see `reasoningModels`.
  */
 function isOpenAIReasoningModel(model: string): boolean {
-  const name = model.startsWith('ft:') ? model.slice('ft:'.length) : model;
-  return /^o\d/.test(name) || /^gpt-[5-9](?:[.-]|$)/.test(name);
+  const name = model.replace(/^ft:/i, '');
+  return /^o\d/i.test(name) || /^gpt-(?!35(?:[.-]|$))(?:[5-9]|[1-9]\d+)(?:[.-]|$)/i.test(name);
+}
+
+/**
+ * Checks OpenAI request options given as plain values (a JSON configuration, JavaScript code),
+ * whose types nothing checked: a string given as `reasoningModels` would otherwise match every
+ * model name it contains. `path` names the options in the error.
+ */
+export function assertOpenAIRequestOptions(
+  options: OpenAIRequestOptions | undefined,
+  path: string
+): void {
+  if (options === undefined || options === null) return;
+  const reasoningModels: unknown = options.reasoningModels;
+  const reasoningEffort: unknown = options.reasoningEffort;
+  const nativeToolMessages: unknown = options.nativeToolMessages;
+  if (
+    reasoningModels !== undefined &&
+    typeof reasoningModels !== 'boolean' &&
+    !(Array.isArray(reasoningModels) && reasoningModels.every((name) => typeof name === 'string'))
+  ) {
+    throw new ValidationError(
+      `${path}.reasoningModels`,
+      `must be true, false or a list of model names, got ${shownValue(reasoningModels)}`
+    );
+  }
+  if (
+    reasoningEffort !== undefined &&
+    (typeof reasoningEffort !== 'string' || reasoningEffort.trim() === '')
+  ) {
+    throw new ValidationError(
+      `${path}.reasoningEffort`,
+      `must be a reasoning effort such as 'low', got ${shownValue(reasoningEffort)}`
+    );
+  }
+  if (nativeToolMessages !== undefined && typeof nativeToolMessages !== 'boolean') {
+    throw new ValidationError(
+      `${path}.nativeToolMessages`,
+      `must be true or false, got ${shownValue(nativeToolMessages)}`
+    );
+  }
+}
+
+/** A plain value as an error can show it ("true" for a string, not true). */
+function shownValue(value: unknown): string {
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (Array.isArray(value)) return 'a list with a value that is not a string';
+  if (typeof value === 'object' && value !== null) return 'an object';
+  if (typeof value === 'function') return 'a function';
+  return String(value);
 }
 
 /** A message in the OpenAI format: tool calls on the assistant turn, results as `tool` messages. */

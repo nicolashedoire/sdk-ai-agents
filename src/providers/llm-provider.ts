@@ -42,9 +42,11 @@ export type LLMMessage =
     };
 
 /**
- * How much an OpenAI reasoning model thinks before it answers (`reasoning_effort`). The values
- * a model accepts depend on the model (`minimal` only exists for the first GPT-5 models, `none`
- * from GPT-5.1 on, `xhigh` and `max` for recent ones): the API refuses the others.
+ * How much an OpenAI reasoning model thinks before it answers (`reasoning_effort`). Not every
+ * model accepts every value, and the API refuses the others: `minimal` exists only for the
+ * first GPT-5 models, `none` from GPT-5.1 on (not for GPT-6 Astra), `xhigh` from GPT-5.4 on,
+ * and `max` is documented only for GPT-5.6 and GPT-6 on the Responses API, which the SDK does
+ * not use.
  */
 export type OpenAIReasoningEffort =
   | 'none'
@@ -158,7 +160,7 @@ export interface LLMProvider {
   /**
    * Checks whether the provider supports a model
    *
-   * @param model - Model name (e.g. "gpt-4", "claude-3-opus")
+   * @param model - Model name (e.g. "gpt-5.4", "claude-opus-5")
    * @returns true when the model is supported, false otherwise
    */
   supportsModel(model: string): boolean;

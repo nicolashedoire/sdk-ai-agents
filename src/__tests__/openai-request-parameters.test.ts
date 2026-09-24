@@ -4,19 +4,28 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ReasoningEngine } from '../engines/reasoning-engine.js';
+import { ValidationError } from '../errors/index.js';
 import { DEFAULT_OPENAI_MODEL, OpenAIProvider, type OpenAIProviderOptions } from '../index.js';
 import type { LLMRequest } from '../providers/llm-provider.js';
 import { createSDK, type SDK } from '../sdk.js';
 import { FileEventStore } from '../stores/file-event-store.js';
 import type { SDKConfig } from '../types/sdk.js';
 import { LocalHttpServer } from './support/local-http-server.js';
+import { ScriptedLLMProvider } from './support/scripted-llm-provider.js';
+import {
+  createTestSDK,
+  lookupMetricDefinition,
+  scriptBuildOrBuy,
+  type TestSDK,
+} from './support/test-sdk.js';
 import { anthropicError, openAIChat, openAIError } from './support/vendor-api.js';
 
 // The real OpenAI client talks to local servers answering in the OpenAI wire format: each test
 // reads the exact JSON body the vendor would receive. Reasoning models (o-series, GPT-5 and
-// later) refuse `temperature` and `max_tokens` with a 400 and take `max_completion_tokens` and
-// `reasoning_effort`; other models, and OpenAI-compatible servers, keep `temperature` and
-// `max_tokens`.
+// later) refuse `max_tokens`, and `temperature` unless their effort is `none`; as the default
+// effort varies by model, the SDK never sends them a temperature, and sends
+// `max_completion_tokens` and `reasoning_effort`. Other models, and OpenAI-compatible servers,
+// keep `temperature` and `max_tokens`.
 describe('OpenAI request parameters', () => {
   let server: LocalHttpServer;
   let baseURL: string;
@@ -101,6 +110,19 @@ describe('OpenAI request parameters', () => {
           temperature: 0.2,
           max_tokens: 300,
         })),
+      ]);
+    });
+
+    it('recognizes later generations and names in any case', async () => {
+      const later = ['gpt-10', 'gpt-12.1-mini', 'GPT-5.4', 'O3', 'FT:o4-mini:acme::abc123'];
+      // Azure's GPT-3.5 names (35 is 3.5, not a generation), in any case, stay classic.
+      const classic = ['gpt-35-turbo-16k', 'GPT-35-TURBO', 'GPT-4O'];
+
+      const bodies = await bodiesFor([...later, ...classic], { temperature: 0.2, maxTokens: 300 });
+
+      expect(bodies).toEqual([
+        ...later.map((model) => ({ model, messages: hello, max_completion_tokens: 300 })),
+        ...classic.map((model) => ({ model, messages: hello, temperature: 0.2, max_tokens: 300 })),
       ]);
     });
 
@@ -544,5 +566,126 @@ describe('OpenAI nativeToolMessages', () => {
     });
 
     expect(second.messages).toEqual(asText);
+  });
+});
+
+// The options are often read from a JSON file or given from JavaScript: a value of the wrong
+// type is refused when the SDK or the provider is created, with the path of the option.
+describe('OpenAI options validation', () => {
+  let directory: string;
+  let store: FileEventStore;
+
+  beforeEach(() => {
+    directory = mkdtempSync(join(tmpdir(), 'openai-options-'));
+    store = new FileEventStore(join(directory, 'events'));
+  });
+
+  afterEach(async () => {
+    await store.destroy();
+    rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
+  });
+
+  function sdkWith(config: Partial<SDKConfig>) {
+    return () => createSDK({ apiKey: 'k', retry: false, eventStore: store, ...config });
+  }
+
+  /** The option, typed as the configuration would receive it from plain data. */
+  const plain = (value: unknown) => value as never;
+
+  it('refuses a reasoningModels that is neither a boolean nor a list of names', () => {
+    // A string would have matched every model name it contains.
+    expect(
+      sdkWith({ providerConfig: { openai: { reasoningModels: plain('prod-reasoner') } } })
+    ).toThrow(
+      new ValidationError(
+        'providerConfig.openai.reasoningModels',
+        'must be true, false or a list of model names, got "prod-reasoner"'
+      )
+    );
+    expect(() => new OpenAIProvider('k', undefined, { reasoningModels: plain(['o3', 3]) })).toThrow(
+      new ValidationError(
+        'options.reasoningModels',
+        'must be true, false or a list of model names, got a list with a value that is not a string'
+      )
+    );
+  });
+
+  it('refuses an empty or non-string reasoningEffort, and a non-boolean nativeToolMessages', () => {
+    expect(
+      sdkWith({
+        provider: 'anthropic',
+        fallbackProviders: [
+          { provider: 'anthropic', config: { apiKey: 'a' } },
+          { provider: 'openai', config: { apiKey: 'o', reasoningEffort: plain(' ') } },
+        ],
+      })
+    ).toThrow(
+      new ValidationError(
+        'fallbackProviders[1].config.reasoningEffort',
+        'must be a reasoning effort such as \'low\', got " "'
+      )
+    );
+    expect(() => new OpenAIProvider('k', undefined, { reasoningEffort: plain(2) })).toThrow(
+      "Validation failed: options.reasoningEffort - must be a reasoning effort such as 'low', got 2"
+    );
+    expect(sdkWith({ providerConfig: { openai: { nativeToolMessages: plain('false') } } })).toThrow(
+      new ValidationError(
+        'providerConfig.openai.nativeToolMessages',
+        'must be true or false, got "false"'
+      )
+    );
+  });
+
+  it('accepts every valid form', () => {
+    for (const reasoningModels of [true, false, [], ['prod-reasoner']]) {
+      expect(() => new OpenAIProvider('k', undefined, { reasoningModels })).not.toThrow();
+    }
+    expect(
+      () =>
+        new OpenAIProvider('k', undefined, { reasoningEffort: 'none', nativeToolMessages: false })
+    ).not.toThrow();
+  });
+});
+
+// A cognitive agent's thoughts offer no tools and can reason at their own effort, while tool
+// selection, on GPT-5.4 and later, needs the effort `none` to call tools on Chat Completions.
+describe('reasoning effort of a cognitive agent', () => {
+  let env: TestSDK | undefined;
+
+  afterEach(async () => {
+    await env?.dispose();
+    env = undefined;
+  });
+
+  /** A scripted provider that the SDK treats as OpenAI, to resolve the OpenAI settings. */
+  class ScriptedOpenAI extends ScriptedLLMProvider {
+    getProviderName(): string {
+      return 'openai';
+    }
+  }
+
+  it('sends its reasoningEffort with the thoughts and providerSettings.openai with tool selection', async () => {
+    env = createTestSDK({}, new ScriptedOpenAI());
+    scriptBuildOrBuy(env.provider);
+    const agent = env.sdk.createCognitiveAgent({
+      name: 'analyst',
+      model: 'gpt-5.5',
+      tools: [env.sdk.defineTool(lookupMetricDefinition)],
+      reasoningEffort: 'high',
+      providerSettings: { openai: { reasoningEffort: 'none' } },
+    });
+
+    const result = await agent.think({ problem: 'Should we build or buy our analytics module?' });
+
+    expect(result.status).toBe('completed');
+    const efforts = env.provider.requests.map((request) => [
+      request.tools && request.tools.length > 0 ? 'tool-selection' : 'thought',
+      request.reasoningEffort,
+    ]);
+    expect(efforts).toContainEqual(['tool-selection', 'none']);
+    expect(efforts.filter(([kind]) => kind === 'thought').length).toBeGreaterThan(3);
+    for (const [kind, effort] of efforts) {
+      expect(effort).toBe(kind === 'thought' ? 'high' : 'none');
+    }
   });
 });

@@ -2,7 +2,7 @@ import type { ActionEngine } from '../engines/action-engine.js';
 import { ReasoningEngine } from '../engines/reasoning-engine.js';
 import { ValidationError } from '../errors/index.js';
 import type { TypedDecisionClient } from '../decisions/typed-decisions.js';
-import type { LLMProvider } from '../providers/llm-provider.js';
+import type { LLMProvider, OpenAIReasoningEffort } from '../providers/llm-provider.js';
 import type { IEventStore } from '../stores/event-store.js';
 import type { OpenAIProviderSettings, ProviderSettings } from '../types/agent.js';
 import type { Policy } from '../types/policy.js';
@@ -81,6 +81,13 @@ export interface CognitiveAgentConfig {
   };
   temperature?: number;
   maxTokens?: number;
+  /**
+   * Reasoning effort of the thoughts on an OpenAI reasoning model (the provider's when omitted).
+   * Tool selection takes `providerSettings.openai.reasoningEffort` instead: on GPT-5.4 and later
+   * it needs `none` to call tools, while thoughts, which offer no tools, can reason more.
+   */
+  reasoningEffort?: OpenAIReasoningEffort;
+  /** Settings of tool selection (the native reasoning engine), not of the thoughts. */
   providerSettings?: {
     openai?: OpenAIProviderSettings;
     anthropic?: ProviderSettings;
@@ -129,6 +136,7 @@ export function assembleCognitiveAgent(
       model: config.model,
       ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
       ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
+      ...(config.reasoningEffort !== undefined ? { reasoningEffort: config.reasoningEffort } : {}),
       ...(config.systemPrompt ? { systemPrompt: config.systemPrompt } : {}),
     });
 

@@ -5,7 +5,11 @@ import type { OpenAIVendorConfig, SDKConfig } from '../types/sdk.js';
 import { DEFAULT_ANTHROPIC_MODEL } from './anthropic-provider.js';
 import { FallbackProvider } from './fallback-provider.js';
 import type { LLMProvider } from './llm-provider.js';
-import { DEFAULT_OPENAI_MODEL, type OpenAIRequestOptions } from './openai-provider.js';
+import {
+  assertOpenAIRequestOptions,
+  DEFAULT_OPENAI_MODEL,
+  type OpenAIRequestOptions,
+} from './openai-provider.js';
 import { ProviderFactory } from './provider-factory.js';
 import { UnconfiguredLLMProvider } from './unconfigured-provider.js';
 
@@ -25,6 +29,13 @@ export interface ProviderSetup {
  * applied to each vendor individually so a provider is retried before failing over.
  */
 export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}): LLMProvider {
+  // Before anything is built, and named as in the configuration.
+  assertOpenAIRequestOptions(config.providerConfig?.openai, 'providerConfig.openai');
+  for (const [index, fallback] of (config.fallbackProviders ?? []).entries()) {
+    if (fallback.provider === 'openai') {
+      assertOpenAIRequestOptions(fallback.config, `fallbackProviders[${index}].config`);
+    }
+  }
   const canFailOver = (config.fallbackProviders?.length ?? 0) > 0;
   // With a fallback available, do not wait on a long retry-after: fail over instead.
   const retryPolicy =

@@ -9,7 +9,11 @@ export interface ProviderSettings {
 
 /** OpenAI settings: those of every provider, and the reasoning effort of reasoning models. */
 export interface OpenAIProviderSettings extends ProviderSettings {
-  /** Sent to reasoning models only (o-series, GPT-5 and later); overrides the provider's. */
+  /**
+   * Sent to reasoning models only (o-series, GPT-5 and later); overrides the provider's. On
+   * GPT-5.4 and later, a request with tools needs `none`: OpenAI refuses tools with any other
+   * effort on Chat Completions (see `OpenAIRequestOptions.reasoningEffort`).
+   */
   reasoningEffort?: OpenAIReasoningEffort;
 }
 
