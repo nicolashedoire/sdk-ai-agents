@@ -756,6 +756,7 @@ describe('OpenAIProvider streaming', () => {
       {
         provider: 'openai',
         model: 'gpt-4',
+        requestedModel: 'gpt-4',
         usage: { promptTokens: 10, completionTokens: 0, totalTokens: 10 },
         reason: 'No response from LLM',
       },

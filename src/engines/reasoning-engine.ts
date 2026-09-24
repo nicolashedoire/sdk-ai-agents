@@ -308,7 +308,11 @@ export class ReasoningEngine {
     answers: DiscardedAnswer[]
   ): Promise<void> {
     for (const answer of answers) {
-      await context.onModelUsage?.({ model: answer.model, usage: answer.usage });
+      await context.onModelUsage?.({
+        model: answer.model,
+        ...(answer.requestedModel ? { requestedModel: answer.requestedModel } : {}),
+        usage: answer.usage,
+      });
     }
   }
 
@@ -327,6 +331,7 @@ export class ReasoningEngine {
         data: {
           provider: answer.provider,
           model: answer.model,
+          ...(answer.requestedModel ? { requestedModel: answer.requestedModel } : {}),
           usage: answer.usage,
           reason: answer.reason,
         },

@@ -50,7 +50,7 @@ describe('run cost report', () => {
           usage: { promptTokens: 3, completionTokens: 2 },
         }),
         event('intention.generated', { message: 'done', model: 'gpt-4o' }),
-        // A total alone does not say what the tokens cost.
+        // A total alone does not say what the tokens cost: they count, not their cost.
         event('intention.generated', { model: 'gpt-4o', usage: { totalTokens: 9 } }),
         event('decision.evaluated', { model: 'jev-1.13.0', answers: {} }),
       ],
@@ -73,6 +73,7 @@ describe('run cost report', () => {
         unmeteredCalls: 2,
         inputTokens: 3,
         outputTokens: 2,
+        totalOnlyTokens: 9,
         costUsd: 5,
       },
       {

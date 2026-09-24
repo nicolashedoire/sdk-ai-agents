@@ -156,6 +156,8 @@ export interface ModelUsage {
    * `promptTokens`/`completionTokens`, and their cost is unknown. Absent when there are none.
    */
   unmeteredCalls?: number;
+  /** Tokens of those calls that reported a total alone. Absent when there are none. */
+  totalOnlyTokens?: number;
 }
 
 export class ThoughtGenerationError extends SDKError {

@@ -1,4 +1,5 @@
 import { ThoughtGenerationError, type ModelUsage } from '../errors/index.js';
+import { FallbackProvider } from '../providers/fallback-provider.js';
 import type {
   DiscardedAnswer,
   LLMProvider,
@@ -89,6 +90,8 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
     ];
     const usage: ModelUsage = { promptTokens: 0, completionTokens: 0, calls: 0 };
     let model: string | undefined;
+    // What was asked of the provider that answered: a fallback may have used its own default.
+    let requestedModel: string | undefined = this.options.model;
     // Kept apart from the thought's usage: their model may not be the one that answered.
     const discarded: DiscardedAnswer[] = [];
     const onDiscardedAnswer = (answer: DiscardedAnswer) => {
@@ -100,7 +103,7 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       let response: LLMResponse;
       try {
-        response = await this.provider.generateCompletion({
+        ({ response, requestedModel } = await this.complete({
           ...(request.runId ? { runId: request.runId } : {}),
           model: this.options.model,
           messages: [...messages],
@@ -111,7 +114,7 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
             : {}),
           ...(request.abortSignal ? { abortSignal: request.abortSignal } : {}),
           onDiscardedAnswer,
-        });
+        }));
       } catch (error) {
         // Keep the tokens of earlier attempts: they were billed even if this call failed.
         if (usage.calls === 0 && discarded.length === 0) throw error;
@@ -122,7 +125,7 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
             originalError: error instanceof Error ? error : new Error(String(error)),
             ...(usage.calls > 0 ? { usage } : {}),
             ...(discarded.length > 0 ? { discarded } : {}),
-            requestedModel: this.options.model,
+            ...(requestedModel ? { requestedModel } : {}),
             ...(model ? { model } : {}),
           }
         );
@@ -137,7 +140,7 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
           patch: parsed.patch,
           ignoredFields: parsed.ignoredFields,
           model: response.model,
-          requestedModel: this.options.model,
+          ...(requestedModel ? { requestedModel } : {}),
           usage,
           ...(discarded.length > 0 ? { discarded } : {}),
         };
@@ -156,8 +159,26 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
       usage,
       ...(discarded.length > 0 ? { discarded } : {}),
       model: model ?? this.options.model,
-      requestedModel: this.options.model,
+      ...(requestedModel ? { requestedModel } : {}),
     });
+  }
+
+  /**
+   * One call to the provider, and the model it asked for. A fallback chain may send a fallback
+   * its own default model instead of this generator's: that is what the answer is priced on.
+   */
+  private async complete(
+    request: LLMRequest
+  ): Promise<{ response: LLMResponse; requestedModel?: string }> {
+    if (this.provider instanceof FallbackProvider) {
+      const result = await this.provider.generateCompletionWithFallback(request);
+      return {
+        response: result.response,
+        ...(result.requestedModel ? { requestedModel: result.requestedModel } : {}),
+      };
+    }
+    const response = await this.provider.generateCompletion(request);
+    return { response, ...(request.model ? { requestedModel: request.model } : {}) };
   }
 }
 
@@ -169,6 +190,10 @@ function addUsage(usage: ModelUsage, reported: LLMResponse['usage']): void {
   usage.calls += 1;
   if (reported?.promptTokens === undefined && reported?.completionTokens === undefined) {
     usage.unmeteredCalls = (usage.unmeteredCalls ?? 0) + 1;
+    // A total alone still counts as tokens (see `tokensOfUsage`), not as a cost.
+    if (reported?.totalTokens !== undefined) {
+      usage.totalOnlyTokens = (usage.totalOnlyTokens ?? 0) + reported.totalTokens;
+    }
     return;
   }
   usage.promptTokens += reported.promptTokens ?? 0;

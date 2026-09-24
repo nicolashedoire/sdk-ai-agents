@@ -1,4 +1,4 @@
-import { UNKNOWN_MODEL, modelCallsOf } from '../costs/run-cost.js';
+import { UNKNOWN_MODEL, modelCallsOf, tokensOfRecord } from '../costs/run-cost.js';
 import type { LLMResponse } from '../providers/llm-provider.js';
 import type { Event } from '../types/events.js';
 import type { RunProgress } from '../types/run.js';
@@ -54,7 +54,7 @@ export class CognitiveRunMeter {
   async countRecorded(event: Pick<Event, 'type' | 'data'>): Promise<void> {
     const record = modelCallsOf(event);
     if (!record) return;
-    this.tokensUsed += tokensOfUsage(event.data.usage);
+    this.tokensUsed += tokensOfRecord(record);
     if (!this.onModelCall) return;
     // A call that named no model has no price, whatever the pricing table says.
     const names = {
@@ -70,7 +70,12 @@ export class CognitiveRunMeter {
       });
     }
     if (record.unmeteredCalls > 0) {
-      await this.onModelCall({ ...names, calls: record.unmeteredCalls });
+      // Their tokens are the totals some of them reported alone; their cost is unknown.
+      await this.onModelCall({
+        ...names,
+        ...(record.totalOnlyTokens > 0 ? { usage: { totalTokens: record.totalOnlyTokens } } : {}),
+        calls: record.unmeteredCalls,
+      });
     }
   }
 }

@@ -16,6 +16,7 @@ import { ValidationError } from '../errors/index.js';
 import { generateEventId } from '../utils/id.js';
 import { costOf, DEFAULT_PRICING, findModelPrice, type PricingTable } from '../costs/pricing.js';
 import type { LLMResponse } from '../providers/llm-provider.js';
+import { tokensOfUsage } from '../utils/usage-tokens.js';
 
 /**
  * Rule conditions that name a built-in check rather than a field to evaluate. They must not
@@ -60,7 +61,9 @@ export class PolicyEngine {
    * model that answered (or of the model requested). Counted for `agentId` (a governed or
    * cognitive agent, or the agent a typed decision names) and for limits that name no agent;
    * a call without an agent counts only for those. `calls` is the number of model calls
-   * behind the usage (a cognitive thought and its repairs), 1 by default.
+   * behind the usage (a cognitive thought and its repairs): a whole number above 0, else 1.
+   * Its tokens are its input and output tokens, else the total it reported alone, whose cost
+   * is unknown (see `tokensOfUsage`), as `getRunCost` counts them.
    */
   async recordModelUsage(
     agentId: string | undefined,
@@ -75,8 +78,10 @@ export class PolicyEngine {
     const { usage } = call;
     const input = usage?.promptTokens;
     const output = usage?.completionTokens;
-    const tokens = usage?.totalTokens ?? (input ?? 0) + (output ?? 0);
-    const calls = call.calls ?? 1;
+    const tokens = tokensOfUsage(usage);
+    // A count a caller got wrong (NaN, 0, a fraction) still counts the call it came with.
+    const calls =
+      call.calls !== undefined && Number.isInteger(call.calls) && call.calls > 0 ? call.calls : 1;
     // Without input or output counts (none at all, or a total alone) the cost is unknown.
     if (input === undefined && output === undefined) {
       await this.budgetTracker.recordModelUsage(agentId, { tokens, uncosted: 'no-usage', calls });
