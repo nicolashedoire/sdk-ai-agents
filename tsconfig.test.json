@@ -64,6 +64,7 @@
     "src/__tests__/run-cost.test.ts",
     "src/__tests__/priced-model-calls.test.ts",
     "src/__tests__/stream-ends.test.ts",
+    "src/__tests__/sdk-live-text.test.ts",
     "src/__tests__/billed-failures.test.ts",
     "src/__tests__/observed-event-store.test.ts",
     "src/__tests__/live-events.test.ts",
