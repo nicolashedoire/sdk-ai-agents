@@ -252,8 +252,9 @@ type EventType =
   | 'run.completed'
   | 'run.failed'
   | 'run.cancelled'
+  | 'run.stopped'
   | 'intention.generated'
-  | 'intention.rejected'
+  | 'intention.rejected' // never recorded by the SDK
   | 'action.executing'
   | 'action.executed'
   | 'action.failed'
@@ -263,9 +264,22 @@ type EventType =
   | 'approval.approved'
   | 'approval.rejected'
   | 'tool.called'
-  | 'tool.failed'
+  | 'tool.failed' // never recorded by the SDK
+  | 'resource.read'
   | 'provider.fallback'
-  | 'error.occurred';
+  | 'provider.retry'
+  | 'tool.retry'
+  | 'incident.reported'
+  | 'error.occurred' // never recorded by the SDK
+  | 'cognition.started'
+  | 'cognition.operation_selected'
+  | 'cognition.thought'
+  | 'cognition.operation_failed'
+  | 'cognition.concluded'
+  | 'cognition.evaluated'
+  | 'cognition.feedback'
+  | 'cognition.knowledge_recorded'
+  | 'decision.evaluated';
 ```
 
 ### 이벤트 구조 {#event-structure}
