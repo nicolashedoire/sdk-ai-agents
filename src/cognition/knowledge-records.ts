@@ -12,10 +12,16 @@ import type { RecalledKnowledgeRecord } from './thought-patch.js';
 
 const requiredText = z.string().trim().min(1);
 
-/** Letters, digits, dot, dash and underscore: a scope is also a file name. */
+/**
+ * Lowercase letters, digits, dot, dash and underscore: a scope is also a file name, and
+ * file systems that ignore case must not let two scopes share one file.
+ */
 export const knowledgeScopeSchema = z
   .string()
-  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/, 'use letters, digits, ".", "-" or "_" (at most 100)');
+  .regex(
+    /^[a-z0-9][a-z0-9._-]{0,99}$/,
+    'use lowercase letters, digits, ".", "-" or "_" (at most 100)'
+  );
 
 /** One test of a rule or explanation, as run by an outcome evaluator. */
 export const knowledgeEvidenceSchema = z.object({

@@ -249,7 +249,7 @@ export function proposalRefusal(
   }
   const remembered = rememberedMatch(state, proposal);
   if (remembered?.status === 'refuted') {
-    return `"${proposal.statement}" restates ${remembered.id}, refuted in earlier runs; propose a variant that explains the refutation`;
+    return `"${proposal.statement}" restates ${remembered.id}, refuted in earlier runs; propose a variant that cites ${remembered.id} in premiseRefs and explains the refutation`;
   }
   const parent = proposal.parentId;
   if (

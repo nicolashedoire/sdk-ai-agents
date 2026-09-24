@@ -46,7 +46,7 @@ interface Event {
 | `cognition.operation_failed` | `step`, `operation`, `error`, `recovery?` |
 | `cognition.evaluated` | `step`, `predictionId`, `hypothesisId`, `evaluator` (`id`, `version`), `verdict`, `observed?`, `summary?`, `context?`, `metrics?`, `causeCandidates?`, `reason?`, `durationMs` — the full report of a prediction test |
 | `cognition.concluded` | `decision`, `status` (`committed`, `provisional`, `abstain`), `confidence`, `steps`, `evidenceRevision`, `hypotheses`, `predictions` |
-| `cognition.knowledge_recorded` | `scope`, `findings` (statement, kind, scope, `revises?`, `difference?`, `evidence`: each test with `runId`, `predictionId`, `verdict`, `expected`, `observed`, evaluator), `error?` when the store failed |
+| `cognition.knowledge_recorded` | `scope`, `findings` (statement, kind, scope, `revises?`, `difference?`, `evidence`: each test with `runId`, `predictionId`, `verdict`, `expected`, `observed`, evaluator), `error?` when the store failed. Appended after `run.completed`, `run.failed` or `run.cancelled`, and only when the run tested something |
 | `cognition.feedback` | `feedback` (`verdict`, `agreement?`, `wrongAbout?`, …), `profileId`, `profileVersionBefore`, `profileVersionAfter` |
 | `decision.evaluated` | `client`, `purpose` (`operation_selection`, `hypothesis_assessment`, `direct`), `model`, `state`, `questions`, `answers`, `usage`, `step?` |
 

@@ -13,6 +13,8 @@ export interface KnowledgeSettings {
   recallLimit: number;
   /** Whether runs record what their tests established. */
   record: boolean;
+  /** A store that does not answer within this delay is treated as failed. */
+  timeoutMs: number;
 }
 
 export interface RecalledKnowledge {
@@ -33,7 +35,7 @@ export class RunKnowledge {
     const { store, scope, recallLimit } = this.settings;
     if (recallLimit === 0) return { scope, items: [] };
     try {
-      const items = await store.recall({ scope, goal, limit: recallLimit });
+      const items = await this.within(store.recall({ scope, goal, limit: recallLimit }), 'recall');
       return { scope, items: items.slice(0, recallLimit).map(toRecalledKnowledge) };
     } catch (error) {
       return { scope, items: [], error: truncate(toError(error).message) };
@@ -47,10 +49,26 @@ export class RunKnowledge {
     const findings = knowledgeFindings(state, runId);
     if (findings.length === 0) return undefined;
     try {
-      await store.record({ scope, runId, recordedAt: Date.now(), findings });
+      await this.within(store.record({ scope, runId, recordedAt: Date.now(), findings }), 'record');
       return { scope, findings };
     } catch (error) {
       return { scope, findings, error: truncate(toError(error).message) };
+    }
+  }
+
+  private async within<T>(call: Promise<T>, action: string): Promise<T> {
+    const { timeoutMs } = this.settings;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const expired = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`the knowledge store did not ${action} within ${timeoutMs} ms`)),
+        timeoutMs
+      );
+    });
+    try {
+      return await Promise.race([call, expired]);
+    } finally {
+      clearTimeout(timer);
     }
   }
 }

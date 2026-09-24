@@ -72,7 +72,7 @@ export interface CognitiveAgentConfig {
    */
   knowledge?: {
     store: KnowledgeStore;
-    /** What the knowledge is about (letters, digits, ".", "-", "_"), e.g. `inclined-plane`. */
+    /** What the knowledge is about (lowercase letters, digits, ".", "-", "_"), e.g. `inclined-plane`. */
     scope: string;
     /** Items recalled at the start of a run, 0 to 50. Defaults to 10. */
     recallLimit?: number;
@@ -146,7 +146,9 @@ export function assembleCognitiveAgent(
     controller: resolveController(config, environment.decisionClient),
     ...optionalAssessor(config, environment.decisionClient),
     ...(config.evaluator ? { evaluator: config.evaluator } : {}),
-    ...(config.knowledge ? { knowledge: knowledgeSettings(config.knowledge) } : {}),
+    ...(config.knowledge
+      ? { knowledge: knowledgeSettings(config.knowledge, limits.timeoutMs) }
+      : {}),
     seeker: new InformationSeeker({
       agentId: environment.agentId,
       model: config.model,
@@ -165,7 +167,8 @@ export function assembleCognitiveAgent(
 const MAX_RECALL = 50;
 
 function knowledgeSettings(
-  knowledge: NonNullable<CognitiveAgentConfig['knowledge']>
+  knowledge: NonNullable<CognitiveAgentConfig['knowledge']>,
+  timeoutMs: number
 ): KnowledgeSettings {
   const recallLimit = knowledge.recallLimit ?? 10;
   if (!Number.isInteger(recallLimit) || recallLimit < 0 || recallLimit > MAX_RECALL) {
@@ -179,6 +182,7 @@ function knowledgeSettings(
     scope: parseKnowledgeScope(knowledge.scope),
     recallLimit,
     record: knowledge.record ?? true,
+    timeoutMs,
   };
 }
 

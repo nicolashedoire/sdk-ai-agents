@@ -24,8 +24,8 @@ flowchart LR
 2. **At the start of the next run** in the same scope, the most relevant items are **recalled** and placed in the mental state as `knowledge`, with ids `M1`, `M2`…
 3. **During the run**:
    - the model sees each item with its status and its latest tests, and is told to reuse a verified rule within its scope, citing it;
-   - a hypothesis that restates a **refuted** item, with the same scope, is refused by the engine: only a variant that explains the refutation can come back;
-   - a hypothesis that restates a **verified** item is linked to it automatically, so the comparison step sees the earlier tests.
+   - a hypothesis that restates a **refuted** item word for word (same kind, statement and scope, case and punctuation aside) is refused by the engine; the model is told to propose instead a variant that cites the item's `M` id in its premises and explains the refutation, but any other wording or scope is accepted as a new hypothesis;
+   - a hypothesis that restates a **verified** or **contested** item is linked to it automatically (its `M` id is added to the premises), so the comparison step sees the earlier tests.
 
 ## Turn it on
 
@@ -53,7 +53,7 @@ second.state.knowledge;
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `store` | (required) | Where the journal is kept: `FileKnowledgeStore`, `InMemoryKnowledgeStore` or your own |
-| `scope` | (required) | What the knowledge is about. Runs share what they learned only within a scope. Letters, digits, `.`, `-`, `_` |
+| `scope` | (required) | What the knowledge is about. Runs share what they learned only within a scope. Lowercase letters, digits, `.`, `-`, `_`: two scopes that differ only by case would share one file on macOS and Windows |
 | `recallLimit` | `10` | Items recalled at the start of a run, from 0 to 50. `0` records without recalling |
 | `record` | `true` | Whether runs record what their tests established |
 
@@ -75,7 +75,7 @@ A run that fails or is stopped still records the tests it ran: a measurement sta
 | Status | When | What the model is told |
 | --- | --- | --- |
 | `verified` | Only confirmations so far | Reuse it within its scope and cite it; outside that scope it is a hypothesis to test again |
-| `refuted` | Only refutations so far | Never propose it again as it was; only a variant that explains the refutation |
+| `refuted` | Only refutations so far | Never propose it again as it was; a variant cites its `M` id in its premises and says what differs |
 | `contested` | Both confirmations and refutations | It holds only in some conditions: find which |
 
 The same statement in the same scope is the same item, whatever its case or punctuation. Tests are deduplicated by run and prediction: recording the same run twice adds nothing.
@@ -102,11 +102,11 @@ A scope is a boundary, not a folder name for tidiness:
 
 | Store | Use it for |
 | --- | --- |
-| `FileKnowledgeStore(directory)` | One file per scope, `<directory>/<scope>.jsonl`, one line per run. Lines are only appended, so the file is also a readable history. Writes are serialized within one process |
+| `FileKnowledgeStore(directory)` | One file per scope, `<directory>/<scope>.jsonl`, one line per run. Lines are only appended, so the file is also a readable history. Writes through one `FileKnowledgeStore` instance are serialized: share one instance between the agents of a process |
 | `InMemoryKnowledgeStore()` | Tests, prototypes, short-lived processes |
 | Your own `KnowledgeStore` | A database shared by several processes |
 
-Several processes writing the same scope at once should use a database: implement the three methods of the port.
+Several instances or processes writing the same scope at once should use a database: implement the three methods of the port. A line left unfinished by an interrupted write is skipped when reading, with a warning, and the next entry starts on a new line; a line that is valid JSON but not a valid entry stops the reading with its line number, since the file was altered.
 
 ```ts
 import type { KnowledgeStore } from '@sdk-ai-agents/core';
@@ -132,12 +132,13 @@ for (const item of await store.list('inclined-plane')) {
 
 - The recalled items are recorded in `cognition.started` (`knowledge.scope`, `knowledge.items`), so `sdk.getMentalState(runId)` rebuilds exactly what the run knew, without reading the store again, even if the store changed since.
 - The findings are recorded in a `cognition.knowledge_recorded` event (`scope`, `findings`).
-- A store that fails never stops a run: a failed recall is recorded as `knowledge.error` in `cognition.started` and the run goes on without memory; a failed recording is recorded as `error` in `cognition.knowledge_recorded`.
+- A store that fails never stops a run: a failed recall is recorded as `knowledge.error` in `cognition.started` and the run goes on without memory; a failed recording is recorded as `error` in `cognition.knowledge_recorded`. A store that does not answer within the run's `limits.timeoutMs` is treated as failed. If the event log itself cannot record the findings, a warning is printed and the run's result is returned unchanged.
 
 ## Limits
 
 - **Word matching.** Recall is not semantic; related rules worded differently can be missed.
-- **Exact restatements only.** Only a restatement of a refuted rule with the same wording (case and punctuation aside) and the same scope is refused; a reworded one is accepted as a new hypothesis.
+- **Exact restatements only.** Only a restatement of a refuted rule with the same kind, wording (case and punctuation aside) and scope is refused; a reworded one is accepted as a new hypothesis.
+- **One test is enough to be `verified`.** An item is verified as soon as one prediction was confirmed and none refuted, and the model chooses which prediction tests a rule: a weak prediction still counts as a confirmation.
 - **Scope is declared, not checked.** A rule verified for "rigid balls" is shown with that scope, and the model is told not to apply it elsewhere without a new test; nothing verifies it in code.
 - **The evaluator is trusted.** Memory is as reliable as your evaluator: a wrong measurement is remembered as a test.
-- **One process per file.** `FileKnowledgeStore` serializes writes within a process only.
+- **One writer per file.** `FileKnowledgeStore` serializes the writes of one instance only; two instances or two processes writing the same scope are not coordinated.

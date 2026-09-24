@@ -129,7 +129,7 @@ export function buildSystemPrompt(profile: ThinkerProfile, extraInstructions?: s
 }
 
 const KNOWLEDGE_RULES =
-  'Knowledge: `knowledge` lists what earlier runs established with real tests (ids M1…). Reuse a verified rule within its scope and cite it in premiseRefs; never propose a refuted one again as it was, only a variant that explains the refutation; a contested one holds only in some conditions. Outside its tested scope, a remembered rule is a hypothesis to test again, not a fact.';
+  'Knowledge: `knowledge` lists what earlier runs established with real tests (ids M1…). Reuse a verified rule within its scope and cite it in premiseRefs; never propose a refuted one again as it was: a variant cites its M id in premiseRefs and says in its rationale what differs; a contested one holds only in some conditions. Outside its tested scope, a remembered rule is a hypothesis to test again, not a fact.';
 
 const KNOWLEDGE_OPERATIONS: ReadonlySet<GeneratedOperation> = new Set([
   'represent',

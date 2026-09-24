@@ -21,7 +21,7 @@ In a usual agent, the "reasoning" is whatever the model writes: if it says it is
 
 A common pattern is to have one model judge another. Here, the agent states **before** the test what it should observe and what would prove it wrong, and **your code** decides: a measurement, a simulator, a test suite, a query. A refuted rule is rejected, and can only come back as a variant that states its difference. See [Predictions and the outcome evaluator](./evidence-and-verification#predictions-and-the-outcome-evaluator).
 
-What the tests answered is kept for later runs of the same scope: the next run starts with the rules that held and cannot restate, as it was, one that failed. Memory products remember what was said; this [memory across runs](./memory) keeps only what a test answered.
+What the tests answered is kept for later runs of the same scope: the next run starts with the rules that held and cannot restate, word for word, one that failed. Memory products remember what was said; this [memory across runs](./memory) keeps only what a test answered.
 
 ### 3. Evidence and preferences are kept apart
 

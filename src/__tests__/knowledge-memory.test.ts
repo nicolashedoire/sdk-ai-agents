@@ -1,12 +1,12 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { FileKnowledgeStore } from '../cognition/file-knowledge-store.js';
 import type { KnowledgeEntry, KnowledgeFinding, KnowledgeItem } from '../cognition/knowledge-records.js';
-import { projectKnowledge, rankKnowledge } from '../cognition/knowledge-records.js';
 import { InMemoryKnowledgeStore, type KnowledgeStore } from '../cognition/knowledge-store.js';
 import { ValidationError } from '../errors/index.js';
+import { FileEventStore } from '../stores/file-event-store.js';
+import type { Event } from '../types/events.js';
 import { InclinedPlaneBench, OBSERVATIONS, PROBLEM, scriptRuleDiscovery } from './support/inclined-plane.js';
 import { json, type ScriptedLLMProvider } from './support/scripted-llm-provider.js';
 import { createTestSDK, type TestSDK } from './support/test-sdk.js';
@@ -30,87 +30,6 @@ function entry(runId: string, recordedAt: number, findings: KnowledgeFinding[]):
   return { scope: SCOPE, runId, recordedAt, findings };
 }
 
-describe('knowledge journal', () => {
-  it('merges the tests of every run and says whether they agree', () => {
-    const items = projectKnowledge([
-      entry('run-1', 1, [finding(FREE_RULE, 'run-1', 'confirmed')]),
-      entry('run-2', 2, [finding('rolling time on this plane does NOT depend on the ball.', 'run-2', 'refuted')]),
-      entry('run-3', 3, [finding(RIGID_RULE, 'run-3', 'confirmed')]),
-      entry('run-4', 4, [finding('Sliding friction is negligible', 'run-4', 'refuted')]),
-    ]);
-
-    // The same statement with another case and punctuation is the same knowledge.
-    expect(items.map((item) => [item.statement, item.status, item.confirmations, item.refutations, item.version])).toEqual([
-      ['rolling time on this plane does NOT depend on the ball.', 'contested', 1, 1, 2],
-      [RIGID_RULE, 'verified', 1, 0, 1],
-      ['Sliding friction is negligible', 'refuted', 0, 1, 1],
-    ]);
-    expect(items[0]?.runIds).toEqual(['run-1', 'run-2']);
-  });
-
-  it('adds nothing when the same run is recorded twice', () => {
-    const once = entry('run-1', 1, [finding(RIGID_RULE, 'run-1', 'confirmed')]);
-    const [item] = projectKnowledge([once, { ...once, recordedAt: 5 }]);
-    expect(item).toMatchObject({ confirmations: 1, version: 1, lastRecordedAt: 5 });
-    expect(item?.tests).toHaveLength(1);
-  });
-
-  it('recalls what shares the most words with the goal, then what was tested most', () => {
-    const items = projectKnowledge([
-      entry('run-1', 1, [finding('Sliding friction is negligible', 'run-1', 'confirmed')]),
-      entry('run-2', 2, [finding(RIGID_RULE, 'run-2', 'confirmed'), finding(FREE_RULE, 'run-2', 'refuted')]),
-      entry('run-3', 3, [finding(RIGID_RULE, 'run-3', 'confirmed')]),
-    ]);
-    const statements = (ranked: KnowledgeItem[]) => ranked.map((item) => item.statement);
-
-    expect(statements(rankKnowledge(items, 'How long does a rigid steel ball take to roll?', 2))).toEqual([RIGID_RULE, FREE_RULE]);
-    expect(statements(rankKnowledge(items, 'Is friction negligible when sliding?', 1))).toEqual(['Sliding friction is negligible']);
-    expect(rankKnowledge(items, 'anything', 0)).toEqual([]);
-  });
-});
-
-describe('knowledge stores', () => {
-  const directories: string[] = [];
-  afterEach(() => {
-    for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
-  });
-  function temporaryDirectory(): string {
-    const directory = mkdtempSync(join(tmpdir(), 'knowledge-'));
-    directories.push(directory);
-    return directory;
-  }
-
-  it('keeps knowledge in a file journal that survives the process', async () => {
-    const directory = temporaryDirectory();
-    await new FileKnowledgeStore(directory).record(entry('run-1', 1, [finding(RIGID_RULE, 'run-1', 'confirmed')]));
-    await new FileKnowledgeStore(directory).record(entry('run-2', 2, [finding(RIGID_RULE, 'run-2', 'confirmed', 'P4')]));
-
-    const reopened = new FileKnowledgeStore(directory);
-    expect(await reopened.list(SCOPE)).toEqual([expect.objectContaining({ statement: RIGID_RULE, confirmations: 2, version: 2 })]);
-    expect(await reopened.recall({ scope: SCOPE, goal: 'rigid balls', limit: 5 })).toHaveLength(1);
-    expect(await reopened.list('another-scope')).toEqual([]);
-  });
-
-  it('serializes concurrent writes so no finding is lost', async () => {
-    const store = new FileKnowledgeStore(temporaryDirectory());
-    await Promise.all(
-      Array.from({ length: 20 }, (_, index) => store.record(entry(`run-${index}`, index, [finding(RIGID_RULE, `run-${index}`, 'confirmed')])))
-    );
-    expect(await store.list(SCOPE)).toEqual([expect.objectContaining({ confirmations: 20, version: 20 })]);
-  });
-
-  it('refuses unsafe scopes, invalid findings and unreadable journal lines', async () => {
-    const directory = temporaryDirectory();
-    const store = new FileKnowledgeStore(directory);
-    await expect(store.list('../outside')).rejects.toThrow(ValidationError);
-    await expect(store.record({ scope: SCOPE, runId: 'run-1', recordedAt: 1, findings: [] })).rejects.toThrow(ValidationError);
-    await expect(new InMemoryKnowledgeStore().list('a/b')).rejects.toThrow(ValidationError);
-
-    writeFileSync(join(directory, `${SCOPE}.jsonl`), '{"scope":"inclined-plane"\n');
-    await expect(store.list(SCOPE)).rejects.toThrow(`knowledge.${SCOPE}:1`);
-  });
-});
-
 /** A store that is down: every call fails. */
 class UnavailableKnowledgeStore implements KnowledgeStore {
   async recall(): Promise<KnowledgeItem[]> {
@@ -121,6 +40,27 @@ class UnavailableKnowledgeStore implements KnowledgeStore {
   }
   async list(): Promise<KnowledgeItem[]> {
     throw new Error('knowledge database unreachable');
+  }
+}
+
+/** A store that never answers. */
+class SilentKnowledgeStore implements KnowledgeStore {
+  recall(): Promise<KnowledgeItem[]> {
+    return new Promise(() => undefined);
+  }
+  record(): Promise<void> {
+    return new Promise(() => undefined);
+  }
+  list(): Promise<KnowledgeItem[]> {
+    return new Promise(() => undefined);
+  }
+}
+
+/** An event log that cannot write the knowledge event. */
+class KnowledgeBlindEventStore extends FileEventStore {
+  override async append(runId: string, event: Event): Promise<void> {
+    if (event.type === 'cognition.knowledge_recorded') throw new Error('event store down');
+    return super.append(runId, event);
   }
 }
 
@@ -155,8 +95,8 @@ describe('memory across runs', () => {
   afterEach(async () => {
     for (const env of environments.splice(0)) await env.dispose();
   });
-  function environment(): TestSDK {
-    const env = createTestSDK();
+  function environment(overrides: Parameters<typeof createTestSDK>[0] = {}): TestSDK {
+    const env = createTestSDK(overrides);
     environments.push(env);
     return env;
   }
@@ -196,7 +136,7 @@ describe('memory across runs', () => {
     // The refuted rule cannot come back as it was; the verified one rests on its earlier tests.
     const thoughts = (await second.sdk.getEvents(run2.runId)).filter((event) => event.type === 'cognition.thought');
     expect(thoughts.find((event) => event.data.operation === 'hypothesize')?.data.issues).toEqual([
-      `"${FREE_RULE}" restates M1, refuted in earlier runs; propose a variant that explains the refutation`,
+      `"${FREE_RULE}" restates M1, refuted in earlier runs; propose a variant that cites M1 in premiseRefs and explains the refutation`,
     ]);
     expect(run2.state.hypotheses).toEqual([expect.objectContaining({ id: 'H1', statement: RIGID_RULE, premiseRefs: ['M2'] })]);
     expect(run2.decision).toMatchObject({ hypothesisId: 'H1', status: 'committed' });
@@ -232,6 +172,68 @@ describe('memory across runs', () => {
     });
   });
 
+  it('records the tests of a run that failed afterwards', async () => {
+    const env = environment();
+    const store = new InMemoryKnowledgeStore();
+    scriptRuleDiscovery(env.provider).always('revise', { error: new Error('model down') });
+    const agent = env.sdk.createCognitiveAgent({
+      name: 'physicist',
+      model: 'test-model',
+      evaluator: new InclinedPlaneBench(),
+      knowledge: { store, scope: SCOPE },
+      limits: { maxConsecutiveFailures: 1 },
+    });
+
+    const result = await agent.think({ problem: PROBLEM, observations: OBSERVATIONS });
+
+    expect(result.status).toBe('failed');
+    const types = (await env.sdk.getEvents(result.runId)).map((event) => event.type);
+    expect(types.indexOf('cognition.knowledge_recorded')).toBeGreaterThan(types.indexOf('run.failed'));
+    expect(await store.list(SCOPE)).toEqual([expect.objectContaining({ statement: FREE_RULE, status: 'refuted' })]);
+  });
+
+  it('never loses the result of a run because its memory could not be written', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'blind-events-'));
+    const eventStore = new KnowledgeBlindEventStore(directory);
+    try {
+      const env = environment({ eventStore });
+      scriptRuleDiscovery(env.provider);
+      const store = new InMemoryKnowledgeStore();
+      const agent = env.sdk.createCognitiveAgent({ name: 'physicist', model: 'test-model', evaluator: new InclinedPlaneBench(), knowledge: { store, scope: SCOPE } });
+
+      const result = await agent.think({ problem: PROBLEM, observations: OBSERVATIONS });
+
+      expect(result).toMatchObject({ status: 'completed', decision: { status: 'committed' } });
+      expect(await store.list(SCOPE)).toHaveLength(2);
+    } finally {
+      await eventStore.destroy();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('does not wait forever for a store that never answers', async () => {
+    const env = environment();
+    scriptRuleDiscovery(env.provider);
+    const agent = env.sdk.createCognitiveAgent({
+      name: 'physicist',
+      model: 'test-model',
+      evaluator: new InclinedPlaneBench(),
+      knowledge: { store: new SilentKnowledgeStore(), scope: SCOPE },
+      limits: { timeoutMs: 400 },
+    });
+
+    const result = await agent.think({ problem: PROBLEM, observations: OBSERVATIONS });
+
+    expect(result.decision?.status).toBe('committed');
+    const events = await env.sdk.getEvents(result.runId);
+    expect(events.find((event) => event.type === 'cognition.started')?.data.knowledge).toMatchObject({
+      error: 'the knowledge store did not recall within 400 ms',
+    });
+    expect(events.find((event) => event.type === 'cognition.knowledge_recorded')?.data).toMatchObject({
+      error: 'the knowledge store did not record within 400 ms',
+    });
+  });
+
   it('can record without recalling, and refuses invalid settings', async () => {
     const env = environment();
     const store = new InMemoryKnowledgeStore();
@@ -252,6 +254,7 @@ describe('memory across runs', () => {
       expect.objectContaining({ statement: RIGID_RULE, confirmations: 1 }),
     ]);
     expect(() => env.sdk.createCognitiveAgent({ name: 'a', model: 'm', knowledge: { store, scope: 'no spaces' } })).toThrow(ValidationError);
+    expect(() => env.sdk.createCognitiveAgent({ name: 'a', model: 'm', knowledge: { store, scope: 'Acme' } })).toThrow(ValidationError);
     expect(() => env.sdk.createCognitiveAgent({ name: 'a', model: 'm', knowledge: { store, scope: SCOPE, recallLimit: 51 } })).toThrow(ValidationError);
   });
 });

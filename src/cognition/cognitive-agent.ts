@@ -268,9 +268,14 @@ export class CognitiveAgent {
   }
 
   private async rememberFindings(run: RunContext, state: MentalState): Promise<void> {
-    const recorded = await this.knowledge?.remember(state, run.runId);
-    if (recorded) {
-      await run.recorder.record(run.runId, 'cognition.knowledge_recorded', recorded);
+    try {
+      const recorded = await this.knowledge?.remember(state, run.runId);
+      if (recorded) {
+        await run.recorder.record(run.runId, 'cognition.knowledge_recorded', recorded);
+      }
+    } catch (error) {
+      // Memory is best effort: it never replaces the run's result.
+      console.warn(`Knowledge of run ${run.runId} could not be recorded:`, toError(error).message);
     }
   }
 
