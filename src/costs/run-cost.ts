@@ -5,11 +5,14 @@ import { costOf, findModelPrice, type PricingTable } from './pricing.js';
 
 export type UsageSource = 'llm' | 'decision';
 
-/** Name given to the model of a call that recorded none. */
-export const UNKNOWN_MODEL = 'unknown';
+/**
+ * Name given to the model of a call that recorded none. Parentheses keep it apart from real
+ * model ids, which never contain them; such a call is never priced.
+ */
+export const UNKNOWN_MODEL = '(unknown)';
 
 export interface ModelCostLine {
-  /** Model id returned by the provider (`unknown` when the call recorded no model name). */
+  /** Model id returned by the provider (`(unknown)` when the call recorded no model name). */
   model: string;
   /** Model name that was requested, when it differs (used to find the price too). */
   requestedModel?: string;
@@ -24,7 +27,7 @@ export interface ModelCostLine {
   outputTokens: number;
   /**
    * Cost of the calls that reported their tokens. Undefined when the model has no configured
-   * price.
+   * price, or when none of the line's calls reported token counts (nothing is known of it).
    */
   costUsd?: number;
 }
@@ -146,7 +149,7 @@ function decisionRecord(data: Record<string, unknown>): UsageRecord {
   };
 }
 
-/** The model that answered, else the one requested, else `unknown`. */
+/** The model that answered, else the one requested, else `(unknown)`. */
 function modelOf(names: { model?: string; requestedModel?: string }): {
   model: string;
   requestedModel?: string;
@@ -204,7 +207,7 @@ export function computeRunCost(
     }
     // A model named by no call cannot have a price, even under a catch-all `*` key.
     const price =
-      line.model === UNKNOWN_MODEL && !line.requestedModel
+      line.model === UNKNOWN_MODEL
         ? undefined
         : findModelPrice(pricing, line.model, line.requestedModel);
     if (!price) {
@@ -213,6 +216,8 @@ export function computeRunCost(
       unpricedCalls += line.calls - unmetered;
       continue;
     }
+    // A line whose calls all lack token counts has no known cost, not a cost of $0.
+    if (unmetered === line.calls) continue;
     line.costUsd = roundUsd(costOf(price, line.inputTokens, line.outputTokens));
     totalUsd += line.costUsd;
   }

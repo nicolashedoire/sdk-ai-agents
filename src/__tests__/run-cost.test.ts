@@ -82,7 +82,6 @@ describe('run cost report', () => {
         unmeteredCalls: 1,
         inputTokens: 0,
         outputTokens: 0,
-        costUsd: 0,
       },
     ]);
   });
@@ -136,16 +135,25 @@ describe('run cost report', () => {
   it('counts a call that names no model, and never prices it', () => {
     const report = computeRunCost(
       'run_1',
-      [event('intention.generated', { usage: { promptTokens: 4, completionTokens: 1 } })],
-      { ...PRICING, '*': { inputPerMillion: 1, outputPerMillion: 1 } }
+      [
+        event('intention.generated', { usage: { promptTokens: 4, completionTokens: 1 } }),
+        // A real model named "unknown" is not mixed up with it.
+        event('intention.generated', {
+          model: 'unknown',
+          usage: { promptTokens: 1, completionTokens: 0 },
+        }),
+      ],
+      { ...PRICING, '*': { inputPerMillion: 1_000_000, outputPerMillion: 1_000_000 } }
     );
 
     expect(report.lines).toEqual([
-      { model: 'unknown', source: 'llm', calls: 1, inputTokens: 4, outputTokens: 1 },
+      { model: '(unknown)', source: 'llm', calls: 1, inputTokens: 4, outputTokens: 1 },
+      { model: 'unknown', source: 'llm', calls: 1, inputTokens: 1, outputTokens: 0, costUsd: 1 },
     ]);
     expect(report).toMatchObject({
+      totalUsd: 1,
       complete: false,
-      unpricedModels: ['unknown'],
+      unpricedModels: ['(unknown)'],
       unpricedCalls: 1,
     });
   });
@@ -168,9 +176,8 @@ describe('run cost report', () => {
         unmeteredCalls: 1,
         inputTokens: 0,
         outputTokens: 0,
-        costUsd: 0,
       },
-      { model: 'unknown', source: 'decision', calls: 1, inputTokens: 5, outputTokens: 0 },
+      { model: '(unknown)', source: 'decision', calls: 1, inputTokens: 5, outputTokens: 0 },
     ]);
     expect(report).toMatchObject({ complete: false, unmeteredCalls: 1, unpricedCalls: 1 });
   });
@@ -252,7 +259,6 @@ describe('run cost of real runs whose calls report no token counts', () => {
         unmeteredCalls: 1,
         inputTokens: 0,
         outputTokens: 0,
-        costUsd: 0,
       },
     ]);
   });

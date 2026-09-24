@@ -1,6 +1,10 @@
 import type { ActionEngine } from './engines/action-engine.js';
 import type { PolicyEngine } from './engines/policy-engine.js';
-import type { ModelCallUsage, ReasoningEngine, ReasoningStep } from './engines/reasoning-engine.js';
+import type {
+  AnsweredModelCall,
+  ReasoningEngine,
+  ReasoningStep,
+} from './engines/reasoning-engine.js';
 import type { LLMMessage } from './providers/llm-provider.js';
 import type { IEventStore } from './stores/event-store.js';
 import type { Event } from './types/events.js';
@@ -174,7 +178,7 @@ export class AgentImpl {
    * Called by the reasoning engine as soon as the vendor answered, so a step that then fails
    * (tool arguments that are not valid JSON) and an answer a provider discarded are counted.
    */
-  private async recordModelCall(state: RunState, call: ModelCallUsage): Promise<void> {
+  private async recordModelCall(state: RunState, call: AnsweredModelCall): Promise<void> {
     const { usage } = call;
     state.tokensUsed +=
       usage?.totalTokens ?? (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0);

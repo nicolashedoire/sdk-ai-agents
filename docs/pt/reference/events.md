@@ -34,7 +34,7 @@ interface Event {
 | `tool.retry` | `toolName`, `retry`, `delayMs`, `error` |
 | `provider.fallback` | `primaryProvider`, `usedProvider`, `attemptedProviders` |
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
-| `provider.answer_discarded` | `provider`, `model`, `usage`, `reason` — uma resposta cobrada pelo fornecedor, com o consumo que ele informou, que o provedor não pôde usar (uma resposta da OpenAI sem nenhuma escolha); contada nos custos e nos orçamentos |
+| `provider.answer_discarded` | `provider`, `model`, `usage`, `reason` — uma resposta cobrada pelo fornecedor, com o consumo que ele informou, que o provedor não pôde usar (uma resposta da OpenAI sem nenhuma escolha); contada nos custos e, nos agentes governados, nos orçamentos por período |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` do conteúdo servido (o próprio conteúdo não é armazenado) |
 
 `tool.failed`, `intention.rejected` e `error.occurred` fazem parte do tipo `EventType`, mas o SDK nunca os registra: uma chamada de ferramenta que falha é um evento `action.failed`; uma recusada por uma política, um evento `policy.violated`, e uma rejeitada na aprovação, um evento `approval.rejected`.

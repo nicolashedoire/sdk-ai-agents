@@ -45,7 +45,7 @@ Keys are exact model ids or prefixes ending with `*`. Providers often answer wit
 The SDK never invents a price, nor a token count. The cost of a call is unknown in two cases, and the report says so:
 
 - **its model has no price**: its calls and tokens are still counted, the model is listed in `unpricedModels`, those calls in `unpricedCalls`, and its line has no `costUsd`;
-- **it reported no token counts** — neither input nor output tokens, as with a provider that returns no usage, or only a total: it is counted in `unmeteredCalls` (and in its line's `unmeteredCalls`), and its model in `unmeteredModels`. It is never taken as zero tokens.
+- **it reported no token counts** — neither input nor output tokens, as with a provider that returns no usage, or only a total: it is counted in `unmeteredCalls` (and in its line's `unmeteredCalls`), and its model in `unmeteredModels`. It is never taken as zero tokens, and a line none of whose calls reported them has no `costUsd` either.
 
 A call without token counts is unmetered even when its model has a price, as budgets count it. When the cost of any call is unknown, the report is marked `complete: false` and `totalUsd` only adds up the calls whose cost is known: a lower bound, not the cost of the run.
 
@@ -56,9 +56,9 @@ A call the vendor answered is billed, whatever the SDK then does with the answer
 - a governed agent's tool call whose arguments are not valid JSON: `intention.generated` is recorded before the answer is read;
 - a cognitive thought whose reply fails validation, repairs included, and an operation that `stop()` or the run's timeout cut short after billed attempts (`cognition.operation_failed` with their `usage`, and `decision.evaluated` for the typed-decision requests already answered);
 - a typed decision whose answer does not match its questions (a choice that is not one of the options, a missing or mistyped answer): `decision.evaluated` with the `error` and empty `answers`, then `sdk.decisions` throws the error, and a cognitive agent falls back as before;
-- an answer a provider discards: an OpenAI answer without any choice, which fails the call or makes a fallback provider take over (`provider.answer_discarded`).
+- an answer a provider discards: an OpenAI answer without any choice, which fails the call or makes a fallback provider take over (`provider.answer_discarded`, in governed runs and cognitive thoughts alike, priced at the model that gave it).
 
-An attempt that failed without an answer — an HTTP error, a timeout, a lost connection, which retries and failovers handle — reports no usage and is not counted. An answer that could not be used at all (discarded, or not a valid decision body) is counted only when the vendor reported its usage.
+An attempt that failed without an answer — an HTTP error, a timeout, a lost connection, which retries and failovers handle — reports no usage and is not counted. An answer that could not be used at all (discarded, or not a valid decision body) is counted only when the vendor reported its usage. An answer that arrives just as the run is cancelled is dropped by the provider without its usage, and is not counted either.
 
 ## Where usage comes from
 

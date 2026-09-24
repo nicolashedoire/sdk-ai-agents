@@ -45,7 +45,7 @@ const sdk = createSDK({
 SDK 从不编造价格，也不编造 token 数。调用的成本在两种情况下是未知的，报告会明确指出：
 
 - **它的模型没有价格**：它的调用次数和 token 数仍然会被计数，模型列在 `unpricedModels` 中，这些调用计入 `unpricedCalls`，它所在的行没有 `costUsd`；
-- **它没有报告 token 数**——既没有输入 token 数也没有输出 token 数，例如提供商不返回用量，或者只返回一个总数：它会计入 `unmeteredCalls`（以及它所在行的 `unmeteredCalls`），它的模型列在 `unmeteredModels` 中。它永远不会被当作 0 个 token。
+- **它没有报告 token 数**——既没有输入 token 数也没有输出 token 数，例如提供商不返回用量，或者只返回一个总数：它会计入 `unmeteredCalls`（以及它所在行的 `unmeteredCalls`），它的模型列在 `unmeteredModels` 中。它永远不会被当作 0 个 token；如果某一行的调用都没有报告 token 数，这一行同样没有 `costUsd`。
 
 没有 token 数的调用即使模型有价格，也会像预算中那样被算作未计量调用。只要有任何调用的成本未知，报告就会被标记为 `complete: false`，而 `totalUsd` 只累加成本已知的调用：它只是一个下限，而不是这次运行的成本。
 
@@ -56,9 +56,9 @@ SDK 从不编造价格，也不编造 token 数。调用的成本在两种情况
 - 受治理智能体的工具调用，其参数不是有效的 JSON：`intention.generated` 会在读取应答之前被记录；
 - 应答未通过校验的认知思维（包括修复），以及在已计费的尝试之后被 `stop()` 或运行超时打断的操作（`cognition.operation_failed` 带有它们的 `usage`，已经得到应答的类型化决策请求记录为 `decision.evaluated`）；
 - 答案与问题不符的类型化决策（选择不在选项之中，答案缺失或类型不对）：先记录带有 `error` 和空 `answers` 的 `decision.evaluated`，然后 `sdk.decisions` 抛出该错误，认知智能体则像以前一样回退；
-- 提供商丢弃的应答：不含任何选项的 OpenAI 应答，它会让调用失败，或让回退提供商接手（`provider.answer_discarded`）。
+- 提供商丢弃的应答：不含任何选项的 OpenAI 应答，它会让调用失败，或让回退提供商接手（`provider.answer_discarded`；在受治理的运行和认知思维中都一样，按给出该应答的模型计价）。
 
-没有得到应答就失败的尝试——HTTP 错误、超时、连接断开，也就是重试和故障转移所处理的情况——不会报告用量，因此不计数。完全无法使用的应答（被丢弃的应答，或不是有效决策正文的应答）只有在厂商报告了其用量时才会计数。
+没有得到应答就失败的尝试——HTTP 错误、超时、连接断开，也就是重试和故障转移所处理的情况——不会报告用量，因此不计数。完全无法使用的应答（被丢弃的应答，或不是有效决策正文的应答）只有在厂商报告了其用量时才会计数。恰好在运行被取消时到达的应答会被提供商连同其用量一起丢弃，同样不会计数。
 
 ## 用量从哪里来 {#where-usage-comes-from}
 

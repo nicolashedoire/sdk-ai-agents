@@ -45,7 +45,7 @@ Schlüssel sind exakte Modellkennungen oder Präfixe, die auf `*` enden. Anbiete
 Das SDK erfindet nie einen Preis und nie eine Token-Anzahl. Die Kosten eines Aufrufs sind in zwei Fällen unbekannt, und der Bericht sagt es:
 
 - **sein Modell hat keinen Preis**: Seine Aufrufe und Tokens werden trotzdem gezählt, das Modell wird in `unpricedModels` aufgeführt, diese Aufrufe in `unpricedCalls`, und seine Zeile hat kein `costUsd`;
-- **er hat keine Token-Anzahl gemeldet** – weder Eingabe- noch Ausgabe-Tokens, etwa bei einem Anbieter, der keinen Verbrauch zurückgibt oder nur eine Summe: Er wird in `unmeteredCalls` gezählt (und im `unmeteredCalls` seiner Zeile), sein Modell in `unmeteredModels`. Er wird nie als null Tokens gewertet.
+- **er hat keine Token-Anzahl gemeldet** – weder Eingabe- noch Ausgabe-Tokens, etwa bei einem Anbieter, der keinen Verbrauch zurückgibt oder nur eine Summe: Er wird in `unmeteredCalls` gezählt (und im `unmeteredCalls` seiner Zeile), sein Modell in `unmeteredModels`. Er wird nie als null Tokens gewertet, und eine Zeile, von deren Aufrufen keiner sie gemeldet hat, hat ebenfalls kein `costUsd`.
 
 Ein Aufruf ohne Token-Anzahl gilt als ungemessen, auch wenn sein Modell einen Preis hat, so wie Budgets ihn zählen. Sobald die Kosten eines Aufrufs unbekannt sind, wird der Bericht mit `complete: false` markiert, und `totalUsd` addiert nur die Aufrufe mit bekannten Kosten: eine Untergrenze, nicht die Kosten des Laufs.
 
@@ -56,9 +56,9 @@ Ein Aufruf, den der Hersteller beantwortet hat, wird berechnet, was auch immer d
 - ein Tool-Aufruf eines kontrollierten Agenten, dessen Argumente kein gültiges JSON sind: `intention.generated` wird aufgezeichnet, bevor die Antwort gelesen wird;
 - ein kognitiver Gedanke, dessen Antwort die Validierung nicht besteht, einschließlich Reparaturen, und eine Operation, die `stop()` oder das Zeitlimit des Laufs nach berechneten Versuchen abbricht (`cognition.operation_failed` mit ihrem `usage`, und `decision.evaluated` für die bereits beantworteten Anfragen typisierter Entscheidungen);
 - eine typisierte Entscheidung, deren Antwort nicht zu ihren Fragen passt (eine Wahl, die keine der Optionen ist, eine fehlende Antwort oder eine vom falschen Typ): `decision.evaluated` mit dem `error` und leeren `answers`, danach wirft `sdk.decisions` den Fehler, und ein kognitiver Agent weicht wie bisher auf seine Alternative aus;
-- eine Antwort, die ein Anbieter verwirft: eine OpenAI-Antwort ohne jede Auswahl, an der der Aufruf scheitert oder nach der ein Fallback-Anbieter übernimmt (`provider.answer_discarded`).
+- eine Antwort, die ein Anbieter verwirft: eine OpenAI-Antwort ohne jede Auswahl, an der der Aufruf scheitert oder nach der ein Fallback-Anbieter übernimmt (`provider.answer_discarded`, in kontrollierten Läufen wie in kognitiven Gedanken, zum Preis des Modells, das sie gegeben hat).
 
-Ein Versuch, der ohne Antwort fehlschlug – ein HTTP-Fehler, eine Zeitüberschreitung, eine verlorene Verbindung, also das, was Wiederholungsversuche und Failover behandeln –, meldet keinen Verbrauch und wird nicht gezählt. Eine Antwort, die überhaupt nicht verwendbar war (verworfen, oder kein gültiger Entscheidungs-Body), wird nur gezählt, wenn der Hersteller ihren Verbrauch gemeldet hat.
+Ein Versuch, der ohne Antwort fehlschlug – ein HTTP-Fehler, eine Zeitüberschreitung, eine verlorene Verbindung, also das, was Wiederholungsversuche und Failover behandeln –, meldet keinen Verbrauch und wird nicht gezählt. Eine Antwort, die überhaupt nicht verwendbar war (verworfen, oder kein gültiger Entscheidungs-Body), wird nur gezählt, wenn der Hersteller ihren Verbrauch gemeldet hat. Eine Antwort, die genau beim Abbruch des Laufs eintrifft, verwirft der Anbieter ohne ihren Verbrauch; auch sie wird nicht gezählt.
 
 ## Woher der Verbrauch stammt {#where-usage-comes-from}
 

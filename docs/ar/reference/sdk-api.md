@@ -147,7 +147,7 @@ interface OutcomeEvaluator {
 
 ### `RunCostReport` {#runcostreport}
 
-ما يُعيده `getRunCost(runId)`: كل استدعاء للنموذج في التشغيل أجاب عنه المورّد، بما في ذلك الخطوات الفاشلة — انظر [تكاليف API](../guide/costs).
+ما يُعيده `getRunCost(runId)`: استدعاءات النموذج في التشغيل، بما في ذلك الخطوات الفاشلة — انظر [تكاليف API](../guide/costs).
 
 ```ts
 interface RunCostReport {
@@ -180,7 +180,7 @@ interface ModelCostLine {
 | `complete` | `false` حين تكون كلفة بعض الاستدعاءات مجهولة: `unpricedCalls` أو `unmeteredCalls` أكبر من 0 |
 | `unpricedModels`، `unpricedCalls` | النماذج التي لا سعر لها في `pricing`، واستدعاءاتها التي أبلغت عن رموزها |
 | `unmeteredModels`، `unmeteredCalls` | نماذج الاستدعاءات التي لم تُبلِغ عن أي عدد لرموز الإدخال أو الإخراج، وتلك الاستدعاءات |
-| `lines` | سطر لكل نموذج ومصدر: الاستدعاءات، ورموز الاستدعاءات التي أبلغت عنها، و`unmeteredCalls` إن وُجدت، و`costUsd` حين يكون للنموذج سعر؛ وقيمة `model` هي `unknown` لاستدعاء لم يسجّل اسم نموذج |
+| `lines` | سطر لكل نموذج ومصدر: الاستدعاءات، ورموز الاستدعاءات التي أبلغت عنها، و`unmeteredCalls` إن وُجدت، و`costUsd` حين يكون للنموذج سعر وأبلغ بعض استدعاءات السطر عن رموزها؛ وقيمة `model` هي `(unknown)` لاستدعاء لم يسجّل اسم نموذج |
 
 ## الآثار وإعادة التشغيل والاختبار {#traces-replay-and-testing}
 

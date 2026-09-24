@@ -34,7 +34,7 @@ interface Event {
 | `tool.retry` | `toolName`, `retry`, `delayMs`, `error` |
 | `provider.fallback` | `primaryProvider`, `usedProvider`, `attemptedProviders` |
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
-| `provider.answer_discarded` | `provider`, `model`, `usage`, `reason` — 벤더가 청구하고 사용량도 보고했지만 프로바이더가 쓸 수 없었던 응답(선택지가 하나도 없는 OpenAI 응답). 비용과 예산에 집계됩니다 |
+| `provider.answer_discarded` | `provider`, `model`, `usage`, `reason` — 벤더가 청구하고 사용량도 보고했지만 프로바이더가 쓸 수 없었던 응답(선택지가 하나도 없는 OpenAI 응답). 비용에 집계되고, 통제형 에이전트라면 기간별 예산에도 집계됩니다 |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, 제공한 내용의 `sha256`(내용 자체는 저장되지 않음) |
 
 `tool.failed`, `intention.rejected`, `error.occurred`는 `EventType` 타입에 포함되지만 SDK는 이들을 절대 기록하지 않습니다. 실패한 도구 호출은 `action.failed` 이벤트로, 정책에 거부된 호출은 `policy.violated` 이벤트로, 승인 단계에서 거절된 호출은 `approval.rejected` 이벤트로 기록됩니다.

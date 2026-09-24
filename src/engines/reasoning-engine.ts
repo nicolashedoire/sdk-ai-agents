@@ -43,11 +43,11 @@ export interface ReasoningContext {
    * billed it, once the provider call is over, even if it failed (see
    * `LLMRequest.onDiscardedAnswer`). Governed agents count their budgets through it.
    */
-  onModelUsage?: (call: ModelCallUsage) => void | Promise<void>;
+  onModelUsage?: (call: AnsweredModelCall) => void | Promise<void>;
 }
 
 /** A model call as budgets count it: the model that answered, the one asked for, the tokens. */
-export interface ModelCallUsage {
+export interface AnsweredModelCall {
   model?: string;
   requestedModel?: string;
   usage?: LLMResponse['usage'];
@@ -153,9 +153,13 @@ export class ReasoningEngine {
             discarded.push(discardedAnswer);
           },
         });
-      } finally {
-        await this.recordDiscardedAnswers(context, eventStore, discarded);
+      } catch (error) {
+        // The provider's failure is what the caller needs to see: a store that cannot record
+        // the discarded answers does not replace it (they are still counted in budgets).
+        await this.recordDiscardedAnswers(context, eventStore, discarded).catch(() => undefined);
+        throw error;
       }
+      await this.recordDiscardedAnswers(context, eventStore, discarded);
       const { response, requestedModel, answeredBy } = answer;
 
       // Counted before the answer is read, so that a step failing on it still counts it.
@@ -271,8 +275,8 @@ export class ReasoningEngine {
   }
 
   /**
-   * Records each answer a provider discarded after the vendor billed it (an empty answer the
-   * provider failed on or failed over from), and counts it like any other model call.
+   * Counts each answer a provider discarded after the vendor billed it (an empty answer the
+   * provider failed on or failed over from) like any other model call, then records it.
    */
   private async recordDiscardedAnswers(
     context: ReasoningContext,
@@ -281,6 +285,8 @@ export class ReasoningEngine {
   ): Promise<void> {
     for (const answer of answers) {
       await context.onModelUsage?.({ model: answer.model, usage: answer.usage });
+    }
+    for (const answer of answers) {
       await eventStore.append(context.runId, {
         id: generateEventId(),
         runId: context.runId,

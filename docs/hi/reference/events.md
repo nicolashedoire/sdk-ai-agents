@@ -34,7 +34,7 @@ interface Event {
 | `tool.retry` | `toolName`, `retry`, `delayMs`, `error` |
 | `provider.fallback` | `primaryProvider`, `usedProvider`, `attemptedProviders` |
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
-| `provider.answer_discarded` | `provider`, `model`, `usage`, `reason` — ऐसा जवाब जिसका बिल vendor ने बनाया और उपयोग भी बताया, पर प्रदाता उसे इस्तेमाल नहीं कर सका (बिना किसी choice वाला OpenAI जवाब); लागत और बजट में गिना जाता है |
+| `provider.answer_discarded` | `provider`, `model`, `usage`, `reason` — ऐसा जवाब जिसका बिल vendor ने बनाया और उपयोग भी बताया, पर प्रदाता उसे इस्तेमाल नहीं कर सका (बिना किसी choice वाला OpenAI जवाब); लागत में गिना जाता है, और नियंत्रित एजेंटों के लिए हर अवधि के बजट में भी |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, सर्व की गई सामग्री का `sha256` (सामग्री खुद सहेजी नहीं जाती) |
 
 `tool.failed`, `intention.rejected` और `error.occurred` टाइप `EventType` का हिस्सा हैं, लेकिन SDK इन्हें कभी दर्ज नहीं करता: विफल टूल कॉल एक `action.failed` इवेंट होती है, किसी नीति द्वारा ठुकराई गई कॉल एक `policy.violated` इवेंट, और मंज़ूरी में अस्वीकार की गई कॉल एक `approval.rejected` इवेंट।

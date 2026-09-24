@@ -45,7 +45,7 @@ Les clés sont des identifiants de modèle exacts ou des préfixes terminés par
 Le SDK n'invente jamais un tarif, ni un nombre de tokens. Le coût d'un appel est inconnu dans deux cas, et le rapport le dit :
 
 - **son modèle n'a pas de tarif** : ses appels et ses tokens sont tout de même comptabilisés, le modèle est listé dans `unpricedModels`, ces appels dans `unpricedCalls`, et sa ligne n'a pas de `costUsd` ;
-- **il n'a rapporté aucun nombre de tokens** — ni en entrée ni en sortie, comme avec un fournisseur qui ne renvoie pas de consommation, ou seulement un total : il est compté dans `unmeteredCalls` (et dans le `unmeteredCalls` de sa ligne), et son modèle dans `unmeteredModels`. Il n'est jamais pris pour zéro token.
+- **il n'a rapporté aucun nombre de tokens** — ni en entrée ni en sortie, comme avec un fournisseur qui ne renvoie pas de consommation, ou seulement un total : il est compté dans `unmeteredCalls` (et dans le `unmeteredCalls` de sa ligne), et son modèle dans `unmeteredModels`. Il n'est jamais pris pour zéro token, et une ligne dont aucun appel ne les a rapportés n'a pas de `costUsd` non plus.
 
 Un appel sans nombre de tokens est compté comme non mesuré même si son modèle a un tarif, comme le font les budgets. Dès que le coût d'un appel est inconnu, le rapport est marqué `complete: false` et `totalUsd` n'additionne que les appels dont le coût est connu : c'est un minimum, pas le coût de l'exécution.
 
@@ -56,9 +56,9 @@ Un appel auquel l'éditeur a répondu est facturé, quoi que le SDK fasse ensuit
 - l'appel d'outil d'un agent gouverné dont les arguments ne sont pas du JSON valide : `intention.generated` est enregistré avant la lecture de la réponse ;
 - une pensée cognitive dont la réponse échoue à la validation, réparations comprises, et une opération que `stop()` ou le délai de l'exécution interrompt après des tentatives facturées (`cognition.operation_failed` avec leur `usage`, et `decision.evaluated` pour les requêtes de décision typée qui ont déjà reçu leur réponse) ;
 - une décision typée dont la réponse ne correspond pas à ses questions (un choix qui ne fait pas partie des options, une réponse manquante ou du mauvais type) : `decision.evaluated` avec son `error` et des `answers` vides, puis `sdk.decisions` lève l'erreur, et un agent cognitif se replie comme avant ;
-- une réponse qu'un fournisseur écarte : une réponse OpenAI sans aucun choix, qui fait échouer l'appel ou passer la main à un fournisseur de repli (`provider.answer_discarded`).
+- une réponse qu'un fournisseur écarte : une réponse OpenAI sans aucun choix, qui fait échouer l'appel ou passer la main à un fournisseur de repli (`provider.answer_discarded`, dans les exécutions gouvernées comme dans les pensées cognitives, au tarif du modèle qui l'a donnée).
 
-Une tentative qui a échoué sans réponse — une erreur HTTP, un délai dépassé, une connexion perdue, ce que gèrent les nouvelles tentatives et les basculements — ne rapporte aucune consommation et n'est pas comptée. Une réponse totalement inutilisable (écartée, ou qui n'est pas un corps de décision valide) n'est comptée que si l'éditeur a rapporté sa consommation.
+Une tentative qui a échoué sans réponse — une erreur HTTP, un délai dépassé, une connexion perdue, ce que gèrent les nouvelles tentatives et les basculements — ne rapporte aucune consommation et n'est pas comptée. Une réponse totalement inutilisable (écartée, ou qui n'est pas un corps de décision valide) n'est comptée que si l'éditeur a rapporté sa consommation. Une réponse qui arrive juste au moment où l'exécution est annulée est écartée par le fournisseur sans sa consommation, et n'est pas comptée non plus.
 
 ## D'où vient la consommation {#where-usage-comes-from}
 

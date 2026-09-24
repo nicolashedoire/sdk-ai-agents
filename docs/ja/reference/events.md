@@ -34,7 +34,7 @@ interface Event {
 | `tool.retry` | `toolName`、`retry`、`delayMs`、`error` |
 | `provider.fallback` | `primaryProvider`、`usedProvider`、`attemptedProviders` |
 | `provider.retry` | `provider`、`model`、`retry`、`delayMs`、`error` |
-| `provider.answer_discarded` | `provider`、`model`、`usage`、`reason`。ベンダーが課金し、使用量を報告したにもかかわらず、プロバイダーが使えなかった応答（選択肢を一つも含まない OpenAI の応答）。コストと予算に数えられる |
+| `provider.answer_discarded` | `provider`、`model`、`usage`、`reason`。ベンダーが課金し、使用量を報告したにもかかわらず、プロバイダーが使えなかった応答（選択肢を一つも含まない OpenAI の応答）。コストに数えられ、ガバナンス付きエージェントでは期間ごとの予算にも数えられる |
 | `resource.read` | `uri`、`mimeType?`、`bytes`、提供した内容の `sha256`（内容そのものは保存されない） |
 
 `tool.failed`、`intention.rejected`、`error.occurred` は `EventType` 型に含まれますが、SDK がこれらを記録することはありません。失敗したツール呼び出しは `action.failed` イベントに、ポリシーに拒否された呼び出しは `policy.violated` イベントに、承認で却下された呼び出しは `approval.rejected` イベントになります。

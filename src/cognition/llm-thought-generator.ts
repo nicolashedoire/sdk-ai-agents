@@ -34,7 +34,14 @@ export interface GeneratedThought {
   model?: string;
   /** Model name requested, which may differ from the versioned id the provider returns. */
   requestedModel?: string;
+  /** Calls whose answer was used or read, repairs included (not the discarded ones). */
   usage?: ModelUsage;
+  /**
+   * Answers a provider discarded after the vendor billed them (an empty answer before a
+   * failover), each with its own provider, model and usage: the engine records them as
+   * `provider.answer_discarded` events, so each is priced at the model that gave it.
+   */
+  discarded?: DiscardedAnswer[];
 }
 
 /** Produces the thought for one operation. The default implementation uses an LLM. */
@@ -82,10 +89,10 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
     ];
     const usage: ModelUsage = { promptTokens: 0, completionTokens: 0, calls: 0 };
     let model: string | undefined;
-    // Answers a provider discarded after the vendor billed them count like the others.
+    // Kept apart from the thought's usage: their model may not be the one that answered.
+    const discarded: DiscardedAnswer[] = [];
     const onDiscardedAnswer = (answer: DiscardedAnswer) => {
-      addUsage(usage, answer.usage);
-      model ??= answer.model;
+      discarded.push(answer);
     };
     const maxAttempts = 1 + Math.max(0, this.options.maxRepairAttempts ?? 1);
     let lastError = 'no reply';
@@ -107,13 +114,14 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
         });
       } catch (error) {
         // Keep the tokens of earlier attempts: they were billed even if this call failed.
-        if (usage.calls === 0) throw error;
+        if (usage.calls === 0 && discarded.length === 0) throw error;
         throw new ThoughtGenerationError(
           request.operation,
           error instanceof Error ? error.message : String(error),
           {
             originalError: error instanceof Error ? error : new Error(String(error)),
-            usage,
+            ...(usage.calls > 0 ? { usage } : {}),
+            ...(discarded.length > 0 ? { discarded } : {}),
             requestedModel: this.options.model,
             ...(model ? { model } : {}),
           }
@@ -131,6 +139,7 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
           model: response.model,
           requestedModel: this.options.model,
           usage,
+          ...(discarded.length > 0 ? { discarded } : {}),
         };
       }
       lastError = parsed.error;
@@ -145,6 +154,7 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
 
     throw new ThoughtGenerationError(request.operation, lastError, {
       usage,
+      ...(discarded.length > 0 ? { discarded } : {}),
       model: model ?? this.options.model,
       requestedModel: this.options.model,
     });

@@ -147,7 +147,7 @@ interface OutcomeEvaluator {
 
 ### `RunCostReport` {#runcostreport}
 
-`getRunCost(runId)` が返すもの。ベンダーが応答した実行内のすべてのモデル呼び出しを、失敗したステップの分も含めて集計します。[API コスト](../guide/costs) を参照してください。
+`getRunCost(runId)` が返すもの。実行内のモデル呼び出しを、失敗したステップの分も含めて集計します。[API コスト](../guide/costs) を参照してください。
 
 ```ts
 interface RunCostReport {
@@ -180,7 +180,7 @@ interface ModelCostLine {
 | `complete` | 一部の呼び出しのコストが不明な場合、つまり `unpricedCalls` または `unmeteredCalls` が 0 より大きい場合は `false` |
 | `unpricedModels`、`unpricedCalls` | `pricing` に価格のないモデルと、そのうちトークン数を報告した呼び出し |
 | `unmeteredModels`、`unmeteredCalls` | 入力トークン数も出力トークン数も報告しなかった呼び出しのモデルと、その呼び出し |
-| `lines` | モデルと発生源ごとに 1 行。呼び出し回数、トークン数を報告した呼び出しのトークン数、該当する場合は `unmeteredCalls`、モデルに価格がある場合は `costUsd`。モデル名を記録しなかった呼び出しの `model` は `unknown` |
+| `lines` | モデルと発生源ごとに 1 行。呼び出し回数、トークン数を報告した呼び出しのトークン数、該当する場合は `unmeteredCalls`、モデルに価格があり、その行のいずれかの呼び出しがトークン数を報告した場合は `costUsd`。モデル名を記録しなかった呼び出しの `model` は `(unknown)` |
 
 ## トレース、リプレイ、テスト {#traces-replay-and-testing}
 

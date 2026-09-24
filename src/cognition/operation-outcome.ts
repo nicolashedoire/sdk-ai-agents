@@ -1,4 +1,5 @@
 import { ThoughtGenerationError, type ModelUsage } from '../errors/index.js';
+import type { DiscardedAnswer } from '../providers/llm-provider.js';
 import type { GeneratedOperation } from './thought-fields.js';
 import type { EvaluationRecord, ObservationRecord, ThoughtPatch } from './thought-patch.js';
 
@@ -33,6 +34,8 @@ export interface OperationOutcome {
   model?: string;
   requestedModel?: string;
   usage?: ModelUsage;
+  /** Answers a provider discarded after the vendor billed them, recorded on their own. */
+  discarded?: DiscardedAnswer[];
 }
 
 const MAX_MESSAGE_LENGTH = 500;
@@ -51,6 +54,7 @@ export function failureOutcome(error: unknown): OperationOutcome {
     return {
       failure: error,
       ...(error.usage ? { usage: error.usage } : {}),
+      ...(error.discarded ? { discarded: error.discarded } : {}),
       ...(error.model ? { model: error.model } : {}),
       ...(error.requestedModel ? { requestedModel: error.requestedModel } : {}),
     };

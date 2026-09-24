@@ -94,9 +94,10 @@ export class DecisionService {
     } catch (error) {
       // The backend answered and billed the call, but its answer was rejected: recorded so
       // that it is priced, before the error reaches the caller.
+      // A store that cannot record it does not replace the client's error.
       const rejected = rejectedDecision(error);
       if (rejected) {
-        await this.record(runId, input, { answers: {}, ...rejected });
+        await this.record(runId, input, { answers: {}, ...rejected }).catch(() => undefined);
       }
       throw error;
     }

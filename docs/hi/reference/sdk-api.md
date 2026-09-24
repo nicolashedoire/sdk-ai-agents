@@ -147,7 +147,7 @@ interface OutcomeEvaluator {
 
 ### `RunCostReport` {#runcostreport}
 
-`getRunCost(runId)` क्या लौटाता है: run की हर वह मॉडल कॉल जिसका जवाब vendor ने दिया, विफल कदमों सहित — देखें [API लागत](../guide/costs)।
+`getRunCost(runId)` क्या लौटाता है: run की मॉडल कॉल, विफल कदमों सहित — देखें [API लागत](../guide/costs)।
 
 ```ts
 interface RunCostReport {
@@ -180,7 +180,7 @@ interface ModelCostLine {
 | `complete` | `false` जब कुछ कॉल की लागत अज्ञात हो: `unpricedCalls` या `unmeteredCalls` 0 से ज़्यादा |
 | `unpricedModels`, `unpricedCalls` | `pricing` में बिना कीमत वाले मॉडल, और उनकी वे कॉल जिन्होंने अपने tokens बताए |
 | `unmeteredModels`, `unmeteredCalls` | उन कॉल के मॉडल जिन्होंने न इनपुट tokens की गिनती बताई न आउटपुट tokens की, और वे कॉल |
-| `lines` | हर मॉडल और स्रोत के लिए एक: कॉल, उन कॉल के tokens जिन्होंने उन्हें बताया, अगर हों तो `unmeteredCalls`, मॉडल की कीमत हो तो `costUsd`; जिस कॉल ने कोई मॉडल नाम दर्ज नहीं किया, उसका `model` `unknown` होता है |
+| `lines` | हर मॉडल और स्रोत के लिए एक: कॉल, उन कॉल के tokens जिन्होंने उन्हें बताया, अगर हों तो `unmeteredCalls`, मॉडल की कीमत हो और पंक्ति की किसी कॉल ने अपने tokens बताए हों तो `costUsd`; जिस कॉल ने कोई मॉडल नाम दर्ज नहीं किया, उसका `model` `(unknown)` होता है |
 
 ## ट्रेस, रीप्ले और टेस्टिंग {#traces-replay-and-testing}
 

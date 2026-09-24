@@ -147,7 +147,7 @@ interface OutcomeEvaluator {
 
 ### `RunCostReport` {#runcostreport}
 
-`getRunCost(runId)`가 돌려주는 것: 벤더가 응답한 실행의 모든 모델 호출이며, 실패한 단계도 포함합니다. [API 비용](../guide/costs)을 참고하세요.
+`getRunCost(runId)`가 돌려주는 것: 실행의 모델 호출이며, 실패한 단계도 포함합니다. [API 비용](../guide/costs)을 참고하세요.
 
 ```ts
 interface RunCostReport {
@@ -180,7 +180,7 @@ interface ModelCostLine {
 | `complete` | 일부 호출의 비용을 알 수 없을 때, 즉 `unpricedCalls`나 `unmeteredCalls`가 0보다 클 때 `false` |
 | `unpricedModels`, `unpricedCalls` | `pricing`에 가격이 없는 모델과, 그중 토큰 수를 보고한 호출 |
 | `unmeteredModels`, `unmeteredCalls` | 입력 토큰 수도 출력 토큰 수도 보고하지 않은 호출의 모델과 그 호출 |
-| `lines` | 모델과 출처마다 한 줄: 호출 수, 토큰 수를 보고한 호출의 토큰, 있으면 `unmeteredCalls`, 모델에 가격이 있으면 `costUsd`. 모델 이름을 기록하지 않은 호출의 `model`은 `unknown`입니다 |
+| `lines` | 모델과 출처마다 한 줄: 호출 수, 토큰 수를 보고한 호출의 토큰, 있으면 `unmeteredCalls`, 모델에 가격이 있고 그 줄의 호출 중 토큰 수를 보고한 것이 있으면 `costUsd`. 모델 이름을 기록하지 않은 호출의 `model`은 `(unknown)`입니다 |
 
 ## 트레이스, 리플레이, 테스트 {#traces-replay-and-testing}
 

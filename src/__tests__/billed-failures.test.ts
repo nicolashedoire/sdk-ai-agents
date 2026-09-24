@@ -1,9 +1,13 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { DecisionClientError } from '../errors/index.js';
 import { AnthropicProvider } from '../providers/anthropic-provider.js';
 import { FallbackProvider } from '../providers/fallback-provider.js';
 import { OpenAIProvider } from '../providers/openai-provider.js';
+import { FileEventStore } from '../stores/file-event-store.js';
 import type { Event } from '../types/events.js';
 import type { Policy } from '../types/policy.js';
 import { LocalHttpServer, type Reply } from './support/local-http-server.js';
@@ -65,6 +69,21 @@ function scoreAnswer(index: number) {
   };
 }
 
+/** A file event store that cannot write one type of event (a full disk, a failing database). */
+class RefusingEventStore extends FileEventStore {
+  constructor(
+    directory: string,
+    private readonly refused: Event['type']
+  ) {
+    super(directory);
+  }
+
+  override async append(runId: string, event: Event): Promise<void> {
+    if (event.type === this.refused) throw new Error(`cannot write ${event.type}`);
+    return super.append(runId, event);
+  }
+}
+
 function ofType(events: Event[], type: Event['type']): Event[] {
   return events.filter((event) => event.type === type);
 }
@@ -75,6 +94,7 @@ describe('billed calls that fail', () => {
   let anthropic: LocalHttpServer;
   let jev: LocalHttpServer;
   let lookups: number;
+  let refusing: { store: RefusingEventStore; directory: string } | undefined;
 
   beforeEach(() => {
     openai = new LocalHttpServer();
@@ -86,7 +106,18 @@ describe('billed calls that fail', () => {
     await Promise.all([openai.stop(), anthropic.stop(), jev.stop()]);
     await env?.dispose();
     env = undefined;
+    if (refusing) {
+      await refusing.store.destroy();
+      rmSync(refusing.directory, { recursive: true, force: true });
+      refusing = undefined;
+    }
   });
+
+  function refusingStore(type: Event['type']): RefusingEventStore {
+    const directory = mkdtempSync(join(tmpdir(), 'sdk-ai-agents-refusing-'));
+    refusing = { store: new RefusingEventStore(join(directory, 'events'), type), directory };
+    return refusing.store;
+  }
 
   async function openAIProvider(): Promise<OpenAIProvider> {
     return new OpenAIProvider('k', 'gpt-4o', {
@@ -277,6 +308,27 @@ describe('billed calls that fail', () => {
       });
     });
 
+    it("reports the provider's error when the discarded answer cannot be recorded", async () => {
+      openai.reply(EMPTY_ANSWER);
+      env = createTestSDK({
+        llmProvider: await openAIProvider(),
+        pricing: PRICING,
+        eventStore: refusingStore('provider.answer_discarded'),
+      });
+      const agent = governedAgent();
+
+      const result = await agent.run({ message: 'Hi' });
+
+      expect(result.status).toBe('failed');
+      expect(result.error?.message).toContain('No response from LLM');
+      expect(result.error?.message).not.toContain('cannot write');
+      // Budgets count it all the same.
+      expect(await env.sdk.getBudgetUsage({ agentId: agent.id, period: 'all' })).toMatchObject({
+        tokensUsed: 30,
+        costUsd: 30,
+      });
+    });
+
     it('counts an empty answer that was retried', async () => {
       openai.reply(
         EMPTY_ANSWER,
@@ -305,24 +357,93 @@ describe('billed calls that fail', () => {
   });
 
   describe('cognitive agents', () => {
-    it('counts the empty answers its thoughts failed on', async () => {
-      openai.reply(EMPTY_ANSWER);
-      env = createTestSDK({ llmProvider: await openAIProvider(), pricing: PRICING });
+    it('prices the empty answers a thought failed over from at their own model', async () => {
+      // Every OpenAI answer is empty (1 000 tokens billed); Claude answers after each one.
+      openai.reply(
+        openAIChat({ model: 'gpt-4o', choices: [], usage: { prompt: 1_000, completion: 0 } })
+      );
+      anthropic.reply(
+        anthropicMessage({
+          text: [
+            JSON.stringify({
+              summary: 'Framed the question',
+              addFacts: [{ statement: 'Budget is 10k EUR', source: 'input' }],
+              addUnknowns: [{ question: 'What is the current churn?' }],
+            }),
+          ],
+          model: 'claude-opus-5',
+          usage: { input: 20, output: 5 },
+        }),
+        anthropicMessage({
+          text: ['not json'],
+          model: 'claude-opus-5',
+          usage: { input: 20, output: 5 },
+        })
+      );
+      const fallback = new AnthropicProvider('k', undefined, {
+        baseURL: await anthropic.start(),
+        maxRetries: 0,
+      });
+      env = createTestSDK({
+        llmProvider: new FallbackProvider(await openAIProvider(), [fallback]),
+        pricing: PRICING,
+      });
       const agent = env.sdk.createCognitiveAgent({ name: 'analyst', model: 'gpt-4o' });
 
       const result = await agent.think({ problem: PROBLEM });
 
-      expect(result.status).toBe('failed');
-      const failed = ofType(await env.sdk.getEvents(result.runId), 'cognition.thought');
-      expect(failed[0]?.data).toMatchObject({
-        failed: true,
+      const events = await env.sdk.getEvents(result.runId);
+      const discarded = ofType(events, 'provider.answer_discarded');
+      expect(discarded).toHaveLength(openai.requests.length);
+      expect(discarded[0]?.data).toEqual({
+        provider: 'openai',
         model: 'gpt-4o',
-        usage: { calls: 1, promptTokens: 30 },
+        usage: { promptTokens: 1_000, completionTokens: 0, totalTokens: 1_000 },
+        reason: 'No response from LLM',
       });
-      expect(await env.sdk.getRunCost(result.runId)).toMatchObject({
-        totalUsd: 30 * openai.requests.length,
+      // The first thought succeeded with Claude's answer; the empty answer is not in its usage.
+      expect(ofType(events, 'cognition.thought')[0]?.data).toMatchObject({
+        failed: false,
+        model: 'claude-opus-5',
+        usage: { calls: 1, promptTokens: 20, completionTokens: 5 },
+      });
+      const cost = await env.sdk.getRunCost(result.runId);
+      expect(cost).toMatchObject({
+        totalUsd: 1_000 * openai.requests.length + 25 * anthropic.requests.length,
         complete: true,
-        lines: [{ model: 'gpt-4o', calls: openai.requests.length }],
+      });
+      expect(cost.lines.map(({ model, calls }) => ({ model, calls }))).toEqual([
+        { model: 'gpt-4o', calls: openai.requests.length },
+        { model: 'claude-opus-5', calls: anthropic.requests.length },
+      ]);
+    });
+
+    it('records the empty answer of a thought a stop cut short', async () => {
+      openai.reply(EMPTY_ANSWER);
+      anthropic.reply({ ...anthropicMessage({ text: ['too late'] }), delayMs: 10_000 });
+      const fallback = new AnthropicProvider('k', undefined, {
+        baseURL: await anthropic.start(),
+        maxRetries: 0,
+      });
+      env = createTestSDK({
+        llmProvider: new FallbackProvider(await openAIProvider(), [fallback]),
+        pricing: PRICING,
+      });
+      const agent = env.sdk.createCognitiveAgent({ name: 'analyst', model: 'gpt-4o' });
+
+      const running = agent.think({ problem: PROBLEM });
+      await until(() => anthropic.requests.length === 1);
+      await agent.stop();
+      const result = await running;
+
+      expect(result.status).toBe('cancelled');
+      const events = await env.sdk.getEvents(result.runId);
+      expect(ofType(events, 'provider.answer_discarded')).toHaveLength(1);
+      expect(ofType(events, 'cognition.operation_failed')).toEqual([]);
+      expect(await env.sdk.getRunCost(result.runId)).toMatchObject({
+        totalUsd: 30,
+        complete: true,
+        lines: [{ model: 'gpt-4o', calls: 1 }],
       });
     });
 
@@ -509,6 +630,39 @@ describe('billed calls that fail', () => {
         totalUsd: 1_005,
         complete: true,
       });
+    });
+
+    it('bounds the reason it stores, which quotes the answer', async () => {
+      const option = 'x'.repeat(5_000);
+      const answer = { type: 'choice', choice: option, probabilities: {}, confidence: 0.9 };
+      jev.reply(jevAnswer({ choice: answer }, { input: 10, output: 1 }));
+      env = createTestSDK({ jev: { apiKey: 'k', baseUrl: await jev.start() }, pricing: PRICING });
+
+      await env.sdk.decisions
+        .choose({ context: 'c', question: 'q', options: ['a', 'b'], runId: 'run_long' })
+        .catch(() => undefined);
+
+      const [evaluated] = await env.sdk.getEvents('run_long');
+      const reason = String(evaluated?.data.error);
+      expect(reason).toContain('Response answers do not match the questions');
+      expect(reason).toHaveLength(500);
+      expect(reason.endsWith('…')).toBe(true);
+    });
+
+    it("throws the client's error when the rejected answer cannot be recorded", async () => {
+      const refund = { type: 'choice', choice: 'refund', probabilities: {}, confidence: 0.9 };
+      jev.reply(jevAnswer({ choice: refund }, { input: 10, output: 1 }));
+      env = createTestSDK({
+        jev: { apiKey: 'k', baseUrl: await jev.start() },
+        eventStore: refusingStore('decision.evaluated'),
+      });
+
+      const failure = await env.sdk.decisions
+        .choose({ context: 'c', question: 'q', options: ['billing', 'technical'] })
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(DecisionClientError);
+      expect((failure as Error).message).toContain('Response answers do not match the questions');
     });
 
     it('records a malformed answer only when it reports its usage', async () => {

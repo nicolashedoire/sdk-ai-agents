@@ -147,7 +147,7 @@ Fonctions utilitaires pour les questions : `noul(instructions, criteria?)`, `ch
 
 ### `RunCostReport` {#runcostreport}
 
-Ce que renvoie `getRunCost(runId)` : chaque appel au modèle de l'exécution auquel l'éditeur a répondu, étapes échouées comprises — voir [Coûts d'API](../guide/costs).
+Ce que renvoie `getRunCost(runId)` : les appels au modèle de l'exécution, étapes échouées comprises — voir [Coûts d'API](../guide/costs).
 
 ```ts
 interface RunCostReport {
@@ -180,7 +180,7 @@ interface ModelCostLine {
 | `complete` | `false` quand le coût de certains appels est inconnu : `unpricedCalls` ou `unmeteredCalls` supérieur à 0 |
 | `unpricedModels`, `unpricedCalls` | Modèles sans tarif dans `pricing`, et ceux de leurs appels qui ont rapporté leurs tokens |
 | `unmeteredModels`, `unmeteredCalls` | Modèles des appels qui n'ont rapporté aucun nombre de tokens en entrée ou en sortie, et ces appels |
-| `lines` | Une par modèle et par source : appels, tokens des appels qui les ont rapportés, `unmeteredCalls` s'il y en a, `costUsd` quand le modèle a un tarif ; `model` vaut `unknown` pour un appel qui n'a enregistré aucun nom de modèle |
+| `lines` | Une par modèle et par source : appels, tokens des appels qui les ont rapportés, `unmeteredCalls` s'il y en a, `costUsd` quand le modèle a un tarif et qu'une partie des appels de la ligne ont rapporté leurs tokens ; `model` vaut `(unknown)` pour un appel qui n'a enregistré aucun nom de modèle |
 
 ## Traces, rejeu et tests {#traces-replay-and-testing}
 

@@ -45,7 +45,7 @@ Las claves son identificadores exactos de modelo o prefijos que terminan en `*`.
 El SDK nunca se inventa un precio, ni un número de tokens. El coste de una llamada es desconocido en dos casos, y el informe lo dice:
 
 - **su modelo no tiene precio**: sus llamadas y sus tokens se siguen contabilizando, el modelo aparece en `unpricedModels`, esas llamadas en `unpricedCalls`, y su línea no tiene `costUsd`;
-- **no informó de ningún número de tokens** — ni de entrada ni de salida, como con un proveedor que no devuelve el consumo, o solo un total: se cuenta en `unmeteredCalls` (y en el `unmeteredCalls` de su línea), y su modelo en `unmeteredModels`. Nunca se toma como cero tokens.
+- **no informó de ningún número de tokens** — ni de entrada ni de salida, como con un proveedor que no devuelve el consumo, o solo un total: se cuenta en `unmeteredCalls` (y en el `unmeteredCalls` de su línea), y su modelo en `unmeteredModels`. Nunca se toma como cero tokens, y una línea cuyas llamadas no informaron de ninguno tampoco tiene `costUsd`.
 
 Una llamada sin número de tokens cuenta como no medida aunque su modelo tenga precio, igual que en los presupuestos. En cuanto el coste de alguna llamada es desconocido, el informe se marca con `complete: false` y `totalUsd` solo suma las llamadas cuyo coste se conoce: es un mínimo, no el coste de la ejecución.
 
@@ -56,9 +56,9 @@ Una llamada que el fabricante ha respondido se factura, haga lo que haga despué
 - la llamada a una herramienta de un agente gobernado cuyos argumentos no son JSON válido: `intention.generated` se registra antes de leer la respuesta;
 - un pensamiento cognitivo cuya respuesta no pasa la validación, reparaciones incluidas, y una operación que `stop()` o el tiempo límite de la ejecución interrumpe tras intentos facturados (`cognition.operation_failed` con su `usage`, y `decision.evaluated` para las peticiones de decisión tipada que ya tenían respuesta);
 - una decisión tipada cuya respuesta no corresponde a sus preguntas (una opción que no está entre las ofrecidas, una respuesta ausente o de otro tipo): `decision.evaluated` con su `error` y `answers` vacío, después `sdk.decisions` lanza el error, y un agente cognitivo recurre a su alternativa como antes;
-- una respuesta que un proveedor descarta: una respuesta de OpenAI sin ninguna opción, que hace fallar la llamada o cede el turno a un proveedor de respaldo (`provider.answer_discarded`).
+- una respuesta que un proveedor descarta: una respuesta de OpenAI sin ninguna opción, que hace fallar la llamada o cede el turno a un proveedor de respaldo (`provider.answer_discarded`, tanto en las ejecuciones gobernadas como en los pensamientos cognitivos, al precio del modelo que la dio).
 
-Un intento que falló sin respuesta — un error HTTP, un tiempo de espera agotado, una conexión perdida, lo que gestionan los reintentos y las conmutaciones — no informa de ningún consumo y no se cuenta. Una respuesta que no se pudo usar en absoluto (descartada, o que no es un cuerpo de decisión válido) solo se cuenta si el fabricante informó de su consumo.
+Un intento que falló sin respuesta — un error HTTP, un tiempo de espera agotado, una conexión perdida, lo que gestionan los reintentos y las conmutaciones — no informa de ningún consumo y no se cuenta. Una respuesta que no se pudo usar en absoluto (descartada, o que no es un cuerpo de decisión válido) solo se cuenta si el fabricante informó de su consumo. Una respuesta que llega justo cuando se cancela la ejecución la descarta el proveedor sin su consumo, y tampoco se cuenta.
 
 ## De dónde viene el consumo {#where-usage-comes-from}
 

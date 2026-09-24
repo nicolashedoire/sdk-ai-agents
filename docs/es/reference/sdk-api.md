@@ -147,7 +147,7 @@ Helpers de preguntas: `noul(instructions, criteria?)`, `choice(instructions, opt
 
 ### `RunCostReport` {#runcostreport}
 
-Lo que devuelve `getRunCost(runId)`: cada llamada al modelo de la ejecución que el fabricante respondió, pasos fallidos incluidos — consulta [Costes de API](../guide/costs).
+Lo que devuelve `getRunCost(runId)`: las llamadas al modelo de la ejecución, pasos fallidos incluidos — consulta [Costes de API](../guide/costs).
 
 ```ts
 interface RunCostReport {
@@ -180,7 +180,7 @@ interface ModelCostLine {
 | `complete` | `false` cuando el coste de algunas llamadas es desconocido: `unpricedCalls` o `unmeteredCalls` mayor que 0 |
 | `unpricedModels`, `unpricedCalls` | Modelos sin precio en `pricing`, y sus llamadas que informaron de sus tokens |
 | `unmeteredModels`, `unmeteredCalls` | Modelos de las llamadas que no informaron de ningún número de tokens de entrada o de salida, y esas llamadas |
-| `lines` | Una por modelo y origen: llamadas, tokens de las llamadas que informaron de ellos, `unmeteredCalls` si las hay, `costUsd` cuando el modelo tiene precio; `model` es `unknown` para una llamada que no registró ningún nombre de modelo |
+| `lines` | Una por modelo y origen: llamadas, tokens de las llamadas que informaron de ellos, `unmeteredCalls` si las hay, `costUsd` cuando el modelo tiene precio y alguna llamada de la línea informó de sus tokens; `model` es `(unknown)` para una llamada que no registró ningún nombre de modelo |
 
 ## Trazas, repetición y pruebas {#traces-replay-and-testing}
 

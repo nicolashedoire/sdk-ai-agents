@@ -147,7 +147,7 @@ Question helpers: `noul(instructions, criteria?)`, `choice(instructions, options
 
 ### `RunCostReport`
 
-What `getRunCost(runId)` returns: every model call of the run that the vendor answered, failed steps included — see [API costs](../guide/costs).
+What `getRunCost(runId)` returns: the model calls of the run, failed steps included — see [API costs](../guide/costs).
 
 ```ts
 interface RunCostReport {
@@ -180,7 +180,7 @@ interface ModelCostLine {
 | `complete` | `false` when the cost of some calls is unknown: `unpricedCalls` or `unmeteredCalls` above 0 |
 | `unpricedModels`, `unpricedCalls` | Models without a price in `pricing`, and their calls that reported their tokens |
 | `unmeteredModels`, `unmeteredCalls` | Models of the calls that reported no input or output token counts, and those calls |
-| `lines` | One per model and source: calls, tokens of the calls that reported them, `unmeteredCalls` when there are any, `costUsd` when the model has a price; `model` is `unknown` for a call that recorded no model name |
+| `lines` | One per model and source: calls, tokens of the calls that reported them, `unmeteredCalls` when there are any, `costUsd` when the model has a price and some of the line's calls reported their tokens; `model` is `(unknown)` for a call that recorded no model name |
 
 ## Traces, replay and testing
 

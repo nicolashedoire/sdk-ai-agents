@@ -147,7 +147,7 @@ interface OutcomeEvaluator {
 
 ### `RunCostReport` {#runcostreport}
 
-`getRunCost(runId)` 的返回值：运行中厂商已应答的每一次模型调用，包括失败的步骤——参见 [API 成本](../guide/costs)。
+`getRunCost(runId)` 的返回值：运行中的模型调用，包括失败的步骤——参见 [API 成本](../guide/costs)。
 
 ```ts
 interface RunCostReport {
@@ -180,7 +180,7 @@ interface ModelCostLine {
 | `complete` | 当部分调用的成本未知，即 `unpricedCalls` 或 `unmeteredCalls` 大于 0 时为 `false` |
 | `unpricedModels`、`unpricedCalls` | 在 `pricing` 中没有价格的模型，以及它们报告了 token 数的调用 |
 | `unmeteredModels`、`unmeteredCalls` | 既没有报告输入 token 数也没有报告输出 token 数的调用所用的模型，以及这些调用 |
-| `lines` | 每个模型和来源一行：调用次数、报告了 token 数的调用的 token 数、存在时的 `unmeteredCalls`、模型有价格时的 `costUsd`；没有记录模型名的调用，其 `model` 为 `unknown` |
+| `lines` | 每个模型和来源一行：调用次数、报告了 token 数的调用的 token 数、存在时的 `unmeteredCalls`、模型有价格且该行有调用报告了 token 数时的 `costUsd`；没有记录模型名的调用，其 `model` 为 `(unknown)` |
 
 ## 追踪记录、回放与测试 {#traces-replay-and-testing}
 

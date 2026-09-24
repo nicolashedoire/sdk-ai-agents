@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { truncate } from '../cognition/operation-outcome.js';
 import { DecisionClientError, ValidationError } from '../errors/index.js';
 
 /**
@@ -230,7 +231,8 @@ export function rejectedDecision(
   }
   const { model, usage } = error.billed;
   const cause = error.originalError ? `: ${error.originalError.message}` : '';
-  return { model, ...(usage ? { usage } : {}), error: `${error.message}${cause}` };
+  // The message quotes the model's answer: bounded, like the other failures that are stored.
+  return { model, ...(usage ? { usage } : {}), error: truncate(`${error.message}${cause}`) };
 }
 
 /** Normalizes a score answer to [0, 1] (0 = lowest level, 1 = highest level). */

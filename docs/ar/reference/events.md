@@ -34,7 +34,7 @@ interface Event {
 | `tool.retry` | `toolName`، و`retry`، و`delayMs`، و`error` |
 | `provider.fallback` | `primaryProvider`، و`usedProvider`، و`attemptedProviders` |
 | `provider.retry` | `provider`، و`model`، و`retry`، و`delayMs`، و`error` |
-| `provider.answer_discarded` | `provider`، و`model`، و`usage`، و`reason` — إجابة دفع المورّد كلفتها وأبلغ عن استهلاكها، لكن المزوّد لم يستطع استخدامها (إجابة من OpenAI بلا أي خيار)؛ تُحتسَب في التكاليف والميزانيات |
+| `provider.answer_discarded` | `provider`، و`model`، و`usage`، و`reason` — إجابة دفع المورّد كلفتها وأبلغ عن استهلاكها، لكن المزوّد لم يستطع استخدامها (إجابة من OpenAI بلا أي خيار)؛ تُحتسَب في التكاليف، ولدى الوكلاء الخاضعين للحوكمة في الميزانيات لكل فترة |
 | `resource.read` | `uri`، و`mimeType?`، و`bytes`، و`sha256` للمحتوى المُقدَّم (لا يُخزَّن المحتوى نفسه) |
 
 تنتمي `tool.failed` و`intention.rejected` و`error.occurred` إلى النوع `EventType`، لكن حزمة SDK لا تسجّلها أبدًا: استدعاء الأداة الفاشل حدثٌ من نوع `action.failed`، والاستدعاء الذي ترفضه سياسةٌ حدثٌ من نوع `policy.violated`، والذي يُرفض عند الموافقة حدثٌ من نوع `approval.rejected`.

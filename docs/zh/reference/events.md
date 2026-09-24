@@ -34,7 +34,7 @@ interface Event {
 | `tool.retry` | `toolName`、`retry`、`delayMs`、`error` |
 | `provider.fallback` | `primaryProvider`、`usedProvider`、`attemptedProviders` |
 | `provider.retry` | `provider`、`model`、`retry`、`delayMs`、`error` |
-| `provider.answer_discarded` | `provider`、`model`、`usage`、`reason`——厂商已计费并报告了用量、但提供商无法使用的应答（不含任何选项的 OpenAI 应答）；计入成本和预算 |
+| `provider.answer_discarded` | `provider`、`model`、`usage`、`reason`——厂商已计费并报告了用量、但提供商无法使用的应答（不含任何选项的 OpenAI 应答）；计入成本，对受治理智能体还计入按周期的预算 |
 | `resource.read` | `uri`、`mimeType?`、`bytes`、所提供内容的 `sha256`（内容本身不会被保存） |
 
 `tool.failed`、`intention.rejected` 和 `error.occurred` 属于 `EventType` 类型，但 SDK 从不记录它们：失败的工具调用记录为 `action.failed` 事件，被策略拒绝的调用记录为 `policy.violated` 事件，在审批中被驳回的调用记录为 `approval.rejected` 事件。
