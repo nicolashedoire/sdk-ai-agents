@@ -454,6 +454,12 @@ describe('PolicyEngine', () => {
       expect(engine.getActivePolicies('agent-1')).toHaveLength(1)
     })
 
+    it('refuses a policy that is not an object', () => {
+      expect(() => engine.applyGlobalPolicy(null as unknown as Policy)).toThrow(
+        'Validation failed: policy - must be an object, got null'
+      )
+    })
+
     it('refuses rules that are not a list of objects', () => {
       const broken = { ...policyOf('budget', []), rules: undefined } as unknown as Policy
       expect(() => engine.applyGlobalPolicy(broken)).toThrow(
@@ -517,6 +523,14 @@ describe('PolicyEngine', () => {
       expect(stepsResult.reason).toContain('Limit cannot be checked: maxSteps must be a finite number > 0, got NaN')
 
       steps.metadata.value = 10
+      const tokens = { condition: 'maxTokens', action: 'deny' as const, metadata: { value: 1000 } as Record<string, unknown> }
+      engine.applyAgentPolicy('agent-1', { ...policyOf('budget', [tokens]), id: 'tokens' })
+      tokens.metadata.value = null
+      const tokensResult = await engine.validate(toolCall, context)
+      expect(tokensResult.allowed).toBe(false)
+      expect(tokensResult.reason).toContain('Limit cannot be checked: maxTokens must be a finite number > 0, got null')
+
+      tokens.metadata.value = 1000
       duration.metadata.value = '60000'
       const durationResult = await engine.validate(toolCall, context)
       expect(durationResult.allowed).toBe(false)

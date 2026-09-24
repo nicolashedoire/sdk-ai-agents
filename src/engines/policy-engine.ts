@@ -83,14 +83,14 @@ export class PolicyEngine {
   }
 
   applyGlobalPolicy(policy: Policy): void {
-    if (!policy.enabled) return;
     assertCheckableLimits(policy);
+    if (!policy.enabled) return;
     this.globalPolicies.set(policy.id, policy);
   }
 
   applyAgentPolicy(agentId: string, policy: Policy): void {
-    if (!policy.enabled) return;
     assertCheckableLimits(policy);
+    if (!policy.enabled) return;
 
     if (!this.agentPolicies.has(agentId)) {
       this.agentPolicies.set(agentId, new Map());
@@ -512,10 +512,20 @@ export class PolicyEngine {
     }
 
     const budgetLimit = rule.metadata?.budgetLimit as BudgetLimit | undefined;
-    // Checked when the policy was applied: one removed since then covers everyone.
+    // Checked when the policy was applied. A limit removed since then, or whose agent or tool
+    // is no longer a name, cannot say whom it covers: it refuses every call it is checked for.
     if (typeof budgetLimit !== 'object' || budgetLimit === null) {
       const problem = budgetLimitProblem(budgetLimit);
       return uncheckable(`Budget cannot be checked: budgetLimit ${problem?.reason}`, policyId);
+    }
+    for (const key of ['agentId', 'toolName'] as const) {
+      const value: unknown = budgetLimit[key];
+      if (value !== undefined && typeof value !== 'string') {
+        return uncheckable(
+          `Budget cannot be checked: budgetLimit.${key} must be a string, got ${shownValue(value)}`,
+          policyId
+        );
+      }
     }
 
     // If agentId is specified in limit, it must match context
@@ -708,10 +718,10 @@ export class PolicyEngine {
 const PERIODS = new Set(['hour', 'day', 'week', 'month', 'all']);
 
 /** The limits each policy type reads; `allowlist` and `custom` policies read none of them. */
-const LIMITS_READ_BY: Partial<Record<PolicyType, ReadonlySet<string>>> = {
-  budget: new Set(['maxSteps', 'maxTokens', 'budgetLimit']),
-  timeout: new Set(['maxDuration']),
-};
+const LIMITS_READ_BY = new Map<PolicyType, ReadonlySet<string>>([
+  ['budget', new Set(['maxSteps', 'maxTokens', 'budgetLimit'])],
+  ['timeout', new Set(['maxDuration'])],
+]);
 
 const LIMIT_CONDITIONS = new Set(['maxSteps', 'maxTokens', 'maxDuration', 'budgetLimit']);
 
@@ -724,13 +734,17 @@ const BUDGET_CAPS = ['maxTokens', 'maxToolCalls', 'maxCost'] as const;
  * worked only by coercion, and a limit in a policy type that does not read it did nothing.
  */
 export function assertCheckableLimits(policy: Policy): void {
+  const given: unknown = policy;
+  if (typeof given !== 'object' || given === null) {
+    throw new ValidationError('policy', `must be an object, got ${shownValue(given)}`);
+  }
   if (!policy.enabled) return;
   const at = `policy '${policy.id}'`;
   const rules: unknown = policy.rules;
   if (!Array.isArray(rules)) {
     throw new ValidationError(`${at} rules`, `must be an array, got ${shownValue(rules)}`);
   }
-  const reads = LIMITS_READ_BY[policy.type];
+  const reads = LIMITS_READ_BY.get(policy.type);
   rules.forEach((rule: unknown, index) => {
     const ruleAt = `${at} rules[${index}]`;
     if (typeof rule !== 'object' || rule === null) {

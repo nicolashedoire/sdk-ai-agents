@@ -103,14 +103,26 @@ describe('run budget policies', () => {
   });
 
   it('checks default policies before creating anything', () => {
+    env = createTestSDK();
     const broken = policy('budget', {
       condition: 'budgetLimit',
       action: 'deny',
       metadata: { budgetLimit: { period: 'fortnight', maxTokens: 10 } },
     });
-    expect(() => createSDK({ defaultPolicies: [broken] })).toThrow(
+    // Reading eventStore is the constructor's first step: a FileEventStore would follow.
+    let storeRead = false;
+    const config = {
+      defaultPolicies: [broken],
+      get eventStore() {
+        storeRead = true;
+        return env.store;
+      },
+    };
+
+    expect(() => createSDK(config)).toThrow(
       `Validation failed: policy 'limit-budgetLimit' rules[0].metadata.budgetLimit.period - must be one of hour, day, week, month, all, got "fortnight"`
     );
+    expect(storeRead).toBe(false);
   });
 
   it('keeps an agent running as before when setPolicy refuses a policy', async () => {
@@ -401,6 +413,34 @@ describe('run budget policies', () => {
         'Budget cannot be checked: budgetLimit.maxCost must be a finite number >= 0, got "0.5"'
       );
       expect(lookups).toBe(0);
+    });
+
+    it('refuses every call when a limit no longer says whom it covers', async () => {
+      for (const change of ['removed', 'agentId'] as const) {
+        const provider = new ScriptedLLMProvider().always(CHANNEL, toolCall);
+        const agent = agentWith([], provider);
+        const metadata: {
+          budgetLimit?: { period: 'all'; maxToolCalls: number; agentId?: unknown };
+        } = {
+          budgetLimit: { period: 'all', maxToolCalls: 5, agentId: 'someone-else' },
+        };
+        env.sdk.defineGlobalPolicy(
+          policy('budget', { condition: 'budgetLimit', action: 'deny', metadata })
+        );
+        if (change === 'removed') delete metadata.budgetLimit;
+        else if (metadata.budgetLimit) metadata.budgetLimit.agentId = 7;
+
+        const result = await agent.run({ message: 'Look it up' });
+
+        expect(result.error?.message).toContain(
+          change === 'removed'
+            ? 'Budget cannot be checked: budgetLimit must be an object, got undefined'
+            : 'Budget cannot be checked: budgetLimit.agentId must be a string, got 7'
+        );
+        expect(lookups).toBe(0);
+        await env.dispose();
+      }
+      env = createTestSDK();
     });
 
     it('refuses rather than count when a call cap was changed after the policy was defined', async () => {
