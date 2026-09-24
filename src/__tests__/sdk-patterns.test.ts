@@ -1,13 +1,19 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { createSDK } from '../sdk.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createTestSDK, type TestSDK } from './support/test-sdk.js';
 
 describe('SDK Decision Patterns', () => {
-  let sdk: ReturnType<typeof createSDK>;
+  let env: TestSDK;
+  let sdk: TestSDK['sdk'];
 
   beforeEach(() => {
-    sdk = createSDK({
-      apiKey: 'test-api-key',
-    });
+    // Patterns are computed over every run of the store: a throwaway one per test, not the
+    // shared ./events folder that other suites and earlier runs fill.
+    env = createTestSDK({ apiKey: 'test-api-key' });
+    sdk = env.sdk;
+  });
+
+  afterEach(async () => {
+    await env.dispose();
   });
 
   it('should analyze patterns across multiple runs', async () => {

@@ -1,13 +1,18 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { createSDK } from '../sdk.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createTestSDK, type TestSDK } from './support/test-sdk.js';
 
 describe('SDK Trace Visualization', () => {
-  let sdk: ReturnType<typeof createSDK>;
+  let env: TestSDK;
+  let sdk: TestSDK['sdk'];
 
   beforeEach(() => {
-    sdk = createSDK({
-      apiKey: 'test-api-key',
-    });
+    // A throwaway event store per test, not the shared ./events folder of the working tree.
+    env = createTestSDK({ apiKey: 'test-api-key' });
+    sdk = env.sdk;
+  });
+
+  afterEach(async () => {
+    await env.dispose();
   });
 
   it('should create visualization from trace', async () => {

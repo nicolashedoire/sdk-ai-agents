@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { ActionEngine } from '../engines/action-engine.js'
 import { PolicyEngine } from '../engines/policy-engine.js'
 import { ToolRegistry } from '../registry/tool-registry.js'
@@ -12,9 +15,12 @@ describe('ActionEngine', () => {
   let policyEngine: PolicyEngine
   let toolRegistry: ToolRegistry
   let eventStore: FileEventStore
+  let directory: string
 
   beforeEach(() => {
-    eventStore = new FileEventStore('./test-events')
+    // A throwaway folder per test: ./test-events was shared with the other engine suite.
+    directory = mkdtempSync(join(tmpdir(), 'action-engine-'))
+    eventStore = new FileEventStore(directory)
     policyEngine = new PolicyEngine()
     toolRegistry = new ToolRegistry()
     actionEngine = new ActionEngine(policyEngine, toolRegistry, eventStore)
@@ -29,6 +35,11 @@ describe('ActionEngine', () => {
         return { result: `Processed: ${(params as { value: string }).value}` }
       },
     })
+  })
+
+  afterEach(async () => {
+    await eventStore.destroy()
+    rmSync(directory, { recursive: true, force: true })
   })
 
   describe('executeIntention - tool_call', () => {

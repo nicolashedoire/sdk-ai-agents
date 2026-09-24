@@ -1,29 +1,35 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { createSDK } from '../sdk.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Policy } from '../types/policy.js';
+import { createTestSDK, type TestSDK } from './support/test-sdk.js';
 
 describe('Policy Audit Trail', () => {
   const mockApiKey = 'test-api-key';
+  let env: TestSDK;
 
   beforeEach(() => {
-    // Clear any state if needed
+    // A throwaway event store: the default one creates ./events in the working tree.
+    env = createTestSDK({ apiKey: mockApiKey });
+  });
+
+  afterEach(async () => {
+    await env.dispose();
   });
 
   describe('getPolicyAuditTrail', () => {
     it('should return empty array for non-existent run', () => {
-      const sdk = createSDK({ apiKey: mockApiKey });
+      const sdk = env.sdk;
       const auditTrail = sdk.getPolicyAuditTrail('non-existent-run');
       expect(auditTrail).toEqual([]);
     });
 
     it('should return empty array when no policies evaluated', () => {
-      const sdk = createSDK({ apiKey: mockApiKey });
+      const sdk = env.sdk;
       const auditTrail = sdk.getPolicyAuditTrail('test-run-id');
       expect(auditTrail).toEqual([]);
     });
 
     it('should return audit trail with correct structure', () => {
-      const sdk = createSDK({ apiKey: mockApiKey });
+      const sdk = env.sdk;
       const auditTrail = sdk.getPolicyAuditTrail('test-run-id');
       
       // Verify structure (even if empty)
@@ -45,7 +51,7 @@ describe('Policy Audit Trail', () => {
     });
 
     it('should handle multiple policies in audit trail', () => {
-      const sdk = createSDK({ apiKey: mockApiKey });
+      const sdk = env.sdk;
       const auditTrail = sdk.getPolicyAuditTrail('test-run-id');
       
       // Verify it's an array (can be empty)

@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { BudgetTracker } from '../managers/budget-tracker.js';
 import { FileEventStore } from '../stores/file-event-store.js';
 import type { BudgetLimit } from '../types/policy.js';
@@ -6,11 +9,19 @@ import type { BudgetLimit } from '../types/policy.js';
 describe('BudgetTracker', () => {
   let tracker: BudgetTracker;
   let eventStore: FileEventStore;
+  let directory: string;
 
   beforeEach(() => {
-    eventStore = new FileEventStore();
+    // A throwaway folder: the default one is ./events in the working tree.
+    directory = mkdtempSync(join(tmpdir(), 'budget-tracker-'));
+    eventStore = new FileEventStore(directory);
     tracker = new BudgetTracker(eventStore);
     tracker.clearCache();
+  });
+
+  afterEach(async () => {
+    await eventStore.destroy();
+    rmSync(directory, { recursive: true, force: true });
   });
 
   describe('recordToolCall', () => {

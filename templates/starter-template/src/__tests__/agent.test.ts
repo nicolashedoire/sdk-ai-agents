@@ -1,12 +1,30 @@
-import { describe, it, expect } from 'vitest';
-import { createSDK } from '@sdk-ai-agents/core';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
+import { createSDK, FileEventStore } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 import { defineTool } from '@sdk-ai-agents/core';
 
 describe('Agent', () => {
+  // Tests record their events in a temporary folder, not in the project's ./events.
+  let directory: string;
+  let eventStore: FileEventStore;
+
+  beforeEach(() => {
+    directory = mkdtempSync(join(tmpdir(), 'agent-test-'));
+    eventStore = new FileEventStore(directory);
+  });
+
+  afterEach(async () => {
+    await eventStore.destroy();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
   it('should create an SDK instance', () => {
     const sdk = createSDK({
       apiKey: 'test-key',
+      eventStore,
     });
     expect(sdk).toBeDefined();
   });
@@ -14,6 +32,7 @@ describe('Agent', () => {
   it('should create an agent with tools', () => {
     const sdk = createSDK({
       apiKey: 'test-key',
+      eventStore,
     });
 
     const calculatorTool = defineTool({

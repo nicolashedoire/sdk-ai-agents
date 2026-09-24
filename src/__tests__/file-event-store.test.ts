@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { promises as fs } from 'fs'
+import { tmpdir } from 'os'
 import { join } from 'path'
 import { FileEventStore } from '../stores/file-event-store.js'
 import type { Event } from '../types/events.js'
 
 describe('FileEventStore', () => {
-  const testEventsDir = `./test-events-${Date.now()}`
+  // Under the system's temporary folder, not in the working tree.
+  const testEventsDir = join(tmpdir(), `file-event-store-${process.pid}-${Date.now()}`)
   let store: FileEventStore
 
   beforeEach(async () => {
@@ -18,7 +20,8 @@ describe('FileEventStore', () => {
   })
 
   afterEach(async () => {
-    store.destroy()
+    // Its last flush must be over before the folder is removed, or it could write it again.
+    await store.destroy()
     try {
       await fs.rm(testEventsDir, { recursive: true, force: true })
     } catch {
