@@ -101,6 +101,24 @@ export interface LLMRequest {
 
   /** Abort signal to cancel the request (optional) */
   abortSignal?: AbortSignal;
+
+  /**
+   * Called when a provider discards an answer the vendor billed and reported the usage of
+   * (the OpenAI provider's empty answer, which it fails on or fails over from), so the caller
+   * can still count it. Passed unchanged to the providers of a fallback chain and to retries.
+   */
+  onDiscardedAnswer?: (answer: DiscardedAnswer) => void;
+}
+
+/** An answer a vendor billed, with the usage it reported, that the provider could not use. */
+export interface DiscardedAnswer {
+  /** Provider that received it (`openai`…). */
+  provider: string;
+  /** Model that answered, else the one requested. */
+  model: string;
+  usage: NonNullable<LLMResponse['usage']>;
+  /** Why it could not be used. */
+  reason: string;
 }
 
 /**

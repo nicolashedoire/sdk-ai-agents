@@ -137,6 +137,7 @@ describe('run costs', () => {
     const baseUrl = await server.start();
     server.reply({ status: 200, body: { model: 'jev-1.13.0', answers: { a: { type: 'noul', noul: 0.1 } }, usage: {} } });
     const response = await new JevClient({ apiKey: 'k', baseUrl }).evaluate({ state: 's', questions: { a: { type: 'noul', instructions: 'q' } } });
-    expect(response.usage).toEqual({ inputTokens: 0, outputTokens: 0 });
+    // No token counts: the cost of the call is unknown, not zero.
+    expect(response.usage).toBeUndefined();
   });
 });

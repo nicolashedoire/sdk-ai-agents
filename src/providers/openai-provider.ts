@@ -105,6 +105,20 @@ export class OpenAIProvider implements LLMProvider {
 
       const choice = response.choices[0];
       if (!choice) {
+        // Billed all the same: the caller is told what it cost before this call fails.
+        if (response.usage) {
+          request.onDiscardedAnswer?.({
+            provider: 'openai',
+            // The model that answered, else the one the request body named.
+            model: response.model || request.model || this.defaultModel,
+            usage: {
+              promptTokens: response.usage.prompt_tokens,
+              completionTokens: response.usage.completion_tokens,
+              totalTokens: response.usage.total_tokens,
+            },
+            reason: 'No response from LLM',
+          });
+        }
         throw new Error('No response from LLM');
       }
 

@@ -1,4 +1,9 @@
-import { choice, noul, type TypedDecisionClient } from '../decisions/typed-decisions.js';
+import {
+  choice,
+  noul,
+  rejectedDecision,
+  type TypedDecisionClient,
+} from '../decisions/typed-decisions.js';
 import {
   HeuristicController,
   type CognitiveController,
@@ -109,7 +114,7 @@ export class TypedDecisionController implements CognitiveController {
         state,
         questions,
         answers: response.answers,
-        usage: response.usage,
+        ...(response.usage ? { usage: response.usage } : {}),
       };
 
       const next = response.answers.next_operation;
@@ -151,7 +156,24 @@ export class TypedDecisionController implements CognitiveController {
         throw error;
       }
       const message = error instanceof Error ? error.message : String(error);
-      return this.defer(input, `decision client failed: ${message}`, []);
+      // An answer the client rejected was billed all the same: it stays in the audit trail.
+      const rejected = rejectedDecision(error);
+      return this.defer(
+        input,
+        `decision client failed: ${message}`,
+        rejected
+          ? [
+              {
+                client: this.client.name,
+                purpose: 'operation_selection',
+                state,
+                questions,
+                answers: {},
+                ...rejected,
+              },
+            ]
+          : []
+      );
     }
   }
 

@@ -4,8 +4,10 @@ import {
   choice,
   noul,
   normalizeScore,
+  rejectedDecision,
   score,
   type DecisionResponse,
+  type DecisionUsage,
   type NoulQuestion,
   type Structured,
   type TypedDecisionClient,
@@ -65,7 +67,8 @@ export interface RateResult {
 /**
  * Typed decisions with context injection, single and multiple choice, yes/no checks and
  * ratings. Every call is written to the event log as `decision.evaluated`, with its usage,
- * so it is traceable and priced like any other model call.
+ * so it is traceable and priced like any other model call — also a call whose answer the
+ * client rejected (recorded with its `error`, then the error is thrown).
  */
 export class DecisionService {
   constructor(
@@ -79,13 +82,37 @@ export class DecisionService {
   ): Promise<DecisionResponse<Q> & { runId: string }> {
     // A run id the store would refuse is refused before the paid call, not after it.
     if (input.runId !== undefined) this.eventStore.checkRunId?.(input.runId);
-    const response = await this.client.evaluate({
-      state: input.context,
-      questions: input.questions,
-      ...(input.model ? { model: input.model } : {}),
-      ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
-    });
     const runId = input.runId ?? `decision_${generateId()}`;
+    let response: DecisionResponse<Q>;
+    try {
+      response = await this.client.evaluate({
+        state: input.context,
+        questions: input.questions,
+        ...(input.model ? { model: input.model } : {}),
+        ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+      });
+    } catch (error) {
+      // The backend answered and billed the call, but its answer was rejected: recorded so
+      // that it is priced, before the error reaches the caller.
+      const rejected = rejectedDecision(error);
+      if (rejected) {
+        await this.record(runId, input, { answers: {}, ...rejected });
+      }
+      throw error;
+    }
+    await this.record(runId, input, {
+      model: response.model,
+      answers: response.answers,
+      ...(response.usage ? { usage: response.usage } : {}),
+    });
+    return { ...response, runId };
+  }
+
+  private async record(
+    runId: string,
+    input: AskInput<TypedQuestions>,
+    outcome: { model: string; answers: object; usage?: DecisionUsage; error?: string }
+  ): Promise<void> {
     await this.eventStore.append(runId, {
       id: generateEventId(),
       runId,
@@ -94,15 +121,15 @@ export class DecisionService {
       data: {
         client: this.client.name,
         purpose: 'direct',
-        model: response.model,
+        model: outcome.model,
         state: input.context,
         questions: input.questions,
-        answers: response.answers,
-        usage: response.usage,
+        answers: outcome.answers,
+        ...(outcome.usage ? { usage: outcome.usage } : {}),
+        ...(outcome.error ? { error: outcome.error } : {}),
       },
       ...(input.agentId ? { metadata: { agentId: input.agentId } } : {}),
     });
-    return { ...response, runId };
   }
 
   /** Picks exactly one option. */

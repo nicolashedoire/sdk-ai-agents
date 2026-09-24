@@ -5,43 +5,67 @@ import { costOf, findModelPrice, type PricingTable } from './pricing.js';
 
 export type UsageSource = 'llm' | 'decision';
 
+/** Name given to the model of a call that recorded none. */
+export const UNKNOWN_MODEL = 'unknown';
+
 export interface ModelCostLine {
-  /** Model id returned by the provider. */
+  /** Model id returned by the provider (`unknown` when the call recorded no model name). */
   model: string;
   /** Model name that was requested, when it differs (used to find the price too). */
   requestedModel?: string;
   source: UsageSource;
   calls: number;
+  /**
+   * Calls among `calls` that reported no input/output token counts: their tokens are not in
+   * `inputTokens`/`outputTokens` and their cost is unknown. Present when there are any.
+   */
+  unmeteredCalls?: number;
   inputTokens: number;
   outputTokens: number;
-  /** Undefined when the model has no configured price. */
+  /**
+   * Cost of the calls that reported their tokens. Undefined when the model has no configured
+   * price.
+   */
   costUsd?: number;
 }
 
 export interface RunCostReport {
   runId: string;
   currency: 'USD';
-  /** Sum of the priced lines. */
+  /**
+   * Cost of the calls whose cost is known. When `complete` is false, the calls counted in
+   * `unpricedCalls` and `unmeteredCalls` are missing from it: it is only a lower bound.
+   */
   totalUsd: number;
-  /** False when some usage could not be priced (see `unpricedModels`). */
+  /** False when the cost of some calls is unknown (`unpricedCalls` or `unmeteredCalls`). */
   complete: boolean;
   lines: ModelCostLine[];
+  /** Models without a configured price. */
   unpricedModels: string[];
+  /** Calls of those models that reported their tokens: counted, but their cost is unknown. */
+  unpricedCalls: number;
+  /** Calls that reported no input/output token counts: their cost is unknown. */
+  unmeteredCalls: number;
+  /** Models of those calls. */
+  unmeteredModels: string[];
 }
 
-const llmUsageSchema = z.object({
-  model: z.string(),
-  requestedModel: z.string().optional(),
-  usage: z.object({
+const llmUsageSchema = z
+  .object({
     promptTokens: z.number().optional(),
     completionTokens: z.number().optional(),
     calls: z.number().int().positive().optional(),
-  }),
-});
+    unmeteredCalls: z.number().int().nonnegative().optional(),
+  })
+  .optional();
 
-const decisionUsageSchema = z.object({
-  model: z.string(),
-  usage: z.object({ inputTokens: z.number(), outputTokens: z.number() }),
+const decisionUsageSchema = z
+  .object({ inputTokens: z.number().optional(), outputTokens: z.number().optional() })
+  .optional();
+
+const modelCallSchema = z.object({
+  model: z.string().optional(),
+  requestedModel: z.string().optional(),
 });
 
 interface UsageRecord {
@@ -49,46 +73,95 @@ interface UsageRecord {
   requestedModel?: string;
   source: UsageSource;
   calls: number;
+  /** Calls among `calls` without input/output token counts (their tokens are unknown). */
+  unmeteredCalls: number;
   inputTokens: number;
   outputTokens: number;
 }
 
-/** Reads the token usage recorded by LLM calls and typed decisions in a run. */
+/**
+ * Reads the model calls recorded in a run, with their token usage: LLM calls (native
+ * reasoning and tool selection, answers discarded after the vendor billed them, cognitive
+ * thoughts and operations interrupted after billed attempts) and typed decisions, rejected
+ * answers included. A call recorded without input/output token counts is counted as
+ * unmetered: its cost is unknown, never taken as zero.
+ */
 export function collectUsage(events: Event[]): UsageRecord[] {
   const records: UsageRecord[] = [];
   for (const event of uniqueById(events)) {
-    if (event.type === 'intention.generated' || event.type === 'cognition.thought') {
-      const parsed = llmUsageSchema.safeParse(event.data);
-      if (parsed.success) {
-        records.push({
-          model: parsed.data.model,
-          ...(parsed.data.requestedModel && parsed.data.requestedModel !== parsed.data.model
-            ? { requestedModel: parsed.data.requestedModel }
-            : {}),
-          source: 'llm',
-          calls: parsed.data.usage.calls ?? 1,
-          inputTokens: parsed.data.usage.promptTokens ?? 0,
-          outputTokens: parsed.data.usage.completionTokens ?? 0,
-        });
-      }
-    }
-    if (event.type === 'decision.evaluated') {
-      const parsed = decisionUsageSchema.safeParse(event.data);
-      if (parsed.success) {
-        records.push({
-          model: parsed.data.model,
-          source: 'decision',
-          calls: 1,
-          inputTokens: parsed.data.usage.inputTokens,
-          outputTokens: parsed.data.usage.outputTokens,
-        });
-      }
-    }
+    const record = usageOf(event);
+    if (record) records.push(record);
   }
   return records;
 }
 
-/** Aggregates the usage of a run per model and prices it. */
+function usageOf(event: Event): UsageRecord | undefined {
+  const { data } = event;
+  switch (event.type) {
+    case 'intention.generated':
+      // The final answer of a cognitive run is recorded as an intention, not a model call.
+      return data.source === 'cognition' ? undefined : llmRecord(data);
+    case 'provider.answer_discarded':
+      return llmRecord(data);
+    case 'cognition.thought':
+    case 'cognition.operation_failed':
+      // A thought made by the engine alone (a tool result, a test) called no model.
+      return data.model !== undefined || data.usage !== undefined ? llmRecord(data) : undefined;
+    case 'decision.evaluated':
+      return decisionRecord(data);
+    default:
+      return undefined;
+  }
+}
+
+function llmRecord(data: Record<string, unknown>): UsageRecord {
+  // A malformed name or usage does not hide the call: its model or its cost is then unknown.
+  const names = modelCallSchema.safeParse(data);
+  const parsed = llmUsageSchema.safeParse(data.usage);
+  const usage = parsed.success ? parsed.data : undefined;
+  const calls = usage?.calls ?? 1;
+  const metered = usage?.promptTokens !== undefined || usage?.completionTokens !== undefined;
+  return {
+    ...modelOf(names.success ? names.data : {}),
+    source: 'llm',
+    calls,
+    unmeteredCalls: metered ? Math.min(calls, usage?.unmeteredCalls ?? 0) : calls,
+    inputTokens: usage?.promptTokens ?? 0,
+    outputTokens: usage?.completionTokens ?? 0,
+  };
+}
+
+function decisionRecord(data: Record<string, unknown>): UsageRecord {
+  const names = modelCallSchema.safeParse(data);
+  const parsed = decisionUsageSchema.safeParse(data.usage);
+  const usage = parsed.success ? parsed.data : undefined;
+  const metered = usage?.inputTokens !== undefined || usage?.outputTokens !== undefined;
+  return {
+    ...modelOf({ model: names.success ? names.data.model : undefined }),
+    source: 'decision',
+    calls: 1,
+    unmeteredCalls: metered ? 0 : 1,
+    inputTokens: usage?.inputTokens ?? 0,
+    outputTokens: usage?.outputTokens ?? 0,
+  };
+}
+
+/** The model that answered, else the one requested, else `unknown`. */
+function modelOf(names: { model?: string; requestedModel?: string }): {
+  model: string;
+  requestedModel?: string;
+} {
+  const model = names.model || names.requestedModel || UNKNOWN_MODEL;
+  return names.requestedModel && names.requestedModel !== model
+    ? { model, requestedModel: names.requestedModel }
+    : { model };
+}
+
+/**
+ * Aggregates the usage of a run per model and prices it. The cost of a call is unknown when
+ * its model has no price (`unpricedCalls`) or it reported no token counts (`unmeteredCalls`):
+ * the report is then not `complete`, and `totalUsd` only covers the calls whose cost is known.
+ */
 export function computeRunCost(
   runId: string,
   events: Event[],
@@ -106,6 +179,9 @@ export function computeRunCost(
       outputTokens: 0,
     };
     line.calls += record.calls;
+    if (record.unmeteredCalls > 0) {
+      line.unmeteredCalls = (line.unmeteredCalls ?? 0) + record.unmeteredCalls;
+    }
     // Any record of the line can tell which name was requested (a failed first call too).
     if (!line.requestedModel && record.requestedModel) {
       line.requestedModel = record.requestedModel;
@@ -116,11 +192,25 @@ export function computeRunCost(
   }
 
   const unpricedModels: string[] = [];
+  const unmeteredModels = new Set<string>();
+  let unpricedCalls = 0;
+  let unmeteredCalls = 0;
   let totalUsd = 0;
   for (const line of lines.values()) {
-    const price = findModelPrice(pricing, line.model, line.requestedModel);
+    const unmetered = line.unmeteredCalls ?? 0;
+    if (unmetered > 0) {
+      unmeteredCalls += unmetered;
+      unmeteredModels.add(line.model);
+    }
+    // A model named by no call cannot have a price, even under a catch-all `*` key.
+    const price =
+      line.model === UNKNOWN_MODEL && !line.requestedModel
+        ? undefined
+        : findModelPrice(pricing, line.model, line.requestedModel);
     if (!price) {
       unpricedModels.push(line.model);
+      // As budgets count them: a call without token counts is unmetered, whatever its model.
+      unpricedCalls += line.calls - unmetered;
       continue;
     }
     line.costUsd = roundUsd(costOf(price, line.inputTokens, line.outputTokens));
@@ -131,9 +221,12 @@ export function computeRunCost(
     runId,
     currency: 'USD',
     totalUsd: roundUsd(totalUsd),
-    complete: unpricedModels.length === 0,
+    complete: unpricedCalls + unmeteredCalls === 0,
     lines: [...lines.values()],
     unpricedModels,
+    unpricedCalls,
+    unmeteredCalls,
+    unmeteredModels: [...unmeteredModels],
   };
 }
 

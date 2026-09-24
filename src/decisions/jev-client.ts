@@ -5,6 +5,7 @@ import {
   parseAnswers,
   type DecisionRequest,
   type DecisionResponse,
+  type DecisionUsage,
   type TypedDecisionClient,
   type TypedQuestions,
 } from './typed-decisions.js';
@@ -47,13 +48,18 @@ export const JEV_DEFAULT_MODEL = 'jev-latest';
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504, 529]);
 const MAX_ERROR_DETAIL_LENGTH = 500;
 
+const usageSchema = z
+  .object({ input_tokens: z.number().optional(), output_tokens: z.number().optional() })
+  .optional();
+
 const evaluationResponseSchema = z.object({
   model: z.string(),
   answers: z.record(z.unknown()),
-  usage: z
-    .object({ input_tokens: z.number().optional(), output_tokens: z.number().optional() })
-    .optional(),
+  usage: usageSchema,
 });
+
+/** What a body that is not a valid evaluation may still tell about the call's cost. */
+const billedResponseSchema = z.object({ model: z.string().optional(), usage: usageSchema });
 
 const modelsResponseSchema = z.object({
   models: z.array(
@@ -100,37 +106,45 @@ export class JevClient implements TypedDecisionClient {
     request: DecisionRequest<Q>
   ): Promise<DecisionResponse<Q>> {
     assertValidQuestions(request.questions);
+    const requestedModel = request.model ?? this.model;
     const body = JSON.stringify({
       state: request.state,
-      model: request.model ?? this.model,
+      model: requestedModel,
       questions: request.questions,
     });
 
     const payload = await this.send('POST', '/v1/systemone', body, request.abortSignal);
     const parsed = evaluationResponseSchema.safeParse(payload);
     if (!parsed.success) {
+      // No usable answer: the call is reported as billed only if the body gives its usage.
+      const billed = billedResponseSchema.safeParse(payload);
+      const usage = billed.success ? toDecisionUsage(billed.data.usage) : undefined;
       throw new DecisionClientError(this.name, 'Unexpected response shape from /v1/systemone', {
         retryable: false,
+        ...(billed.success && usage
+          ? { billed: { model: billed.data.model ?? requestedModel, usage } }
+          : {}),
       });
     }
 
+    const usage = toDecisionUsage(parsed.data.usage);
     let answers: DecisionResponse<Q>['answers'];
     try {
       answers = parseAnswers(request.questions, parsed.data.answers);
     } catch (error) {
+      // The model answered, and the call was billed: the caller can still count it.
       throw new DecisionClientError(this.name, 'Response answers do not match the questions', {
         retryable: false,
         originalError: toError(error),
+        billed: { model: parsed.data.model, ...(usage ? { usage } : {}) },
       });
     }
 
     return {
       model: parsed.data.model,
       answers,
-      usage: {
-        inputTokens: parsed.data.usage?.input_tokens ?? 0,
-        outputTokens: parsed.data.usage?.output_tokens ?? 0,
-      },
+      // Without token counts the cost is unknown: no usage rather than zero tokens.
+      ...(usage ? { usage } : {}),
     };
   }
 
@@ -268,6 +282,14 @@ function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
     };
     signal?.addEventListener('abort', onAbort, { once: true });
   });
+}
+
+/** Token counts as reported, or undefined when neither input nor output tokens were given. */
+function toDecisionUsage(usage: z.infer<typeof usageSchema>): DecisionUsage | undefined {
+  if (usage?.input_tokens === undefined && usage?.output_tokens === undefined) {
+    return undefined;
+  }
+  return { inputTokens: usage.input_tokens ?? 0, outputTokens: usage.output_tokens ?? 0 };
 }
 
 function describeErrorBody(text: string): string {

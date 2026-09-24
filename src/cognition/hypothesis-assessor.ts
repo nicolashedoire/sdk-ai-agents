@@ -1,7 +1,9 @@
 import { ValidationError } from '../errors/index.js';
 import {
   normalizeScore,
+  rejectedDecision,
   score,
+  type DecisionResponse,
   type ScoreQuestion,
   type TypedDecisionClient,
 } from '../decisions/typed-decisions.js';
@@ -107,7 +109,7 @@ export class TypedHypothesisAssessor implements HypothesisAssessor {
         EVIDENCE_LEVELS
       );
     });
-    const evidence = await this.ask(evidenceState, evidenceQuestions, input.abortSignal);
+    const evidence = await this.ask('evidence', evidenceState, evidenceQuestions, input, []);
 
     const proposals = hypotheses.filter((hypothesis) => hypothesis.kind === 'proposal');
     const fitState = {
@@ -122,17 +124,10 @@ export class TypedHypothesisAssessor implements HypothesisAssessor {
         FIT_LEVELS
       );
     });
-    let fit: Awaited<ReturnType<TypedHypothesisAssessor['ask']>> | undefined;
-    try {
-      fit =
-        proposals.length > 0
-          ? await this.ask(fitState, fitQuestions, input.abortSignal)
-          : undefined;
-    } catch (error) {
-      if (input.abortSignal?.aborted) throw error;
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new HypothesisAssessmentError(`fit request failed: ${reason}`, [evidence.record]);
-    }
+    const fit =
+      proposals.length > 0
+        ? await this.ask('fit', fitState, fitQuestions, input, [evidence.record])
+        : undefined;
     const records = [evidence.record, ...(fit ? [fit.record] : [])];
 
     const updates = hypotheses.map((hypothesis) => {
@@ -173,25 +168,45 @@ export class TypedHypothesisAssessor implements HypothesisAssessor {
     return { patch, evaluations: records };
   }
 
+  /**
+   * One typed-decision request. When it fails after earlier requests of the assessment, or
+   * after the backend billed an answer it rejected, the error carries those calls
+   * (`HypothesisAssessmentError`) so they are still recorded and priced, also when the run is
+   * being stopped.
+   */
   private async ask(
+    label: 'evidence' | 'fit',
     state: Record<string, unknown>,
     questions: Record<string, ScoreQuestion>,
-    abortSignal: AbortSignal | undefined
+    input: { abortSignal?: AbortSignal },
+    earlier: DecisionEvaluationRecord[]
   ) {
-    const response = await this.client.evaluate({
-      state,
-      questions,
-      ...(this.options.model ? { model: this.options.model } : {}),
-      ...(abortSignal ? { abortSignal } : {}),
-    });
-    const record: DecisionEvaluationRecord = {
+    const call = {
       client: this.client.name,
-      purpose: 'hypothesis_assessment',
-      model: response.model,
+      purpose: 'hypothesis_assessment' as const,
       state,
       questions,
+    };
+    let response: DecisionResponse<Record<string, ScoreQuestion>>;
+    try {
+      response = await this.client.evaluate({
+        state,
+        questions,
+        ...(this.options.model ? { model: this.options.model } : {}),
+        ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+      });
+    } catch (error) {
+      const rejected = rejectedDecision(error);
+      const records = rejected ? [...earlier, { ...call, answers: {}, ...rejected }] : earlier;
+      if (records.length === 0) throw error;
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new HypothesisAssessmentError(`${label} request failed: ${reason}`, records);
+    }
+    const record: DecisionEvaluationRecord = {
+      ...call,
+      model: response.model,
       answers: response.answers,
-      usage: response.usage,
+      ...(response.usage ? { usage: response.usage } : {}),
     };
     return { response, record };
   }

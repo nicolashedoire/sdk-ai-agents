@@ -1,5 +1,6 @@
 import { ThoughtGenerationError, type ModelUsage } from '../errors/index.js';
 import type {
+  DiscardedAnswer,
   LLMProvider,
   LLMRequest,
   LLMResponse,
@@ -81,6 +82,11 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
     ];
     const usage: ModelUsage = { promptTokens: 0, completionTokens: 0, calls: 0 };
     let model: string | undefined;
+    // Answers a provider discarded after the vendor billed them count like the others.
+    const onDiscardedAnswer = (answer: DiscardedAnswer) => {
+      addUsage(usage, answer.usage);
+      model ??= answer.model;
+    };
     const maxAttempts = 1 + Math.max(0, this.options.maxRepairAttempts ?? 1);
     let lastError = 'no reply';
 
@@ -97,6 +103,7 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
             ? { reasoningEffort: this.options.reasoningEffort }
             : {}),
           ...(request.abortSignal ? { abortSignal: request.abortSignal } : {}),
+          onDiscardedAnswer,
         });
       } catch (error) {
         // Keep the tokens of earlier attempts: they were billed even if this call failed.
@@ -112,9 +119,7 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
           }
         );
       }
-      usage.promptTokens += response.usage?.promptTokens ?? 0;
-      usage.completionTokens += response.usage?.completionTokens ?? 0;
-      usage.calls += 1;
+      addUsage(usage, response.usage);
       model = response.model;
 
       const content = response.content ?? '';
@@ -144,6 +149,20 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
       requestedModel: this.options.model,
     });
   }
+}
+
+/**
+ * Adds one call to the usage. A call that reported no input/output token counts is counted
+ * as unmetered: its cost is unknown, not zero.
+ */
+function addUsage(usage: ModelUsage, reported: LLMResponse['usage']): void {
+  usage.calls += 1;
+  if (reported?.promptTokens === undefined && reported?.completionTokens === undefined) {
+    usage.unmeteredCalls = (usage.unmeteredCalls ?? 0) + 1;
+    return;
+  }
+  usage.promptTokens += reported.promptTokens ?? 0;
+  usage.completionTokens += reported.completionTokens ?? 0;
 }
 
 /**

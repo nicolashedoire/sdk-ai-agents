@@ -1,3 +1,4 @@
+import { ThoughtGenerationError } from '../errors/index.js';
 import type { CognitiveOperation } from './cognitive-operations.js';
 import type { CognitiveRunRecorder } from './cognitive-run-recorder.js';
 import { HypothesisAssessmentError, type HypothesisAssessor } from './hypothesis-assessor.js';
@@ -20,7 +21,8 @@ export interface OperationPerformerDependencies {
  * Executes one cognitive operation and returns its outcome without touching the state:
  * tools for `seek_information`, the outcome evaluator for `test_prediction`, the
  * typed-decision assessor for `compare` when configured, the thought generator otherwise.
- * Failures become outcomes, except cancellation.
+ * Failures become outcomes, except cancellation: the model calls billed before it are then
+ * recorded here, since no thought will carry them.
  */
 export class OperationPerformer {
   constructor(private readonly deps: OperationPerformerDependencies) {}
@@ -64,9 +66,31 @@ export class OperationPerformer {
         ...(generated.usage ? { usage: generated.usage } : {}),
       };
     } catch (error) {
-      if (signal.aborted) throw error;
+      if (signal.aborted) {
+        await this.recordInterrupted(input, error);
+        throw error;
+      }
       return failureOutcome(error);
     }
+  }
+
+  /**
+   * An operation stopped by a cancellation or a timeout after attempts the vendor billed (an
+   * invalid reply, then a repair cut short): their usage is recorded with the failure.
+   */
+  private async recordInterrupted(
+    input: { runId: string; operation: CognitiveOperation; step: number },
+    error: unknown
+  ): Promise<void> {
+    if (!(error instanceof ThoughtGenerationError) || !error.usage) return;
+    await this.deps.recorder.record(input.runId, 'cognition.operation_failed', {
+      step: input.step,
+      operation: input.operation,
+      error: truncate(error.message),
+      ...(error.model ? { model: error.model } : {}),
+      ...(error.requestedModel ? { requestedModel: error.requestedModel } : {}),
+      usage: error.usage,
+    });
   }
 
   /** Compares with the typed-decision assessor; undefined lets the LLM compare instead. */
@@ -89,11 +113,12 @@ export class OperationPerformer {
       await this.deps.recorder.evaluations(input.runId, input.step, assessment.evaluations);
       return { proposal: { contract: 'compare', patch: assessment.patch } };
     } catch (error) {
-      if (input.signal.aborted) throw error;
       if (error instanceof HypothesisAssessmentError) {
-        // Calls made before the failure were billed: keep them in the trace and the costs.
+        // Calls made before the failure were billed: keep them in the trace and the costs,
+        // also when the run is being stopped.
         await this.deps.recorder.evaluations(input.runId, input.step, error.evaluations);
       }
+      if (input.signal.aborted) throw error;
       await this.deps.recorder.record(input.runId, 'cognition.operation_failed', {
         step: input.step,
         operation: 'compare',

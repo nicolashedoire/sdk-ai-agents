@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ValidationError } from '../errors/index.js';
+import { DecisionClientError, ValidationError } from '../errors/index.js';
 
 /**
  * Typed decisions ("System One" questions).
@@ -103,7 +103,11 @@ export interface DecisionResponse<Q extends TypedQuestions> {
   /** Versioned model id that answered (e.g. `jev-1.13.0`). */
   model: string;
   answers: TypedAnswers<Q>;
-  usage: DecisionUsage;
+  /**
+   * Tokens the call used. Absent when the backend reported no input/output token counts: the
+   * cost of the call is then unknown (`sdk.getRunCost` counts it as unmetered), not zero.
+   */
+  usage?: DecisionUsage;
 }
 
 /**
@@ -211,6 +215,22 @@ export function parseAnswers<Q extends TypedQuestions>(
     parsed[id] = answer;
   }
   return parsed as TypedAnswers<Q>;
+}
+
+/**
+ * The call behind an error of a backend that answered, and billed the call, although its
+ * answer was rejected (see `DecisionClientError.billed`): the model, the usage it reported
+ * and why the answer was rejected. Undefined for any other failure.
+ */
+export function rejectedDecision(
+  error: unknown
+): { model: string; usage?: DecisionUsage; error: string } | undefined {
+  if (!(error instanceof DecisionClientError) || !error.billed) {
+    return undefined;
+  }
+  const { model, usage } = error.billed;
+  const cause = error.originalError ? `: ${error.originalError.message}` : '';
+  return { model, ...(usage ? { usage } : {}), error: `${error.message}${cause}` };
 }
 
 /** Normalizes a score answer to [0, 1] (0 = lowest level, 1 = highest level). */

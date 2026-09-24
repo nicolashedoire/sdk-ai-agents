@@ -320,24 +320,30 @@ function recordedAllowedTools(events: Event[]): string[] | undefined {
 
 /**
  * The progress of the original run when each of its intentions was generated: the step, the
- * tokens used so far and the time elapsed. Budget and timeout policies then decide in the
- * replay as they did in the original run, so a call they refused is refused again.
+ * tokens used so far (answers a provider discarded included, as the run counted them) and the
+ * time elapsed. Budget and timeout policies then decide in the replay as they did in the
+ * original run, so a call they refused is refused again.
  */
 function recordedProgress(
   events: Event[]
 ): Array<{ step: number; tokensUsed: number; elapsedMs: number }> {
   const startedAt = events.find((event) => event.type === 'run.started')?.timestamp;
   let tokensUsed = 0;
-  return events
-    .filter((event) => event.type === 'intention.generated')
-    .map((event, step) => {
-      tokensUsed += tokensOf(event.data.usage);
-      return {
-        step,
+  const progress: Array<{ step: number; tokensUsed: number; elapsedMs: number }> = [];
+  for (const event of events) {
+    if (event.type !== 'intention.generated' && event.type !== 'provider.answer_discarded') {
+      continue;
+    }
+    tokensUsed += tokensOf(event.data.usage);
+    if (event.type === 'intention.generated') {
+      progress.push({
+        step: progress.length,
         tokensUsed,
         elapsedMs: startedAt === undefined ? 0 : Math.max(0, event.timestamp - startedAt),
-      };
-    });
+      });
+    }
+  }
+  return progress;
 }
 
 function tokensOf(usage: unknown): number {
