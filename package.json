@@ -94,6 +94,7 @@
     "@vitest/coverage-v8": "^1.0.4",
     "mermaid": "11.17.2",
     "pg": "^8.11.3",
+    "postcss-rtlcss": "6.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.2",
     "vitepress": "1.6.4",

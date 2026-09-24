@@ -32,6 +32,13 @@
   font-size: 26px;
 }
 
+/* The default theme sets this gap in a `:deep(.logo)` rule, which no longer matches once
+   postcss-rtlcss prefixes it (see config.mts). A logical property sits on the right side
+   in both reading directions. */
+.VPNavBarTitle .logo {
+  margin-inline-end: 8px;
+}
+
 .illustration {
   display: block;
   margin: 24px auto;
