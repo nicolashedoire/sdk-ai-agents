@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import type { RegressionTestSuite } from '../types/regression-test.js';
+import { fileInFolder } from '../utils/file-in-folder.js';
 
 export class RegressionTestManager {
   private testSuitesDir: string;
@@ -44,7 +45,7 @@ export class RegressionTestManager {
       updatedAt: Date.now(),
     };
 
-    const filePath = join(this.testSuitesDir, `${suite.id}.json`);
+    const filePath = fileInFolder(this.testSuitesDir, suite.id, '.json', 'id');
     await fs.writeFile(filePath, JSON.stringify(suite, null, 2), 'utf-8');
 
     this.testSuitesCache.set(suite.id, suite);
@@ -61,7 +62,7 @@ export class RegressionTestManager {
     await this.ensureTestSuitesDir();
 
     try {
-      const filePath = join(this.testSuitesDir, `${suiteId}.json`);
+      const filePath = fileInFolder(this.testSuitesDir, suiteId, '.json', 'id');
       const content = await fs.readFile(filePath, 'utf-8');
       const suite = JSON.parse(content) as RegressionTestSuite;
       this.testSuitesCache.set(suiteId, suite);
@@ -108,7 +109,7 @@ export class RegressionTestManager {
     await this.ensureTestSuitesDir();
 
     try {
-      const filePath = join(this.testSuitesDir, `${suiteId}.json`);
+      const filePath = fileInFolder(this.testSuitesDir, suiteId, '.json', 'id');
       await fs.unlink(filePath);
       this.testSuitesCache.delete(suiteId);
       return true;

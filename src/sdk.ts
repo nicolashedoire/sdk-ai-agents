@@ -129,6 +129,10 @@ export interface SDK {
     periodEnd: number;
     tokensUsed: number;
     toolCallsCount: number;
+    /** USD spent by model calls with a price; unpriced and unmetered calls have none. */
+    costUsd: number;
+    unpricedCalls: number;
+    unmeteredCalls: number;
     lastUpdated: number;
   }>;
   getPolicyAuditTrail(runId: string): Array<{
@@ -261,6 +265,7 @@ export class SDKImpl implements SDK {
 
     // Connect BudgetTracker and EventStore to PolicyEngine
     this.policyEngine.setBudgetTracker(this.budgetTracker);
+    this.policyEngine.setPricing(this.pricing);
     this.policyEngine.setEventStore(this.eventStore);
 
     // Create provider once (shared, stateless)
@@ -343,9 +348,9 @@ export class SDKImpl implements SDK {
     const ids = runIds ?? (await this.eventStore.getRunIds());
     const examples: ControllerTrainingExample[] = [];
     for (const runId of ids) {
-      const events = await this.eventStore.getEvents(runId);
-      if (!events.some((event) => event.type === 'cognition.started')) continue;
       try {
+        const events = await this.eventStore.getEvents(runId);
+        if (!events.some((event) => event.type === 'cognition.started')) continue;
         examples.push(...buildControllerDataset(runId, events));
       } catch (error) {
         // One damaged run must not block the export of all the others.
@@ -1152,6 +1157,10 @@ export class SDKImpl implements SDK {
     periodEnd: number;
     tokensUsed: number;
     toolCallsCount: number;
+    /** USD spent by model calls with a price; unpriced and unmetered calls have none. */
+    costUsd: number;
+    unpricedCalls: number;
+    unmeteredCalls: number;
     lastUpdated: number;
   }> {
     const usage = await this.budgetTracker.getUsage(limit);
@@ -1163,6 +1172,9 @@ export class SDKImpl implements SDK {
       periodEnd: usage.periodEnd,
       tokensUsed: usage.tokensUsed,
       toolCallsCount: usage.toolCallsCount,
+      costUsd: usage.costUsd,
+      unpricedCalls: usage.unpricedCalls,
+      unmeteredCalls: usage.unmeteredCalls,
       lastUpdated: usage.lastUpdated,
     };
   }

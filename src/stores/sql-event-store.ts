@@ -6,6 +6,8 @@ import type {
   EventQueryResult,
 } from '../types/events.js';
 import type { IEventStore, BackupData } from './event-store.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { ValidationError } from '../errors/index.js';
 import { deriveRunStatus } from '../utils/run-status.js';
 
 export interface SQLConnection {
@@ -19,20 +21,79 @@ export interface SQLEventStoreConfig {
   tableName?: string;
 }
 
+/** An SQL identifier, optionally qualified by a schema (`app.events`): it goes into the SQL text. */
+const TABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,62}(\.[A-Za-z_][A-Za-z0-9_]{0,62})?$/;
+
+/**
+ * The schema creation attempt a call belongs to, if any. Each attempt has its own token: a
+ * call waits for the schema unless it belongs to this store's attempt still in progress.
+ */
+const schemaAttemptOf = new AsyncLocalStorage<object>();
+
 export class SQLEventStore implements IEventStore {
+  /** The connection for every query: each one waits until the schema exists. */
   protected connection: SQLConnection;
   protected tableName: string;
+  /** Schema of the table (`app` in `app.events`), if any. */
+  protected schemaName: string | undefined;
+  /** The table's name without its schema. */
+  protected unqualifiedTableName: string;
+  /** Prefix of the index names: `idx_<table>`, without the schema. */
+  protected indexPrefix: string;
+  private readonly rawConnection: SQLConnection;
+  private schema?: Promise<void>;
+  /** Token of the schema creation in progress (see schemaAttemptOf). */
+  private schemaAttempt?: object;
 
   constructor(config: SQLEventStoreConfig) {
-    this.connection = config.connection;
-    this.tableName = config.tableName || 'events';
-    this.initializeSchema();
+    const tableName = config.tableName || 'events';
+    if (!TABLE_NAME.test(tableName)) {
+      throw new ValidationError(
+        'tableName',
+        `"${tableName.slice(0, 80)}" is not a table name: use letters, digits and "_" (at most 63), optionally after a schema ("app.events")`
+      );
+    }
+    this.tableName = tableName;
+    const [first, second] = tableName.split('.');
+    this.schemaName = second === undefined ? undefined : first;
+    this.unqualifiedTableName = second ?? tableName;
+    this.indexPrefix = `idx_${this.unqualifiedTableName}`;
+    this.rawConnection = config.connection;
+    this.connection = afterSchema(
+      config.connection,
+      () => this.ensureSchema(),
+      () => this.schemaAttempt !== undefined && schemaAttemptOf.getStore() === this.schemaAttempt
+    );
+    // Created at once, in the background. Queries wait for it, so the first write cannot come
+    // before the table exists. A failure (database not reachable yet) is reported by the
+    // operations that wait for it, and the next operation tries again.
+    this.ensureSchema().catch(() => undefined);
+  }
+
+  /** The schema, created once; after a failure, the next call tries again. */
+  private ensureSchema(): Promise<void> {
+    if (!this.schema) {
+      const attempt = {};
+      this.schemaAttempt = attempt;
+      const settled = () => {
+        if (this.schemaAttempt === attempt) this.schemaAttempt = undefined;
+      };
+      this.schema = schemaAttemptOf
+        .run(attempt, () => this.initializeSchema(this.rawConnection))
+        .then(settled, (error: unknown) => {
+          settled();
+          this.schema = undefined;
+          throw error;
+        });
+    }
+    return this.schema;
   }
 
   /**
-   * Initializes the database schema if it doesn't exist.
+   * Initializes the database schema if it doesn't exist, on the connection given. Queries
+   * made through `this.connection` from here run at once (they do not wait for the schema).
    */
-  protected async initializeSchema(): Promise<void> {
+  protected async initializeSchema(connection: SQLConnection): Promise<void> {
     const createTableSQL = `
       CREATE TABLE IF NOT EXISTS ${this.tableName} (
         id TEXT PRIMARY KEY,
@@ -44,20 +105,21 @@ export class SQLEventStore implements IEventStore {
       )
     `;
 
-    await this.connection.execute(createTableSQL);
+    await connection.execute(createTableSQL);
 
-    // Create indexes for common queries
+    // Indexes for common queries. SQLite puts the schema on the index name, not the table.
+    const indexSchema = this.schemaName ? `${this.schemaName}.` : '';
     const createIndexesSQL = [
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_run_id ON ${this.tableName}(run_id)`,
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_type ON ${this.tableName}(type)`,
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_timestamp ON ${this.tableName}(timestamp)`,
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_run_timestamp ON ${this.tableName}(run_id, timestamp)`,
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_type_timestamp ON ${this.tableName}(type, timestamp)`,
+      `CREATE INDEX IF NOT EXISTS ${indexSchema}${this.indexPrefix}_run_id ON ${this.unqualifiedTableName}(run_id)`,
+      `CREATE INDEX IF NOT EXISTS ${indexSchema}${this.indexPrefix}_type ON ${this.unqualifiedTableName}(type)`,
+      `CREATE INDEX IF NOT EXISTS ${indexSchema}${this.indexPrefix}_timestamp ON ${this.unqualifiedTableName}(timestamp)`,
+      `CREATE INDEX IF NOT EXISTS ${indexSchema}${this.indexPrefix}_run_timestamp ON ${this.unqualifiedTableName}(run_id, timestamp)`,
+      `CREATE INDEX IF NOT EXISTS ${indexSchema}${this.indexPrefix}_type_timestamp ON ${this.unqualifiedTableName}(type, timestamp)`,
     ];
 
     for (const indexSQL of createIndexesSQL) {
       try {
-        await this.connection.execute(indexSQL);
+        await connection.execute(indexSQL);
       } catch {
         // Ignore errors if index already exists (some databases may throw)
         // This is safe because we use IF NOT EXISTS where supported
@@ -637,6 +699,33 @@ export class SQLEventStore implements IEventStore {
    * Closes the database connection.
    */
   async close(): Promise<void> {
+    // Let a schema creation in progress finish (or fail) before closing its connection.
+    await this.schema?.catch(() => undefined);
     await this.connection.close();
   }
+}
+
+/**
+ * A connection whose queries wait for the schema before running, except the ones that belong
+ * to the schema's own creation (a subclass creating it through `this.connection`).
+ */
+function afterSchema(
+  connection: SQLConnection,
+  schema: () => Promise<void>,
+  creatingSchema: () => boolean
+): SQLConnection {
+  const ready = async () => {
+    if (!creatingSchema()) await schema();
+  };
+  return {
+    query: async <T = unknown>(sql: string, params?: unknown[]): Promise<T[]> => {
+      await ready();
+      return connection.query<T>(sql, params);
+    },
+    execute: async (sql: string, params?: unknown[]): Promise<void> => {
+      await ready();
+      await connection.execute(sql, params);
+    },
+    close: () => connection.close(),
+  };
 }

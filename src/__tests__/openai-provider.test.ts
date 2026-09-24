@@ -1,34 +1,44 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { OpenAIProvider } from '../providers/openai-provider.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LLMProviderError } from '../errors/index.js';
-import OpenAI from 'openai';
+import { OpenAIProvider } from '../providers/openai-provider.js';
+import { LocalHttpServer } from './support/local-http-server.js';
+import { openAIChat, openAIError } from './support/vendor-api.js';
 
-const mockCreate = vi.fn();
-
-vi.mock('openai', () => {
-  return {
-    default: class MockOpenAI {
-      chat = {
-        completions: {
-          create: mockCreate,
-        },
-      };
-    },
-  };
-});
-
+// The real OpenAI client talks to a local server that answers in the OpenAI wire format.
 describe('OpenAIProvider', () => {
+  let server: LocalHttpServer;
+  let baseURL: string;
   let provider: OpenAIProvider;
 
-  beforeEach(() => {
-    provider = new OpenAIProvider('test-api-key');
-    mockCreate.mockClear();
+  beforeEach(async () => {
+    server = new LocalHttpServer();
+    baseURL = `${await server.start()}/v1`;
+    provider = new OpenAIProvider('test-api-key', 'gpt-4', { baseURL, maxRetries: 0 });
   });
+
+  afterEach(async () => {
+    await server.stop();
+  });
+
+  const calculator = {
+    type: 'function' as const,
+    function: {
+      name: 'calculator',
+      description: 'Performs calculations',
+      parameters: {
+        type: 'object',
+        properties: {
+          operation: { type: 'string' },
+          a: { type: 'number' },
+          b: { type: 'number' },
+        },
+      },
+    },
+  };
 
   describe('constructor', () => {
     it('should create provider with API key', () => {
-      const p = new OpenAIProvider('test-key');
-      expect(p).toBeDefined();
+      expect(new OpenAIProvider('test-key')).toBeDefined();
     });
 
     it('should throw error if API key is empty', () => {
@@ -36,14 +46,18 @@ describe('OpenAIProvider', () => {
       expect(() => new OpenAIProvider('   ')).toThrow('OpenAI API key is required');
     });
 
-    it('should use default model if not specified', () => {
-      const p = new OpenAIProvider('test-key');
-      expect(p.supportsModel('gpt-4')).toBe(true);
-    });
+    it('should send the API key and call the configured address', async () => {
+      server.reply(openAIChat({ content: 'OK' }));
 
-    it('should use custom default model if specified', () => {
-      const p = new OpenAIProvider('test-key', 'gpt-3.5-turbo');
-      expect(p.supportsModel('gpt-3.5-turbo')).toBe(true);
+      await provider.generateCompletion({
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: 'Hello' }],
+      });
+
+      expect(server.requests).toHaveLength(1);
+      expect(server.requests[0]?.method).toBe('POST');
+      expect(server.requests[0]?.url).toBe('/v1/chat/completions');
+      expect(server.requests[0]?.headers.authorization).toBe('Bearer test-api-key');
     });
   });
 
@@ -54,6 +68,14 @@ describe('OpenAIProvider', () => {
       expect(provider.supportsModel('gpt-4-turbo')).toBe(true);
       expect(provider.supportsModel('o1-preview')).toBe(true);
       expect(provider.supportsModel('o1-mini')).toBe(true);
+    });
+
+    it('should recognize the newer OpenAI model families', () => {
+      // A fallback only receives the requested model if it serves it.
+      for (const model of ['o3', 'o3-mini', 'o4-mini', 'chatgpt-4o-latest', 'ft:gpt-4o:org::id']) {
+        expect(provider.supportsModel(model)).toBe(true);
+      }
+      expect(provider.supportsModel('omni-model')).toBe(false);
     });
 
     it('should return false for non-GPT models', () => {
@@ -70,29 +92,13 @@ describe('OpenAIProvider', () => {
 
   describe('generateCompletion', () => {
     it('should generate completion with text response', async () => {
-      const mockResponse = {
-        id: 'chatcmpl-123',
-        object: 'chat.completion',
-        created: 1234567890,
-        model: 'gpt-4',
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: 'assistant' as const,
-              content: 'Hello! How can I help you?',
-            },
-            finish_reason: 'stop' as const,
-          },
-        ],
-        usage: {
-          prompt_tokens: 10,
-          completion_tokens: 5,
-          total_tokens: 15,
-        },
-      };
-
-      mockCreate.mockResolvedValue(mockResponse);
+      server.reply(
+        openAIChat({
+          content: 'Hello! How can I help you?',
+          model: 'gpt-4-0613',
+          usage: { prompt: 10, completion: 5 },
+        })
+      );
 
       const result = await provider.generateCompletion({
         model: 'gpt-4',
@@ -100,107 +106,80 @@ describe('OpenAIProvider', () => {
       });
 
       expect(result.content).toBe('Hello! How can I help you?');
-      expect(result.model).toBe('gpt-4');
-      expect(result.usage).toEqual({
-        promptTokens: 10,
-        completionTokens: 5,
-        totalTokens: 15,
-      });
-      expect(mockCreate).toHaveBeenCalled();
+      expect(result.toolCalls).toBeUndefined();
+      // The model the API answered with, which may be a dated version of the requested one.
+      expect(result.model).toBe('gpt-4-0613');
+      expect(result.usage).toEqual({ promptTokens: 10, completionTokens: 5, totalTokens: 15 });
     });
 
     it('should generate completion with tool calls', async () => {
-      const mockResponse = {
-        id: 'chatcmpl-123',
-        object: 'chat.completion',
-        created: 1234567890,
-        model: 'gpt-4',
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: 'assistant' as const,
-              content: null,
-              tool_calls: [
-                {
-                  id: 'call-1',
-                  type: 'function' as const,
-                  function: {
-                    name: 'calculator',
-                    arguments: JSON.stringify({ operation: 'add', a: 1, b: 2 }),
-                  },
-                },
-              ],
-            },
-            finish_reason: 'tool_calls' as const,
-          },
-        ],
-        usage: {
-          prompt_tokens: 20,
-          completion_tokens: 10,
-          total_tokens: 30,
-        },
-      };
-
-      mockCreate.mockResolvedValue(mockResponse);
+      server.reply(
+        openAIChat({
+          content: null,
+          toolCalls: [
+            { name: 'calculator', arguments: JSON.stringify({ operation: 'add', a: 1, b: 2 }) },
+          ],
+        })
+      );
 
       const result = await provider.generateCompletion({
         model: 'gpt-4',
         messages: [{ role: 'user', content: 'Calculate 1+2' }],
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'calculator',
-              description: 'Performs calculations',
-              parameters: {
-                type: 'object',
-                properties: {
-                  operation: { type: 'string' },
-                  a: { type: 'number' },
-                  b: { type: 'number' },
-                },
-              },
-            },
-          },
-        ],
+        tools: [calculator],
       });
 
       expect(result.content).toBeNull();
-      expect(result.toolCalls).toBeDefined();
-      expect(result.toolCalls?.length).toBe(1);
-      expect(result.toolCalls?.[0].function.name).toBe('calculator');
-      expect(JSON.parse(result.toolCalls![0].function.arguments)).toEqual({
+      expect(result.toolCalls).toHaveLength(1);
+      // The id the tool's result will refer to.
+      expect(result.toolCalls?.[0]?.id).toBe('call_1');
+      expect(result.toolCalls?.[0]?.function.name).toBe('calculator');
+      expect(JSON.parse(result.toolCalls?.[0]?.function.arguments ?? '')).toEqual({
         operation: 'add',
         a: 1,
         b: 2,
       });
     });
 
-    it('should handle system messages', async () => {
-      const mockResponse = {
-        id: 'chatcmpl-123',
-        object: 'chat.completion',
-        created: 1234567890,
+    it('should send tools in the OpenAI format and let the model choose', async () => {
+      server.reply(openAIChat({ content: 'OK' }));
+
+      await provider.generateCompletion({
         model: 'gpt-4',
-        choices: [
+        messages: [{ role: 'user', content: 'Calculate 1+2' }],
+        tools: [calculator],
+      });
+
+      expect(server.jsonBody(0)).toMatchObject({
+        tools: [
           {
-            index: 0,
-            message: {
-              role: 'assistant' as const,
-              content: 'OK',
+            type: 'function',
+            function: {
+              name: 'calculator',
+              description: 'Performs calculations',
+              parameters: calculator.function.parameters,
             },
-            finish_reason: 'stop' as const,
           },
         ],
-        usage: {
-          prompt_tokens: 10,
-          completion_tokens: 2,
-          total_tokens: 12,
-        },
-      };
+        tool_choice: 'auto',
+      });
+    });
 
-      mockCreate.mockResolvedValue(mockResponse);
+    it('should send neither tools nor tool_choice when there are no tools', async () => {
+      server.reply(openAIChat({ content: 'OK' }));
+
+      await provider.generateCompletion({
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: 'Hi' }],
+        tools: [],
+      });
+
+      const body = server.jsonBody(0) as Record<string, unknown>;
+      expect(body).not.toHaveProperty('tools');
+      expect(body).not.toHaveProperty('tool_choice');
+    });
+
+    it('should handle system messages', async () => {
+      server.reply(openAIChat({ content: 'OK' }));
 
       await provider.generateCompletion({
         model: 'gpt-4',
@@ -210,40 +189,16 @@ describe('OpenAIProvider', () => {
         ],
       });
 
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          messages: [
-            { role: 'system', content: 'You are helpful' },
-            { role: 'user', content: 'Hello' },
-          ],
-        })
-      );
+      expect(server.jsonBody(0)).toMatchObject({
+        messages: [
+          { role: 'system', content: 'You are helpful' },
+          { role: 'user', content: 'Hello' },
+        ],
+      });
     });
 
     it('should handle maxTokens parameter', async () => {
-      const mockResponse = {
-        id: 'chatcmpl-123',
-        object: 'chat.completion',
-        created: 1234567890,
-        model: 'gpt-4',
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: 'assistant' as const,
-              content: 'OK',
-            },
-            finish_reason: 'stop' as const,
-          },
-        ],
-        usage: {
-          prompt_tokens: 10,
-          completion_tokens: 2,
-          total_tokens: 12,
-        },
-      };
-
-      mockCreate.mockResolvedValue(mockResponse);
+      server.reply(openAIChat({ content: 'OK' }));
 
       await provider.generateCompletion({
         model: 'gpt-4',
@@ -251,37 +206,11 @@ describe('OpenAIProvider', () => {
         maxTokens: 100,
       });
 
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          max_tokens: 100,
-        })
-      );
+      expect(server.jsonBody(0)).toMatchObject({ max_tokens: 100 });
     });
 
     it('should handle temperature parameter', async () => {
-      const mockResponse = {
-        id: 'chatcmpl-123',
-        object: 'chat.completion',
-        created: 1234567890,
-        model: 'gpt-4',
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: 'assistant' as const,
-              content: 'OK',
-            },
-            finish_reason: 'stop' as const,
-          },
-        ],
-        usage: {
-          prompt_tokens: 10,
-          completion_tokens: 2,
-          total_tokens: 12,
-        },
-      };
-
-      mockCreate.mockResolvedValue(mockResponse);
+      server.reply(openAIChat({ content: 'OK' }));
 
       await provider.generateCompletion({
         model: 'gpt-4',
@@ -289,26 +218,60 @@ describe('OpenAIProvider', () => {
         temperature: 0.7,
       });
 
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          temperature: 0.7,
-        })
-      );
+      expect(server.jsonBody(0)).toMatchObject({ temperature: 0.7 });
     });
 
-    it('should handle errors correctly', async () => {
-      const mockError = new Error('API Error');
-      mockCreate.mockRejectedValue(mockError);
+    it('should use default model if not specified', async () => {
+      const custom = new OpenAIProvider('test-key', 'gpt-3.5-turbo', { baseURL, maxRetries: 0 });
+      server.reply(openAIChat({ content: 'OK' }));
+
+      await custom.generateCompletion({
+        model: '',
+        messages: [{ role: 'user', content: 'Hello' }],
+      });
+
+      expect(server.jsonBody(0)).toMatchObject({ model: 'gpt-3.5-turbo' });
+    });
+
+    it('should wrap an API error with the vendor message', async () => {
+      server.reply(openAIError(500, 'The server had an error'));
+
+      const failure = await provider
+        .generateCompletion({ model: 'gpt-4', messages: [{ role: 'user', content: 'Hello' }] })
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(LLMProviderError);
+      const error = failure as LLMProviderError;
+      expect(error.provider).toBe('openai');
+      expect(error.retryable).toBe(true);
+      expect(error.connectionFailure).toBe(false);
+      expect(error.message).toContain('The server had an error');
+    });
+
+    it('should mask an API key echoed back in an error message', async () => {
+      server.reply(openAIError(401, 'Incorrect API key provided: sk-proj-abcdef123456'));
 
       await expect(
         provider.generateCompletion({
           model: 'gpt-4',
           messages: [{ role: 'user', content: 'Hello' }],
         })
-      ).rejects.toThrow(LLMProviderError);
+      ).rejects.toThrow('sk-***');
+    });
+
+    it('should mark a connection failure as such', async () => {
+      await server.stop();
+
+      const failure = await provider
+        .generateCompletion({ model: 'gpt-4', messages: [{ role: 'user', content: 'Hello' }] })
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(LLMProviderError);
+      expect((failure as LLMProviderError).connectionFailure).toBe(true);
     });
 
     it('should handle abort signal', async () => {
+      server.reply(openAIChat({ content: 'too late' }));
       const abortController = new AbortController();
       abortController.abort();
 
@@ -319,61 +282,37 @@ describe('OpenAIProvider', () => {
           abortSignal: abortController.signal,
         })
       ).rejects.toThrow('Request aborted');
+      // An already cancelled request is never sent, so never billed.
+      expect(server.requests).toHaveLength(0);
     });
 
-    it('should use default model if not specified', async () => {
-      const mockResponse = {
-        id: 'chatcmpl-123',
-        object: 'chat.completion',
-        created: 1234567890,
-        model: 'gpt-4',
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: 'assistant' as const,
-              content: 'OK',
-            },
-            finish_reason: 'stop' as const,
-          },
-        ],
-        usage: {
-          prompt_tokens: 10,
-          completion_tokens: 2,
-          total_tokens: 12,
-        },
-      };
-
-      mockCreate.mockResolvedValue(mockResponse);
-
-      const provider = new OpenAIProvider('test-key', 'gpt-3.5-turbo');
-      await provider.generateCompletion({
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: 'Hello' }],
-      });
-
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: 'gpt-3.5-turbo',
+    it('should cancel a request aborted while in flight, without waiting for the answer', async () => {
+      server.reply({ ...openAIChat({ content: 'too late' }), delayMs: 5_000 });
+      const abortController = new AbortController();
+      const outcome = provider
+        .generateCompletion({
+          model: 'gpt-4',
+          messages: [{ role: 'user', content: 'Hello' }],
+          abortSignal: abortController.signal,
         })
-      );
+        .then(
+          () => 'answered',
+          (error: unknown) => error
+        );
+      while (server.requests.length === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      const abortedAt = Date.now();
+      abortController.abort();
+
+      const failure = await outcome;
+      expect(failure).toHaveProperty('message', 'Request aborted');
+      // The HTTP request is cut: the 5 s answer is not waited for.
+      expect(Date.now() - abortedAt).toBeLessThan(1_000);
     });
 
     it('should handle empty response', async () => {
-      const mockResponse = {
-        id: 'chatcmpl-123',
-        object: 'chat.completion',
-        created: 1234567890,
-        model: 'gpt-4',
-        choices: [],
-        usage: {
-          prompt_tokens: 10,
-          completion_tokens: 0,
-          total_tokens: 10,
-        },
-      };
-
-      mockCreate.mockResolvedValue(mockResponse);
+      server.reply(openAIChat({ choices: [], usage: { prompt: 10, completion: 0 } }));
 
       await expect(
         provider.generateCompletion({
@@ -384,48 +323,27 @@ describe('OpenAIProvider', () => {
     });
 
     it('should handle tool calls with empty arguments', async () => {
-      const mockResponse = {
-        id: 'chatcmpl-123',
-        object: 'chat.completion',
-        created: 1234567890,
-        model: 'gpt-4',
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: 'assistant' as const,
-              content: null,
-              tool_calls: [
-                {
-                  id: 'call-1',
-                  type: 'function' as const,
-                  function: {
-                    name: 'test_tool',
-                    arguments: '',
-                  },
-                },
-              ],
-            },
-            finish_reason: 'tool_calls' as const,
-          },
-        ],
-        usage: {
-          prompt_tokens: 20,
-          completion_tokens: 10,
-          total_tokens: 30,
-        },
-      };
-
-      mockCreate.mockResolvedValue(mockResponse);
+      server.reply(
+        openAIChat({ content: null, toolCalls: [{ name: 'test_tool', arguments: '' }] })
+      );
 
       const result = await provider.generateCompletion({
         model: 'gpt-4',
         messages: [{ role: 'user', content: 'Test' }],
       });
 
-      expect(result.toolCalls).toBeDefined();
-      expect(result.toolCalls?.[0].function.arguments).toBe('{}');
+      expect(result.toolCalls?.[0]?.function.arguments).toBe('{}');
+    });
+
+    it('should leave usage undefined when the API reports none', async () => {
+      server.reply(openAIChat({ content: 'OK' }));
+
+      const result = await provider.generateCompletion({
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: 'Hello' }],
+      });
+
+      expect(result.usage).toBeUndefined();
     });
   });
 });
-

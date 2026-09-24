@@ -24,6 +24,8 @@ const sdk = createSDK({
 });
 ```
 
+Ein Fallback-Anbieter eines anderen Herstellers braucht einen eigenen Schlüssel, in seiner `config` oder in `providerConfig`: Der Schlüssel des primären Anbieters wird nie an einen anderen Hersteller gesendet. Er erhält das Modell des Agenten nur, wenn er es anbietet, sonst sein eigenes `defaultModel` (Anthropic lehnt einen OpenAI-Modellnamen ab und umgekehrt). Das Event `intention.generated` nennt den Anbieter, der geantwortet hat, und das verwendete Modell.
+
 | Option | Standard | |
 | --- | --- | --- |
 | `maxRetries` | `2` | Wiederholungsversuche nach dem ersten Versuch |
@@ -37,7 +39,7 @@ Nur **vorübergehende** Fehler werden wiederholt: 408, 409, 425, 429, 5xx, 529, 
 
 Ist die Richtlinie des SDK aktiv, werden die eigenen Wiederholungsversuche der OpenAI- und Anthropic-Clients deaktiviert – **Wiederholungen stapeln sich nie**. Jeder Wiederholungsversuch wird als Ereignis `provider.retry` mit Anbieter, Modell, Versuch, Verzögerung und Fehler aufgezeichnet. Übergeben Sie `retry: false`, um stattdessen die Standardwerte des Anbieters zu behalten.
 
-Ein Anbieter, den Sie mit `llmProvider` einsetzen, wird unverändert verwendet, sofern Sie `retry` nicht ausdrücklich setzen, und ein `FallbackProvider` wird nie umhüllt, damit seine Failover im Trace sichtbar bleiben.
+Ein Anbieter, den Sie mit `llmProvider` einsetzen, wird unverändert verwendet, sofern Sie `retry` nicht ausdrücklich setzen, und ein `FallbackProvider` wird nie umhüllt, damit seine Failover im Trace sichtbar bleiben. Auch seine Anbieter werden nicht umhüllt, `retry` gilt für sie also nicht: Um einen vor dem Failover erneut zu versuchen, umhüllen Sie ihn mit `RetryingLLMProvider` und geben Sie seinem Client `maxRetries: 0`. Setzen Sie `maxRetryAfterMs` der Richtlinie auf ihr `maxDelayMs`, wie es das SDK tut, wenn ein Fallback übernehmen kann, damit ein Anbieter, der um eine lange Pause bittet, dem Fallback überlassen wird. Diese Wiederholungsversuche werden nicht als Ereignisse `provider.retry` aufgezeichnet.
 
 ## Tools {#tools}
 

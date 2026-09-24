@@ -27,7 +27,6 @@ interface Event {
 | Type | Data |
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` — or `intention` for a cognitive final answer |
-| `intention.rejected` | `reason` |
 | `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools` when a caller used a tool it was not given; the budget policy's id when its call budget is spent) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval` when the tool's own `metadata.requiresApproval` asked for it), `reason?` (`cancelled before a decision` when the caller gave up or the run stopped, `no decision within N ms` after `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` — `action.failed` also records a call refused for invalid arguments (before any policy) or because its caller left after an approval |
@@ -36,6 +35,8 @@ interface Event {
 | `provider.fallback` | `primaryProvider`, `usedProvider`, `attemptedProviders` |
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` of the content served (the content itself is not stored) |
+
+`tool.failed`, `intention.rejected` and `error.occurred` belong to the `EventType` type, but the SDK never records them: a failed tool call is an `action.failed` event, a call refused by a policy a `policy.violated` event, and one rejected at approval an `approval.rejected` event.
 
 ## Cognition
 
@@ -56,6 +57,5 @@ interface Event {
 | Type | Data |
 | --- | --- |
 | `incident.reported` | `incident`, `deliveries`, `suppressed?` (`throttled`, `below minimum severity`) |
-| `error.occurred` | `error` |
 
 The mental state of a cognitive run is the fold of its `cognition.thought` patches in `step` order, starting from the goal and observations of `cognition.started`. Observations produced during the run are carried by the thought patches, with `sourceEventId` pointing to the `action.executed` or `cognition.evaluated` event that holds the full payload. Runs without `schemaVersion` are rebuilt with the rules they were recorded with.

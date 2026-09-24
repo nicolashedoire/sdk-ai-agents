@@ -67,7 +67,7 @@ npm run example:quick-start
 npm run example:complete
 
 # Test API
-npm run example:test-api
+npm run test:api
 ```
 
 ## टेस्टिंग {#testing}
@@ -269,13 +269,12 @@ dist/
 
 - हर module के लिए यूनिट टेस्ट
 - Vitest का इस्तेमाल
-- कोई भी टेस्ट किसी असली सशुल्क सेवा को कॉल नहीं करता। नए modules के टेस्ट suites कोई module mock इस्तेमाल नहीं करते: SDK के ports को `src/__tests__/support/` के टेस्ट डबल लागू करते हैं, और HTTP adapters लोकल सर्वरों के सामने चलते हैं
-- पुराने टेस्ट suites (SDK का entry point, OpenAI और Anthropic प्रदाता, Reasoning Engine, फ़ॉलबैक, regression runner) अब भी vendor libraries `openai` और `@anthropic-ai/sdk` को `vi.mock` से, और इवेंट स्टोर जैसी कुछ निर्भरताओं को `vi.fn()` से बदलते हैं
+- कोई भी टेस्ट किसी असली सशुल्क सेवा को कॉल नहीं करता, और कोई भी module mock या spy इस्तेमाल नहीं करता: SDK के ports को `src/__tests__/support/` के टेस्ट डबल लागू करते हैं, और HTTP adapters, OpenAI और Anthropic प्रदाताओं सहित, लोकल सर्वरों के सामने चलते हैं। `no-mocks.test.ts` `vi.mock`, `vi.fn` और `vi.spyOn` को अस्वीकार करता है
 
 ### इंटीग्रेशन टेस्ट {#integration-tests}
 
 - पूरे कार्य-प्रवाहों के लिए इंटीग्रेशन टेस्ट
-- LLM प्रदाताओं की जगह mock की गई vendor library (`vi.mock`) इस्तेमाल होती है; कोई भी टेस्ट असली API को कॉल नहीं करता
+- मॉडल या तो स्क्रिप्ट किया गया प्रदाता है, या असली OpenAI या Anthropic client जो vendor के format में जवाब देने वाले लोकल सर्वर से बात करता है; कोई भी टेस्ट असली API को कॉल नहीं करता
 - अलग-अलग इवेंट स्टोर के साथ टेस्ट
 
 ### टेस्ट की संरचना का उदाहरण {#example-test-structure}
@@ -355,7 +354,7 @@ describe('MyClass', () => {
 
 अगर टेस्ट विफल होते हैं:
 
-1. जाँचें कि `src/__tests__/support/` के टेस्ट डबल, या पुराने suites के mocks, अब भी उन interfaces से मेल खाते हैं जिनकी जगह वे लेते हैं
+1. जाँचें कि `src/__tests__/support/` के टेस्ट डबल अब भी उन interfaces से मेल खाते हैं जिनकी जगह वे लेते हैं
 2. जाँचें कि dependencies अप-टू-डेट हैं
 3. errors को उसी समय देखने के लिए टेस्ट watch मोड में चलाएँ
 

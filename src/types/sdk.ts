@@ -29,15 +29,25 @@ export interface SDKConfig {
   /** Turns matching events into incidents delivered by email, webhook or your own notifier. */
   incidents?: IncidentMonitorOptions;
   provider?: 'openai' | 'anthropic';
+  /**
+   * Settings of each vendor, used by the primary provider and by any fallback of that vendor
+   * (a fallback's own `config` takes precedence). `baseURL` points a provider at a compatible
+   * endpoint or a proxy.
+   */
   providerConfig?: {
-    openai?: { apiKey?: string; defaultModel?: string };
-    anthropic?: { apiKey?: string; defaultModel?: string };
+    openai?: { apiKey?: string; defaultModel?: string; baseURL?: string };
+    anthropic?: { apiKey?: string; defaultModel?: string; baseURL?: string };
   };
+  /**
+   * Tried in order when the primary provider fails. A fallback of another vendor never gets the
+   * primary `apiKey`: it needs its own key, here or in `providerConfig`.
+   */
   fallbackProviders?: Array<{
     provider: 'openai' | 'anthropic';
     config?: {
       apiKey?: string;
       defaultModel?: string;
+      baseURL?: string;
     };
   }>;
   eventStore?: IEventStore;

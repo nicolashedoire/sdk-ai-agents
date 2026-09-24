@@ -1,3 +1,4 @@
+import type { SQLiteDatabase } from '../../stores/sqlite-event-store.js';
 import type { SqliteConnectionLike } from '../../tools/sqlite-read-only.js';
 
 /** The part of `node:sqlite` the tests use. */
@@ -5,7 +6,7 @@ export interface NodeSqlite {
   DatabaseSync: new (
     path: string,
     options?: { readOnly?: boolean }
-  ) => SqliteConnectionLike & { close(): void };
+  ) => SqliteConnectionLike & SQLiteDatabase;
 }
 
 /**

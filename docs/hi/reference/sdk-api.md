@@ -11,10 +11,10 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | मुख्य प्रदाता की key (`llmProvider` के साथ ज़रूरी नहीं)। बिना किसी key के, टूल और MCP सर्वर काम करते हैं और जिन कॉल को मॉडल चाहिए वे एक साफ़ error के साथ विफल होती हैं |
 | `provider` | `'openai' \| 'anthropic'` | मुख्य प्रदाता, डिफ़ॉल्ट `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | हर प्रदाता के लिए `apiKey` और `defaultModel` |
-| `fallbackProviders` | `Array<{ provider, config? }>` | मुख्य प्रदाता के विफल होने पर क्रम से आज़माए जाते हैं |
-| `llmProvider` | `LLMProvider` | आपका अपना प्रदाता (लोकल मॉडल, gateway, टेस्ट के लिए नकली प्रदाता) |
-| `retry` | `Partial<RetryPolicy> \| false` | LLM की retry नीति, हर प्रदाता के लिए, फ़ॉलबैक से पहले |
+| `providerConfig` | `{ openai?, anthropic? }` | हर vendor की `apiKey`, `defaultModel` और `baseURL` (`baseURL`: कोई संगत endpoint, जैसे Azure OpenAI की v1 API या लोकल मॉडल सर्वर, या कोई proxy)। मुख्य प्रदाता अपने vendor की entry इस्तेमाल करता है, और दूसरे vendor का फ़ॉलबैक अपने vendor की |
+| `fallbackProviders` | `Array<{ provider, config? }>` | मुख्य प्रदाता के विफल होने पर क्रम से आज़माए जाते हैं; `config`, `providerConfig` से ऊपर होता है। मुख्य प्रदाता के ही vendor का फ़ॉलबैक उसकी कोई सेटिंग नहीं लेता (सिर्फ़ global `apiKey`); दूसरे vendor के फ़ॉलबैक को अपनी key चाहिए |
+| `llmProvider` | `LLMProvider` | आपका अपना प्रदाता (लोकल मॉडल, gateway, टेस्ट के लिए नकली प्रदाता)। अगर वह `nativeToolMessages` घोषित करे तो टूल कॉल और उनके नतीजे native format (`LLMMessage`) में पाता है, वरना text के रूप में |
+| `retry` | `Partial<RetryPolicy> \| false` | LLM की retry नीति, हर प्रदाता के लिए, फ़ॉलबैक से पहले। जोड़े गए `llmProvider` पर केवल तब लागू होती है जब इसे स्पष्ट रूप से सेट किया जाए, और `llmProvider` के रूप में दिए गए `FallbackProvider` या उसके प्रदाताओं पर कभी नहीं |
 | `jev` | `JevClientConfig` | टाइप्ड निर्णयों के लिए TypeSafe Jev चालू करता है — सीधे, या `baseUrl` और `model: 'typesafe-ai/jev'` के साथ [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) के ज़रिए |
 | `decisionClient` | `TypedDecisionClient` | कोई भी टाइप्ड-निर्णय backend (`jev` पर प्राथमिकता रखता है) |
 | `pricing` | `PricingTable` | USD प्रति मिलियन tokens, डिफ़ॉल्ट के ऊपर मिलाया जाता है |
@@ -174,4 +174,4 @@ interface ResourceProvider {
 
 ## बुनियादी घटक {#building-blocks}
 
-SDK जो कुछ भी इस्तेमाल करता है, वह कस्टम सेटअप के लिए एक्सपोर्ट किया गया है: `JevClient`, `DecisionService`, `LLMThoughtGenerator`, `HeuristicController`, `TypedDecisionController`, `TypedHypothesisAssessor`, `PredictionTester`, `applyThought`, `assembleThought`, `assessReadiness`, `rankHypotheses`, `rebuildMentalState`, `describeMentalState`, `fingerprint`, `defineThinkerProfile`, `refineProfile`, `withRetry`, `RetryingLLMProvider`, `MonitoredEventStore`, `EmailIncidentNotifier`, `WebhookIncidentNotifier`, `ResendEmailTransport`, `computeRunCost`, `FileEventStore`, `SQLiteEventStore`, `PostgreSQLEventStore`, और सभी टाइप।
+SDK के बुनियादी घटक कस्टम सेटअप के लिए एक्सपोर्ट किए गए हैं: `JevClient`, `DecisionService`, `LLMThoughtGenerator`, `HeuristicController`, `TypedDecisionController`, `TypedHypothesisAssessor`, `PredictionTester`, `applyThought`, `assembleThought`, `assessReadiness`, `rankHypotheses`, `rebuildMentalState`, `describeMentalState`, `fingerprint`, `defineThinkerProfile`, `refineProfile`, `withRetry`, `RetryingLLMProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider`, `MonitoredEventStore`, `EmailIncidentNotifier`, `WebhookIncidentNotifier`, `ResendEmailTransport`, `computeRunCost`, `FileEventStore`, `SQLiteEventStore`, `PostgreSQLEventStore`, और उनके मुख्य टाइप।

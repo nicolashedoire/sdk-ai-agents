@@ -24,6 +24,8 @@ const sdk = createSDK({
 });
 ```
 
+Si el proveedor de respaldo es de otro fabricante, necesita su propia clave, en su `config` o en `providerConfig`: la clave del principal nunca se envía a otro fabricante. Recibe el modelo del agente solo si lo sirve; si no, usa su propio `defaultModel` (Anthropic rechaza un nombre de modelo de OpenAI, y viceversa). El evento `intention.generated` indica qué proveedor respondió y con qué modelo.
+
 | Opción | Por defecto | |
 | --- | --- | --- |
 | `maxRetries` | `2` | Reintentos después del primer intento |
@@ -37,7 +39,7 @@ Solo se reintentan los errores **transitorios**: 408, 409, 425, 429, 5xx, 529, l
 
 Cuando la política del SDK está activa, se desactivan los reintentos propios de los clientes de OpenAI y Anthropic — **los reintentos nunca se acumulan**. Cada reintento se registra como un evento `provider.retry` con el proveedor, el modelo, el intento, la espera y el error. Pasa `retry: false` para conservar en su lugar los valores por defecto del proveedor.
 
-Un proveedor que inyectas con `llmProvider` se usa tal cual salvo que fijes `retry` explícitamente, y un `FallbackProvider` nunca se envuelve, para que sus conmutaciones sigan siendo visibles en la traza.
+Un proveedor que inyectas con `llmProvider` se usa tal cual salvo que fijes `retry` explícitamente, y un `FallbackProvider` nunca se envuelve, para que sus conmutaciones sigan siendo visibles en la traza. Sus proveedores tampoco se envuelven, así que `retry` no se les aplica: para reintentar uno antes de conmutar, envuélvelo en `RetryingLLMProvider` y dale a su cliente `maxRetries: 0`. Fija el `maxRetryAfterMs` de la política en su `maxDelayMs`, como hace el SDK cuando un proveedor de reserva puede tomar el relevo, para que un proveedor que pide una pausa larga se deje para el de reserva. Esos reintentos no se registran como eventos `provider.retry`.
 
 ## Herramientas {#tools}
 

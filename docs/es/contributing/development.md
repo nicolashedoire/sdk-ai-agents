@@ -67,7 +67,7 @@ npm run example:quick-start
 npm run example:complete
 
 # Test API
-npm run example:test-api
+npm run test:api
 ```
 
 ## Pruebas {#testing}
@@ -269,13 +269,12 @@ dist/
 
 - Pruebas unitarias para cada módulo
 - Usa Vitest
-- Ninguna prueba llama a un servicio de pago real. Las suites de los módulos más recientes no usan mocks de módulos: los puertos del SDK los implementan los dobles de prueba de `src/__tests__/support/`, y los adaptadores HTTP se ejecutan contra servidores locales
-- Las suites más antiguas (punto de entrada del SDK, proveedores de OpenAI y Anthropic, motor de razonamiento, conmutación por error, ejecutor de pruebas de regresión) todavía sustituyen las bibliotecas de los proveedores `openai` y `@anthropic-ai/sdk` con `vi.mock`, y algunas dependencias, como el almacén de eventos, con `vi.fn()`
+- Ninguna prueba llama a un servicio de pago real, y ninguna usa mocks de módulos ni espías: los puertos del SDK los implementan los dobles de prueba de `src/__tests__/support/`, y los adaptadores HTTP, incluidos los proveedores de OpenAI y Anthropic, se ejecutan contra servidores locales. `no-mocks.test.ts` rechaza `vi.mock`, `vi.fn` y `vi.spyOn`
 
 ### Pruebas de integración {#integration-tests}
 
 - Pruebas de integración de flujos de trabajo completos
-- Los proveedores de LLM se sustituyen por una biblioteca del proveedor simulada (`vi.mock`); ninguna prueba llama a una API real
+- El modelo es un proveedor guionizado, o el cliente real de OpenAI o Anthropic hablando con un servidor local que responde en el formato del proveedor; ninguna prueba llama a una API real
 - Pruebas con distintos almacenes de eventos
 
 ### Ejemplo de estructura de una prueba {#example-test-structure}
@@ -355,7 +354,7 @@ Si obtienes errores de TypeScript:
 
 Si fallan las pruebas:
 
-1. Comprueba que los dobles de prueba de `src/__tests__/support/`, o los mocks de las suites más antiguas, siguen coincidiendo con las interfaces que sustituyen
+1. Comprueba que los dobles de prueba de `src/__tests__/support/` siguen coincidiendo con las interfaces que sustituyen
 2. Comprueba que las dependencias están actualizadas
 3. Ejecuta las pruebas en modo watch para ver los errores en tiempo real
 

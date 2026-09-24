@@ -232,6 +232,8 @@ const agent = sdk.createAgent({
 });
 ```
 
+Budget- und Zeitlimits werden vor jedem Tool-Aufruf eines Laufs eines kontrollierten Agenten geprüft, anhand des Fortschritts des Laufs: `maxSteps` zählt die bereits erledigten Schritte (der erste Aufruf liegt bei Schritt 0), `maxTokens` die Tokens seiner Modellaufrufe, `maxDuration` die Zeit seit dem Start des Laufs. Ein Limit lehnt den Tool-Aufruf ab, wodurch der Lauf fehlschlägt; einen Modellaufruf unterbricht es nie. Token- und Kostenbudgets pro Zeitraum (`budgetLimit` mit `maxTokens` oder `maxCost`) zählen die Tokens und Kosten der Modellaufrufe kontrollierter Agenten, und ein Replay wendet `maxSteps`, `maxTokens` und `maxDuration` wie der ursprüngliche Lauf an (Budgets pro Zeitraum sehen den Verbrauch des aktuellen Zeitraums). Kognitive Agenten haben eigene Limits (`maxSteps`, `maxToolCalls`, `timeoutMs`).
+
 ### 4. Traces {#_4-traces}
 
 Jede Ausführung erzeugt einen vollständigen, wiederholbaren Trace.

@@ -1,19 +1,25 @@
 import { LLMProviderError } from '../errors/index.js';
 import type { LLMProvider, LLMRequest, LLMResponse } from './llm-provider.js';
 
+/** A completion from a fallback chain, and which provider gave it. */
+export interface FallbackResult {
+  response: LLMResponse;
+  /** Name of the provider that answered (`openai`, `anthropic`…). */
+  usedProvider: string;
+  /** True when the primary provider failed and a fallback answered. */
+  wasFallback: boolean;
+  /** Names of the providers tried, in order, up to the one that answered. */
+  attemptedProviders: string[];
+  /** Model sent to the provider that answered; absent when it used its default model. */
+  requestedModel?: string;
+}
+
 /**
  * Provider wrapper that implements fallback logic between multiple providers.
  *
  * When a request fails with the primary provider, it automatically tries
  * the fallback providers in order until one succeeds or all fail.
  */
-export interface FallbackResult {
-  response: LLMResponse;
-  usedProvider: string;
-  wasFallback: boolean;
-  attemptedProviders: string[];
-}
-
 export class FallbackProvider implements LLMProvider {
   private providers: LLMProvider[];
   private fallbackProviders: LLMProvider[];
@@ -41,42 +47,49 @@ export class FallbackProvider implements LLMProvider {
    * Generates completion with fallback and returns metadata about which provider was used.
    */
   async generateCompletionWithFallback(request: LLMRequest): Promise<FallbackResult> {
-    let lastError: Error | null = null;
     const attemptedProviders: string[] = [];
+    const failures: Array<{ provider: string; error: Error }> = [];
 
-    for (let i = 0; i < this.providers.length; i++) {
-      const provider = this.providers[i];
+    for (const [index, provider] of this.providers.entries()) {
+      if (request.abortSignal?.aborted) {
+        // A cancelled call stops the chain: no fallback is tried for it.
+        throw new Error('Request aborted');
+      }
       const providerName = provider.getProviderName();
       attemptedProviders.push(providerName);
+      const providerRequest = this.requestFor(provider, index, request);
 
       try {
-        // Resolve settings for this specific provider if providerSettings is provided
-        const providerRequest = this.resolveProviderSettings(request, providerName);
-
         const response = await provider.generateCompletion(providerRequest);
-        const wasFallback = i > 0; // i > 0 means we used a fallback provider
-
         return {
           response,
           usedProvider: providerName,
-          wasFallback,
+          wasFallback: index > 0,
           attemptedProviders,
+          ...(providerRequest.model ? { requestedModel: providerRequest.model } : {}),
         };
       } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-
-        // If this is not the last provider, continue to next fallback
-        if (i < this.providers.length - 1) {
-          continue;
-        }
-
-        // This was the last provider, throw the error
-        throw this.wrapError(lastError, attemptedProviders);
+        failures.push({
+          provider: providerName,
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
       }
     }
 
-    // Should never reach here, but TypeScript needs this
-    throw this.wrapError(lastError || new Error('All providers failed'), attemptedProviders);
+    throw this.wrapError(failures, attemptedProviders);
+  }
+
+  /**
+   * The request for one provider: its own settings and a model it serves. The primary gets the
+   * requested model; a fallback gets it only if it supports it, and its own default model
+   * otherwise (Anthropic refuses an OpenAI model name, and the other way round).
+   */
+  private requestFor(provider: LLMProvider, index: number, request: LLMRequest): LLMRequest {
+    const resolved = this.resolveProviderSettings(request, provider.getProviderName());
+    if (index === 0 || !request.model || provider.supportsModel(request.model)) {
+      return resolved;
+    }
+    return { ...resolved, model: '' };
   }
 
   /**
@@ -118,6 +131,11 @@ export class FallbackProvider implements LLMProvider {
     return this.providers.some((provider) => provider.supportsModel(model));
   }
 
+  /** Native tool messages only if every provider of the chain takes them. */
+  get nativeToolMessages(): boolean {
+    return this.providers.every((provider) => provider.nativeToolMessages === true);
+  }
+
   getProviderName(): string {
     // Return primary provider name with fallback indicator
     const primaryName = this.providers[0].getProviderName();
@@ -143,19 +161,34 @@ export class FallbackProvider implements LLMProvider {
   }
 
   /**
-   * Checks if a fallback occurred (i.e., if we have fallback providers configured)
+   * Whether the chain has fallback providers after its primary one.
    */
   hasFallbackProviders(): boolean {
     return this.fallbackProviders.length > 0;
   }
 
-  private wrapError(error: Error, attemptedProviders: string[]): LLMProviderError {
-    const providerNames = attemptedProviders.join(' -> ');
-    const message = `All providers failed (attempted: ${providerNames}): ${error.message}`;
+  /**
+   * One error for the whole chain: its message names every attempt with its own error, and
+   * its `cause` is the last vendor error, whose status and headers stay available.
+   */
+  private wrapError(
+    failures: Array<{ provider: string; error: Error }>,
+    attemptedProviders: string[]
+  ): LLMProviderError {
+    const attempts = failures
+      .map(({ provider, error }) => `${provider}: ${vendorMessage(error)}`)
+      .join('; ');
+    const last = failures.at(-1)?.error;
+    const cause = last instanceof LLMProviderError ? last.originalError : last;
     return new LLMProviderError(
-      providerNames,
-      new Error(message),
-      true // retryable
+      attemptedProviders.join(' -> '),
+      new Error(`All providers failed: ${attempts}`, { cause }),
+      true
     );
   }
+}
+
+/** The vendor's own message, without the "LLM provider error: <name>:" prefix of the wrapper. */
+function vendorMessage(error: Error): string {
+  return error instanceof LLMProviderError ? error.originalError.message : error.message;
 }

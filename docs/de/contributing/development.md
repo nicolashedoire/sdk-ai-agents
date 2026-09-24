@@ -67,7 +67,7 @@ npm run example:quick-start
 npm run example:complete
 
 # Test API
-npm run example:test-api
+npm run test:api
 ```
 
 ## Tests {#testing}
@@ -269,13 +269,12 @@ dist/
 
 - Unit-Tests für jedes Modul
 - Verwendet Vitest
-- Kein Test ruft einen echten kostenpflichtigen Dienst auf. Die Suiten der neueren Module verwenden keine Modul-Mocks: Die Ports des SDK werden von den Test-Doubles in `src/__tests__/support/` implementiert, und HTTP-Adapter laufen gegen lokale Server
-- Die älteren Suiten (Einstiegspunkt des SDK, OpenAI- und Anthropic-Anbieter, Reasoning Engine, Fallback, Regressionstest-Runner) ersetzen die Bibliotheken der Anbieter `openai` und `@anthropic-ai/sdk` weiterhin mit `vi.mock` und einige Abhängigkeiten, etwa den Event Store, mit `vi.fn()`
+- Kein Test ruft einen echten kostenpflichtigen Dienst auf, und keiner verwendet Modul-Mocks oder Spies: Die Ports des SDK werden von den Test-Doubles in `src/__tests__/support/` implementiert, und HTTP-Adapter, einschließlich der OpenAI- und Anthropic-Anbieter, laufen gegen lokale Server. `no-mocks.test.ts` lehnt `vi.mock`, `vi.fn` und `vi.spyOn` ab
 
 ### Integrationstests {#integration-tests}
 
 - Integrationstests für vollständige Arbeitsabläufe
-- LLM-Anbieter werden durch eine gemockte Anbieterbibliothek (`vi.mock`) ersetzt; kein Test ruft eine echte API auf
+- Das Modell ist ein skriptgesteuerter Anbieter oder der echte OpenAI- bzw. Anthropic-Client, der mit einem lokalen Server im Format des Anbieters spricht; kein Test ruft eine echte API auf
 - Tests mit verschiedenen Event Stores
 
 ### Beispielstruktur eines Tests {#example-test-structure}
@@ -355,7 +354,7 @@ Wenn Sie TypeScript-Fehler erhalten:
 
 Wenn Tests fehlschlagen:
 
-1. Prüfen Sie, ob die Test-Doubles in `src/__tests__/support/` oder die Mocks der älteren Suiten noch zu den Schnittstellen passen, die sie ersetzen
+1. Prüfen Sie, ob die Test-Doubles in `src/__tests__/support/` noch zu den Schnittstellen passen, die sie ersetzen
 2. Prüfen Sie, ob die Abhängigkeiten aktuell sind
 3. Führen Sie die Tests im Watch-Modus aus, um Fehler in Echtzeit zu sehen
 

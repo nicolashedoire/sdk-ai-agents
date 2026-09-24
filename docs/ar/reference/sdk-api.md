@@ -11,10 +11,10 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | مفتاح المزوّد الأساسي (غير مطلوب مع `llmProvider`). دون أي مفتاح، تعمل الأدوات وخوادم MCP، وتفشل الاستدعاءات التي تحتاج إلى نموذج بخطأ واضح |
 | `provider` | `'openai' \| 'anthropic'` | المزوّد الأساسي، والافتراضي `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey` و`defaultModel` لكل مزوّد |
-| `fallbackProviders` | `Array<{ provider, config? }>` | تُجرَّب بالترتيب حين يفشل المزوّد الأساسي |
-| `llmProvider` | `LLMProvider` | مزوّدك الخاص (نموذج محلي، أو بوابة، أو بديل اختباري) |
-| `retry` | `Partial<RetryPolicy> \| false` | سياسة إعادة المحاولة للنموذج اللغوي، لكل مزوّد، قبل التحويل إلى البديل |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey` و`defaultModel` و`baseURL` لكل جهة (`baseURL`: نقطة نهاية متوافقة، مثل واجهة v1 من Azure OpenAI أو خادم نماذج محلي، أو وكيل proxy). يستخدم المزوّد الأساسي مدخل جهته، ويستخدم المزوّد الاحتياطي من جهة أخرى مدخل جهته هو |
+| `fallbackProviders` | `Array<{ provider, config? }>` | تُجرَّب بالترتيب حين يفشل المزوّد الأساسي؛ ويتقدّم `config` على `providerConfig`. لا يرث المزوّد الاحتياطي من جهة المزوّد الأساسي نفسها أيًّا من إعداداته (سوى `apiKey` العام)؛ أما المزوّد من جهة أخرى فيحتاج إلى مفتاحه الخاص |
+| `llmProvider` | `LLMProvider` | مزوّدك الخاص (نموذج محلي، أو بوابة، أو بديل اختباري). يتلقّى استدعاءات الأدوات ونتائجها بالصيغة الأصلية (`LLMMessage`) إن صرّح بـ `nativeToolMessages`، وإلا فنصًّا |
+| `retry` | `Partial<RetryPolicy> \| false` | سياسة إعادة المحاولة للنموذج اللغوي، لكل مزوّد، قبل التحويل إلى البديل. لا تُطبَّق على `llmProvider` محقون إلا إذا عُيّنت صراحةً، ولا تُطبَّق أبدًا على `FallbackProvider` مُمرَّر بوصفه `llmProvider` ولا على مزوّداته |
 | `jev` | `JevClientConfig` | يفعّل TypeSafe Jev للقرارات المُنمَّطة — مباشرةً، أو عبر [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) مع `baseUrl` و`model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | أي واجهة خلفية للقرارات المُنمَّطة (لها الأولوية على `jev`) |
 | `pricing` | `PricingTable` | دولار أمريكي لكل مليون رمز، يُدمَج فوق القيم الافتراضية |
@@ -174,4 +174,4 @@ interface ResourceProvider {
 
 ## اللبنات الأساسية {#building-blocks}
 
-كل ما تستخدمه حزمة SDK مُصدَّر لأجل الإعدادات المخصّصة: `JevClient`، و`DecisionService`، و`LLMThoughtGenerator`، و`HeuristicController`، و`TypedDecisionController`، و`TypedHypothesisAssessor`، و`PredictionTester`، و`applyThought`، و`assembleThought`، و`assessReadiness`، و`rankHypotheses`، و`rebuildMentalState`، و`describeMentalState`، و`fingerprint`، و`defineThinkerProfile`، و`refineProfile`، و`withRetry`، و`RetryingLLMProvider`، و`MonitoredEventStore`، و`EmailIncidentNotifier`، و`WebhookIncidentNotifier`، و`ResendEmailTransport`، و`computeRunCost`، و`FileEventStore`، و`SQLiteEventStore`، و`PostgreSQLEventStore`، وجميع الأنواع.
+مكوّنات حزمة SDK مُصدَّرة لأجل الإعدادات المخصّصة: `JevClient`، و`DecisionService`، و`LLMThoughtGenerator`، و`HeuristicController`، و`TypedDecisionController`، و`TypedHypothesisAssessor`، و`PredictionTester`، و`applyThought`، و`assembleThought`، و`assessReadiness`، و`rankHypotheses`، و`rebuildMentalState`، و`describeMentalState`، و`fingerprint`، و`defineThinkerProfile`، و`refineProfile`، و`withRetry`، و`RetryingLLMProvider`، و`OpenAIProvider`، و`AnthropicProvider`، و`FallbackProvider`، و`MonitoredEventStore`، و`EmailIncidentNotifier`، و`WebhookIncidentNotifier`، و`ResendEmailTransport`، و`computeRunCost`، و`FileEventStore`، و`SQLiteEventStore`، و`PostgreSQLEventStore`، وأنواعها الرئيسية.

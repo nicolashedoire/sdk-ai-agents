@@ -12,6 +12,8 @@ import type { PolicyAuditEntry } from '../types/audit.js';
 import type { IEventStore } from '../stores/event-store.js';
 import { ConditionEvaluator } from '../evaluators/condition-evaluator.js';
 import { generateEventId } from '../utils/id.js';
+import { costOf, DEFAULT_PRICING, findModelPrice, type PricingTable } from '../costs/pricing.js';
+import type { LLMResponse } from '../providers/llm-provider.js';
 
 /**
  * Rule conditions that name a built-in check rather than a field to evaluate. They must not
@@ -29,6 +31,7 @@ export class PolicyEngine {
   private globalPolicies: Map<string, Policy> = new Map();
   private agentPolicies: Map<string, Map<string, Policy>> = new Map();
   private budgetTracker?: BudgetTracker;
+  private pricing: PricingTable = DEFAULT_PRICING;
   private conditionEvaluator: ConditionEvaluator;
   private eventStore?: IEventStore;
   private auditEntries: Map<string, PolicyAuditEntry[]> = new Map();
@@ -43,6 +46,38 @@ export class PolicyEngine {
 
   setBudgetTracker(tracker: BudgetTracker): void {
     this.budgetTracker = tracker;
+  }
+
+  /** Prices used to count the cost of model calls in budgets (`maxCost`). */
+  setPricing(pricing: PricingTable): void {
+    this.pricing = pricing;
+  }
+
+  /**
+   * Counts a model call of an agent in its budgets per period: its tokens, and its cost from
+   * the price of the model that answered (or of the model requested).
+   */
+  async recordModelUsage(
+    agentId: string,
+    call: { model?: string; requestedModel?: string; usage?: LLMResponse['usage'] }
+  ): Promise<void> {
+    if (!this.budgetTracker) return;
+    const { usage } = call;
+    const input = usage?.promptTokens;
+    const output = usage?.completionTokens;
+    const tokens = usage?.totalTokens ?? (input ?? 0) + (output ?? 0);
+    // Without input or output counts (none at all, or a total alone) the cost is unknown.
+    if (input === undefined && output === undefined) {
+      await this.budgetTracker.recordModelUsage(agentId, { tokens, uncosted: 'no-usage' });
+      return;
+    }
+    const price = findModelPrice(this.pricing, call.model, call.requestedModel);
+    await this.budgetTracker.recordModelUsage(
+      agentId,
+      price
+        ? { tokens, costUsd: costOf(price, input ?? 0, output ?? 0) }
+        : { tokens, uncosted: 'no-price' }
+    );
   }
 
   applyGlobalPolicy(policy: Policy): void {
@@ -106,6 +141,8 @@ export class PolicyEngine {
   async validate(intention: Intention, context: PolicyContext): Promise<PolicyValidationResult> {
     const policies = this.getActivePolicies(context.agentId);
     const violatedPolicies: string[] = [];
+    // What each violated policy says went wrong, e.g. "Max steps (10) exceeded".
+    const reasons = new Map<string, string>();
     const approvalRequiredPolicies: Array<{ policyId: string; rule: PolicyRule }> = [];
 
     for (const policy of policies) {
@@ -123,6 +160,7 @@ export class PolicyEngine {
       const result = await this.validatePolicy(policy, intention, context);
       if (!result.allowed) {
         violatedPolicies.push(policy.id);
+        if (result.reason) reasons.set(policy.id, result.reason);
       }
 
       // Check if any rule requires approval
@@ -150,7 +188,7 @@ export class PolicyEngine {
       return { allowed: true };
     }
 
-    return this.createViolationResult(intention, policies, violatedPolicies);
+    return this.createViolationResult(intention, policies, violatedPolicies, reasons);
   }
 
   /**
@@ -324,10 +362,15 @@ export class PolicyEngine {
   private createViolationResult(
     intention: Intention,
     policies: Policy[],
-    violatedPolicies: string[]
+    violatedPolicies: string[],
+    reasons: ReadonlyMap<string, string>
   ): PolicyValidationResult {
-    const firstPolicy = policies.find((p) => p.id === violatedPolicies[0]);
-    const reason = this.getViolationReason(intention, firstPolicy, violatedPolicies);
+    const firstId = violatedPolicies[0];
+    const firstPolicy = policies.find((p) => p.id === firstId);
+    // The policy's own reason says what was exceeded; the generic one only names policies.
+    const reason =
+      (firstId !== undefined ? reasons.get(firstId) : undefined) ??
+      this.getViolationReason(intention, firstPolicy, violatedPolicies);
 
     return {
       allowed: false,
@@ -479,8 +522,23 @@ export class PolicyEngine {
       return null; // This limit doesn't apply to this tool
     }
 
-    // Calculate additional usage for this action
-    const additionalTokens = context.tokensUsed || 0;
+    // The limit is plain data from the caller: a cost cap that is not an amount cannot be
+    // checked, and refuses like one whose spend is unknown.
+    const maxCost: unknown = budgetLimit.maxCost;
+    if (
+      maxCost !== undefined &&
+      !(typeof maxCost === 'number' && Number.isFinite(maxCost) && maxCost >= 0)
+    ) {
+      return {
+        allowed: false,
+        reason: `Cost budget cannot be checked: maxCost must be a finite number >= 0 (USD), got ${shownValue(maxCost)}`,
+        violatedPolicies: [policyId],
+      };
+    }
+
+    // A tool call consumes no tokens: model tokens are recorded as they are used
+    // (recordModelUsage), so adding the run's total here would count them twice.
+    const additionalTokens = 0;
     const additionalToolCalls = context.intention?.toolName ? 1 : 0;
 
     const checkResult = await this.budgetTracker.checkBudget(
@@ -641,6 +699,16 @@ export class PolicyEngine {
 }
 
 const PERIODS = new Set(['hour', 'day', 'week', 'month', 'all']);
+
+/** A value from plain policy data, as a reason can show it ("0.5" for a string, not 0.5). */
+function shownValue(value: unknown): string {
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (typeof value === 'bigint') return `${value}n`;
+  if (typeof value === 'function') return 'a function';
+  if (typeof value === 'object' && value !== null)
+    return Array.isArray(value) ? 'an array' : 'an object';
+  return String(value);
+}
 
 /** A budget limit with a call count, read from policy metadata (plain data from the caller). */
 function isToolCallLimit(value: unknown): value is BudgetLimit & { maxToolCalls: number } {

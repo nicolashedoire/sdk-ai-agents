@@ -11,10 +11,10 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Key of the primary provider (not needed with `llmProvider`). Without any key, tools and MCP servers work and calls that need a model fail with a clear error |
 | `provider` | `'openai' \| 'anthropic'` | Primary provider, default `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | Per-provider `apiKey` and `defaultModel` |
-| `fallbackProviders` | `Array<{ provider, config? }>` | Tried in order when the primary fails |
-| `llmProvider` | `LLMProvider` | Your own provider (local model, gateway, test double) |
-| `retry` | `Partial<RetryPolicy> \| false` | LLM retry policy, per provider, before fallback |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` and `baseURL` of each vendor (`baseURL`: a compatible endpoint, such as the Azure OpenAI v1 API or a local model server, or a proxy). The primary uses its vendor's entry, and a fallback of another vendor uses its own vendor's entry |
+| `fallbackProviders` | `Array<{ provider, config? }>` | Tried in order when the primary fails; a `config` overrides `providerConfig`. A fallback of the primary's vendor inherits none of the primary's settings (only the SDK-wide `apiKey`); one of another vendor needs its own key |
+| `llmProvider` | `LLMProvider` | Your own provider (local model, gateway, test double). It gets tool calls and results in the native format (`LLMMessage`) if it declares `nativeToolMessages`, as plain text otherwise |
+| `retry` | `Partial<RetryPolicy> \| false` | LLM retry policy, per provider, before fallback. Applied to an injected `llmProvider` only when set explicitly, and never to a `FallbackProvider` given as `llmProvider` or to its providers |
 | `jev` | `JevClientConfig` | Enables TypeSafe Jev for typed decisions — directly, or through [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) with `baseUrl` and `model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | Any typed-decision backend (takes precedence over `jev`) |
 | `pricing` | `PricingTable` | USD per million tokens, merged over defaults |
@@ -174,4 +174,4 @@ interface ResourceProvider {
 
 ## Building blocks
 
-Everything the SDK uses is exported for custom setups: `JevClient`, `DecisionService`, `LLMThoughtGenerator`, `HeuristicController`, `TypedDecisionController`, `TypedHypothesisAssessor`, `PredictionTester`, `applyThought`, `assembleThought`, `assessReadiness`, `rankHypotheses`, `rebuildMentalState`, `describeMentalState`, `fingerprint`, `defineThinkerProfile`, `refineProfile`, `withRetry`, `RetryingLLMProvider`, `MonitoredEventStore`, `EmailIncidentNotifier`, `WebhookIncidentNotifier`, `ResendEmailTransport`, `computeRunCost`, `FileEventStore`, `SQLiteEventStore`, `PostgreSQLEventStore`, and all the types.
+The SDK's building blocks are exported for custom setups: `JevClient`, `DecisionService`, `LLMThoughtGenerator`, `HeuristicController`, `TypedDecisionController`, `TypedHypothesisAssessor`, `PredictionTester`, `applyThought`, `assembleThought`, `assessReadiness`, `rankHypotheses`, `rebuildMentalState`, `describeMentalState`, `fingerprint`, `defineThinkerProfile`, `refineProfile`, `withRetry`, `RetryingLLMProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider`, `MonitoredEventStore`, `EmailIncidentNotifier`, `WebhookIncidentNotifier`, `ResendEmailTransport`, `computeRunCost`, `FileEventStore`, `SQLiteEventStore`, `PostgreSQLEventStore`, and their main types.

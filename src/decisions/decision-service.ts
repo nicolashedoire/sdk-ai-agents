@@ -77,6 +77,8 @@ export class DecisionService {
   async ask<Q extends TypedQuestions>(
     input: AskInput<Q>
   ): Promise<DecisionResponse<Q> & { runId: string }> {
+    // A run id the store would refuse is refused before the paid call, not after it.
+    if (input.runId !== undefined) this.eventStore.checkRunId?.(input.runId);
     const response = await this.client.evaluate({
       state: input.context,
       questions: input.questions,

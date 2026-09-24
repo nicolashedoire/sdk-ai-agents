@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
-import { join } from 'node:path';
 import type { ImpactAnalysis } from '../types/impact-analysis.js';
+import { fileInFolder } from '../utils/file-in-folder.js';
 
 export class ImpactAnalysisManager {
   private analysesDir: string;
@@ -23,7 +23,7 @@ export class ImpactAnalysisManager {
   async saveAnalysis(analysis: ImpactAnalysis): Promise<void> {
     await this.ensureAnalysesDir();
 
-    const filePath = join(this.analysesDir, `${analysis.id}.json`);
+    const filePath = fileInFolder(this.analysesDir, analysis.id, '.json', 'id');
     await fs.writeFile(filePath, JSON.stringify(analysis, null, 2), 'utf-8');
 
     this.analysesCache.set(analysis.id, analysis);
@@ -38,7 +38,7 @@ export class ImpactAnalysisManager {
     await this.ensureAnalysesDir();
 
     try {
-      const filePath = join(this.analysesDir, `${analysisId}.json`);
+      const filePath = fileInFolder(this.analysesDir, analysisId, '.json', 'id');
       const content = await fs.readFile(filePath, 'utf-8');
       const analysis = JSON.parse(content) as ImpactAnalysis;
       this.analysesCache.set(analysisId, analysis);
@@ -52,7 +52,7 @@ export class ImpactAnalysisManager {
     await this.ensureAnalysesDir();
 
     try {
-      const filePath = join(this.analysesDir, `${analysisId}.json`);
+      const filePath = fileInFolder(this.analysesDir, analysisId, '.json', 'id');
       await fs.unlink(filePath);
       this.analysesCache.delete(analysisId);
       return true;

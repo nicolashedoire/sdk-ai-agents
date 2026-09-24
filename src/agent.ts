@@ -1,6 +1,7 @@
 import type { ActionEngine } from './engines/action-engine.js';
 import type { PolicyEngine } from './engines/policy-engine.js';
-import type { ReasoningEngine } from './engines/reasoning-engine.js';
+import type { ReasoningEngine, ReasoningStep } from './engines/reasoning-engine.js';
+import type { LLMMessage } from './providers/llm-provider.js';
 import type { IEventStore } from './stores/event-store.js';
 import type { Event } from './types/events.js';
 import type { Agent, ProviderSettings } from './types/agent.js';
@@ -10,10 +11,16 @@ import type { Tool } from './types/tool.js';
 import { DEFAULT_MAX_STEPS, DEFAULT_TIMEOUT_MS } from './utils/constants.js';
 import { generateEventId, generateRunId } from './utils/id.js';
 
+/** Answer to a call the model made alongside the one that ran. */
+const NOT_RUN = 'Not run: one tool runs per step. Call it again if it is still needed.';
+
 interface RunState {
-  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
+  conversationHistory: LLMMessage[];
+  /** The user's message still to send; empty once it is in the history. */
   currentInput: string;
   step: number;
+  /** Tokens the run's model calls used so far. */
+  tokensUsed: number;
   maxSteps: number;
   timeout: number;
   startTime: number;
@@ -107,6 +114,7 @@ export class AgentImpl {
       conversationHistory: [],
       currentInput: input.message,
       step: 0,
+      tokensUsed: 0,
       maxSteps: this.agent.config.maxSteps || DEFAULT_MAX_STEPS,
       timeout: this.agent.config.timeout || DEFAULT_TIMEOUT_MS,
       startTime: Date.now(),
@@ -121,7 +129,9 @@ export class AgentImpl {
       this.checkTimeout(state);
 
       try {
-        const intention = await this.generateIntention(runId, state);
+        const step = await this.generateStep(runId, state);
+        const { intention, toolCall } = step;
+        await this.recordModelCall(state, step);
 
         this.checkCancellation(runId, state);
 
@@ -129,8 +139,8 @@ export class AgentImpl {
           return await this.completeRun(runId, intention.reasoning);
         }
 
-        if (intention.type === 'tool_call') {
-          await this.handleToolCall(runId, state, intention);
+        if (toolCall) {
+          await this.handleToolCall(runId, state, intention, toolCall);
           this.checkCancellation(runId, state);
         }
 
@@ -160,7 +170,15 @@ export class AgentImpl {
     }
   }
 
-  private async generateIntention(runId: string, state: RunState): Promise<Intention> {
+  /** Adds a model call's tokens to the run, and its tokens and cost to the agent's budgets. */
+  private async recordModelCall(state: RunState, step: ReasoningStep): Promise<void> {
+    const { usage } = step;
+    state.tokensUsed +=
+      usage?.totalTokens ?? (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0);
+    await this.policyEngine.recordModelUsage(this.agent.id, step);
+  }
+
+  private async generateStep(runId: string, state: RunState): Promise<ReasoningStep> {
     // Merge agent and run providerSettings
     // Priority: run settings > agent settings
     const providerSettings = this.mergeProviderSettings(
@@ -168,7 +186,7 @@ export class AgentImpl {
       state.providerSettings
     );
 
-    return await this.reasoningEngine.generateIntention(
+    return await this.reasoningEngine.generateStep(
       {
         runId,
         agentId: this.agent.id,
@@ -185,7 +203,10 @@ export class AgentImpl {
   }
 
   /**
-   * Merges agent and run providerSettings with priority: run > agent
+   * Merges agent and run providerSettings. For each field the priority is: run
+   * provider-specific > run default > agent provider-specific > agent default. Each provider's
+   * group is resolved completely here, so a run default wins over an agent's provider-specific
+   * value (it did not when the groups were merged separately).
    */
   private mergeProviderSettings(
     agentSettings?: Agent['config']['providerSettings'],
@@ -201,27 +222,28 @@ export class AgentImpl {
       return undefined;
     }
 
-    // Merge: run settings override agent settings
     return {
-      default: {
-        ...agentSettings?.default,
-        ...runSettings?.default,
-      },
-      openai: {
-        ...agentSettings?.openai,
-        ...runSettings?.openai,
-      },
-      anthropic: {
-        ...agentSettings?.anthropic,
-        ...runSettings?.anthropic,
-      },
+      default: layerSettings(agentSettings?.default, runSettings?.default),
+      openai: layerSettings(
+        agentSettings?.default,
+        agentSettings?.openai,
+        runSettings?.default,
+        runSettings?.openai
+      ),
+      anthropic: layerSettings(
+        agentSettings?.default,
+        agentSettings?.anthropic,
+        runSettings?.default,
+        runSettings?.anthropic
+      ),
     };
   }
 
   private async handleToolCall(
     runId: string,
     state: RunState,
-    intention: Intention
+    intention: Intention,
+    toolCall: NonNullable<ReasoningStep['toolCall']>
   ): Promise<void> {
     if (state.abortController?.signal.aborted) {
       throw new Error('Run cancelled');
@@ -230,22 +252,36 @@ export class AgentImpl {
     const result = await this.actionEngine.executeIntention(intention, {
       runId,
       agentId: this.agent.id,
+      // What budget policies check: the run's step, tokens and start time.
+      run: { step: state.step, tokensUsed: state.tokensUsed, startedAt: state.startTime },
       abortSignal: state.abortController?.signal,
       // Only this agent's tools, even if the model names another tool registered in the SDK.
       allowedTools: this.agent.tools.map((tool) => tool.name),
     });
 
-    state.conversationHistory.push({
-      role: 'user',
-      content: state.currentInput,
+    // The turn so far: the user's message, the model's call, then the tool's result, which
+    // refers to the call by its id. The next step continues from there, with no new input.
+    // The user's message opens the conversation, even when empty (it must come first).
+    if (state.currentInput || state.conversationHistory.length === 0) {
+      state.conversationHistory.push({ role: 'user', content: state.currentInput });
+    }
+    state.conversationHistory.push(toolCall.turn, {
+      role: 'tool',
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      // As in the plain-text lines of earlier versions ("undefined" for a tool returning nothing).
+      content: String(JSON.stringify(result.result)),
     });
-
-    state.conversationHistory.push({
-      role: 'assistant',
-      content: `Tool ${intention.toolName} executed with result: ${JSON.stringify(result.result)}`,
-    });
-
-    state.currentInput = `Previous tool result: ${JSON.stringify(result.result)}. Continue.`;
+    for (const other of toolCall.notRun) {
+      state.conversationHistory.push({
+        role: 'tool',
+        toolCallId: other.id,
+        toolName: other.name,
+        content: NOT_RUN,
+        isError: true,
+      });
+    }
+    state.currentInput = '';
   }
 
   private async completeRun(runId: string, output: string | undefined): Promise<RunResult> {
@@ -307,4 +343,14 @@ export class AgentImpl {
       },
     });
   }
+}
+
+/** Layers settings from lowest to highest priority; an unset field never hides a lower one. */
+function layerSettings(...layers: Array<ProviderSettings | undefined>): ProviderSettings {
+  const result: ProviderSettings = {};
+  for (const layer of layers) {
+    if (layer?.temperature !== undefined) result.temperature = layer.temperature;
+    if (layer?.maxTokens !== undefined) result.maxTokens = layer.maxTokens;
+  }
+  return result;
 }

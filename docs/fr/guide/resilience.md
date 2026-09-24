@@ -24,6 +24,8 @@ const sdk = createSDK({
 });
 ```
 
+Un fournisseur de repli d'un autre éditeur a besoin de sa propre clé, dans son `config` ou dans `providerConfig` : la clé du fournisseur principal n'est jamais envoyée à un autre éditeur. Il reçoit le modèle de l'agent seulement s'il le sert, et sinon son propre `defaultModel` (Anthropic refuse un nom de modèle OpenAI, et inversement). L'événement `intention.generated` indique le fournisseur qui a répondu et le modèle utilisé.
+
 | Option | Valeur par défaut | |
 | --- | --- | --- |
 | `maxRetries` | `2` | Nouvelles tentatives après la première tentative |
@@ -37,7 +39,7 @@ Seules les erreurs **transitoires** donnent lieu à de nouvelles tentatives : 4
 
 Quand la politique du SDK est active, les nouvelles tentatives propres aux clients OpenAI et Anthropic sont désactivées — **les nouvelles tentatives ne s'empilent jamais**. Chaque nouvelle tentative est enregistrée sous forme d'événement `provider.retry` avec le fournisseur, le modèle, la tentative, le délai et l'erreur. Passez `retry: false` pour conserver plutôt les réglages par défaut des fournisseurs.
 
-Un fournisseur que vous injectez avec `llmProvider` est utilisé tel quel, sauf si vous définissez `retry` explicitement, et un `FallbackProvider` n'est jamais enveloppé, pour que ses basculements restent visibles dans la trace.
+Un fournisseur que vous injectez avec `llmProvider` est utilisé tel quel, sauf si vous définissez `retry` explicitement, et un `FallbackProvider` n'est jamais enveloppé, pour que ses basculements restent visibles dans la trace. Ses fournisseurs ne sont pas enveloppés non plus, donc `retry` ne s'applique pas à eux : pour en relancer un avant de basculer, enveloppez-le dans `RetryingLLMProvider` et donnez à son client `maxRetries: 0`. Donnez à `maxRetryAfterMs` la valeur de `maxDelayMs`, comme le fait le SDK quand un repli peut prendre le relais, pour qu'un fournisseur qui demande une longue pause soit laissé au repli. Ces nouvelles tentatives ne sont pas enregistrées comme événements `provider.retry`.
 
 ## Outils {#tools}
 

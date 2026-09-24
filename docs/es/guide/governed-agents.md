@@ -232,6 +232,8 @@ const agent = sdk.createAgent({
 });
 ```
 
+Los límites de presupuesto y de duración se comprueban antes de cada llamada a herramienta de una ejecución de un agente gobernado, según su progreso: `maxSteps` cuenta los pasos ya dados (la primera llamada está en el paso 0), `maxTokens` los tokens que usaron sus llamadas al modelo y `maxDuration` el tiempo transcurrido desde el inicio de la ejecución. Un límite rechaza la llamada a herramienta, lo que hace fallar la ejecución; nunca interrumpe una llamada al modelo. Los presupuestos de tokens y de coste por periodo (`budgetLimit` con `maxTokens` o `maxCost`) cuentan los tokens y el coste de las llamadas al modelo de los agentes gobernados, y una repetición aplica `maxSteps`, `maxTokens` y `maxDuration` como la ejecución original (los presupuestos por periodo ven el consumo del periodo actual). Los agentes cognitivos tienen sus propios límites (`maxSteps`, `maxToolCalls`, `timeoutMs`).
+
 ### 4. Trazas {#_4-traces}
 
 Cada ejecución genera una traza completa que se puede repetir.

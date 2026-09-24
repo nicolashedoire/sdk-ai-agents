@@ -39,6 +39,10 @@ export class RetryingLLMProvider implements LLMProvider {
     return this.inner.getProviderName();
   }
 
+  get nativeToolMessages(): boolean {
+    return this.inner.nativeToolMessages === true;
+  }
+
   /** The decorated provider (useful to reach provider-specific features). */
   unwrap(): LLMProvider {
     return this.inner;

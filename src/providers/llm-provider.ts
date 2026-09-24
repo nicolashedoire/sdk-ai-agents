@@ -5,6 +5,42 @@
  * Abstracts provider differences and normalizes responses.
  */
 
+/** A tool call made by the model. */
+export interface LLMToolCall {
+  /** Id the tool's result refers to (given by the vendor, or by the SDK when it gives none). */
+  id?: string;
+  function: {
+    name: string;
+    arguments: string; // JSON string
+  };
+}
+
+/**
+ * A message of the conversation. Assistant tool calls and `tool` results are only sent to
+ * providers that declare `nativeToolMessages`; other providers get them as plain text.
+ */
+export type LLMMessage =
+  | { role: 'system' | 'user'; content: string }
+  | {
+      role: 'assistant';
+      content: string;
+      /** Tool calls the model made in this turn. */
+      toolCalls?: LLMToolCall[];
+      /**
+       * The turn as the vendor returned it (with its thinking blocks, for instance), sent back
+       * unchanged when the conversation continues with the same vendor.
+       */
+      vendorContent?: { provider: string; content: unknown };
+    }
+  | {
+      role: 'tool';
+      toolCallId: string;
+      toolName: string;
+      content: string;
+      /** The tool did not run (or failed): `content` says why. */
+      isError?: boolean;
+    };
+
 /**
  * Normalized request to generate an LLM completion
  */
@@ -12,14 +48,11 @@ export interface LLMRequest {
   /** Run the request belongs to, used to trace retries and costs (optional). */
   runId?: string;
 
-  /** Model to use (e.g. "gpt-4", "claude-3-opus") */
+  /** Model to use (e.g. "gpt-4o"). An empty string lets the provider use its default model. */
   model: string;
 
   /** Conversation messages */
-  messages: Array<{
-    role: 'system' | 'user' | 'assistant';
-    content: string;
-  }>;
+  messages: LLMMessage[];
 
   /** Tools available to the LLM (optional) */
   tools?: Array<{
@@ -56,12 +89,10 @@ export interface LLMResponse {
   content: string | null;
 
   /** Tool calls requested by the LLM (optional) */
-  toolCalls?: Array<{
-    function: {
-      name: string;
-      arguments: string; // JSON string
-    };
-  }>;
+  toolCalls?: LLMToolCall[];
+
+  /** The answer as the vendor returned it, to send back in the next turn (see LLMMessage). */
+  vendorContent?: { provider: string; content: unknown };
 
   /** Model that generated the response */
   model: string;
@@ -72,6 +103,20 @@ export interface LLMResponse {
     completionTokens?: number;
     totalTokens?: number;
   };
+}
+
+/** Options of the vendor client (OpenAI, Anthropic) behind a built-in provider. */
+export interface VendorClientOptions {
+  /**
+   * Retries performed by the vendor client itself. The SDK sets it to 0 when its own retry
+   * policy is active, so retries are not stacked.
+   */
+  maxRetries?: number;
+  /**
+   * Address of the API, for a compatible endpoint (Azure OpenAI, a local model server, a
+   * gateway) or a proxy. The vendor's own address when omitted.
+   */
+  baseURL?: string;
 }
 
 /**
@@ -104,4 +149,10 @@ export interface LLMProvider {
    * @returns Provider name
    */
   getProviderName(): string;
+
+  /**
+   * True when the provider takes assistant tool calls and `tool` messages in the vendor's
+   * native format. Otherwise the SDK sends tool results as plain text, as it always did.
+   */
+  readonly nativeToolMessages?: boolean;
 }

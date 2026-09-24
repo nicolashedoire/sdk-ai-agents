@@ -24,6 +24,8 @@ const sdk = createSDK({
 });
 ```
 
+来自另一厂商的回退提供商需要自己的密钥，写在它的 `config` 或 `providerConfig` 中：主提供商的密钥绝不会发送给其他厂商。只有当它支持智能体的模型时才会收到该模型，否则使用它自己的 `defaultModel`（Anthropic 会拒绝 OpenAI 的模型名，反之亦然）。`intention.generated` 事件会记录实际应答的提供商及其使用的模型。
+
 | 选项 | 默认值 | |
 | --- | --- | --- |
 | `maxRetries` | `2` | 首次尝试之后的重试次数 |
@@ -37,7 +39,7 @@ const sdk = createSDK({
 
 当 SDK 的重试策略生效时，OpenAI 和 Anthropic 客户端自带的重试会被禁用——**重试永远不会叠加**。每一次重试都会被记录为一个 `provider.retry` 事件，包含提供商、模型、尝试次数、延迟和错误。传入 `retry: false` 可以改为保留厂商的默认设置。
 
-你通过 `llmProvider` 注入的提供商会按原样使用，除非你显式设置了 `retry`；`FallbackProvider` 永远不会被包装，这样它的故障转移在追踪记录中始终可见。
+你通过 `llmProvider` 注入的提供商会按原样使用，除非你显式设置了 `retry`；`FallbackProvider` 永远不会被包装，这样它的故障转移在追踪记录中始终可见。它内部的提供商也不会被包装，因此 `retry` 对它们不起作用：要在故障转移前重试某个提供商，请用 `RetryingLLMProvider` 包装它，并为它的客户端设置 `maxRetries: 0`。请像 SDK 在有备用提供商可接手时那样，把策略的 `maxRetryAfterMs` 设为它的 `maxDelayMs`，这样要求长时间暂停的提供商会被留给备用提供商处理。这些重试不会被记录为 `provider.retry` 事件。
 
 ## 工具 {#tools}
 

@@ -24,6 +24,8 @@ const sdk = createSDK({
 });
 ```
 
+A fallback of another vendor needs its own key, in its `config` or in `providerConfig`: the primary key is never sent to another vendor. It gets the agent's model only if it serves it, and otherwise its own `defaultModel` (Anthropic refuses an OpenAI model name, and the other way round). The `intention.generated` event names the provider that answered and the model it used.
+
 | Option | Default | |
 | --- | --- | --- |
 | `maxRetries` | `2` | Retries after the first attempt |
@@ -37,7 +39,7 @@ Only **transient** errors are retried: 408, 409, 425, 429, 5xx, 529, connection 
 
 When the SDK policy is active, the OpenAI and Anthropic clients' own retries are disabled — **retries never stack**. Each retry is recorded as a `provider.retry` event with the provider, model, attempt, delay and error. Pass `retry: false` to keep the vendor defaults instead.
 
-A provider you inject with `llmProvider` is used as given unless you set `retry` explicitly, and a `FallbackProvider` is never wrapped so its failovers stay visible in the trace.
+A provider you inject with `llmProvider` is used as given unless you set `retry` explicitly, and a `FallbackProvider` is never wrapped so its failovers stay visible in the trace. Its providers are not wrapped either, so `retry` does not apply to them: to retry one before failing over, wrap it in `RetryingLLMProvider` and give its client `maxRetries: 0`. Set the policy's `maxRetryAfterMs` to its `maxDelayMs`, as the SDK does when a fallback can take over, so that a provider asking for a long pause is left for the fallback. Those retries are not recorded as `provider.retry` events.
 
 ## Tools
 
