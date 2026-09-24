@@ -100,4 +100,11 @@ console.log('\nPredictions:');
 for (const prediction of result.state.predictions) {
   console.log(`  ${prediction.id} of ${prediction.hypothesisId}: ${prediction.status} — ${prediction.expected}`);
 }
-console.log(`\nRun ${result.runId}: ${(await sdk.getRunCost(result.runId)).totalUsd.toFixed(4)} USD`);
+const cost = await sdk.getRunCost(result.runId);
+// Calls without a price or without token counts have an unknown cost: totalUsd is then a floor.
+const unknownCalls = cost.unpricedCalls + cost.unmeteredCalls;
+console.log(
+  cost.complete
+    ? `\nRun ${result.runId}: ${cost.totalUsd.toFixed(4)} USD`
+    : `\nRun ${result.runId}: at least ${cost.totalUsd.toFixed(4)} USD (${unknownCalls} call(s) of unknown cost)`
+);

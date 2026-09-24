@@ -128,7 +128,7 @@ interface OutcomeEvaluator {
 
 | Метод | Возвращает |
 | --- | --- |
-| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage, runId }` — ответы типизируются по вопросам |
+| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage?, runId }` — ответы типизируются по вопросам; без `usage`, если бэкенд не сообщил число токенов |
 | `choose({ context, question, options, minConfidence? })` | `{ choice, confidence, probabilities, confident, runId }` |
 | `selectMany({ context, question, options, threshold? })` | `{ selected, probabilities, runId }` |
 | `check({ context, question, criteria?, threshold? })` | `{ probability, yes, runId }` |
@@ -144,6 +144,43 @@ interface OutcomeEvaluator {
 | `getIncidents(runId)` | `Promise<Incident[]>` |
 | `approveAction(approvalId, by, reason?)`, `rejectAction(...)`, `getPendingApprovals(runId?)` | Одобрения человеком |
 | `getBudgetUsage(limit)`, `getPolicyAuditTrail(runId)` | Бюджеты и аудит политик |
+
+### `RunCostReport` {#runcostreport}
+
+Что возвращает `getRunCost(runId)`: вызовы модели в запуске, включая шаги, завершившиеся ошибкой, — см. [Затраты на API](../guide/costs).
+
+```ts
+interface RunCostReport {
+  runId: string;
+  currency: 'USD';
+  totalUsd: number;
+  complete: boolean;
+  lines: ModelCostLine[];
+  unpricedModels: string[];
+  unpricedCalls: number;
+  unmeteredCalls: number;
+  unmeteredModels: string[];
+}
+
+interface ModelCostLine {
+  model: string;
+  requestedModel?: string;
+  source: 'llm' | 'decision';
+  calls: number;
+  unmeteredCalls?: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd?: number;
+}
+```
+
+| Поле | |
+| --- | --- |
+| `totalUsd` | Стоимость вызовов с известной стоимостью; когда `complete` равно `false`, это лишь нижняя граница |
+| `complete` | `false`, когда стоимость некоторых вызовов неизвестна: `unpricedCalls` или `unmeteredCalls` больше 0 |
+| `unpricedModels`, `unpricedCalls` | Модели без цены в `pricing` и их вызовы, сообщившие свои токены |
+| `unmeteredModels`, `unmeteredCalls` | Модели вызовов, не сообщивших число ни входных, ни выходных токенов, и сами эти вызовы |
+| `lines` | По одной на модель и источник: вызовы, токены вызовов, которые их сообщили, `unmeteredCalls`, если такие есть, `costUsd`, если у модели есть цена и какие-то вызовы строки сообщили свои токены; `model` равно `(unknown)` для вызова, не записавшего имя модели |
 
 ## Трассы, воспроизведение и тестирование {#traces-replay-and-testing}
 

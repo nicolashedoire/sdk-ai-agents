@@ -145,6 +145,7 @@ export class InformationSeeker {
         ...(generated.model ? { model: generated.model } : {}),
         ...(generated.requestedModel ? { requestedModel: generated.requestedModel } : {}),
         ...(generated.usage ? { usage: generated.usage } : {}),
+        ...(generated.discarded ? { discarded: generated.discarded } : {}),
       };
     } catch (error) {
       if (signal.aborted) throw error;

@@ -128,7 +128,7 @@ interface OutcomeEvaluator {
 
 | الدالة | تعيد |
 | --- | --- |
-| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage, runId }` — تُستنتَج أنواع الإجابات من الأسئلة |
+| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage?, runId }` — تُستنتَج أنواع الإجابات من الأسئلة؛ ولا يوجد `usage` حين لا تُبلِغ الواجهة الخلفية عن عدد الرموز |
 | `choose({ context, question, options, minConfidence? })` | `{ choice, confidence, probabilities, confident, runId }` |
 | `selectMany({ context, question, options, threshold? })` | `{ selected, probabilities, runId }` |
 | `check({ context, question, criteria?, threshold? })` | `{ probability, yes, runId }` |
@@ -144,6 +144,43 @@ interface OutcomeEvaluator {
 | `getIncidents(runId)` | `Promise<Incident[]>` |
 | `approveAction(approvalId, by, reason?)`، `rejectAction(...)`، `getPendingApprovals(runId?)` | الموافقات البشرية |
 | `getBudgetUsage(limit)`، `getPolicyAuditTrail(runId)` | الميزانيات وتدقيق السياسات |
+
+### `RunCostReport` {#runcostreport}
+
+ما يُعيده `getRunCost(runId)`: استدعاءات النموذج في التشغيل، بما في ذلك الخطوات الفاشلة — انظر [تكاليف API](../guide/costs).
+
+```ts
+interface RunCostReport {
+  runId: string;
+  currency: 'USD';
+  totalUsd: number;
+  complete: boolean;
+  lines: ModelCostLine[];
+  unpricedModels: string[];
+  unpricedCalls: number;
+  unmeteredCalls: number;
+  unmeteredModels: string[];
+}
+
+interface ModelCostLine {
+  model: string;
+  requestedModel?: string;
+  source: 'llm' | 'decision';
+  calls: number;
+  unmeteredCalls?: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd?: number;
+}
+```
+
+| الحقل | |
+| --- | --- |
+| `totalUsd` | كلفة الاستدعاءات المعروفة الكلفة؛ وهي مجرّد حدّ أدنى حين تكون `complete` مساوية لـ `false` |
+| `complete` | `false` حين تكون كلفة بعض الاستدعاءات مجهولة: `unpricedCalls` أو `unmeteredCalls` أكبر من 0 |
+| `unpricedModels`، `unpricedCalls` | النماذج التي لا سعر لها في `pricing`، واستدعاءاتها التي أبلغت عن رموزها |
+| `unmeteredModels`، `unmeteredCalls` | نماذج الاستدعاءات التي لم تُبلِغ عن أي عدد لرموز الإدخال أو الإخراج، وتلك الاستدعاءات |
+| `lines` | سطر لكل نموذج ومصدر: الاستدعاءات، ورموز الاستدعاءات التي أبلغت عنها، و`unmeteredCalls` إن وُجدت، و`costUsd` حين يكون للنموذج سعر وأبلغ بعض استدعاءات السطر عن رموزها؛ وقيمة `model` هي `(unknown)` لاستدعاء لم يسجّل اسم نموذج |
 
 ## الآثار وإعادة التشغيل والاختبار {#traces-replay-and-testing}
 

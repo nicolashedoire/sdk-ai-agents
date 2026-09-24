@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import { LLMProviderError } from '../errors/index.js';
 import type {
+  DiscardedAnswer,
   LLMMessage,
   LLMProvider,
+  LLMRequest,
   LLMResponse,
   OpenAIReasoningEffort,
 } from '../providers/llm-provider.js';
@@ -34,6 +36,31 @@ export interface ReasoningContext {
     default?: ProviderSettings;
   };
   abortSignal?: AbortSignal;
+  /**
+   * Called for every model call the vendor answered: the answer of this step as soon as it
+   * arrives, before it is read (a step that then fails, for instance on tool arguments that
+   * are not valid JSON, still counts it), and each answer a provider discarded after the vendor
+   * billed it, once the provider call is over, even if it failed (see
+   * `LLMRequest.onDiscardedAnswer`). Governed agents count their budgets through it.
+   */
+  onModelUsage?: (call: AnsweredModelCall) => void | Promise<void>;
+}
+
+/** A model call as budgets count it: the model that answered, the one asked for, the tokens. */
+export interface AnsweredModelCall {
+  model?: string;
+  requestedModel?: string;
+  usage?: LLMResponse['usage'];
+}
+
+/** The answer of one call to the provider, and who gave it. */
+interface ProviderAnswer {
+  response: LLMResponse;
+  /** What was actually asked: a fallback may use its own default model. */
+  requestedModel?: string;
+  answeredBy: string;
+  /** Set when a fallback chain answered after its primary provider failed. */
+  fallback?: { usedProvider: string; attemptedProviders: string[] };
 }
 
 /** One model call of a run: what the model intends, and what the call cost. */
@@ -111,78 +138,39 @@ export class ReasoningEngine {
       const tools = this.buildToolsSchema(context.availableTools);
       const model = context.model || this.model;
 
-      // Check if provider is a FallbackProvider
-      let response: LLMResponse;
-      // What was actually asked, and of whom: a fallback may use its own default model.
-      let requestedModel: string | undefined = model;
-      let answeredBy = this.provider.getProviderName();
-      let fallbackInfo: {
-        usedProvider: string;
-        wasFallback: boolean;
-        attemptedProviders: string[];
-      } | null = null;
-
-      // Resolve temperature and maxTokens for regular providers
-      // For FallbackProvider, pass providerSettings and let it resolve per provider
-      let temperature: number | undefined;
-      let maxTokens: number | undefined;
-      let providerSettings: ReasoningContext['providerSettings'] | undefined;
-
-      if (this.provider instanceof FallbackProvider) {
-        // For FallbackProvider, pass providerSettings so it can resolve per provider
-        providerSettings = context.providerSettings;
-        // Also pass direct temperature/maxTokens as fallback
-        temperature = context.temperature;
-        maxTokens = context.maxTokens;
-
-        const result = await this.provider.generateCompletionWithFallback({
+      // Answers a provider discarded after the vendor billed them: recorded once the call is
+      // over, also when it failed.
+      const discarded: DiscardedAnswer[] = [];
+      let answer: ProviderAnswer;
+      try {
+        answer = await this.callProvider(context, {
           runId: context.runId,
           model,
           messages,
           tools,
-          temperature,
-          maxTokens,
-          providerSettings,
           abortSignal,
+          onDiscardedAnswer: (discardedAnswer) => {
+            discarded.push(discardedAnswer);
+          },
         });
-        response = result.response;
-        requestedModel = result.requestedModel;
-        answeredBy = result.usedProvider;
-        fallbackInfo = {
-          usedProvider: result.usedProvider,
-          wasFallback: result.wasFallback,
-          attemptedProviders: result.attemptedProviders,
-        };
-
-        // Log fallback event if fallback was used
-        if (result.wasFallback) {
-          await this.logFallbackEvent(context, eventStore, fallbackInfo);
-        }
-      } else {
-        // For regular provider, resolve settings now
-        const providerName = this.provider.getProviderName();
-        const resolvedSettings = this.resolveProviderSettings(
-          providerName,
-          context.providerSettings
-        );
-        temperature =
-          resolvedSettings.temperature ?? context.temperature ?? DEFAULT_LLM_TEMPERATURE;
-        maxTokens = resolvedSettings.maxTokens ?? context.maxTokens;
-
-        response = await this.provider.generateCompletion({
-          runId: context.runId,
-          model,
-          messages,
-          tools,
-          temperature,
-          maxTokens,
-          ...(resolvedSettings.reasoningEffort !== undefined
-            ? { reasoningEffort: resolvedSettings.reasoningEffort }
-            : {}),
-          abortSignal,
-        });
+      } catch (error) {
+        // The provider's failure is what the caller needs to see: a store that cannot record
+        // the discarded answers does not replace it (they are still counted in budgets).
+        await this.recordDiscardedAnswers(context, eventStore, discarded).catch(() => undefined);
+        throw error;
       }
+      await this.recordDiscardedAnswers(context, eventStore, discarded);
+      const { response, requestedModel, answeredBy } = answer;
 
+      // Counted before the answer is read, so that a step failing on it still counts it.
+      await context.onModelUsage?.({
+        model: response.model,
+        ...(requestedModel ? { requestedModel } : {}),
+        usage: response.usage,
+      });
+      if (answer.fallback) {
+        await this.logFallbackEvent(context, eventStore, answer.fallback);
+      }
       await this.logIntentionGenerated(
         context,
         eventStore,
@@ -237,6 +225,87 @@ export class ReasoningEngine {
   }
 
   /**
+   * Sends the request to the provider. A fallback chain gets the per-provider settings and
+   * reports who answered; a single provider gets its settings resolved here.
+   */
+  private async callProvider(
+    context: ReasoningContext,
+    request: Omit<LLMRequest, 'temperature' | 'maxTokens' | 'providerSettings'> & {
+      model: string;
+    }
+  ): Promise<ProviderAnswer> {
+    if (this.provider instanceof FallbackProvider) {
+      // The chain resolves providerSettings per provider; direct values are its fallback.
+      const result = await this.provider.generateCompletionWithFallback({
+        ...request,
+        temperature: context.temperature,
+        maxTokens: context.maxTokens,
+        providerSettings: context.providerSettings,
+      });
+      return {
+        response: result.response,
+        ...(result.requestedModel ? { requestedModel: result.requestedModel } : {}),
+        answeredBy: result.usedProvider,
+        ...(result.wasFallback
+          ? {
+              fallback: {
+                usedProvider: result.usedProvider,
+                attemptedProviders: result.attemptedProviders,
+              },
+            }
+          : {}),
+      };
+    }
+    const providerName = this.provider.getProviderName();
+    const resolvedSettings = this.resolveProviderSettings(providerName, context.providerSettings);
+    const response = await this.provider.generateCompletion({
+      ...request,
+      temperature: resolvedSettings.temperature ?? context.temperature ?? DEFAULT_LLM_TEMPERATURE,
+      maxTokens: resolvedSettings.maxTokens ?? context.maxTokens,
+      ...(resolvedSettings.reasoningEffort !== undefined
+        ? { reasoningEffort: resolvedSettings.reasoningEffort }
+        : {}),
+    });
+    // An empty model lets the provider use its own default: then nothing was asked by name.
+    return {
+      response,
+      ...(request.model ? { requestedModel: request.model } : {}),
+      answeredBy: providerName,
+    };
+  }
+
+  /**
+   * Counts each answer a provider discarded after the vendor billed it (an empty answer the
+   * provider failed on or failed over from) like any other model call, then records it.
+   */
+  private async recordDiscardedAnswers(
+    context: ReasoningContext,
+    eventStore: IEventStore,
+    answers: DiscardedAnswer[]
+  ): Promise<void> {
+    for (const answer of answers) {
+      await context.onModelUsage?.({ model: answer.model, usage: answer.usage });
+    }
+    for (const answer of answers) {
+      await eventStore.append(context.runId, {
+        id: generateEventId(),
+        runId: context.runId,
+        type: 'provider.answer_discarded',
+        timestamp: Date.now(),
+        data: {
+          provider: answer.provider,
+          model: answer.model,
+          usage: answer.usage,
+          reason: answer.reason,
+        },
+        metadata: {
+          agentId: context.agentId,
+        },
+      });
+    }
+  }
+
+  /**
    * Resolves provider settings for a specific provider name.
    * Priority: provider-specific > default
    */
@@ -269,7 +338,7 @@ export class ReasoningEngine {
   private async logFallbackEvent(
     context: ReasoningContext,
     eventStore: IEventStore,
-    fallbackInfo: { usedProvider: string; wasFallback: boolean; attemptedProviders: string[] }
+    fallbackInfo: { usedProvider: string; attemptedProviders: string[] }
   ): Promise<void> {
     await eventStore.append(context.runId, {
       id: generateEventId(),

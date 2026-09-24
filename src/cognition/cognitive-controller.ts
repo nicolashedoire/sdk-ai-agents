@@ -15,15 +15,19 @@ export interface ControllerInput {
   abortSignal?: AbortSignal;
 }
 
-/** A typed-decision call made while reasoning, kept for the audit trail. */
+/** A typed-decision call made while reasoning, kept for the audit trail and its cost. */
 export interface DecisionEvaluationRecord {
   client: string;
   purpose: 'operation_selection' | 'hypothesis_assessment' | 'direct';
   model: string;
   state: unknown;
   questions: TypedQuestions;
+  /** Empty when the answer was rejected (see `error`). */
   answers: Record<string, TypedAnswer>;
-  usage: { inputTokens: number; outputTokens: number };
+  /** Absent when the backend reported no token counts: the call's cost is then unknown. */
+  usage?: { inputTokens: number; outputTokens: number };
+  /** Why the answer was rejected, for a call the backend billed although its answer was unusable. */
+  error?: string;
 }
 
 export interface ControllerDecision {

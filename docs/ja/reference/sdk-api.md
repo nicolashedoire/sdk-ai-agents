@@ -128,7 +128,7 @@ interface OutcomeEvaluator {
 
 | メソッド | 戻り値 |
 | --- | --- |
-| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage, runId }` — 回答の型は質問から決まる |
+| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage?, runId }` — 回答の型は質問から決まる。バックエンドがトークン数を報告しなかった場合、`usage` はない |
 | `choose({ context, question, options, minConfidence? })` | `{ choice, confidence, probabilities, confident, runId }` |
 | `selectMany({ context, question, options, threshold? })` | `{ selected, probabilities, runId }` |
 | `check({ context, question, criteria?, threshold? })` | `{ probability, yes, runId }` |
@@ -144,6 +144,43 @@ interface OutcomeEvaluator {
 | `getIncidents(runId)` | `Promise<Incident[]>` |
 | `approveAction(approvalId, by, reason?)`、`rejectAction(...)`、`getPendingApprovals(runId?)` | 人による承認 |
 | `getBudgetUsage(limit)`、`getPolicyAuditTrail(runId)` | 予算とポリシーの監査 |
+
+### `RunCostReport` {#runcostreport}
+
+`getRunCost(runId)` が返すもの。実行内のモデル呼び出しを、失敗したステップの分も含めて集計します。[API コスト](../guide/costs) を参照してください。
+
+```ts
+interface RunCostReport {
+  runId: string;
+  currency: 'USD';
+  totalUsd: number;
+  complete: boolean;
+  lines: ModelCostLine[];
+  unpricedModels: string[];
+  unpricedCalls: number;
+  unmeteredCalls: number;
+  unmeteredModels: string[];
+}
+
+interface ModelCostLine {
+  model: string;
+  requestedModel?: string;
+  source: 'llm' | 'decision';
+  calls: number;
+  unmeteredCalls?: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd?: number;
+}
+```
+
+| フィールド | |
+| --- | --- |
+| `totalUsd` | コストのわかっている呼び出しのコスト。`complete` が `false` のときは下限にすぎない |
+| `complete` | 一部の呼び出しのコストが不明な場合、つまり `unpricedCalls` または `unmeteredCalls` が 0 より大きい場合は `false` |
+| `unpricedModels`、`unpricedCalls` | `pricing` に価格のないモデルと、そのうちトークン数を報告した呼び出し |
+| `unmeteredModels`、`unmeteredCalls` | 入力トークン数も出力トークン数も報告しなかった呼び出しのモデルと、その呼び出し |
+| `lines` | モデルと発生源ごとに 1 行。呼び出し回数、トークン数を報告した呼び出しのトークン数、該当する場合は `unmeteredCalls`、モデルに価格があり、その行のいずれかの呼び出しがトークン数を報告した場合は `costUsd`。モデル名を記録しなかった呼び出しの `model` は `(unknown)` |
 
 ## トレース、リプレイ、テスト {#traces-replay-and-testing}
 

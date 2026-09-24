@@ -34,6 +34,7 @@ interface Event {
 | `tool.retry` | `toolName`, `retry`, `delayMs`, `error` |
 | `provider.fallback` | `primaryProvider`, `usedProvider`, `attemptedProviders` |
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
+| `provider.answer_discarded` | `provider`, `model`, `usage`, `reason` — 벤더가 청구하고 사용량도 보고했지만 프로바이더가 쓸 수 없었던 응답(선택지가 하나도 없는 OpenAI 응답). 비용에 집계되고, 통제형 에이전트라면 기간별 예산에도 집계됩니다 |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, 제공한 내용의 `sha256`(내용 자체는 저장되지 않음) |
 
 `tool.failed`, `intention.rejected`, `error.occurred`는 `EventType` 타입에 포함되지만 SDK는 이들을 절대 기록하지 않습니다. 실패한 도구 호출은 `action.failed` 이벤트로, 정책에 거부된 호출은 `policy.violated` 이벤트로, 승인 단계에서 거절된 호출은 `approval.rejected` 이벤트로 기록됩니다.
@@ -44,13 +45,13 @@ interface Event {
 | --- | --- |
 | `cognition.started` | `schemaVersion`(2, 오래된 실행에는 없음), `goal`, `context?`, `observations`(문제와 함께 주어진 것), `commitRules`, `knowledge?`(`scope`, 이전 실행에서 불러온 `items`, 저장소가 실패한 경우 `error?`), `profile`, `controller`, `assessor`, `evaluator?`, `allowedTools`, `limits` |
 | `cognition.operation_selected` | `step`, `operation`, `controller`, `available`, `stepsRemaining`, `forced?`(엔진이 결정을 강제함), `confidence?`, `probabilities?`, `rationale?`, `fallbackFrom?` |
-| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?`(`promptTokens`, `completionTokens`, `calls`) |
-| `cognition.operation_failed` | `step`, `operation`, `error`, `recovery?` |
+| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?`(`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — 토큰 수를 보고하지 않은 호출) |
+| `cognition.operation_failed` | `step`, `operation`, `error`, `recovery?` — 청구된 시도 뒤에 중지나 타임아웃으로 중단된 연산이면 `model?`, `requestedModel?`, `usage?`도 |
 | `cognition.evaluated` | `step`, `predictionId`, `hypothesisId`, `evaluator`(`id`, `version`), `verdict`, `observed?`, `summary?`, `context?`, `metrics?`, `causeCandidates?`, `reason?`, `durationMs` — 예측 테스트의 전체 보고서 |
 | `cognition.concluded` | `decision`, `status`(`committed`, `provisional`, `abstain`), `confidence`, `steps`, `evidenceRevision`, `hypotheses`, `predictions` |
 | `cognition.knowledge_recorded` | `scope`, `findings`(진술, 종류, 범위, `revises?`, `difference?`, `evidence`: `runId`, `predictionId`, `verdict`, `expected`, `observed`, 평가기를 가진 각 테스트), 저장소가 실패한 경우 `error?`. `run.completed`, `run.failed` 또는 `run.cancelled` 뒤에 덧붙여지며, 실행이 무언가를 테스트했을 때만 덧붙여집니다 |
 | `cognition.feedback` | `feedback`(`verdict`, `agreement?`, `wrongAbout?`, …), `profileId`, `profileVersionBefore`, `profileVersionAfter` |
-| `decision.evaluated` | `client`, `purpose`(`operation_selection`, `hypothesis_assessment`, `direct`), `model`, `state`, `questions`, `answers`, `usage`, `step?` |
+| `decision.evaluated` | `client`, `purpose`(`operation_selection`, `hypothesis_assessment`, `direct`), `model`, `state`, `questions`, `answers`(답이 거부되었으면 비어 있음), `usage?`(백엔드가 토큰 수를 보고하지 않았으면 없음), `error?`(청구된 답이 거부된 이유), `step?` |
 
 ## 운영 {#operations}
 

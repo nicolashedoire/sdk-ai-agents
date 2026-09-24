@@ -57,6 +57,8 @@
     "src/__tests__/file-ids.test.ts",
     "src/__tests__/sql-event-store-schema.test.ts",
     "src/__tests__/public-api.test.ts",
+    "src/__tests__/run-cost.test.ts",
+    "src/__tests__/billed-failures.test.ts",
     "examples/cognitive-agent.ts",
     "examples/mcp-server.ts",
     "examples/mcp-openapi.ts",

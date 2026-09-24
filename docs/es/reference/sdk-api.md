@@ -128,7 +128,7 @@ Lanza un `ValidationError` cuando no hay ningún backend configurado.
 
 | Método | Devuelve |
 | --- | --- |
-| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage, runId }` — respuestas tipadas a partir de las preguntas |
+| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage?, runId }` — respuestas tipadas a partir de las preguntas; sin `usage` cuando el backend no informó de ningún número de tokens |
 | `choose({ context, question, options, minConfidence? })` | `{ choice, confidence, probabilities, confident, runId }` |
 | `selectMany({ context, question, options, threshold? })` | `{ selected, probabilities, runId }` |
 | `check({ context, question, criteria?, threshold? })` | `{ probability, yes, runId }` |
@@ -144,6 +144,43 @@ Helpers de preguntas: `noul(instructions, criteria?)`, `choice(instructions, opt
 | `getIncidents(runId)` | `Promise<Incident[]>` |
 | `approveAction(approvalId, by, reason?)`, `rejectAction(...)`, `getPendingApprovals(runId?)` | Aprobaciones humanas |
 | `getBudgetUsage(limit)`, `getPolicyAuditTrail(runId)` | Presupuestos y auditoría de políticas |
+
+### `RunCostReport` {#runcostreport}
+
+Lo que devuelve `getRunCost(runId)`: las llamadas al modelo de la ejecución, pasos fallidos incluidos — consulta [Costes de API](../guide/costs).
+
+```ts
+interface RunCostReport {
+  runId: string;
+  currency: 'USD';
+  totalUsd: number;
+  complete: boolean;
+  lines: ModelCostLine[];
+  unpricedModels: string[];
+  unpricedCalls: number;
+  unmeteredCalls: number;
+  unmeteredModels: string[];
+}
+
+interface ModelCostLine {
+  model: string;
+  requestedModel?: string;
+  source: 'llm' | 'decision';
+  calls: number;
+  unmeteredCalls?: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd?: number;
+}
+```
+
+| Campo | |
+| --- | --- |
+| `totalUsd` | Coste de las llamadas cuyo coste se conoce; solo un mínimo cuando `complete` es `false` |
+| `complete` | `false` cuando el coste de algunas llamadas es desconocido: `unpricedCalls` o `unmeteredCalls` mayor que 0 |
+| `unpricedModels`, `unpricedCalls` | Modelos sin precio en `pricing`, y sus llamadas que informaron de sus tokens |
+| `unmeteredModels`, `unmeteredCalls` | Modelos de las llamadas que no informaron de ningún número de tokens de entrada o de salida, y esas llamadas |
+| `lines` | Una por modelo y origen: llamadas, tokens de las llamadas que informaron de ellos, `unmeteredCalls` si las hay, `costUsd` cuando el modelo tiene precio y alguna llamada de la línea informó de sus tokens; `model` es `(unknown)` para una llamada que no registró ningún nombre de modelo |
 
 ## Trazas, repetición y pruebas {#traces-replay-and-testing}
 

@@ -1,3 +1,5 @@
+import type { DiscardedAnswer } from '../providers/llm-provider.js';
+
 export class SDKError extends Error {
   constructor(
     message: string,
@@ -89,19 +91,39 @@ export class EventStoreError extends SDKError {
   }
 }
 
+/** A call a decision backend answered, and billed, although its answer was then rejected. */
+export interface BilledDecisionCall {
+  /** Model that answered (or the one requested, when the answer did not say). */
+  model: string;
+  /** Tokens the backend reported; absent when it reported none (the cost is then unknown). */
+  usage?: { inputTokens: number; outputTokens: number };
+}
+
 export class DecisionClientError extends SDKError {
   public status?: number;
   public retryable: boolean;
+  /**
+   * Set when the backend answered but the answer was rejected (answers that do not match the
+   * questions, or a malformed body that still reported its usage): the call was billed, and
+   * `sdk.decisions` and cognitive agents record it so that it is priced.
+   */
+  public billed?: BilledDecisionCall;
 
   constructor(
     public client: string,
     public detail: string,
-    options: { status?: number; retryable: boolean; originalError?: Error }
+    options: {
+      status?: number;
+      retryable: boolean;
+      originalError?: Error;
+      billed?: BilledDecisionCall;
+    }
   ) {
     super(`Decision client error (${client}): ${detail}`, 'DECISION_ERROR', options.originalError);
     this.name = 'DecisionClientError';
     this.status = options.status;
     this.retryable = options.retryable;
+    this.billed = options.billed;
   }
 }
 
@@ -110,11 +132,18 @@ export interface ModelUsage {
   completionTokens: number;
   /** Number of model calls behind this usage (repairs included). */
   calls: number;
+  /**
+   * Calls among `calls` that reported no input/output token counts: their tokens are not in
+   * `promptTokens`/`completionTokens`, and their cost is unknown. Absent when there are none.
+   */
+  unmeteredCalls?: number;
 }
 
 export class ThoughtGenerationError extends SDKError {
   /** Tokens consumed by the failed attempts, so they can still be priced. */
   public usage?: ModelUsage;
+  /** Answers a provider discarded after the vendor billed them, priced at their own model. */
+  public discarded?: DiscardedAnswer[];
   public model?: string;
   public requestedModel?: string;
 
@@ -124,6 +153,7 @@ export class ThoughtGenerationError extends SDKError {
     options: {
       originalError?: Error;
       usage?: ModelUsage;
+      discarded?: DiscardedAnswer[];
       model?: string;
       requestedModel?: string;
     } = {}
@@ -135,6 +165,7 @@ export class ThoughtGenerationError extends SDKError {
     );
     this.name = 'ThoughtGenerationError';
     this.usage = options.usage;
+    this.discarded = options.discarded;
     this.model = options.model;
     this.requestedModel = options.requestedModel;
   }

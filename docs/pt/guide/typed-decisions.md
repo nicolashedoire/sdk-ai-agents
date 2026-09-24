@@ -143,6 +143,8 @@ Ambos recorrem ao LLM ou ao controlador heurístico quando o Jev não tem certez
 
 Cada decisão tipada é gravada como um evento `decision.evaluated` com o seu contexto, perguntas, respostas e consumo de tokens — no `runId` que você passar, ou em um fluxo `decision_*` dedicado. O Jev custa **US$ 0,042 por milhão de tokens de entrada, com saída gratuita** (conforme documentado em 2026-09-23), então `sdk.getRunCost(runId)` já o inclui desde o início.
 
+Uma resposta que não corresponde às perguntas (uma escolha que não está entre as opções, uma resposta ausente ou de outro tipo) foi cobrada mesmo assim: ela também é registrada, com o `error` e `answers` vazio, antes de o erro ser lançado. Quando o backend não informa nenhuma contagem de tokens, o evento não tem `usage` e o custo da chamada é indicado como desconhecido, nunca como US$ 0 — veja [Custos de API](./costs#unknown-costs).
+
 ## Boas práticas {#good-practice}
 
 O Jev lê de forma literal e é fraco em aritmética, contagem e comparação de datas. Mantenha os números no código, faça uma pergunta atômica por vez, escreva critérios que descrevam cada opção com precisão e filtre o contexto para o que a pergunta precisa. Veja as [limitações conhecidas](https://docs.typesafe.ai/model-jaggedness/jev-1.13) documentadas pela TypeSafe.

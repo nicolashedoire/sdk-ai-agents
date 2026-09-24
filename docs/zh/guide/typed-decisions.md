@@ -143,6 +143,8 @@ answers.frustration.score;    // number
 
 每一个类型化决策都会被写成一个 `decision.evaluated` 事件，包含它的上下文、问题、答案和 token 用量——写入你传入的 `runId`，或者写入一个专用的 `decision_*` 流。Jev 的价格是**每百万输入 token 0.042 美元，输出免费**（依据 2026-09-23 的文档），所以 `sdk.getRunCost(runId)` 开箱即可把它计算在内。
 
+与问题不符的答案（选择不在选项之中，答案缺失或类型不对）同样已经计费：它也会被记录，带有 `error` 和空的 `answers`，然后才抛出错误。当后端没有报告 token 数时，事件中没有 `usage`，这次调用的成本会被报告为未知，而绝不是 0 美元——参见 [API 成本](./costs#unknown-costs)。
+
 ## 良好实践 {#good-practice}
 
 Jev 按字面意思理解，而且不擅长算术、计数和日期比较。请把数字留在代码里处理，一次只问一个原子性的问题，编写能精确描述每个选项的标准，并把上下文过滤到问题所需的范围。参见 TypeSafe 的[已知局限](https://docs.typesafe.ai/model-jaggedness/jev-1.13)。

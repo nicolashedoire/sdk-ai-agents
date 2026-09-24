@@ -190,7 +190,11 @@ export interface SDK {
   distillThinkerProfile(input: DistillProfileInput): Promise<ThinkerProfile>;
   /** Typed decisions (Jev): context injection, single/multiple choice, checks, ratings. */
   readonly decisions: DecisionService;
-  /** Token usage and cost of a run, per model. */
+  /**
+   * Token usage and cost of a run, per model: every model call the vendor answered, failed
+   * steps included. Calls whose cost is unknown (a model without a price, no token counts)
+   * are counted apart, and the report is then not `complete`.
+   */
   getRunCost(runId: string): Promise<RunCostReport>;
   /** Incidents raised during a run. */
   getIncidents(runId: string): Promise<Incident[]>;

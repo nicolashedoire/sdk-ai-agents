@@ -1,6 +1,10 @@
 import type { ActionEngine } from './engines/action-engine.js';
 import type { PolicyEngine } from './engines/policy-engine.js';
-import type { ReasoningEngine, ReasoningStep } from './engines/reasoning-engine.js';
+import type {
+  AnsweredModelCall,
+  ReasoningEngine,
+  ReasoningStep,
+} from './engines/reasoning-engine.js';
 import type { LLMMessage } from './providers/llm-provider.js';
 import type { IEventStore } from './stores/event-store.js';
 import type { Event } from './types/events.js';
@@ -130,9 +134,7 @@ export class AgentImpl {
       this.checkTimeout(state);
 
       try {
-        const step = await this.generateStep(runId, state);
-        const { intention, toolCall } = step;
-        await this.recordModelCall(state, step);
+        const { intention, toolCall } = await this.generateStep(runId, state);
 
         this.checkCancellation(runId, state);
 
@@ -171,12 +173,16 @@ export class AgentImpl {
     }
   }
 
-  /** Adds a model call's tokens to the run, and its tokens and cost to the agent's budgets. */
-  private async recordModelCall(state: RunState, step: ReasoningStep): Promise<void> {
-    const { usage } = step;
+  /**
+   * Adds a model call's tokens to the run, and its tokens and cost to the agent's budgets.
+   * Called by the reasoning engine as soon as the vendor answered, so a step that then fails
+   * (tool arguments that are not valid JSON) and an answer a provider discarded are counted.
+   */
+  private async recordModelCall(state: RunState, call: AnsweredModelCall): Promise<void> {
+    const { usage } = call;
     state.tokensUsed +=
       usage?.totalTokens ?? (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0);
-    await this.policyEngine.recordModelUsage(this.agent.id, step);
+    await this.policyEngine.recordModelUsage(this.agent.id, call);
   }
 
   private async generateStep(runId: string, state: RunState): Promise<ReasoningStep> {
@@ -197,6 +203,7 @@ export class AgentImpl {
         systemPrompt: this.agent.config.systemPrompt,
         model: this.agent.model,
         providerSettings, // Pass providerSettings instead of resolved settings
+        onModelUsage: (call) => this.recordModelCall(state, call),
       },
       this.eventStore,
       state.abortController?.signal

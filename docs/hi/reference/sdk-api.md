@@ -128,7 +128,7 @@ interface OutcomeEvaluator {
 
 | Method | लौटाता है |
 | --- | --- |
-| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage, runId }` — उत्तरों का टाइप सवालों से निकलता है |
+| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage?, runId }` — उत्तरों का टाइप सवालों से निकलता है; जब backend tokens की गिनती नहीं बताता, तो `usage` नहीं होता |
 | `choose({ context, question, options, minConfidence? })` | `{ choice, confidence, probabilities, confident, runId }` |
 | `selectMany({ context, question, options, threshold? })` | `{ selected, probabilities, runId }` |
 | `check({ context, question, criteria?, threshold? })` | `{ probability, yes, runId }` |
@@ -144,6 +144,43 @@ interface OutcomeEvaluator {
 | `getIncidents(runId)` | `Promise<Incident[]>` |
 | `approveAction(approvalId, by, reason?)`, `rejectAction(...)`, `getPendingApprovals(runId?)` | इंसानी मंज़ूरियाँ |
 | `getBudgetUsage(limit)`, `getPolicyAuditTrail(runId)` | बजट और नीतियों का ऑडिट |
+
+### `RunCostReport` {#runcostreport}
+
+`getRunCost(runId)` क्या लौटाता है: run की मॉडल कॉल, विफल कदमों सहित — देखें [API लागत](../guide/costs)।
+
+```ts
+interface RunCostReport {
+  runId: string;
+  currency: 'USD';
+  totalUsd: number;
+  complete: boolean;
+  lines: ModelCostLine[];
+  unpricedModels: string[];
+  unpricedCalls: number;
+  unmeteredCalls: number;
+  unmeteredModels: string[];
+}
+
+interface ModelCostLine {
+  model: string;
+  requestedModel?: string;
+  source: 'llm' | 'decision';
+  calls: number;
+  unmeteredCalls?: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd?: number;
+}
+```
+
+| फ़ील्ड | |
+| --- | --- |
+| `totalUsd` | उन कॉल की लागत जिनकी लागत ज्ञात है; जब `complete` `false` हो, तो यह सिर्फ़ एक निचली सीमा है |
+| `complete` | `false` जब कुछ कॉल की लागत अज्ञात हो: `unpricedCalls` या `unmeteredCalls` 0 से ज़्यादा |
+| `unpricedModels`, `unpricedCalls` | `pricing` में बिना कीमत वाले मॉडल, और उनकी वे कॉल जिन्होंने अपने tokens बताए |
+| `unmeteredModels`, `unmeteredCalls` | उन कॉल के मॉडल जिन्होंने न इनपुट tokens की गिनती बताई न आउटपुट tokens की, और वे कॉल |
+| `lines` | हर मॉडल और स्रोत के लिए एक: कॉल, उन कॉल के tokens जिन्होंने उन्हें बताया, अगर हों तो `unmeteredCalls`, मॉडल की कीमत हो और पंक्ति की किसी कॉल ने अपने tokens बताए हों तो `costUsd`; जिस कॉल ने कोई मॉडल नाम दर्ज नहीं किया, उसका `model` `(unknown)` होता है |
 
 ## ट्रेस, रीप्ले और टेस्टिंग {#traces-replay-and-testing}
 

@@ -128,7 +128,7 @@ interface OutcomeEvaluator {
 
 | 메서드 | 반환값 |
 | --- | --- |
-| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage, runId }` — 답의 타입은 질문으로부터 정해집니다 |
+| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage?, runId }` — 답의 타입은 질문으로부터 정해집니다. 백엔드가 토큰 수를 보고하지 않았으면 `usage`가 없습니다 |
 | `choose({ context, question, options, minConfidence? })` | `{ choice, confidence, probabilities, confident, runId }` |
 | `selectMany({ context, question, options, threshold? })` | `{ selected, probabilities, runId }` |
 | `check({ context, question, criteria?, threshold? })` | `{ probability, yes, runId }` |
@@ -144,6 +144,43 @@ interface OutcomeEvaluator {
 | `getIncidents(runId)` | `Promise<Incident[]>` |
 | `approveAction(approvalId, by, reason?)`, `rejectAction(...)`, `getPendingApprovals(runId?)` | 사람의 승인 |
 | `getBudgetUsage(limit)`, `getPolicyAuditTrail(runId)` | 예산과 정책 감사 |
+
+### `RunCostReport` {#runcostreport}
+
+`getRunCost(runId)`가 돌려주는 것: 실행의 모델 호출이며, 실패한 단계도 포함합니다. [API 비용](../guide/costs)을 참고하세요.
+
+```ts
+interface RunCostReport {
+  runId: string;
+  currency: 'USD';
+  totalUsd: number;
+  complete: boolean;
+  lines: ModelCostLine[];
+  unpricedModels: string[];
+  unpricedCalls: number;
+  unmeteredCalls: number;
+  unmeteredModels: string[];
+}
+
+interface ModelCostLine {
+  model: string;
+  requestedModel?: string;
+  source: 'llm' | 'decision';
+  calls: number;
+  unmeteredCalls?: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd?: number;
+}
+```
+
+| 필드 | |
+| --- | --- |
+| `totalUsd` | 비용을 아는 호출의 비용. `complete`가 `false`이면 하한일 뿐입니다 |
+| `complete` | 일부 호출의 비용을 알 수 없을 때, 즉 `unpricedCalls`나 `unmeteredCalls`가 0보다 클 때 `false` |
+| `unpricedModels`, `unpricedCalls` | `pricing`에 가격이 없는 모델과, 그중 토큰 수를 보고한 호출 |
+| `unmeteredModels`, `unmeteredCalls` | 입력 토큰 수도 출력 토큰 수도 보고하지 않은 호출의 모델과 그 호출 |
+| `lines` | 모델과 출처마다 한 줄: 호출 수, 토큰 수를 보고한 호출의 토큰, 있으면 `unmeteredCalls`, 모델에 가격이 있고 그 줄의 호출 중 토큰 수를 보고한 것이 있으면 `costUsd`. 모델 이름을 기록하지 않은 호출의 `model`은 `(unknown)`입니다 |
 
 ## 트레이스, 리플레이, 테스트 {#traces-replay-and-testing}
 

@@ -244,6 +244,7 @@ export { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from './providers/anthropi
 export { FallbackProvider } from './providers/fallback-provider.js';
 export type { FallbackResult } from './providers/fallback-provider.js';
 export type {
+  DiscardedAnswer,
   LLMMessage,
   LLMProvider,
   LLMRequest,
