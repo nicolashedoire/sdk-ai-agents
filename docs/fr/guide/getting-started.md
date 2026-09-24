@@ -20,7 +20,7 @@ yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 
 :::
 
-Prérequis : **Node.js 20+**, TypeScript 5+ et **zod 3.25.28 ou ultérieur dans la v3** — les schémas zod 4 ne sont pas encore pris en charge. Les connecteurs MCP nécessitent en plus le SDK MCP officiel :
+Prérequis : **Node.js 20+**, TypeScript 5+ et **zod 3.25.28 ou ultérieur dans la v3** — les schémas zod 4 ne sont pas encore pris en charge. Le paquet est **uniquement ESM** : chargez-le avec `import` ; du code CommonJS peut le charger avec un `import()` dynamique. Les connecteurs MCP nécessitent en plus le SDK MCP officiel :
 
 ```sh
 npm install @modelcontextprotocol/sdk@^1.30.0

@@ -368,12 +368,16 @@ Source map 会在构建时自动生成。它们让你可以直接调试 TypeScri
 
 ## 发布流程 {#release-process}
 
+推送版本标签后，`Release` 工作流会把版本发布到 npm：具体步骤见[发布版本](./releasing)页面。
+
 ### 版本管理 {#versioning}
 
 本项目使用语义化版本（SemVer）：
 - **MAJOR**：不兼容的变更
 - **MINOR**：向后兼容的新功能
 - **PATCH**：向后兼容的缺陷修复
+
+只要版本号以 `0.` 开头，不兼容的变更就改为提升 MINOR（`0.2.0` → `0.3.0`），其他变更提升 PATCH：参见[发布版本](./releasing#release-a-version)。
 
 ### 发布前检查清单 {#pre-release-checklist}
 
@@ -382,21 +386,17 @@ Source map 会在构建时自动生成。它们让你可以直接调试 TypeScri
 - [ ] 文档是最新的
 - [ ] CHANGELOG.md 已更新
 - [ ] `package.json` 中的版本已更新
+- [ ] 文档中显示的版本已更新（`docs/.vitepress/config.mts` 中的 `const version`）
 
 ### 为发布进行构建 {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# The checks of the CI but coverage and the docs build, on a fresh dist/
+# (what prepublishOnly runs before npm publish)
+npm run clean && npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## 资源 {#resources}

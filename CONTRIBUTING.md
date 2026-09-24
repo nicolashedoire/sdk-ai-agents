@@ -27,6 +27,10 @@ npm run test:watch     # Watch mode
 npm run test:coverage  # With coverage
 ```
 
+## Releasing
+
+Versions are published to npm by the `Release` GitHub Actions workflow when a `vX.Y.Z` tag is pushed; `npm run verify` runs its checks locally (the CI also measures coverage and builds the documentation site). The steps (version, changelog, tag, npm token or trusted publishing) are in [docs/contributing/releasing.md](docs/contributing/releasing.md).
+
 ## Architecture Principles
 
 1. **Event-Sourcing First** : Every action generates an event

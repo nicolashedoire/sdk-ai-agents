@@ -20,7 +20,7 @@ yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 
 :::
 
-المتطلبات: **Node.js 20+**، وTypeScript 5+، و**zod 3.25.28 أو أحدث ضمن الإصدار v3** — مخططات zod 4 غير مدعومة بعد. وتحتاج موصِّلات MCP إضافةً إلى ذلك إلى حزمة MCP SDK الرسمية:
+المتطلبات: **Node.js 20+**، وTypeScript 5+، و**zod 3.25.28 أو أحدث ضمن الإصدار v3** — مخططات zod 4 غير مدعومة بعد. الحزمة **بصيغة ESM فقط**: حمّلها باستخدام `import`؛ ويمكن لشيفرة CommonJS تحميلها باستخدام `import()` الديناميكي. وتحتاج موصِّلات MCP إضافةً إلى ذلك إلى حزمة MCP SDK الرسمية:
 
 ```sh
 npm install @modelcontextprotocol/sdk@^1.30.0

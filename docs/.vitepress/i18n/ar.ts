@@ -40,6 +40,7 @@ export const text: LocaleText = {
     'contributing/development': 'دليل التطوير',
     'contributing/source-tree': 'شجرة الشيفرة المصدرية',
     'contributing/translations': 'ترجمة التوثيق',
+    'contributing/releasing': 'إصدار نسخة جديدة',
   },
   ui: {
     editLink: 'عدّل هذه الصفحة على GitHub',

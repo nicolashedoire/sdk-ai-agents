@@ -368,12 +368,16 @@ TypeScript 오류가 나면:
 
 ## 릴리스 과정 {#release-process}
 
+버전 태그가 푸시되면 `Release` 워크플로가 버전을 npm에 게시합니다. 단계는 [릴리스하기](./releasing) 페이지에 있습니다.
+
 ### 버전 관리 {#versioning}
 
 이 프로젝트는 시맨틱 버저닝(SemVer)을 씁니다.
 - **MAJOR**: 호환되지 않는 변경
 - **MINOR**: 하위 호환되는 새 기능
 - **PATCH**: 하위 호환되는 버그 수정
+
+버전이 `0.`으로 시작하는 동안에는 호환되지 않는 변경이 대신 MINOR를 올리고(`0.2.0` → `0.3.0`), 나머지는 PATCH를 올립니다. [릴리스하기](./releasing#release-a-version)를 참고하세요.
 
 ### 릴리스 전 체크리스트 {#pre-release-checklist}
 
@@ -382,21 +386,17 @@ TypeScript 오류가 나면:
 - [ ] 문서 최신화
 - [ ] CHANGELOG.md 업데이트
 - [ ] `package.json`의 버전 업데이트
+- [ ] 문서에 표시되는 버전 업데이트(`docs/.vitepress/config.mts`의 `const version`)
 
 ### 릴리스용 빌드 {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# The checks of the CI but coverage and the docs build, on a fresh dist/
+# (what prepublishOnly runs before npm publish)
+npm run clean && npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## 자료 {#resources}

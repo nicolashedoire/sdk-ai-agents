@@ -368,12 +368,16 @@ Si la compilation échoue :
 
 ## Processus de publication {#release-process}
 
+Les versions sont publiées sur npm par le workflow `Release` quand un tag de version est poussé : les étapes sont décrites sur la page [Publier une version](./releasing).
+
 ### Versionnage {#versioning}
 
 Le projet utilise le versionnage sémantique (SemVer) :
 - **MAJOR** : changements incompatibles
 - **MINOR** : nouvelles fonctionnalités rétrocompatibles
 - **PATCH** : corrections de bugs rétrocompatibles
+
+Tant que la version commence par `0.`, un changement incompatible augmente MINOR à la place (`0.2.0` → `0.3.0`) et tout le reste PATCH : voir [Publier une version](./releasing#release-a-version).
 
 ### Liste de contrôle avant publication {#pre-release-checklist}
 
@@ -382,21 +386,17 @@ Le projet utilise le versionnage sémantique (SemVer) :
 - [ ] Documentation à jour
 - [ ] CHANGELOG.md mis à jour
 - [ ] Version mise à jour dans `package.json`
+- [ ] Version affichée dans la documentation mise à jour (`const version` dans `docs/.vitepress/config.mts`)
 
 ### Compiler pour une publication {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# The checks of the CI but coverage and the docs build, on a fresh dist/
+# (what prepublishOnly runs before npm publish)
+npm run clean && npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## Ressources {#resources}

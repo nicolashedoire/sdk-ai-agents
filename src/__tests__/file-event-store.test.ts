@@ -1,24 +1,23 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { promises as fs } from 'fs'
+import { tmpdir } from 'os'
 import { join } from 'path'
 import { FileEventStore } from '../stores/file-event-store.js'
 import type { Event } from '../types/events.js'
 
 describe('FileEventStore', () => {
-  const testEventsDir = `./test-events-${Date.now()}`
+  let testEventsDir: string
   let store: FileEventStore
 
   beforeEach(async () => {
-    try {
-      await fs.rm(testEventsDir, { recursive: true, force: true })
-    } catch {
-      // Ignore
-    }
+    // A new folder for each test, under the system's temporary folder (not the working tree).
+    testEventsDir = await fs.mkdtemp(join(tmpdir(), 'file-event-store-'))
     store = new FileEventStore(testEventsDir)
   })
 
   afterEach(async () => {
-    store.destroy()
+    // Its last flush must be over before the folder is removed, or it could write it again.
+    await store.destroy()
     try {
       await fs.rm(testEventsDir, { recursive: true, force: true })
     } catch {

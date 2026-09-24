@@ -175,7 +175,7 @@ npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
 ```
 
-Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet).
+Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`).
 
 ## Documentation
 
@@ -205,8 +205,11 @@ The same pages live in [`docs/`](docs) — run `npm run docs:dev` for a local pr
 npm install
 npm run build          # TypeScript → dist/
 npx vitest run         # tests
+npm run verify         # lint, format, build, types, tests, translations (the CI also runs coverage and the docs build)
 npm run docs:dev       # documentation site
 ```
+
+Releases are published to npm by the `Release` workflow when a version tag is pushed: see [Releasing](https://nicolashedoire.github.io/sdk-ai-agents/contributing/releasing).
 
 Tests use no module mocks, and a guard test refuses them: ports are implemented in memory (scripted LLM provider, in-memory decision client, a PostgreSQL client that records its statements), HTTP adapters, the OpenAI and Anthropic providers included, run against local servers answering in the vendor's format, folders are real temporary directories (symbolic links included), SQLite runs on the built-in `node:sqlite` (Node 22+), and MCP runs over the official in-memory transport.
 

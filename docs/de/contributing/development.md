@@ -368,12 +368,16 @@ Wenn der Build fehlschlägt:
 
 ## Release-Prozess {#release-process}
 
+Versionen werden vom Workflow `Release` auf npm veröffentlicht, sobald ein Versions-Tag gepusht wird: Die Schritte stehen auf der Seite [Ein Release veröffentlichen](./releasing).
+
 ### Versionierung {#versioning}
 
 Das Projekt verwendet semantische Versionierung (SemVer):
 - **MAJOR**: Inkompatible Änderungen
 - **MINOR**: Abwärtskompatible neue Funktionen
 - **PATCH**: Abwärtskompatible Fehlerbehebungen
+
+Solange die Version mit `0.` beginnt, erhöht eine inkompatible Änderung stattdessen MINOR (`0.2.0` → `0.3.0`) und alles andere PATCH: siehe [Ein Release veröffentlichen](./releasing#release-a-version).
 
 ### Checkliste vor dem Release {#pre-release-checklist}
 
@@ -382,21 +386,17 @@ Das Projekt verwendet semantische Versionierung (SemVer):
 - [ ] Dokumentation aktuell
 - [ ] CHANGELOG.md aktualisiert
 - [ ] Version in `package.json` aktualisiert
+- [ ] In der Dokumentation angezeigte Version aktualisiert (`const version` in `docs/.vitepress/config.mts`)
 
 ### Build für das Release {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# The checks of the CI but coverage and the docs build, on a fresh dist/
+# (what prepublishOnly runs before npm publish)
+npm run clean && npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## Ressourcen {#resources}

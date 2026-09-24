@@ -20,7 +20,7 @@ yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 
 :::
 
-요구 사항: **Node.js 20+**, TypeScript 5+, 그리고 **v3 안에서 zod 3.25.28 이상**입니다. zod 4 스키마는 아직 지원하지 않습니다. MCP 커넥터를 쓰려면 공식 MCP SDK도 필요합니다.
+요구 사항: **Node.js 20+**, TypeScript 5+, 그리고 **v3 안에서 zod 3.25.28 이상**입니다. zod 4 스키마는 아직 지원하지 않습니다. 패키지는 **ESM 전용**입니다. `import`로 불러오세요. CommonJS 코드에서는 동적 `import()`로 불러올 수 있습니다. MCP 커넥터를 쓰려면 공식 MCP SDK도 필요합니다.
 
 ```sh
 npm install @modelcontextprotocol/sdk@^1.30.0

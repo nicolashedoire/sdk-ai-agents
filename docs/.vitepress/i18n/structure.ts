@@ -48,7 +48,12 @@ export const SIDEBAR = [
   {
     group: 'contributing',
     collapsed: true,
-    pages: ['contributing/development', 'contributing/source-tree', 'contributing/translations'],
+    pages: [
+      'contributing/development',
+      'contributing/source-tree',
+      'contributing/translations',
+      'contributing/releasing',
+    ],
   },
 ] as const;
 

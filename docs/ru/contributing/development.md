@@ -368,12 +368,16 @@ describe('MyClass', () => {
 
 ## Процесс выпуска {#release-process}
 
+Версии публикуются в npm рабочим процессом `Release`, когда отправляется тег версии: шаги описаны на странице [Выпуск версии](./releasing).
+
 ### Версионирование {#versioning}
 
 Проект использует семантическое версионирование (SemVer):
 - **MAJOR**: несовместимые изменения
 - **MINOR**: новые обратно совместимые возможности
 - **PATCH**: обратно совместимые исправления ошибок
+
+Пока версия начинается с `0.`, несовместимое изменение вместо этого увеличивает MINOR (`0.2.0` → `0.3.0`), а всё остальное — PATCH: см. [Выпуск версии](./releasing#release-a-version).
 
 ### Чек-лист перед выпуском {#pre-release-checklist}
 
@@ -382,21 +386,17 @@ describe('MyClass', () => {
 - [ ] Документация актуальна
 - [ ] CHANGELOG.md обновлён
 - [ ] Версия в `package.json` обновлена
+- [ ] Версия, показанная в документации, обновлена (`const version` в `docs/.vitepress/config.mts`)
 
 ### Сборка для выпуска {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# The checks of the CI but coverage and the docs build, on a fresh dist/
+# (what prepublishOnly runs before npm publish)
+npm run clean && npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## Ресурсы {#resources}

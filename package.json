@@ -25,6 +25,7 @@
     }
   },
   "type": "module",
+  "sideEffects": false,
   "scripts": {
     "build": "tsc",
     "typecheck:tests": "tsc -p tsconfig.test.json",
@@ -53,6 +54,8 @@
     "example:mcp-approvals": "tsx examples/mcp-approvals.ts",
     "clean": "rm -rf dist",
     "prepare": "npm run build",
+    "verify": "npm run lint && npm run format:check && npm run build && npm run typecheck:tests && vitest run && npm run docs:check",
+    "prepublishOnly": "npm run clean && npm run verify",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:check": "tsx docs/.vitepress/check-translations.ts",
@@ -74,7 +77,7 @@
     "observability",
     "typescript"
   ],
-  "author": "Nicolashedoire",
+  "author": "Nicolas Hedoire",
   "license": "MIT",
   "engines": {
     "node": ">=20.0.0"
@@ -115,12 +118,15 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/nicolashedoire/sdk-ai-agents.git"
+    "url": "git+https://github.com/nicolashedoire/sdk-ai-agents.git"
   },
   "bugs": {
     "url": "https://github.com/nicolashedoire/sdk-ai-agents/issues"
   },
   "homepage": "https://github.com/nicolashedoire/sdk-ai-agents#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependenciesMeta": {
     "pg": {
       "optional": true

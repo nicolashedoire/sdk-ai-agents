@@ -20,7 +20,7 @@ yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 
 :::
 
-环境要求：**Node.js 20+**、TypeScript 5+，以及 **zod 3.25.28 或 v3 范围内的更高版本**——暂不支持 zod 4 的 schema。MCP 连接器还需要官方的 MCP SDK：
+环境要求：**Node.js 20+**、TypeScript 5+，以及 **zod 3.25.28 或 v3 范围内的更高版本**——暂不支持 zod 4 的 schema。这个包**只支持 ESM**：请用 `import` 加载；CommonJS 代码可以用动态 `import()` 加载。MCP 连接器还需要官方的 MCP SDK：
 
 ```sh
 npm install @modelcontextprotocol/sdk@^1.30.0

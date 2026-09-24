@@ -1,13 +1,19 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { createSDK } from '../sdk.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createTestSDK, type TestSDK } from './support/test-sdk.js';
 
 describe('SDK Alternatives', () => {
-  let sdk: ReturnType<typeof createSDK>;
+  let env: TestSDK;
+  let sdk: TestSDK['sdk'];
 
   beforeEach(() => {
-    sdk = createSDK({
-      apiKey: 'test-api-key',
-    });
+    // A throwaway event store per test: in the shared ./events folder, events appended to
+    // the same run ids by other suites and earlier runs would pile up.
+    env = createTestSDK({ apiKey: 'test-api-key' });
+    sdk = env.sdk;
+  });
+
+  afterEach(async () => {
+    await env.dispose();
   });
 
   it('should extract alternatives from events', async () => {

@@ -6,13 +6,31 @@
  * - Acceptable latency for common operations
  */
 
-import { describe, it, expect } from 'vitest';
-import { createSDK, defineTool } from '../src/index.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, describe, it, expect } from 'vitest';
+import { createSDK, defineTool, FileEventStore } from '../src/index.js';
 import { z } from 'zod';
 
 describe('Performance Benchmarks', () => {
+  // Event stores in a throwaway folder: the default one is ./events in the working tree.
+  const directory = mkdtempSync(join(tmpdir(), 'sdk-benchmarks-'));
+  const stores: FileEventStore[] = [];
+  const eventStoreIn = (name: string) => {
+    const store = new FileEventStore(join(directory, name));
+    stores.push(store);
+    return store;
+  };
+
+  afterAll(async () => {
+    await Promise.all(stores.map((store) => store.destroy()));
+    rmSync(directory, { recursive: true, force: true });
+  });
+
   const sdk = createSDK({
     apiKey: process.env.OPENAI_API_KEY || 'test-key',
+    eventStore: eventStoreIn('shared'),
   });
 
   const simpleTool = sdk.defineTool({
@@ -58,8 +76,10 @@ describe('Performance Benchmarks', () => {
 
   it('should measure SDK initialization time', () => {
     const startTime = Date.now();
+    // The store is still built inside the measured time, as the default one was.
     const testSdk = createSDK({
       apiKey: 'test-key',
+      eventStore: eventStoreIn('initialization'),
     });
     const endTime = Date.now();
     const initTime = endTime - startTime;

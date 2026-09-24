@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { ReplayEngine } from '../engines/replay-engine.js'
 import { ActionEngine } from '../engines/action-engine.js'
 import { PolicyEngine } from '../engines/policy-engine.js'
@@ -10,11 +13,14 @@ import { z } from 'zod'
 describe('ReplayEngine', () => {
   let replayEngine: ReplayEngine
   let eventStore: FileEventStore
+  let directory: string
   let actionEngine: ActionEngine
   let toolRegistry: ToolRegistry
 
   beforeEach(() => {
-    eventStore = new FileEventStore('./test-events')
+    // A throwaway folder per test: ./test-events was shared with the other engine suite.
+    directory = mkdtempSync(join(tmpdir(), 'replay-engine-'))
+    eventStore = new FileEventStore(directory)
     const policyEngine = new PolicyEngine()
     toolRegistry = new ToolRegistry()
     actionEngine = new ActionEngine(policyEngine, toolRegistry, eventStore)
@@ -30,6 +36,11 @@ describe('ReplayEngine', () => {
         return { result: `Processed: ${(params as { value: string }).value}` }
       },
     })
+  })
+
+  afterEach(async () => {
+    await eventStore.destroy()
+    rmSync(directory, { recursive: true, force: true })
   })
 
   describe('replay', () => {

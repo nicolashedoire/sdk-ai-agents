@@ -368,12 +368,16 @@ TypeScript のエラーが出る場合は、次の手順を試してください
 
 ## リリースの手順 {#release-process}
 
+バージョンは、バージョンタグがプッシュされると `Release` ワークフローによって npm に公開されます。手順は[リリースの手順](./releasing)のページにあります。
+
 ### バージョニング {#versioning}
 
 このプロジェクトは、セマンティックバージョニング（SemVer）を使います。
 - **MAJOR**：互換性を壊す変更
 - **MINOR**：後方互換性のある新機能
 - **PATCH**：後方互換性のあるバグ修正
+
+バージョンが `0.` で始まる間は、互換性を壊す変更では代わりに MINOR を上げ（`0.2.0` → `0.3.0`）、それ以外では PATCH を上げます。[リリースの手順](./releasing#release-a-version)を参照してください。
 
 ### リリース前のチェックリスト {#pre-release-checklist}
 
@@ -382,21 +386,17 @@ TypeScript のエラーが出る場合は、次の手順を試してください
 - [ ] ドキュメントが最新になっている
 - [ ] CHANGELOG.md が更新されている
 - [ ] `package.json` のバージョンが更新されている
+- [ ] ドキュメントに表示されるバージョンが更新されている（`docs/.vitepress/config.mts` の `const version`）
 
 ### リリース用のビルド {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# The checks of the CI but coverage and the docs build, on a fresh dist/
+# (what prepublishOnly runs before npm publish)
+npm run clean && npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## リソース {#resources}
