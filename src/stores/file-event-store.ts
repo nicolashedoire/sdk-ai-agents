@@ -10,9 +10,9 @@ import type {
 import type { IEventStore } from './event-store.js';
 import { fileInFolder, isFileId } from '../utils/file-in-folder.js';
 import {
+  acrossRunsInTimeOrder,
   aggregateEvents,
   checkEventFilters,
-  inTimeOrder,
   matchesEventFilters,
 } from '../utils/event-filters.js';
 import { deriveRunStatus } from '../utils/run-status.js';
@@ -121,6 +121,7 @@ export class FileEventStore implements IEventStore {
 
   async getEvents(runId: string, filters?: EventFilters): Promise<Event[]> {
     const filePath = this.getEventFilePath(runId);
+    checkEventFilters(filters);
     await this.flushRun(runId);
 
     try {
@@ -172,9 +173,10 @@ export class FileEventStore implements IEventStore {
   }
 
   /**
-   * Events of every run matching the filters, in time order (ties by event id). Each run file
-   * is read once; a file that cannot be read or parsed is skipped with a warning, so one
-   * damaged run does not hide all the others.
+   * Events of every run matching the filters, in time order: events of the same millisecond by
+   * run id, then in the order their run recorded them. Each run file is read once; a file that
+   * cannot be read or parsed is skipped with a warning, so one damaged run does not hide all
+   * the others.
    */
   async queryEvents(
     filters?: EventFilters,
@@ -191,7 +193,7 @@ export class FileEventStore implements IEventStore {
       throw error;
     }
 
-    const found: Event[] = [];
+    const runs: Array<[string, Event[]]> = [];
     for (const file of files) {
       const runId = file.endsWith('.json') ? file.slice(0, -'.json'.length) : '';
       if (!isFileId(runId)) continue;
@@ -207,10 +209,10 @@ export class FileEventStore implements IEventStore {
         continue;
       }
       if (!Array.isArray(events)) continue;
-      found.push(...events.filter((event) => matchesEventFilters(event, filters)));
+      runs.push([runId, events.filter((event) => matchesEventFilters(event, filters))]);
     }
 
-    const ordered = inTimeOrder(found);
+    const ordered = acrossRunsInTimeOrder(runs);
     const limited = filters?.limit !== undefined ? ordered.slice(0, filters.limit) : ordered;
     return {
       events: limited,
@@ -320,31 +322,11 @@ export class FileEventStore implements IEventStore {
     return fileInFolder(this.eventsDir, runId, '.json', 'runId');
   }
 
+  /** The filters of `getEvents`, with the same meaning as on every other store. */
   private filterEvents(events: Event[], filters?: EventFilters): Event[] {
     if (!filters) return events;
-
-    let filtered = events;
-
-    if (filters.type) {
-      const types = Array.isArray(filters.type) ? filters.type : [filters.type];
-      filtered = filtered.filter((e) => types.includes(e.type));
-    }
-
-    if (filters.since !== undefined) {
-      const since = filters.since;
-      filtered = filtered.filter((e) => e.timestamp >= since);
-    }
-
-    if (filters.until !== undefined) {
-      const until = filters.until;
-      filtered = filtered.filter((e) => e.timestamp <= until);
-    }
-
-    if (filters.limit) {
-      filtered = filtered.slice(0, filters.limit);
-    }
-
-    return filtered;
+    const matching = events.filter((event) => matchesEventFilters(event, filters));
+    return filters.limit !== undefined ? matching.slice(0, filters.limit) : matching;
   }
 
   private getStatusFromEvents(

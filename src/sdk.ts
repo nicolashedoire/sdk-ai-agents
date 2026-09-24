@@ -84,7 +84,7 @@ import { ComparisonReportGenerator } from './utils/comparison-report-generator.j
 import { ImpactAnalyzer } from './utils/impact-analyzer.js';
 import { ImpactAnalysisManager } from './managers/impact-analysis-manager.js';
 import { AdvancedEventFilterEvaluator } from './utils/advanced-event-filter.js';
-import { inTimeOrder } from './utils/event-filters.js';
+import { acrossRunsInTimeOrder } from './utils/event-filters.js';
 import type {
   RegressionTestSuite,
   RegressionTestSuiteConfig,
@@ -334,8 +334,9 @@ export interface SDK {
   // Queries across runs, on any event store.
 
   /**
-   * Events of one run (`runId`) or of every run, in time order (ties by event id), that match
-   * the conditions (see `AdvancedEventFilter`). Without `runId`, the file store reads each run
+   * Events of one run (`runId`) or of every run, in time order (the events of one millisecond
+   * by run, then as each run recorded them), that match the conditions (see
+   * `AdvancedEventFilter`). Without `runId`, the file store reads each run
    * file once; a SQL store lets the database narrow the events when every condition must hold,
    * and returns every event in scope with `or` or `not`.
    */
@@ -1380,7 +1381,7 @@ export class SDKImpl implements SDK {
   }
 
   /**
-   * The events matching a filter, in time order (ties by event id), at most `limit`; with
+   * The events matching a filter, in time order (ties by run, then position), at most `limit`; with
    * `countScope`, also the number of events in scope, which may cost the store a second query.
    */
   private async matchingEvents(
@@ -1443,20 +1444,22 @@ export class SDKImpl implements SDK {
           store.queryEvents(narrowed),
           countScope ? store.countEvents?.(scope) : undefined,
         ]);
+        // In the store's order: time, then run and position in the run (built-in stores).
         return {
-          candidates: inTimeOrder(result.events.filter(inScope)),
+          candidates: result.events.filter(inScope),
           ...(total !== undefined ? { total } : {}),
         };
       }
-      const events = inTimeOrder((await store.queryEvents(scope)).events.filter(inScope));
+      const events = (await store.queryEvents(scope)).events.filter(inScope);
       return { candidates: events, total: events.length };
     }
 
-    const found: Event[] = [];
+    const runs: Array<[string, Event[]]> = [];
     for (const runId of await store.getRunIds()) {
-      found.push(...(await store.getEvents(runId)).filter(inScope));
+      runs.push([runId, (await store.getEvents(runId)).filter(inScope)]);
     }
-    return { candidates: inTimeOrder(found), total: found.length };
+    const found = acrossRunsInTimeOrder(runs);
+    return { candidates: found, total: found.length };
   }
 
   async countEventsAdvanced(filter: AdvancedEventFilter): Promise<number> {

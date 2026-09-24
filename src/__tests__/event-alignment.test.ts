@@ -235,6 +235,32 @@ describe('alignEvents', () => {
     ]);
   });
 
+  it('leaves out the token usage of discarded answers and failed operations', () => {
+    const discarded = (tokens: number, reason: string): Step[] => [
+      [
+        'provider.answer_discarded',
+        { provider: 'openai', model: 'm', usage: { promptTokens: tokens }, reason },
+      ],
+      [
+        'cognition.operation_failed',
+        { step: 1, operation: 'simulate', error: 'bad reply', usage: { promptTokens: tokens } },
+      ],
+    ];
+
+    expect(
+      alignEvents(
+        run('a', discarded(10, 'invalid JSON')),
+        run('b', discarded(99, 'invalid JSON'))
+      ).map((step) => step.kind)
+    ).toEqual(['same', 'same']);
+    // The reason is compared: the answer was discarded for something else.
+    expect(
+      alignEvents(run('a', discarded(10, 'invalid JSON')), run('b', discarded(10, 'refused'))).map(
+        (step) => (step.kind === 'changed' ? step.detail : step.kind)
+      )
+    ).toEqual(['reason: "invalid JSON" → "refused"', 'same']);
+  });
+
   it('pairs a policy check that became a violation for the same tool as one change', () => {
     const intention = { type: 'tool_call', toolName: 'refund', parameters: { amount: 90 } };
     const allowed: Step[] = [['policy.checked', { intention, validation: { allowed: true } }]];

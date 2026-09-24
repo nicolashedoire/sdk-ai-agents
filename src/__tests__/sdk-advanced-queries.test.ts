@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -10,6 +10,7 @@ import { type PostgreSQLPool, PostgreSQLEventStore } from '../stores/postgresql-
 import { SQLiteEventStore } from '../stores/sqlite-event-store.js';
 import { defineTool } from '../sdk.js';
 import type { Event, EventFilters } from '../types/events.js';
+import { generateEventId } from '../utils/id.js';
 import { loadNodeSqlite } from './support/node-sqlite.js';
 import { ScriptedLLMProvider } from './support/scripted-llm-provider.js';
 import { createTestSDK, lookupMetricDefinition, type TestSDK } from './support/test-sdk.js';
@@ -214,7 +215,7 @@ describe('advanced queries on PostgreSQL', () => {
       const reads = pool.statements.filter((statement) => statement.sql.startsWith('SELECT'));
       expect(reads).toEqual([
         {
-          sql: "SELECT * FROM events WHERE 1=1 AND type = $1 AND timestamp >= $2 AND metadata->>'agentId' = $3 ORDER BY timestamp ASC, id ASC",
+          sql: "SELECT * FROM events WHERE 1=1 AND type = $1 AND timestamp >= $2 AND metadata->>'agentId' = $3 ORDER BY timestamp ASC, run_id ASC, seq ASC",
           params: ['tool.called', 500, 'agent-1'],
         },
         {
@@ -250,11 +251,11 @@ describe('advanced queries on PostgreSQL', () => {
       // Before, each call also ran SELECT COUNT(*) for a total nobody read.
       expect(pool.statements.filter((statement) => statement.sql.startsWith('SELECT'))).toEqual([
         {
-          sql: 'SELECT * FROM events WHERE 1=1 AND type = $1 ORDER BY timestamp ASC, id ASC',
+          sql: 'SELECT * FROM events WHERE 1=1 AND type = $1 ORDER BY timestamp ASC, run_id ASC, seq ASC',
           params: ['tool.called'],
         },
         {
-          sql: 'SELECT * FROM events WHERE 1=1 AND type = $1 ORDER BY timestamp ASC, id ASC',
+          sql: 'SELECT * FROM events WHERE 1=1 AND type = $1 ORDER BY timestamp ASC, run_id ASC, seq ASC',
           params: ['tool.called'],
         },
       ]);
@@ -285,15 +286,15 @@ describe('advanced queries on PostgreSQL', () => {
       // the text '"churn"' (never equal), gt/contains and metadataQuery silently ignored.
       expect(pool.statements.filter((statement) => statement.sql.startsWith('SELECT'))).toEqual([
         {
-          sql: 'SELECT * FROM events WHERE 1=1 AND (data #> $1::text[]) = $2::jsonb AND ((metadata #> $3::text[]) = $4::jsonb) IS NOT TRUE ORDER BY timestamp ASC, id ASC',
+          sql: 'SELECT * FROM events WHERE 1=1 AND (data #> $1::text[]) = $2::jsonb AND ((metadata #> $3::text[]) = $4::jsonb) IS NOT TRUE ORDER BY timestamp ASC, run_id ASC, seq ASC',
           params: [['parameters', 'metric'], '"churn"', ['agentVersion'], '"1.0.0"'],
         },
         {
-          sql: "SELECT * FROM events WHERE 1=1 AND (CASE WHEN jsonb_typeof((data #> $1::text[])) = 'number' THEN (data #>> $1::text[])::numeric END) >= $2 AND jsonb_typeof((metadata #> $3::text[])) = 'string' AND strpos((metadata #>> $3::text[]), $4) > 0 ORDER BY timestamp ASC, id ASC",
+          sql: "SELECT * FROM events WHERE 1=1 AND (CASE WHEN jsonb_typeof((data #> $1::text[])) = 'number' THEN (data #>> $1::text[])::numeric END) >= $2 AND jsonb_typeof((metadata #> $3::text[])) = 'string' AND strpos((metadata #>> $3::text[]), $4) > 0 ORDER BY timestamp ASC, run_id ASC, seq ASC",
           params: [['duration'], 30, ['tier'], 'gold'],
         },
         {
-          sql: "SELECT * FROM events WHERE 1=1 AND COALESCE(jsonb_typeof((data #> $1::text[])), 'null') <> 'null' ORDER BY timestamp ASC, id ASC",
+          sql: "SELECT * FROM events WHERE 1=1 AND COALESCE(jsonb_typeof((data #> $1::text[])), 'null') <> 'null' ORDER BY timestamp ASC, run_id ASC, seq ASC",
           params: [['result']],
         },
       ]);
@@ -322,7 +323,10 @@ describe('advanced queries on PostgreSQL', () => {
 
       expect(count).toBe(1);
       expect(pool.statements.filter((statement) => statement.sql.startsWith('SELECT'))).toEqual([
-        { sql: 'SELECT * FROM events WHERE 1=1 ORDER BY timestamp ASC, id ASC', params: [] },
+        {
+          sql: 'SELECT * FROM events WHERE 1=1 ORDER BY timestamp ASC, run_id ASC, seq ASC',
+          params: [],
+        },
       ]);
     } finally {
       await env.dispose();
@@ -353,6 +357,15 @@ describe('the file store', () => {
       expect(result.filtered).toBe(2);
       // Before, 6 reads for 3 runs: getRunIds read every file, then each run was read again.
       expect(store.reads).toBe(0);
+      // The same through the layers the SDK adds: live events, then incident monitoring.
+      const monitored = createTestSDK({ eventStore: store, incidents: { notifiers: [] } });
+      try {
+        const again = await monitored.sdk.queryEventsAdvanced({ type: 'tool.called' });
+        expect(again.filtered).toBe(2);
+        expect(store.reads).toBe(0);
+      } finally {
+        await monitored.dispose();
+      }
     } finally {
       await recorded.env.dispose();
       await store.destroy();
@@ -431,6 +444,27 @@ function describeFieldQueries(
       ).toEqual(['e2']);
     });
 
+    it('applies the same filters to one run with getEvents, limit 0 included', async () => {
+      const store = open();
+      for (const event of events) await store.append(event.runId, event);
+      const inRun = async (filters: EventFilters) =>
+        (await store.getEvents('run_fields', filters)).map((event) => event.id);
+
+      // Before, the file store ignored every filter below but the type and times, and read
+      // `limit: 0` as no limit.
+      expect(
+        await inRun({ dataQuery: { field: 'parameters.metric', operator: 'eq', value: 'churn' } })
+      ).toEqual(['e1']);
+      expect(
+        await inRun({ metadataQuery: { field: 'tier', operator: 'contains', value: 'gold' } })
+      ).toEqual(['e2']);
+      expect(await inRun({ agentId: 'nobody' })).toEqual([]);
+      expect(await inRun({ limit: 0 })).toEqual([]);
+      await expect(
+        store.getEvents('run_fields', { dataQuery: { field: 'a..b', operator: 'exists' } })
+      ).rejects.toThrow(ValidationError);
+    });
+
     it('refuses a field path or an operator that is not one', async () => {
       const store = open();
       await store.append('run_fields', events[0] as Event);
@@ -466,3 +500,144 @@ if (nodeSqlite) {
     return { store, dispose: () => store.close() };
   });
 }
+
+/** A store with only the methods every store must have: the SDK then reads run by run. */
+class PlainEventStore implements IEventStore {
+  constructor(private readonly inner: FileEventStore) {}
+  append(runId: string, event: Event): Promise<void> {
+    return this.inner.append(runId, event);
+  }
+  getEvents(runId: string, filters?: EventFilters): Promise<Event[]> {
+    return this.inner.getEvents(runId, filters);
+  }
+  getRunIds(filters?: { since?: number; until?: number }): Promise<string[]> {
+    return this.inner.getRunIds(filters);
+  }
+  exportEventLog(runId: string) {
+    return this.inner.exportEventLog(runId);
+  }
+}
+
+/** `count` events of one run in the same millisecond, numbered by `step` in recording order. */
+function sameMillisecond(runId: string, count: number, timestamp = 1_000): Event[] {
+  return Array.from({ length: count }, (_, step) => ({
+    id: generateEventId(),
+    runId,
+    type: 'tool.called',
+    timestamp,
+    data: { step },
+    metadata: { agentId: 'agent-1' },
+  }));
+}
+
+function describeOrder(
+  storeName: string,
+  createStore: () => { store: IEventStore; dispose(): Promise<void> }
+): void {
+  describe(`the order of events recorded in the same millisecond, on ${storeName}`, () => {
+    let opened: { store: IEventStore; dispose(): Promise<void> } | undefined;
+
+    afterEach(async () => {
+      await opened?.dispose();
+      opened = undefined;
+    });
+
+    it('is the order each run recorded them, runs by id', async () => {
+      opened = createStore();
+      const { store } = opened;
+      const env = createTestSDK({ eventStore: store });
+      try {
+        // run_b first: the order of runs is their id, not when they were written.
+        for (const event of sameMillisecond('run_b', 5)) await store.append('run_b', event);
+        for (const event of sameMillisecond('run_a', 20)) await store.append('run_a', event);
+        const recorded = [
+          ...(await store.getEvents('run_a')),
+          ...(await store.getEvents('run_b')),
+        ].map((event) => [event.runId, event.data.step]);
+
+        const queried = await env.sdk.queryEventsAdvanced({ agentId: 'agent-1' });
+
+        // Before, ties were broken by the (random) event id: every run came back shuffled.
+        expect(recorded).toEqual([
+          ...Array.from({ length: 20 }, (_, step) => ['run_a', step]),
+          ...Array.from({ length: 5 }, (_, step) => ['run_b', step]),
+        ]);
+        expect(queried.events.map((event) => [event.runId, event.data.step])).toEqual(recorded);
+        const direct = await store.queryEvents?.({ agentId: 'agent-1' });
+        if (direct) {
+          expect(direct.events.map((event) => [event.runId, event.data.step])).toEqual(recorded);
+        }
+      } finally {
+        await env.dispose();
+      }
+    });
+  });
+}
+
+function fileStore(): { store: FileEventStore; directory: string; dispose(): Promise<void> } {
+  const directory = mkdtempSync(join(tmpdir(), 'sdk-ai-agents-order-'));
+  const store = new FileEventStore(join(directory, 'events'));
+  return {
+    store,
+    directory,
+    dispose: async () => {
+      await store.destroy();
+      rmSync(directory, { recursive: true, force: true });
+    },
+  };
+}
+
+describeOrder('the file store', fileStore);
+describeOrder('a store without queryEvents', () => {
+  const file = fileStore();
+  return { store: new PlainEventStore(file.store), dispose: file.dispose };
+});
+if (nodeSqlite) {
+  describeOrder('SQLite (node:sqlite)', () => {
+    const store = new SQLiteEventStore({ db: new nodeSqlite.DatabaseSync(':memory:') });
+    return { store, dispose: () => store.close() };
+  });
+}
+
+describe('the order of events on PostgreSQL', () => {
+  it('adds a sequence column to the table and orders by it', async () => {
+    const pool = new RecordingPostgreSQLPool([]);
+    const store = new PostgreSQLEventStore({ pool });
+    try {
+      await store.getEvents('run_1');
+      await store.queryEvents({});
+
+      const statements = pool.statements.map((statement) => statement.sql);
+      // Tables of earlier versions get the column when the store starts.
+      expect(statements).toContain('ALTER TABLE events ADD COLUMN IF NOT EXISTS seq BIGSERIAL');
+      expect(statements.filter((sql) => sql.startsWith('SELECT'))).toEqual([
+        'SELECT * FROM events WHERE run_id = $1 ORDER BY timestamp ASC, seq ASC',
+        'SELECT * FROM events WHERE 1=1 ORDER BY timestamp ASC, run_id ASC, seq ASC',
+      ]);
+    } finally {
+      await store.close();
+    }
+  });
+});
+
+describe('long runs', () => {
+  it('are read without spreading them onto the stack', async () => {
+    const file = fileStore();
+    const env = createTestSDK({ eventStore: new PlainEventStore(file.store) });
+    try {
+      await file.store.getRunIds();
+      // 200 000 events in one run: push(...events) overflows the stack from about 125 000.
+      const events = sameMillisecond('run_long', 200_000);
+      writeFileSync(join(file.directory, 'events', 'run_long.json'), JSON.stringify(events));
+
+      const viaFileStore = await file.store.queryEvents({ agentId: 'agent-1' });
+      const viaScan = await env.sdk.countEventsAdvanced({ agentId: 'agent-1' });
+
+      expect(viaFileStore.events).toHaveLength(200_000);
+      expect(viaScan).toBe(200_000);
+    } finally {
+      await env.dispose();
+      await file.dispose();
+    }
+  });
+});

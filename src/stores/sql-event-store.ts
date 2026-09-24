@@ -157,7 +157,9 @@ export class SQLEventStore implements IEventStore {
       params.push(...filteredParams);
     }
 
-    sql += ' ORDER BY timestamp ASC';
+    // Events of the same millisecond in the order they were appended (SQLite's rowid): their
+    // ids are random.
+    sql += ' ORDER BY timestamp ASC, rowid ASC';
 
     if (filters?.limit !== undefined) {
       sql += ' LIMIT ?';
@@ -358,8 +360,8 @@ export class SQLEventStore implements IEventStore {
     sql = filteredSQL;
     params.push(...filteredParams);
 
-    // Ties by id: the same order on every store.
-    sql += ' ORDER BY timestamp ASC, id ASC';
+    // Events of the same millisecond by run, then in the order each run recorded them.
+    sql += ' ORDER BY timestamp ASC, run_id ASC, rowid ASC';
 
     if (filters?.limit !== undefined) {
       sql += ' LIMIT ?';

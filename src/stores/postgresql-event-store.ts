@@ -73,9 +73,13 @@ export class PostgreSQLEventStore extends SQLEventStore {
         timestamp BIGINT NOT NULL,
         data JSONB NOT NULL,
         metadata JSONB,
+        seq BIGSERIAL,
         CONSTRAINT events_run_id_fk FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
       )
     `;
+    // The order events were appended in: events of the same millisecond have random ids, and a
+    // table has no order of its own. Tables created by earlier versions get the column here.
+    const addSequenceSQL = `ALTER TABLE ${this.tableName} ADD COLUMN IF NOT EXISTS seq BIGSERIAL`;
 
     // Create indexes for common queries
     const createIndexesSQL = [
@@ -83,6 +87,7 @@ export class PostgreSQLEventStore extends SQLEventStore {
       `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_type ON ${this.tableName}(type)`,
       `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_timestamp ON ${this.tableName}(timestamp)`,
       `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_run_timestamp ON ${this.tableName}(run_id, timestamp)`,
+      `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_run_timestamp_seq ON ${this.tableName}(run_id, timestamp, seq)`,
       `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_type_timestamp ON ${this.tableName}(type, timestamp)`,
       // GIN indexes for JSONB queries (PostgreSQL-specific)
       `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_metadata_gin ON ${this.tableName} USING GIN (metadata)`,
@@ -104,6 +109,7 @@ export class PostgreSQLEventStore extends SQLEventStore {
 
     await connection.execute(createRunsTableSQL);
     await connection.execute(createTableSQL);
+    await connection.execute(addSequenceSQL);
 
     for (const indexSQL of createIndexesSQL) {
       await connection.execute(indexSQL);
@@ -165,7 +171,8 @@ export class PostgreSQLEventStore extends SQLEventStore {
     sql = updatedSQL;
     paramIndex = updatedParamIndex;
 
-    sql += ' ORDER BY timestamp ASC';
+    // Events of the same millisecond in the order they were appended.
+    sql += ' ORDER BY timestamp ASC, seq ASC';
 
     if (filters?.limit !== undefined) {
       sql += ` LIMIT $${paramIndex}`;
@@ -191,8 +198,8 @@ export class PostgreSQLEventStore extends SQLEventStore {
       params,
       filters
     );
-    // Ties by id: the same order on every store.
-    let sql = `${filtered} ORDER BY timestamp ASC, id ASC`;
+    // Events of the same millisecond by run, then in the order each run recorded them.
+    let sql = `${filtered} ORDER BY timestamp ASC, run_id ASC, seq ASC`;
     if (filters?.limit !== undefined) {
       sql += ` LIMIT $${paramIndex}`;
       params.push(filters.limit);

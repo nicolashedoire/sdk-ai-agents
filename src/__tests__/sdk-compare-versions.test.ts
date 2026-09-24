@@ -214,6 +214,28 @@ describe('configHash', () => {
     );
   });
 
+  it('hashes tool metadata holding a cycle or a BigInt instead of failing createAgent', () => {
+    const metadata = (limit: bigint): Record<string, unknown> => {
+      const owner: Record<string, unknown> = { team: 'billing', limit };
+      owner.self = owner;
+      return { owner };
+    };
+    const tool = (limit: bigint) =>
+      defineTool({
+        name: 'refund',
+        description: 'Refunds an order',
+        schema: z.object({}),
+        handler: async () => 'ok',
+        metadata: metadata(limit),
+      });
+
+    // Before: "Converting circular structure to JSON" / "Do not know how to serialize a BigInt".
+    const small = hashOf({ tools: [tool(10n)] });
+    expect(small).toMatch(/^[0-9a-f]{16}$/);
+    expect(hashOf({ tools: [tool(10n)] })).toBe(small);
+    expect(hashOf({ tools: [tool(11n)] })).not.toBe(small);
+  });
+
   it('follows setPolicy and addTools, and each run records the hash it started with', async () => {
     const greeter = env.sdk.createAgent({ name: 'greeter', model: 'test-model' });
     const [before] = await runTwice(env, greeter);

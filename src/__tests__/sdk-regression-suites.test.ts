@@ -1,9 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { AgentImpl } from '../agent.js';
+import { InMemoryKnowledgeStore } from '../cognition/knowledge-store.js';
 import type { Incident, IncidentNotifier } from '../incidents/incident.js';
 import { defineTool } from '../sdk.js';
 import type { RegressionTestSuiteConfig } from '../types/regression-test.js';
+import {
+  InclinedPlaneBench,
+  OBSERVATIONS,
+  PROBLEM,
+  scriptRuleDiscovery,
+} from './support/inclined-plane.js';
 import { ScriptedLLMProvider } from './support/scripted-llm-provider.js';
 import { createTestSDK, lookupMetricDefinition, type TestSDK } from './support/test-sdk.js';
 
@@ -403,6 +410,39 @@ describe('what a comparison leaves out, and what it never does', () => {
     expect(validation.differences.map((difference) => difference.details)).toEqual([
       'intention.generated (schedule) data differs: message: "Let me book that for you." → "Booking the meeting now."',
     ]);
+  });
+
+  it('leaves out the run ids that knowledge evidence records', async () => {
+    env = createTestSDK();
+    // A second SDK writing to the same event log, with its own scripted model.
+    const other = createTestSDK({ eventStore: env.store });
+    try {
+      // Two agents with memories of their own: each run tests the rules and records them.
+      const think = (sdk: TestSDK) => {
+        scriptRuleDiscovery(sdk.provider);
+        return sdk.sdk
+          .createCognitiveAgent({
+            name: 'physicist',
+            model: 'test-model',
+            evaluator: new InclinedPlaneBench(),
+            knowledge: { store: new InMemoryKnowledgeStore(), scope: 'inclined-plane' },
+          })
+          .think({ problem: PROBLEM, observations: OBSERVATIONS });
+      };
+      const first = await think(env);
+      const second = await think(other);
+
+      const comparison = await env.sdk.compareRuns(first.runId, second.runId);
+
+      const recorded = await env.sdk.getEvents(second.runId, {
+        type: 'cognition.knowledge_recorded',
+      });
+      expect(recorded).toHaveLength(1);
+      // Before, each piece of evidence named its own run: the findings always differed.
+      expect(comparison.differences).toEqual([]);
+    } finally {
+      await other.dispose();
+    }
   });
 
   it('leaves the incidents out: they depend on deliveries and throttling', async () => {

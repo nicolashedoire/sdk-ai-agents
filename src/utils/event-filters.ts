@@ -181,9 +181,18 @@ export function aggregateEvents(
   return result;
 }
 
-/** Events in time order, ties by event id: the same order on every store. */
-export function inTimeOrder(events: Event[]): Event[] {
-  return [...events].sort(
-    (a, b) => a.timestamp - b.timestamp || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
-  );
+/**
+ * The events of several runs in time order. Events of the same millisecond keep the order of
+ * their runs (by run id) and, within a run, the order the run recorded them: event ids are
+ * random and would shuffle a run.
+ */
+export function acrossRunsInTimeOrder(runs: Iterable<[runId: string, events: Event[]]>): Event[] {
+  const ordered: Event[] = [];
+  const byRunId = [...runs].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  for (const [, events] of byRunId) {
+    // A loop, not push(...events): a spread of a very long run would overflow the stack.
+    for (const event of events) ordered.push(event);
+  }
+  // Array.prototype.sort is stable: ties keep the run-then-position order built above.
+  return ordered.sort((a, b) => a.timestamp - b.timestamp);
 }

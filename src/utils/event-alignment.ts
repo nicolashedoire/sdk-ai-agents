@@ -22,8 +22,12 @@ export const VOLATILE_DATA_PATHS: Readonly<Partial<Record<EventType, readonly Da
   'approval.requested': [['approvalId']],
   'approval.approved': [['approvalId']],
   'approval.rejected': [['approvalId']],
+  'provider.answer_discarded': [['usage']],
   'decision.evaluated': [['usage']],
   'cognition.evaluated': [['durationMs']],
+  'cognition.operation_failed': [['usage']],
+  // Each piece of evidence names the run that recorded it: the run's own, new id.
+  'cognition.knowledge_recorded': [['findings', '*', 'evidence', '*', 'runId']],
   'cognition.started': [
     ['observations', '*', 'observedAt'],
     ['observations', '*', 'sourceEventId'],
@@ -250,6 +254,9 @@ export function eventSubject(event: Event): string {
       return firstToolCallName(data) ?? 'answer';
     case 'resource.read':
       return stringField(data, 'uri') ?? '';
+    case 'provider.retry':
+    case 'provider.answer_discarded':
+      return stringField(data, 'provider') ?? '';
     default:
       // Policy and approval events are about the call they check, like the action events.
       return toolNameOf(data) ?? stringField(data, 'operation') ?? '';
