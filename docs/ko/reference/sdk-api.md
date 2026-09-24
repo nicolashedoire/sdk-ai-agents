@@ -14,7 +14,7 @@ const sdk = createSDK(config);
 | `providerConfig` | `{ openai?, anthropic? }` | 각 벤더의 `apiKey`, `defaultModel`, `baseURL`(`baseURL`: Azure OpenAI의 v1 API나 로컬 모델 서버 같은 호환 엔드포인트 또는 프록시). 기본 프로바이더는 자기 벤더의 항목을, 다른 벤더의 폴백은 그 벤더의 항목을 사용합니다 |
 | `fallbackProviders` | `Array<{ provider, config? }>` | 기본 프로바이더가 실패하면 순서대로 시도됩니다. `config`는 `providerConfig`보다 우선합니다. 기본 프로바이더와 같은 벤더의 폴백은 기본 프로바이더의 설정을 물려받지 않으며(전역 `apiKey`만), 다른 벤더의 폴백에는 자체 키가 필요합니다 |
 | `llmProvider` | `LLMProvider` | 직접 만든 프로바이더(로컬 모델, 게이트웨이, 테스트 대역). `nativeToolMessages`를 선언하면 도구 호출과 결과를 네이티브 형식(`LLMMessage`)으로, 그렇지 않으면 텍스트로 받습니다 |
-| `retry` | `Partial<RetryPolicy> \| false` | LLM 재시도 정책, 프로바이더별로, 폴백 전에 |
+| `retry` | `Partial<RetryPolicy> \| false` | LLM 재시도 정책, 프로바이더별로, 폴백 전에. 주입한 `llmProvider`에는 명시적으로 설정한 경우에만 적용되며, `llmProvider`로 넘긴 `FallbackProvider`와 그 안의 프로바이더에는 절대 적용되지 않음 |
 | `jev` | `JevClientConfig` | 타입 지정 결정을 위해 TypeSafe Jev를 켭니다. 직접 쓰거나, `baseUrl`과 `model: 'typesafe-ai/jev'`로 [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway)를 통해 씁니다 |
 | `decisionClient` | `TypedDecisionClient` | 어떤 타입 지정 결정 백엔드든(`jev`보다 우선) |
 | `pricing` | `PricingTable` | 토큰 100만 개당 USD, 기본값 위에 병합됩니다 |

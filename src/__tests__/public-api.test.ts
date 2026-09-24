@@ -31,7 +31,7 @@ describe('built-in providers exported by the package', () => {
     env = undefined;
   });
 
-  /** OpenAI first, then Claude with its default model; the SDK's retry policy applies. */
+  /** OpenAI first, then Claude with its default model. Client retries off: one request per vendor per call. */
   async function vendors(): Promise<{ primary: OpenAIProvider; fallback: AnthropicProvider }> {
     const client = (baseURL: string): VendorClientOptions => ({ baseURL, maxRetries: 0 });
     return {
@@ -117,5 +117,7 @@ describe('built-in providers exported by the package', () => {
     expect(result).toMatchObject({ status: 'completed', output: 'Hello after a retry' });
     expect(openai.requests).toHaveLength(2);
     expect(anthropic.requests).toHaveLength(0);
+    // A provider wrapped by hand has no route to the run's events.
+    expect(await sdk.getEvents(result.runId, { type: 'provider.retry' })).toEqual([]);
   });
 });
