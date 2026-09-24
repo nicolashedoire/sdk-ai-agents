@@ -26,6 +26,8 @@ const sdk = createSDK({
 | `model` | `jev-latest` | Fija un identificador versionado para congelar el comportamiento |
 | `timeoutMs` | `30000` | Por intento |
 | `maxRetries` | `2` | Ante 408, 429, 5xx, 529 y errores de red, respetando `retry-after` |
+| `retryBaseDelayMs` | `500` | Primera espera, duplicada en cada reintento |
+| `maxRetryDelayMs` | `30000` | Límite de cada espera, incluido `retry-after` |
 | `fetch` | `fetch` global | Inyecta un transporte compatible con proxies |
 
 ### A través de Vercel AI Gateway {#through-vercel-ai-gateway}

@@ -26,6 +26,8 @@ const sdk = createSDK({
 | `model` | `jev-latest` | ثبّت معرّفًا ذا إصدار لتجميد السلوك |
 | `timeoutMs` | `30000` | لكل محاولة |
 | `maxRetries` | `2` | عند الرموز 408 و429 و5xx و529 وأخطاء الشبكة، مع احترام `retry-after` |
+| `retryBaseDelayMs` | `500` | مدة الانتظار الأولى، وتتضاعف مع كل إعادة محاولة |
+| `maxRetryDelayMs` | `30000` | الحدّ الأعلى لكل انتظار، بما في ذلك `retry-after` |
 | `fetch` | `fetch` العامة | أدخِل وسيلة نقل تدعم الوكيل الوسيط (proxy) |
 
 ### عبر Vercel AI Gateway {#through-vercel-ai-gateway}

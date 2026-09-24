@@ -26,6 +26,8 @@ const sdk = createSDK({
 | `model` | `jev-latest` | 固定一个带版本的 id 以冻结行为 |
 | `timeoutMs` | `30000` | 每次尝试 |
 | `maxRetries` | `2` | 遇到 408、429、5xx、529 和网络错误时重试，并遵循 `retry-after` |
+| `retryBaseDelayMs` | `500` | 第一次等待时间，每次重试翻倍 |
+| `maxRetryDelayMs` | `30000` | 每次等待的上限，包括 `retry-after` |
 | `fetch` | 全局 `fetch` | 注入一个支持代理的传输实现 |
 
 ### 通过 Vercel AI Gateway {#through-vercel-ai-gateway}

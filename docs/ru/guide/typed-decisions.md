@@ -26,6 +26,8 @@ const sdk = createSDK({
 | `model` | `jev-latest` | Закрепите идентификатор с версией, чтобы зафиксировать поведение |
 | `timeoutMs` | `30000` | На одну попытку |
 | `maxRetries` | `2` | При 408, 429, 5xx, 529 и сетевых ошибках, с учётом `retry-after` |
+| `retryBaseDelayMs` | `500` | Первая пауза, удваивается при каждой повторной попытке |
+| `maxRetryDelayMs` | `30000` | Верхняя граница каждой паузы, включая `retry-after` |
 | `fetch` | глобальный `fetch` | Передайте транспорт, поддерживающий прокси |
 
 ### Через Vercel AI Gateway {#through-vercel-ai-gateway}
