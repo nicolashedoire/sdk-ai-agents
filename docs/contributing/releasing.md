@@ -10,11 +10,12 @@ A release takes three steps: write down the new version number and what changed,
 
 | Job | What it does |
 | --- | --- |
-| `version` | Refuses a tag that is not `v` followed by the version in `package.json`. Chooses the npm dist-tag: `latest`, or `next` for a pre-release such as `0.4.0-beta.1`. |
-| `verify` | On Node.js 20, 22 and 24, the checks of the CI: `npm ci`, lint, format check, build, type-check of the tests, tests and translation check. |
-| `publish` | On Node.js 24: `npm ci`, then `npm publish --provenance --access public`. Before anything is sent, `prepublishOnly` deletes `dist/`, builds it again and runs the checks once more (`npm run verify`). |
+| `version` | Refuses a tag that is not `v` followed by the version in `package.json`, a tag on a commit that is not on `main`, and a release without its `## [x.y.z]` section in `CHANGELOG.md`. Chooses the npm dist-tag: `latest`, or `next` for a pre-release such as `0.4.0-beta.1`. |
+| `verify` | On Node.js 20, 22 and 24, the checks of the CI except coverage and the documentation build: `npm ci`, lint, format check, build, type-check of the tests, tests and translation check. |
+| `pack` | Installs the dependencies without their install scripts, builds `dist/` from scratch and packs the package. Refuses a tarball holding anything but `dist/`, `package.json`, `README.md`, `LICENSE` and `CHANGELOG.md`, or a test file, then keeps it as an artifact of the run. |
+| `publish` | The only job that can authenticate with npm: it checks out no code, installs nothing and runs no script. It checks that npm is 11.5.1 or later, then publishes the tarball of `pack` with `npm publish --provenance --access public --ignore-scripts`. |
 
-Nothing is published if one job fails. The workflow starts on a tag rather than on a GitHub release because `npm version` and `git tag` already produce the tag: one push from the terminal is enough, and a GitHub release can still be written from the tag afterwards. A tag pushed to a fork runs the checks and publishes nothing.
+Nothing is published if one job fails. The workflow starts on a tag rather than on a GitHub release because `npm version` and `git tag` already produce the tag: one push from the terminal is enough, and a GitHub release can still be written from the tag afterwards. A tag pushed to a fork runs the checks and publishes nothing. A fix for an older minor version (a backport made on another branch) cannot be released this way: its tag is not on `main`, and published as `latest` it would replace the newest version. The `prepublishOnly` script (`npm run clean && npm run verify`) protects a manual `npm publish`; the workflow does not run it.
 
 ## Before the first release
 
@@ -30,8 +31,8 @@ These steps are done once, by the owner of the repository.
 1. **Check the branch to release.** On an up-to-date `main`:
 
    ```sh
-   npm run verify       # lint, format, build, type-check, tests, translations
-   npm pack --dry-run   # the files that would be published
+   npm run clean && npm run verify   # lint, format, build, type-check, tests, translations
+   npm pack --dry-run                # the files that would be published
    ```
 
    The package contains only `dist/` (JavaScript, type declarations and source maps that include their sources), `README.md`, `LICENSE`, `CHANGELOG.md` and `package.json`.
@@ -48,6 +49,8 @@ These steps are done once, by the owner of the repository.
    ### Added
    - …
    ```
+
+   For a release (not a pre-release), the `version` job refuses a tag whose section is missing.
 
 4. **Change the version** without creating the tag yet (the tag must point to the merged commit):
 
@@ -98,7 +101,7 @@ Once the first version is on npm, the workflow can publish without any secret: n
 2. In the same settings, under *Publishing access*, choose *Require two-factor authentication and disallow tokens*.
 3. Delete the `NPM_TOKEN` secret in GitHub and the token on npmjs.com.
 
-The workflow does not change: npm 11.5.1 or later, shipped with Node.js 24, tries trusted publishing first and only uses `NPM_TOKEN` when trusted publishing is not set up. npm has announced that publishing directly with a granular access token will stop working in January 2027, so this switch is needed anyway. See the npm documentation on [trusted publishing](https://docs.npmjs.com/trusted-publishers) and [provenance](https://docs.npmjs.com/generating-provenance-statements).
+The workflow does not change: npm 11.5.1 or later, which the `publish` job checks for, tries trusted publishing first and only uses `NPM_TOKEN` when trusted publishing is not set up. npm has announced that publishing directly with a granular access token will stop working in January 2027, so this switch is needed anyway. See the npm documentation on [trusted publishing](https://docs.npmjs.com/trusted-publishers) and [provenance](https://docs.npmjs.com/generating-provenance-statements).
 
 ## If something goes wrong
 

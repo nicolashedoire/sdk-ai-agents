@@ -10,11 +10,12 @@ Publicar una versión lleva tres pasos: anotar el nuevo número de versión y lo
 
 | Job | Qué hace |
 | --- | --- |
-| `version` | Rechaza una etiqueta que no sea `v` seguida de la versión de `package.json`. Elige el dist-tag de npm: `latest`, o `next` para una versión preliminar como `0.4.0-beta.1`. |
-| `verify` | En Node.js 20, 22 y 24, las comprobaciones de la CI: `npm ci`, lint, comprobación del formato, build, comprobación de tipos de los tests, tests y comprobación de las traducciones. |
-| `publish` | En Node.js 24: `npm ci` y después `npm publish --provenance --access public`. Antes de enviar nada, `prepublishOnly` borra `dist/`, lo vuelve a construir y repite las comprobaciones (`npm run verify`). |
+| `version` | Rechaza una etiqueta que no sea `v` seguida de la versión de `package.json`, una etiqueta en un commit que no está en `main` y una versión sin su sección `## [x.y.z]` en `CHANGELOG.md`. Elige el dist-tag de npm: `latest`, o `next` para una versión preliminar como `0.4.0-beta.1`. |
+| `verify` | En Node.js 20, 22 y 24, las comprobaciones de la CI salvo la cobertura y la construcción de la documentación: `npm ci`, lint, comprobación del formato, build, comprobación de tipos de los tests, tests y comprobación de las traducciones. |
+| `pack` | Instala las dependencias sin sus scripts de instalación, construye `dist/` desde cero y empaqueta el paquete. Rechaza un archivo que contenga algo más que `dist/`, `package.json`, `README.md`, `LICENSE` y `CHANGELOG.md`, o un archivo de test, y después lo guarda como artefacto de la ejecución. |
+| `publish` | El único job que puede autenticarse ante npm: no descarga el código, no instala nada y no ejecuta ningún script. Comprueba que npm sea la versión 11.5.1 o posterior y publica el archivo de `pack` con `npm publish --provenance --access public --ignore-scripts`. |
 
-No se publica nada si falla un job. El flujo de trabajo arranca con una etiqueta y no con una release de GitHub porque `npm version` y `git tag` ya producen la etiqueta: basta con un solo push desde la terminal, y una release de GitHub se puede redactar después a partir de la etiqueta. Una etiqueta subida a un fork ejecuta las comprobaciones y no publica nada.
+No se publica nada si falla un job. El flujo de trabajo arranca con una etiqueta y no con una release de GitHub porque `npm version` y `git tag` ya producen la etiqueta: basta con un solo push desde la terminal, y una release de GitHub se puede redactar después a partir de la etiqueta. Una etiqueta subida a un fork ejecuta las comprobaciones y no publica nada. Una corrección para una versión menor anterior (un backport hecho en otra rama) no se puede publicar así: su etiqueta no está en `main`, y publicada como `latest` sustituiría a la versión más reciente. El script `prepublishOnly` (`npm run clean && npm run verify`) protege un `npm publish` manual; el flujo de trabajo no lo ejecuta.
 
 ## Antes de la primera publicación {#before-the-first-release}
 
@@ -30,8 +31,8 @@ Estos pasos se hacen una sola vez, y los hace el propietario del repositorio.
 1. **Comprobar la rama que se publica.** En una rama `main` actualizada:
 
    ```sh
-   npm run verify       # lint, format, build, type-check, tests, translations
-   npm pack --dry-run   # the files that would be published
+   npm run clean && npm run verify   # lint, format, build, type-check, tests, translations
+   npm pack --dry-run                # the files that would be published
    ```
 
    El paquete solo contiene `dist/` (el JavaScript, las declaraciones de tipos y los source maps, que incluyen sus fuentes), `README.md`, `LICENSE`, `CHANGELOG.md` y `package.json`.
@@ -48,6 +49,8 @@ Estos pasos se hacen una sola vez, y los hace el propietario del repositorio.
    ### Added
    - …
    ```
+
+   Para una versión (no una versión preliminar), el job `version` rechaza una etiqueta cuya sección falte.
 
 4. **Cambiar la versión** sin crear todavía la etiqueta (la etiqueta debe apuntar al commit fusionado):
 
@@ -98,7 +101,7 @@ Cuando la primera versión ya está en npm, el flujo de trabajo puede publicar s
 2. En la misma configuración, en *Publishing access*, elige *Require two-factor authentication and disallow tokens*.
 3. Borra el secreto `NPM_TOKEN` en GitHub y el token en npmjs.com.
 
-El flujo de trabajo no cambia: npm 11.5.1 o posterior, incluido con Node.js 24, prueba primero la publicación de confianza y solo usa `NPM_TOKEN` cuando no está configurada. npm ha anunciado que publicar directamente con un granular access token dejará de funcionar en enero de 2027, así que este cambio es necesario de todos modos. Consulta la documentación de npm sobre la [publicación de confianza](https://docs.npmjs.com/trusted-publishers) y la [procedencia](https://docs.npmjs.com/generating-provenance-statements).
+El flujo de trabajo no cambia: npm 11.5.1 o posterior, que el job `publish` comprueba, prueba primero la publicación de confianza y solo usa `NPM_TOKEN` cuando no está configurada. npm ha anunciado que publicar directamente con un granular access token dejará de funcionar en enero de 2027, así que este cambio es necesario de todos modos. Consulta la documentación de npm sobre la [publicación de confianza](https://docs.npmjs.com/trusted-publishers) y la [procedencia](https://docs.npmjs.com/generating-provenance-statements).
 
 ## Si algo sale mal {#if-something-goes-wrong}
 

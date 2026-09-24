@@ -10,11 +10,12 @@ Ein Release besteht aus drei Schritten: die neue Versionsnummer und die Änderun
 
 | Job | Was er tut |
 | --- | --- |
-| `version` | Lehnt einen Tag ab, der nicht aus `v` und der Version aus `package.json` besteht. Wählt den npm-Dist-Tag: `latest`, oder `next` für eine Vorabversion wie `0.4.0-beta.1`. |
-| `verify` | Unter Node.js 20, 22 und 24 die Prüfungen der CI: `npm ci`, Lint, Formatprüfung, Build, Typprüfung der Tests, Tests und Prüfung der Übersetzungen. |
-| `publish` | Unter Node.js 24: `npm ci`, dann `npm publish --provenance --access public`. Bevor irgendetwas gesendet wird, löscht `prepublishOnly` den Ordner `dist/`, baut ihn neu und führt die Prüfungen noch einmal aus (`npm run verify`). |
+| `version` | Lehnt einen Tag ab, der nicht aus `v` und der Version aus `package.json` besteht, einen Tag auf einem Commit, der nicht auf `main` liegt, und ein Release ohne seinen Abschnitt `## [x.y.z]` in `CHANGELOG.md`. Wählt den npm-Dist-Tag: `latest`, oder `next` für eine Vorabversion wie `0.4.0-beta.1`. |
+| `verify` | Unter Node.js 20, 22 und 24 die Prüfungen der CI außer Coverage und Build der Dokumentation: `npm ci`, Lint, Formatprüfung, Build, Typprüfung der Tests, Tests und Prüfung der Übersetzungen. |
+| `pack` | Installiert die Abhängigkeiten ohne ihre Installationsskripte, baut `dist/` von Grund auf und packt das Paket. Lehnt ein Archiv ab, das etwas anderes als `dist/`, `package.json`, `README.md`, `LICENSE` und `CHANGELOG.md` oder eine Testdatei enthält, und bewahrt es dann als Artefakt des Laufs auf. |
+| `publish` | Der einzige Job, der sich bei npm authentifizieren kann: Er checkt keinen Code aus, installiert nichts und führt kein Skript aus. Er prüft, dass npm mindestens Version 11.5.1 hat, und veröffentlicht dann das Archiv von `pack` mit `npm publish --provenance --access public --ignore-scripts`. |
 
-Schlägt ein Job fehl, wird nichts veröffentlicht. Der Workflow startet bei einem Tag und nicht bei einem GitHub-Release, weil `npm version` und `git tag` den Tag ohnehin erzeugen: Ein einziger Push aus dem Terminal genügt, und ein GitHub-Release lässt sich danach immer noch aus dem Tag erstellen. Ein in einen Fork gepushter Tag führt die Prüfungen aus und veröffentlicht nichts.
+Schlägt ein Job fehl, wird nichts veröffentlicht. Der Workflow startet bei einem Tag und nicht bei einem GitHub-Release, weil `npm version` und `git tag` den Tag ohnehin erzeugen: Ein einziger Push aus dem Terminal genügt, und ein GitHub-Release lässt sich danach immer noch aus dem Tag erstellen. Ein in einen Fork gepushter Tag führt die Prüfungen aus und veröffentlicht nichts. Eine Korrektur für eine ältere Minor-Version (ein Backport auf einem anderen Branch) lässt sich so nicht veröffentlichen: Ihr Tag liegt nicht auf `main`, und als `latest` veröffentlicht würde sie die neueste Version ersetzen. Das Skript `prepublishOnly` (`npm run clean && npm run verify`) schützt ein manuelles `npm publish`; der Workflow führt es nicht aus.
 
 ## Vor dem ersten Release {#before-the-first-release}
 
@@ -30,8 +31,8 @@ Diese Schritte erledigt der Eigentümer des Repositorys ein einziges Mal.
 1. **Den zu veröffentlichenden Branch prüfen.** Auf einem aktuellen `main`:
 
    ```sh
-   npm run verify       # lint, format, build, type-check, tests, translations
-   npm pack --dry-run   # the files that would be published
+   npm run clean && npm run verify   # lint, format, build, type-check, tests, translations
+   npm pack --dry-run                # the files that would be published
    ```
 
    Das Paket enthält nur `dist/` (JavaScript, Typdeklarationen und Source Maps, die ihre Quellen enthalten), `README.md`, `LICENSE`, `CHANGELOG.md` und `package.json`.
@@ -48,6 +49,8 @@ Diese Schritte erledigt der Eigentümer des Repositorys ein einziges Mal.
    ### Added
    - …
    ```
+
+   Bei einem Release (keiner Vorabversion) lehnt der Job `version` einen Tag ab, dessen Abschnitt fehlt.
 
 4. **Die Version ändern**, ohne den Tag schon zu erstellen (der Tag muss auf den gemergten Commit zeigen):
 
@@ -98,7 +101,7 @@ Sobald die erste Version auf npm ist, kann der Workflow ganz ohne Secret veröff
 2. Wählen Sie in denselben Einstellungen unter *Publishing access* die Option *Require two-factor authentication and disallow tokens*.
 3. Löschen Sie das Secret `NPM_TOKEN` in GitHub und das Token auf npmjs.com.
 
-Der Workflow ändert sich nicht: npm 11.5.1 oder neuer, das mit Node.js 24 ausgeliefert wird, versucht zuerst Trusted Publishing und verwendet `NPM_TOKEN` nur, wenn es nicht eingerichtet ist. npm hat angekündigt, dass direktes Veröffentlichen mit einem granular access token im Januar 2027 nicht mehr funktionieren wird; der Wechsel ist also ohnehin nötig. Siehe die npm-Dokumentation zu [Trusted Publishing](https://docs.npmjs.com/trusted-publishers) und [Provenance](https://docs.npmjs.com/generating-provenance-statements).
+Der Workflow ändert sich nicht: npm 11.5.1 oder neuer, was der Job `publish` prüft, versucht zuerst Trusted Publishing und verwendet `NPM_TOKEN` nur, wenn es nicht eingerichtet ist. npm hat angekündigt, dass direktes Veröffentlichen mit einem granular access token im Januar 2027 nicht mehr funktionieren wird; der Wechsel ist also ohnehin nötig. Siehe die npm-Dokumentation zu [Trusted Publishing](https://docs.npmjs.com/trusted-publishers) und [Provenance](https://docs.npmjs.com/generating-provenance-statements).
 
 ## Wenn etwas schiefgeht {#if-something-goes-wrong}
 

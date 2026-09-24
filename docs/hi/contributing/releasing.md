@@ -10,11 +10,12 @@ SDK npm पर `@sdk-ai-agents/core` नाम से प्रकाशित �
 
 | Job | क्या करता है |
 | --- | --- |
-| `version` | ऐसे tag को ठुकरा देता है जो `v` और उसके बाद `package.json` का वर्ज़न न हो। npm का dist-tag चुनता है: `latest`, या `0.4.0-beta.1` जैसे pre-release के लिए `next`। |
-| `verify` | Node.js 20, 22 और 24 पर CI वाली जाँचें: `npm ci`, lint, format की जाँच, build, टेस्टों की type जाँच, टेस्ट और अनुवादों की जाँच। |
-| `publish` | Node.js 24 पर: `npm ci`, फिर `npm publish --provenance --access public`। कुछ भी भेजने से पहले `prepublishOnly` `dist/` को मिटाकर दोबारा बनाता है और जाँचें एक बार फिर चलाता है (`npm run verify`)। |
+| `version` | ऐसे tag को ठुकरा देता है जो `v` और उसके बाद `package.json` का वर्ज़न न हो, ऐसे commit पर लगा tag जो `main` पर नहीं है, और ऐसी रिलीज़ जिसका `## [x.y.z]` सेक्शन `CHANGELOG.md` में न हो। npm का dist-tag चुनता है: `latest`, या `0.4.0-beta.1` जैसे pre-release के लिए `next`। |
+| `verify` | Node.js 20, 22 और 24 पर coverage और दस्तावेज़ों के build को छोड़कर CI वाली जाँचें: `npm ci`, lint, format की जाँच, build, टेस्टों की type जाँच, टेस्ट और अनुवादों की जाँच। |
+| `pack` | dependencies को उनकी install scripts के बिना इंस्टॉल करता है, `dist/` को शुरू से बनाता है और पैकेज तैयार करता है। ऐसे archive को ठुकरा देता है जिसमें `dist/`, `package.json`, `README.md`, `LICENSE` और `CHANGELOG.md` के अलावा कुछ और हो, या कोई टेस्ट फ़ाइल हो, और फिर उसे run के artifact के रूप में रखता है। |
+| `publish` | अकेला job जो npm पर authenticate कर सकता है: यह कोड checkout नहीं करता, कुछ इंस्टॉल नहीं करता और कोई script नहीं चलाता। यह जाँचता है कि npm 11.5.1 या नया है, फिर `pack` का archive `npm publish --provenance --access public --ignore-scripts` से प्रकाशित करता है। |
 
-अगर कोई भी job विफल होता है, तो कुछ भी प्रकाशित नहीं होता। workflow GitHub release पर नहीं, tag पर शुरू होता है, क्योंकि `npm version` और `git tag` tag बनाते ही हैं: टर्मिनल से एक push काफ़ी है, और GitHub release बाद में tag से लिखी जा सकती है। किसी fork में push किया गया tag जाँचें चलाता है और कुछ भी प्रकाशित नहीं करता।
+अगर कोई भी job विफल होता है, तो कुछ भी प्रकाशित नहीं होता। workflow GitHub release पर नहीं, tag पर शुरू होता है, क्योंकि `npm version` और `git tag` tag बनाते ही हैं: टर्मिनल से एक push काफ़ी है, और GitHub release बाद में tag से लिखी जा सकती है। किसी fork में push किया गया tag जाँचें चलाता है और कुछ भी प्रकाशित नहीं करता। किसी पुराने minor वर्ज़न के लिए fix (किसी दूसरी branch पर किया गया backport) इस तरह रिलीज़ नहीं हो सकता: उसका tag `main` पर नहीं होता, और `latest` के रूप में प्रकाशित होने पर वह सबसे नए वर्ज़न की जगह ले लेता। `prepublishOnly` script (`npm run clean && npm run verify`) हाथ से किए गए `npm publish` की रक्षा करती है; workflow इसे नहीं चलाता।
 
 ## पहली रिलीज़ से पहले {#before-the-first-release}
 
@@ -30,8 +31,8 @@ SDK npm पर `@sdk-ai-agents/core` नाम से प्रकाशित �
 1. **रिलीज़ होने वाली branch जाँचें।** अप-टू-डेट `main` पर:
 
    ```sh
-   npm run verify       # lint, format, build, type-check, tests, translations
-   npm pack --dry-run   # the files that would be published
+   npm run clean && npm run verify   # lint, format, build, type-check, tests, translations
+   npm pack --dry-run                # the files that would be published
    ```
 
    पैकेज में सिर्फ़ `dist/` (JavaScript, type declarations और source maps, जिनमें उनके sources शामिल हैं), `README.md`, `LICENSE`, `CHANGELOG.md` और `package.json` होते हैं।
@@ -48,6 +49,8 @@ SDK npm पर `@sdk-ai-agents/core` नाम से प्रकाशित �
    ### Added
    - …
    ```
+
+   रिलीज़ के लिए (pre-release के लिए नहीं), यह सेक्शन न होने पर `version` job tag को ठुकरा देता है।
 
 4. **वर्ज़न बदलें**, अभी tag बनाए बिना (tag को merge हुए commit की ओर इशारा करना चाहिए):
 
@@ -98,7 +101,7 @@ npm audit signatures
 2. उन्हीं settings में, *Publishing access* के अंदर, *Require two-factor authentication and disallow tokens* चुनें।
 3. GitHub में `NPM_TOKEN` secret और npmjs.com पर token मिटा दें।
 
-workflow नहीं बदलता: Node.js 24 के साथ आने वाला npm 11.5.1 या नया पहले trusted publishing आज़माता है, और `NPM_TOKEN` का इस्तेमाल सिर्फ़ तब करता है जब trusted publishing सेट न हो। npm ने घोषणा की है कि granular access token से सीधे प्रकाशित करना जनवरी 2027 में बंद हो जाएगा, इसलिए यह बदलाव वैसे भी ज़रूरी है। npm के दस्तावेज़ों में [trusted publishing](https://docs.npmjs.com/trusted-publishers) और [provenance](https://docs.npmjs.com/generating-provenance-statements) देखें।
+workflow नहीं बदलता: npm 11.5.1 या नया (जिसकी जाँच `publish` job करता है) पहले trusted publishing आज़माता है, और `NPM_TOKEN` का इस्तेमाल सिर्फ़ तब करता है जब trusted publishing सेट न हो। npm ने घोषणा की है कि granular access token से सीधे प्रकाशित करना जनवरी 2027 में बंद हो जाएगा, इसलिए यह बदलाव वैसे भी ज़रूरी है। npm के दस्तावेज़ों में [trusted publishing](https://docs.npmjs.com/trusted-publishers) और [provenance](https://docs.npmjs.com/generating-provenance-statements) देखें।
 
 ## अगर कुछ गड़बड़ हो जाए {#if-something-goes-wrong}
 

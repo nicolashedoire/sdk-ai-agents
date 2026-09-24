@@ -10,11 +10,12 @@
 
 | المهمة | ما تفعله |
 | --- | --- |
-| `version` | ترفض وسمًا لا يساوي `v` متبوعة بالنسخة المذكورة في `package.json`. وتختار وسم التوزيع (dist-tag) في npm: `latest`، أو `next` لنسخة تمهيدية مثل `0.4.0-beta.1`. |
-| `verify` | على Node.js 20 و22 و24، فحوص التكامل المستمر (CI) نفسها: `npm ci`، والتدقيق (lint)، وفحص التنسيق، والبناء، وفحص أنواع الاختبارات، والاختبارات، وفحص الترجمات. |
-| `publish` | على Node.js 24: `npm ci`، ثم `npm publish --provenance --access public`. وقبل إرسال أي شيء، يحذف `prepublishOnly` المجلد `dist/` ويعيد بناءه ويشغّل الفحوص مرة أخرى (`npm run verify`). |
+| `version` | ترفض وسمًا لا يساوي `v` متبوعة بالنسخة المذكورة في `package.json`، ووسمًا على إيداع ليس على `main`، وإصدارًا ليس له قسمه `## [x.y.z]` في `CHANGELOG.md`. وتختار وسم التوزيع (dist-tag) في npm: `latest`، أو `next` لنسخة تمهيدية مثل `0.4.0-beta.1`. |
+| `verify` | على Node.js 20 و22 و24، فحوص التكامل المستمر (CI) عدا قياس التغطية وبناء التوثيق: `npm ci`، والتدقيق (lint)، وفحص التنسيق، والبناء، وفحص أنواع الاختبارات، والاختبارات، وفحص الترجمات. |
+| `pack` | تثبّت الاعتماديات دون سكربتات التثبيت الخاصة بها، وتبني `dist/` من الصفر وتحزم الحزمة. وترفض أرشيفًا يحتوي على غير `dist/` و`package.json` و`README.md` و`LICENSE` و`CHANGELOG.md`، أو على ملف اختبار، ثم تحفظه ناتجًا (artifact) للتشغيل. |
+| `publish` | المهمة الوحيدة القادرة على المصادقة لدى npm: لا تجلب الشيفرة ولا تثبّت شيئًا ولا تشغّل أي سكربت. تتحقّق من أن نسخة npm هي 11.5.1 أو أحدث، ثم تنشر أرشيف `pack` بالأمر `npm publish --provenance --access public --ignore-scripts`. |
 
-لا يُنشر شيء إذا فشلت أي مهمة. يبدأ سير العمل عند دفع وسم لا عند إصدار (release) على GitHub، لأن `npm version` و`git tag` ينتجان الوسم أصلًا: تكفي دفعة واحدة من الطرفية، ويمكن كتابة إصدار GitHub لاحقًا انطلاقًا من الوسم. أما الوسم المدفوع إلى نسخة متفرعة (fork) فيشغّل الفحوص ولا ينشر شيئًا.
+لا يُنشر شيء إذا فشلت أي مهمة. يبدأ سير العمل عند دفع وسم لا عند إصدار (release) على GitHub، لأن `npm version` و`git tag` ينتجان الوسم أصلًا: تكفي دفعة واحدة من الطرفية، ويمكن كتابة إصدار GitHub لاحقًا انطلاقًا من الوسم. أما الوسم المدفوع إلى نسخة متفرعة (fork) فيشغّل الفحوص ولا ينشر شيئًا. لا يمكن بهذه الطريقة إصدار إصلاح لنسخة ثانوية أقدم يُجرى على فرع آخر (backport): فوسمه ليس على `main`، ولو نُشر بوسم `latest` لحلّ محلّ أحدث نسخة. ويحمي السكربت `prepublishOnly` (`npm run clean && npm run verify`) أي `npm publish` يدوي، ولا يشغّله سير العمل.
 
 ## قبل الإصدار الأول {#before-the-first-release}
 
@@ -30,8 +31,8 @@
 1. **افحص الفرع المراد إصداره.** على `main` محدَّث:
 
    ```sh
-   npm run verify       # lint, format, build, type-check, tests, translations
-   npm pack --dry-run   # the files that would be published
+   npm run clean && npm run verify   # lint, format, build, type-check, tests, translations
+   npm pack --dry-run                # the files that would be published
    ```
 
    لا تحتوي الحزمة إلا على `dist/` (شيفرة JavaScript، وتصريحات الأنواع، وخرائط المصدر (source maps) التي تتضمّن مصادرها)، و`README.md`، و`LICENSE`، و`CHANGELOG.md`، و`package.json`.
@@ -48,6 +49,8 @@
    ### Added
    - …
    ```
+
+   في الإصدار العادي (لا النسخة التمهيدية)، ترفض مهمة `version` الوسم إذا غاب هذا القسم.
 
 4. **غيّر رقم النسخة** دون إنشاء الوسم الآن (يجب أن يشير الوسم إلى الإيداع المدموج):
 
@@ -98,7 +101,7 @@ npm audit signatures
 2. في الإعدادات نفسها، ضمن *Publishing access*، اختر *Require two-factor authentication and disallow tokens*.
 3. احذف السرّ `NPM_TOKEN` في GitHub والرمز على npmjs.com.
 
-لا يتغيّر سير العمل: يجرّب npm 11.5.1 أو أحدث، المرفق مع Node.js 24، النشر الموثوق أولًا، ولا يستخدم `NPM_TOKEN` إلا إذا لم يكن النشر الموثوق مُعدًّا. وقد أعلن npm أن النشر المباشر برمز granular access token سيتوقف عن العمل في يناير 2027، لذا فهذا الانتقال ضروري في كل الأحوال. راجع توثيق npm عن [النشر الموثوق](https://docs.npmjs.com/trusted-publishers) وعن [إثبات المصدر](https://docs.npmjs.com/generating-provenance-statements).
+لا يتغيّر سير العمل: يجرّب npm 11.5.1 أو أحدث، وهو ما تتحقّق منه مهمة `publish`، النشر الموثوق أولًا، ولا يستخدم `NPM_TOKEN` إلا إذا لم يكن النشر الموثوق مُعدًّا. وقد أعلن npm أن النشر المباشر برمز granular access token سيتوقف عن العمل في يناير 2027، لذا فهذا الانتقال ضروري في كل الأحوال. راجع توثيق npm عن [النشر الموثوق](https://docs.npmjs.com/trusted-publishers) وعن [إثبات المصدر](https://docs.npmjs.com/generating-provenance-statements).
 
 ## إذا حدث خطأ {#if-something-goes-wrong}
 

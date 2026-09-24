@@ -10,11 +10,12 @@
 
 | 잡 | 하는 일 |
 | --- | --- |
-| `version` | `v` 뒤에 `package.json`의 버전이 붙은 형태가 아닌 태그를 거부합니다. npm dist-tag를 고릅니다. 보통은 `latest`, `0.4.0-beta.1` 같은 프리릴리스라면 `next`입니다. |
-| `verify` | Node.js 20, 22, 24에서 CI와 같은 검사를 실행합니다. `npm ci`, lint, 포맷 검사, 빌드, 테스트 타입 검사, 테스트, 번역 검사입니다. |
-| `publish` | Node.js 24에서 `npm ci`를 실행한 뒤 `npm publish --provenance --access public`을 실행합니다. 무엇이든 보내기 전에 `prepublishOnly`가 `dist/`를 지우고 다시 빌드한 뒤 검사를 한 번 더 실행합니다(`npm run verify`). |
+| `version` | `v` 뒤에 `package.json`의 버전이 붙은 형태가 아닌 태그, `main`에 없는 커밋에 붙은 태그, 그리고 `CHANGELOG.md`에 `## [x.y.z]` 섹션이 없는 릴리스를 거부합니다. npm dist-tag를 고릅니다. 보통은 `latest`, `0.4.0-beta.1` 같은 프리릴리스라면 `next`입니다. |
+| `verify` | Node.js 20, 22, 24에서 커버리지와 문서 빌드를 제외한 CI 검사를 실행합니다. `npm ci`, lint, 포맷 검사, 빌드, 테스트 타입 검사, 테스트, 번역 검사입니다. |
+| `pack` | 설치 스크립트 없이 의존성을 설치하고, `dist/`를 처음부터 빌드한 뒤 패키지를 만듭니다. `dist/`, `package.json`, `README.md`, `LICENSE`, `CHANGELOG.md` 외의 파일이나 테스트 파일이 든 아카이브는 거부하고, 문제가 없으면 실행의 아티팩트로 보관합니다. |
+| `publish` | npm에 인증할 수 있는 유일한 잡입니다. 코드를 체크아웃하지 않고, 아무것도 설치하지 않으며, 스크립트도 실행하지 않습니다. npm이 11.5.1 이상인지 확인한 뒤 `pack`의 아카이브를 `npm publish --provenance --access public --ignore-scripts`로 게시합니다. |
 
-잡이 하나라도 실패하면 아무것도 게시되지 않습니다. 워크플로가 GitHub 릴리스가 아니라 태그로 시작하는 이유는 `npm version`과 `git tag`가 어차피 태그를 만들기 때문입니다. 터미널에서 푸시 한 번이면 충분하고, GitHub 릴리스는 나중에 태그를 바탕으로 작성할 수 있습니다. 포크에 푸시된 태그는 검사만 실행하고 아무것도 게시하지 않습니다.
+잡이 하나라도 실패하면 아무것도 게시되지 않습니다. 워크플로가 GitHub 릴리스가 아니라 태그로 시작하는 이유는 `npm version`과 `git tag`가 어차피 태그를 만들기 때문입니다. 터미널에서 푸시 한 번이면 충분하고, GitHub 릴리스는 나중에 태그를 바탕으로 작성할 수 있습니다. 포크에 푸시된 태그는 검사만 실행하고 아무것도 게시하지 않습니다. 이전 마이너 버전을 위한 수정(다른 브랜치에서 한 백포트)은 이 방식으로 릴리스할 수 없습니다. 그 태그는 `main`에 있지 않고, `latest`로 게시되면 최신 버전을 대체하게 됩니다. `prepublishOnly` 스크립트(`npm run clean && npm run verify`)는 수동 `npm publish`를 보호하며, 워크플로는 이를 실행하지 않습니다.
 
 ## 첫 릴리스 전에 {#before-the-first-release}
 
@@ -30,8 +31,8 @@
 1. **릴리스할 브랜치를 검사합니다.** 최신 상태의 `main`에서 실행합니다.
 
    ```sh
-   npm run verify       # lint, format, build, type-check, tests, translations
-   npm pack --dry-run   # the files that would be published
+   npm run clean && npm run verify   # lint, format, build, type-check, tests, translations
+   npm pack --dry-run                # the files that would be published
    ```
 
    패키지에는 `dist/`(JavaScript, 타입 선언, 소스를 포함한 source map), `README.md`, `LICENSE`, `CHANGELOG.md`, `package.json`만 들어 있습니다.
@@ -48,6 +49,8 @@
    ### Added
    - …
    ```
+
+   프리릴리스가 아닌 릴리스라면, 이 섹션이 없을 때 `version` 잡이 태그를 거부합니다.
 
 4. **버전을 바꿉니다.** 태그는 아직 만들지 않습니다(태그는 병합된 커밋을 가리켜야 합니다).
 
@@ -98,7 +101,7 @@ npm audit signatures
 2. 같은 설정의 *Publishing access*에서 *Require two-factor authentication and disallow tokens*를 선택하세요.
 3. GitHub의 시크릿 `NPM_TOKEN`과 npmjs.com의 토큰을 삭제하세요.
 
-워크플로는 바뀌지 않습니다. Node.js 24에 포함된 npm 11.5.1 이상은 먼저 신뢰할 수 있는 게시를 시도하고, 그것이 설정되지 않았을 때만 `NPM_TOKEN`을 사용합니다. npm은 granular access token으로 직접 게시하는 방식이 2027년 1월에 더 이상 동작하지 않는다고 발표했으므로, 이 전환은 어차피 필요합니다. npm 문서의 [신뢰할 수 있는 게시](https://docs.npmjs.com/trusted-publishers)와 [출처 증명](https://docs.npmjs.com/generating-provenance-statements)을 참고하세요.
+워크플로는 바뀌지 않습니다. npm 11.5.1 이상(`publish` 잡이 확인합니다)은 먼저 신뢰할 수 있는 게시를 시도하고, 그것이 설정되지 않았을 때만 `NPM_TOKEN`을 사용합니다. npm은 granular access token으로 직접 게시하는 방식이 2027년 1월에 더 이상 동작하지 않는다고 발표했으므로, 이 전환은 어차피 필요합니다. npm 문서의 [신뢰할 수 있는 게시](https://docs.npmjs.com/trusted-publishers)와 [출처 증명](https://docs.npmjs.com/generating-provenance-statements)을 참고하세요.
 
 ## 문제가 생겼을 때 {#if-something-goes-wrong}
 

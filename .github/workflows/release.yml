@@ -1,9 +1,13 @@
 # Publishes @sdk-ai-agents/core to npm when a version tag (v1.2.3, v1.3.0-beta.1) is pushed.
 # How to release: docs/contributing/releasing.md.
 #
-# Authentication: npm trusted publishing (OIDC, nothing to store) once it is configured on
-# npmjs.com for this workflow file; until then, the NPM_TOKEN secret. The npm CLI tries OIDC
-# first and falls back to the token, so the switch needs no change here.
+# The jobs that install dependencies and run code (verify, pack) hold no publishing
+# credential. Only `publish` can get an OIDC token or read NPM_TOKEN, and it installs nothing,
+# runs no script and checks out no code: it publishes the tarball that `pack` built.
+#
+# Authentication: npm trusted publishing (OIDC, nothing stored) once it is set up on npmjs.com
+# for this workflow file; until then, the NPM_TOKEN secret. npm 11.5.1 and later try OIDC
+# first and fall back to the token, so the switch needs no change here.
 name: Release
 
 on:
@@ -21,22 +25,34 @@ concurrency:
 
 jobs:
   version:
-    name: Tag matches package.json
+    name: Tag, version and changelog
     runs-on: ubuntu-latest
     outputs:
+      version: ${{ steps.check.outputs.version }}
       dist-tag: ${{ steps.check.outputs.dist-tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The whole history, to check that the tagged commit is on main.
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24.x
       # The tag name is read from the environment, never pasted into the script.
       - id: check
-        name: Check the tag against package.json
+        name: Check the tag against package.json, main and CHANGELOG.md
         run: |
           version="$(node -p "require('./package.json').version")"
           if [ "$GITHUB_REF_NAME" != "v$version" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match the version in package.json ($version): expected v$version."
+            exit 1
+          fi
+          # Only merged code is published. This also refuses a fix for an older minor version
+          # made on another branch (a backport): published as "latest", it would replace the
+          # newest version for everyone.
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::The commit of $GITHUB_REF_NAME is not on main: tag a commit of main."
             exit 1
           fi
           # npm refuses to publish a pre-release without a dist-tag; it must not become "latest".
@@ -44,7 +60,14 @@ jobs:
             *-*) dist_tag=next ;;
             *) dist_tag=latest ;;
           esac
+          # A release has its own section in the changelog (a pre-release does not need one).
+          if [ "$dist_tag" = latest ] &&
+            ! awk -v heading="## [$version]" 'index($0, heading) == 1 { found = 1 } END { exit !found }' CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no \"## [$version]\" section: move the entries of [Unreleased] under it."
+            exit 1
+          fi
           echo "Publishing $version with the dist-tag $dist_tag."
+          echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "dist-tag=$dist_tag" >> "$GITHUB_OUTPUT"
 
   verify:
@@ -57,6 +80,8 @@ jobs:
         node-version: [20.x, 22.x, 24.x]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -76,9 +101,50 @@ jobs:
       - name: Check translations
         run: npm run docs:check
 
+  pack:
+    name: Build the package
+    needs: [version, verify]
+    runs-on: ubuntu-latest
+    env:
+      TARBALL: sdk-ai-agents-core-${{ needs.version.outputs.version }}.tgz
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # No dependency cache: the published files come from a clean install only.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      # No install scripts: the build only needs TypeScript.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Build
+        run: npm run clean && npm run build
+      - name: Pack
+        run: |
+          mkdir package
+          npm pack --ignore-scripts --pack-destination package
+          sha256sum "package/$TARBALL"
+      - name: Check the package contents
+        run: |
+          # Only dist/, package.json and the three documents, and no test file.
+          files="$(tar -tzf "package/$TARBALL")"
+          unexpected="$(printf '%s\n' "$files" | grep -v -E '^package/(dist/.+|package\.json|README\.md|LICENSE|CHANGELOG\.md)$' || true)"
+          tests="$(printf '%s\n' "$files" | grep -E '/__tests__/|\.(test|spec)\.' || true)"
+          if [ -n "$unexpected$tests" ]; then
+            echo "::error::Unexpected files in $TARBALL: $unexpected $tests"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: package/${{ env.TARBALL }}
+          if-no-files-found: error
+          retention-days: 7
+
   publish:
     name: Publish to npm
-    needs: [version, verify]
+    needs: [version, verify, pack]
     # A tag pushed to a fork runs the checks but publishes nothing.
     if: github.repository == 'nicolashedoire/sdk-ai-agents'
     runs-on: ubuntu-latest
@@ -86,19 +152,35 @@ jobs:
       contents: read
       # OIDC token: signs the provenance statement, and authenticates with trusted publishing.
       id-token: write
+    env:
+      TARBALL: sdk-ai-agents-core-${{ needs.version.outputs.version }}.tgz
     steps:
-      - uses: actions/checkout@v4
-      # Node.js 24 ships npm 11.5.1 or later, which trusted publishing needs. No dependency
-      # cache here: what gets published is built from a clean install only.
       - uses: actions/setup-node@v4
         with:
           node-version: 24.x
           registry-url: 'https://registry.npmjs.org'
-      - name: Install dependencies
-        run: npm ci
-      # prepublishOnly rebuilds dist/ from scratch and runs the checks again on this runner.
+      - name: Check the npm version
+        # Trusted publishing needs npm 11.5.1 or later; older releases of Node.js 24 ship an
+        # older npm. Checked here rather than installing one: this job downloads no code.
+        run: |
+          node -e '
+            const version = process.argv[1];
+            const [major, minor, patch] = version.split(".").map((part) => Number.parseInt(part, 10));
+            const recent = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
+            if (!recent) {
+              console.error("::error::npm " + version + " is older than 11.5.1, which trusted publishing needs.");
+              process.exit(1);
+            }
+            console.log("npm " + version);
+          ' "$(npm --version)"
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: package
       - name: Publish
-        run: npm publish --provenance --access public --tag "$DIST_TAG"
+        run: |
+          sha256sum "package/$TARBALL"
+          npm publish "./package/$TARBALL" --provenance --access public --tag "$DIST_TAG" --ignore-scripts
         env:
           DIST_TAG: ${{ needs.version.outputs.dist-tag }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

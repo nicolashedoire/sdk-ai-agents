@@ -10,11 +10,12 @@
 
 | ジョブ | すること |
 | --- | --- |
-| `version` | `v` に続けて `package.json` のバージョンを書いたものでないタグを拒否します。npm の dist-tag を選びます。通常は `latest`、`0.4.0-beta.1` のようなプレリリースなら `next` です。 |
-| `verify` | Node.js 20、22、24 で CI と同じチェックを実行します。`npm ci`、lint、フォーマットのチェック、ビルド、テストの型チェック、テスト、翻訳のチェックです。 |
-| `publish` | Node.js 24 で `npm ci` を実行し、続けて `npm publish --provenance --access public` を実行します。何かを送信する前に、`prepublishOnly` が `dist/` を削除して作り直し、チェックをもう一度実行します（`npm run verify`）。 |
+| `version` | `v` に続けて `package.json` のバージョンを書いたものでないタグ、`main` にないコミットに付いたタグ、そして `CHANGELOG.md` に `## [x.y.z]` セクションがないリリースを拒否します。npm の dist-tag を選びます。通常は `latest`、`0.4.0-beta.1` のようなプレリリースなら `next` です。 |
+| `verify` | Node.js 20、22、24 で、カバレッジとドキュメントのビルドを除く CI のチェックを実行します。`npm ci`、lint、フォーマットのチェック、ビルド、テストの型チェック、テスト、翻訳のチェックです。 |
+| `pack` | 依存関係をインストールスクリプトなしでインストールし、`dist/` を一から作り直してパッケージを作ります。`dist/`、`package.json`、`README.md`、`LICENSE`、`CHANGELOG.md` 以外のファイルやテストファイルを含むアーカイブは拒否し、問題がなければ実行のアーティファクトとして保存します。 |
+| `publish` | npm で認証できる唯一のジョブです。コードのチェックアウトもインストールもせず、スクリプトも実行しません。npm が 11.5.1 以降であることを確認してから、`pack` のアーカイブを `npm publish --provenance --access public --ignore-scripts` で公開します。 |
 
-どれか 1 つのジョブが失敗すると、何も公開されません。ワークフローが GitHub のリリースではなくタグで始まるのは、`npm version` と `git tag` がもともとタグを作るからです。ターミナルからのプッシュ 1 回で済み、GitHub のリリースは後からタグをもとに書くこともできます。フォークにプッシュされたタグはチェックを実行するだけで、何も公開しません。
+どれか 1 つのジョブが失敗すると、何も公開されません。ワークフローが GitHub のリリースではなくタグで始まるのは、`npm version` と `git tag` がもともとタグを作るからです。ターミナルからのプッシュ 1 回で済み、GitHub のリリースは後からタグをもとに書くこともできます。フォークにプッシュされたタグはチェックを実行するだけで、何も公開しません。古いマイナーバージョン向けの修正（別のブランチで行うバックポート）は、この方法ではリリースできません。そのタグは `main` 上になく、`latest` として公開すると最新のバージョンを置き換えてしまうからです。`prepublishOnly` スクリプト（`npm run clean && npm run verify`）は手動の `npm publish` を守るためのもので、ワークフローはこれを実行しません。
 
 ## 最初のリリースの前に {#before-the-first-release}
 
@@ -30,8 +31,8 @@
 1. **リリースするブランチをチェックする。** 最新の `main` で次を実行します。
 
    ```sh
-   npm run verify       # lint, format, build, type-check, tests, translations
-   npm pack --dry-run   # the files that would be published
+   npm run clean && npm run verify   # lint, format, build, type-check, tests, translations
+   npm pack --dry-run                # the files that would be published
    ```
 
    パッケージに含まれるのは `dist/`（JavaScript、型宣言、ソースを内包した source map）、`README.md`、`LICENSE`、`CHANGELOG.md`、`package.json` だけです。
@@ -48,6 +49,8 @@
    ### Added
    - …
    ```
+
+   プレリリースでないリリースでは、この見出しがないと `version` ジョブがタグを拒否します。
 
 4. **バージョンを変える。** タグはまだ作りません（タグはマージされたコミットを指す必要があります）。
 
@@ -98,7 +101,7 @@ npm audit signatures
 2. 同じ設定の *Publishing access* で、*Require two-factor authentication and disallow tokens* を選びます。
 3. GitHub のシークレット `NPM_TOKEN` と、npmjs.com のトークンを削除します。
 
-ワークフローは変わりません。Node.js 24 に付属する npm 11.5.1 以降は、まず信頼できる公開を試し、それが設定されていないときだけ `NPM_TOKEN` を使います。npm は、granular access token による直接の公開が 2027 年 1 月に使えなくなると発表しているので、いずれにしてもこの切り替えは必要です。npm のドキュメントの[信頼できる公開](https://docs.npmjs.com/trusted-publishers)と[来歴](https://docs.npmjs.com/generating-provenance-statements)も参照してください。
+ワークフローは変わりません。npm 11.5.1 以降（`publish` ジョブが確認します）は、まず信頼できる公開を試し、それが設定されていないときだけ `NPM_TOKEN` を使います。npm は、granular access token による直接の公開が 2027 年 1 月に使えなくなると発表しているので、いずれにしてもこの切り替えは必要です。npm のドキュメントの[信頼できる公開](https://docs.npmjs.com/trusted-publishers)と[来歴](https://docs.npmjs.com/generating-provenance-statements)も参照してください。
 
 ## うまくいかないとき {#if-something-goes-wrong}
 

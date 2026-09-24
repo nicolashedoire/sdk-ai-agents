@@ -10,11 +10,12 @@
 
 | 作业 | 做什么 |
 | --- | --- |
-| `version` | 拒绝不等于 `v` 加上 `package.json` 中版本号的标签。选择 npm 的 dist-tag：通常是 `latest`，`0.4.0-beta.1` 这样的预发布版本则是 `next`。 |
-| `verify` | 在 Node.js 20、22 和 24 上运行与 CI 相同的检查：`npm ci`、lint、格式检查、构建、测试的类型检查、测试和翻译检查。 |
-| `publish` | 在 Node.js 24 上运行 `npm ci`，然后运行 `npm publish --provenance --access public`。在发送任何内容之前，`prepublishOnly` 会删除 `dist/`、重新构建，并再运行一次检查（`npm run verify`）。 |
+| `version` | 拒绝以下标签：不等于 `v` 加上 `package.json` 中版本号的标签、打在不属于 `main` 的提交上的标签，以及 `CHANGELOG.md` 中缺少 `## [x.y.z]` 一节的正式版本。选择 npm 的 dist-tag：通常是 `latest`，`0.4.0-beta.1` 这样的预发布版本则是 `next`。 |
+| `verify` | 在 Node.js 20、22 和 24 上运行 CI 中除覆盖率和文档构建之外的检查：`npm ci`、lint、格式检查、构建、测试的类型检查、测试和翻译检查。 |
+| `pack` | 安装依赖但不运行它们的安装脚本，从零构建 `dist/` 并打包。如果压缩包里除了 `dist/`、`package.json`、`README.md`、`LICENSE` 和 `CHANGELOG.md` 之外还有别的文件，或含有测试文件，就拒绝它；否则把它保存为本次运行的制品。 |
+| `publish` | 唯一能向 npm 认证的作业：它不检出代码、不安装任何东西，也不运行任何脚本。它先检查 npm 版本不低于 11.5.1，再用 `npm publish --provenance --access public --ignore-scripts` 发布 `pack` 生成的压缩包。 |
 
-只要有一个作业失败，就不会发布任何东西。工作流由标签而不是 GitHub release 触发，因为 `npm version` 和 `git tag` 本来就会产生标签：在终端里推送一次就够了，之后仍然可以基于这个标签撰写 GitHub release。推送到 fork 的标签只会运行检查，不会发布任何东西。
+只要有一个作业失败，就不会发布任何东西。工作流由标签而不是 GitHub release 触发，因为 `npm version` 和 `git tag` 本来就会产生标签：在终端里推送一次就够了，之后仍然可以基于这个标签撰写 GitHub release。推送到 fork 的标签只会运行检查，不会发布任何东西。针对较旧次版本的修复（在其他分支上做的向后移植）不能这样发布：它的标签不在 `main` 上，而且以 `latest` 发布会取代最新版本。`prepublishOnly` 脚本（`npm run clean && npm run verify`）保护手动执行的 `npm publish`；工作流不会运行它。
 
 ## 首次发布之前 {#before-the-first-release}
 
@@ -30,8 +31,8 @@
 1. **检查要发布的分支。** 在已更新到最新的 `main` 上运行：
 
    ```sh
-   npm run verify       # lint, format, build, type-check, tests, translations
-   npm pack --dry-run   # the files that would be published
+   npm run clean && npm run verify   # lint, format, build, type-check, tests, translations
+   npm pack --dry-run                # the files that would be published
    ```
 
    包里只有 `dist/`（JavaScript、类型声明，以及内嵌源码的 source map）、`README.md`、`LICENSE`、`CHANGELOG.md` 和 `package.json`。
@@ -48,6 +49,8 @@
    ### Added
    - …
    ```
+
+   对于正式版本（非预发布版本），缺少这一节时 `version` 作业会拒绝该标签。
 
 4. **修改版本号**，暂时不创建标签（标签必须指向合并后的提交）：
 
@@ -98,7 +101,7 @@ npm audit signatures
 2. 在同一设置页的 *Publishing access* 中，选择 *Require two-factor authentication and disallow tokens*。
 3. 删除 GitHub 中的机密 `NPM_TOKEN` 和 npmjs.com 上的令牌。
 
-工作流本身不需要改动：随 Node.js 24 提供的 npm 11.5.1 或更高版本会先尝试可信发布，只有在未配置时才使用 `NPM_TOKEN`。npm 已宣布，使用 granular access token 直接发布将在 2027 年 1 月停止工作，所以无论如何都需要做这次切换。参见 npm 文档中关于[可信发布](https://docs.npmjs.com/trusted-publishers)和[来源证明](https://docs.npmjs.com/generating-provenance-statements)的说明。
+工作流本身不需要改动：npm 11.5.1 或更高版本（`publish` 作业会检查这一点）会先尝试可信发布，只有在未配置时才使用 `NPM_TOKEN`。npm 已宣布，使用 granular access token 直接发布将在 2027 年 1 月停止工作，所以无论如何都需要做这次切换。参见 npm 文档中关于[可信发布](https://docs.npmjs.com/trusted-publishers)和[来源证明](https://docs.npmjs.com/generating-provenance-statements)的说明。
 
 ## 出问题时 {#if-something-goes-wrong}
 
