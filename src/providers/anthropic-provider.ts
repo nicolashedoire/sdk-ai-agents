@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { LLMProviderError } from '../errors/index.js';
-import type { LLMProvider, LLMRequest, LLMResponse } from './llm-provider.js';
+import type { LLMProvider, LLMRequest, LLMResponse, VendorClientOptions } from './llm-provider.js';
 
 interface AnthropicMessage {
   role: 'user' | 'assistant';
@@ -11,14 +11,10 @@ export class AnthropicProvider implements LLMProvider {
   private client: Anthropic;
   private defaultModel: string;
 
-  /**
-   * @param options.maxRetries Retries performed by the Anthropic client itself. The SDK sets
-   * it to 0 when its own retry policy is active, so retries are not stacked.
-   */
   constructor(
     apiKey: string,
     defaultModel = 'claude-3-5-sonnet-20241022',
-    options: { maxRetries?: number } = {}
+    options: VendorClientOptions = {}
   ) {
     if (!apiKey || apiKey.trim() === '') {
       throw new Error('Anthropic API key is required');
@@ -26,6 +22,7 @@ export class AnthropicProvider implements LLMProvider {
     this.client = new Anthropic({
       apiKey,
       ...(options.maxRetries !== undefined ? { maxRetries: options.maxRetries } : {}),
+      ...(options.baseURL !== undefined ? { baseURL: options.baseURL } : {}),
     });
     this.defaultModel = defaultModel;
   }

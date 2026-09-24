@@ -29,13 +29,15 @@ export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}):
   const build = (
     provider: 'openai' | 'anthropic',
     apiKey: string | undefined,
-    defaultModel?: string
+    defaultModel?: string,
+    baseURL?: string
   ) => {
     const vendor = ProviderFactory.createProvider({
       provider,
       apiKey: apiKey || '',
       defaultModel: defaultModel || DEFAULT_MODELS[provider],
       ...(retryPolicy ? { clientMaxRetries: 0 } : {}),
+      ...(baseURL ? { baseURL } : {}),
     });
     return retryPolicy ? new RetryingLLMProvider(vendor, retryPolicy, setup.onRetry) : vendor;
   };
@@ -47,7 +49,12 @@ export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}):
     // No model at all: tool-only uses (MCP servers, governed tool calls) still work.
     return new UnconfiguredLLMProvider();
   }
-  const primary = build(primaryName, primaryKey, primaryConfig?.defaultModel);
+  const primary = build(
+    primaryName,
+    primaryKey,
+    primaryConfig?.defaultModel,
+    primaryConfig?.baseURL
+  );
 
   if (!config.fallbackProviders || config.fallbackProviders.length === 0) {
     return primary;
@@ -56,7 +63,8 @@ export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}):
     build(
       fallback.provider,
       fallback.config?.apiKey || config.apiKey,
-      fallback.config?.defaultModel
+      fallback.config?.defaultModel,
+      fallback.config?.baseURL
     )
   );
   return new FallbackProvider(primary, fallbacks);

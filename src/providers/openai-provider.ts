@@ -1,22 +1,19 @@
 import OpenAI from 'openai';
 import { LLMProviderError } from '../errors/index.js';
-import type { LLMProvider, LLMRequest, LLMResponse } from './llm-provider.js';
+import type { LLMProvider, LLMRequest, LLMResponse, VendorClientOptions } from './llm-provider.js';
 
 export class OpenAIProvider implements LLMProvider {
   private client: OpenAI;
   private defaultModel: string;
 
-  /**
-   * @param options.maxRetries Retries performed by the OpenAI client itself. The SDK sets it
-   * to 0 when its own retry policy is active, so retries are not stacked.
-   */
-  constructor(apiKey: string, defaultModel = 'gpt-4', options: { maxRetries?: number } = {}) {
+  constructor(apiKey: string, defaultModel = 'gpt-4', options: VendorClientOptions = {}) {
     if (!apiKey || apiKey.trim() === '') {
       throw new Error('OpenAI API key is required');
     }
     this.client = new OpenAI({
       apiKey,
       ...(options.maxRetries !== undefined ? { maxRetries: options.maxRetries } : {}),
+      ...(options.baseURL !== undefined ? { baseURL: options.baseURL } : {}),
     });
     this.defaultModel = defaultModel;
   }

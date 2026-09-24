@@ -74,6 +74,20 @@ export interface LLMResponse {
   };
 }
 
+/** Options of the vendor client (OpenAI, Anthropic) behind a built-in provider. */
+export interface VendorClientOptions {
+  /**
+   * Retries performed by the vendor client itself. The SDK sets it to 0 when its own retry
+   * policy is active, so retries are not stacked.
+   */
+  maxRetries?: number;
+  /**
+   * Address of the API, for a compatible endpoint (Azure OpenAI, a local model server, a
+   * gateway) or a proxy. The vendor's own address when omitted.
+   */
+  baseURL?: string;
+}
+
 /**
  * Common interface for every LLM provider
  *
