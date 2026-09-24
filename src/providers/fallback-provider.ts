@@ -123,6 +123,11 @@ export class FallbackProvider implements LLMProvider {
     return this.providers.some((provider) => provider.supportsModel(model));
   }
 
+  /** Native tool messages only if every provider of the chain takes them. */
+  get nativeToolMessages(): boolean {
+    return this.providers.every((provider) => provider.nativeToolMessages === true);
+  }
+
   getProviderName(): string {
     // Return primary provider name with fallback indicator
     const primaryName = this.providers[0].getProviderName();

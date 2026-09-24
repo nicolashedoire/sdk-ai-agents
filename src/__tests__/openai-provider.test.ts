@@ -130,6 +130,8 @@ describe('OpenAIProvider', () => {
 
       expect(result.content).toBeNull();
       expect(result.toolCalls).toHaveLength(1);
+      // The id the tool's result will refer to.
+      expect(result.toolCalls?.[0]?.id).toBe('call_1');
       expect(result.toolCalls?.[0]?.function.name).toBe('calculator');
       expect(JSON.parse(result.toolCalls?.[0]?.function.arguments ?? '')).toEqual({
         operation: 'add',

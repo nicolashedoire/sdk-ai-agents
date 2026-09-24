@@ -147,6 +147,96 @@ describe('AnthropicProvider', () => {
     });
   });
 
+  describe('tool turns in the Anthropic format', () => {
+    it('rebuilds a tool call it did not produce as a tool_use block', async () => {
+      // After a failover, the call may come from another vendor: there is no raw turn to echo.
+      server.reply(anthropicMessage({ text: ['It is 5.'] }));
+
+      await provider.generateCompletion({
+        model: REQUESTED_MODEL,
+        messages: [
+          { role: 'user', content: 'What is 2 + 3?' },
+          {
+            role: 'assistant',
+            content: 'Let me add.',
+            toolCalls: [{ id: 'call_9', function: { name: 'add', arguments: '{"a":2,"b":3}' } }],
+          },
+          { role: 'tool', toolCallId: 'call_9', toolName: 'add', content: '{"sum":5}' },
+        ],
+      });
+
+      expect(server.jsonBody(0)).toMatchObject({
+        messages: [
+          { role: 'user', content: 'What is 2 + 3?' },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'text', text: 'Let me add.' },
+              { type: 'tool_use', id: 'call_9', name: 'add', input: { a: 2, b: 3 } },
+            ],
+          },
+          {
+            role: 'user',
+            content: [{ type: 'tool_result', tool_use_id: 'call_9', content: '{"sum":5}' }],
+          },
+        ],
+      });
+    });
+
+    it('puts the results of one turn in a single user message', async () => {
+      server.reply(anthropicMessage({ text: ['Done'] }));
+
+      await provider.generateCompletion({
+        model: REQUESTED_MODEL,
+        messages: [
+          { role: 'user', content: 'Two lookups' },
+          {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              { id: 't1', function: { name: 'lookup', arguments: '{"key":"a"}' } },
+              { id: 't2', function: { name: 'lookup', arguments: '{"key":"b"}' } },
+            ],
+          },
+          { role: 'tool', toolCallId: 't1', toolName: 'lookup', content: '"A"' },
+          { role: 'tool', toolCallId: 't2', toolName: 'lookup', content: '"B"' },
+        ],
+      });
+
+      const { messages } = server.jsonBody(0) as { messages: Array<{ role: string }> };
+      expect(messages.map((message) => message.role)).toEqual(['user', 'assistant', 'user']);
+      expect(messages[2]).toEqual({
+        role: 'user',
+        content: [
+          { type: 'tool_result', tool_use_id: 't1', content: '"A"' },
+          { type: 'tool_result', tool_use_id: 't2', content: '"B"' },
+        ],
+      });
+    });
+
+    it('returns the call ids, and the raw turn only when the model called a tool', async () => {
+      server.reply(
+        anthropicMessage({ toolUses: [{ name: 'add', input: { a: 1, b: 1 } }] }),
+        anthropicMessage({ text: ['Two'] })
+      );
+      const ask = () =>
+        provider.generateCompletion({
+          model: REQUESTED_MODEL,
+          messages: [{ role: 'user', content: '1 + 1?' }],
+        });
+
+      const call = await ask();
+      const answer = await ask();
+
+      expect(call.toolCalls?.[0]?.id).toBe('toolu_1');
+      expect(call.vendorContent).toEqual({
+        provider: 'anthropic',
+        content: [{ type: 'tool_use', id: 'toolu_1', name: 'add', input: { a: 1, b: 1 } }],
+      });
+      expect(answer.vendorContent).toBeUndefined();
+    });
+  });
+
   describe('parameters that depend on the model', () => {
     const ask = (model: string, extra: { temperature?: number; maxTokens?: number } = {}) =>
       provider.generateCompletion({ model, messages: [{ role: 'user', content: 'Hi' }], ...extra });

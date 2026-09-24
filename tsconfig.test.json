@@ -52,6 +52,7 @@
     "src/__tests__/regression-test-runner.test.ts",
     "src/__tests__/no-mocks.test.ts",
     "src/__tests__/run-budget-policies.test.ts",
+    "src/__tests__/native-tool-messages.test.ts",
     "examples/cognitive-agent.ts",
     "examples/mcp-server.ts",
     "examples/mcp-openapi.ts",

@@ -1,16 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { LLMProviderError } from '../errors/index.js';
-import type { LLMProvider, LLMRequest, LLMResponse, VendorClientOptions } from './llm-provider.js';
-
-interface AnthropicMessage {
-  role: 'user' | 'assistant';
-  content: string | Anthropic.MessageParam['content'];
-}
+import type {
+  LLMMessage,
+  LLMProvider,
+  LLMRequest,
+  LLMResponse,
+  LLMToolCall,
+  VendorClientOptions,
+} from './llm-provider.js';
 
 /** Model used when neither the request nor the configuration names one. */
 export const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-5';
 
 export class AnthropicProvider implements LLMProvider {
+  readonly nativeToolMessages = true;
   private client: Anthropic;
   private defaultModel: string;
 
@@ -56,7 +59,9 @@ export class AnthropicProvider implements LLMProvider {
 
       if (tools && tools.length > 0) {
         params.tools = tools;
-        params.tool_choice = { type: 'auto' };
+        // The SDK runs one tool per step, and every tool_use of a turn needs its tool_result:
+        // the model is asked for at most one call per turn.
+        params.tool_choice = { type: 'auto', disable_parallel_tool_use: true };
       }
 
       // The signal cancels the HTTP request itself: the answer is not waited for.
@@ -85,26 +90,49 @@ export class AnthropicProvider implements LLMProvider {
     return 'anthropic';
   }
 
-  private convertMessages(messages: LLMRequest['messages']): {
+  /**
+   * Messages in the Anthropic format: the system prompt apart, tool calls as `tool_use` blocks
+   * and their results as `tool_result` blocks of the next user turn. A turn this vendor
+   * returned is sent back exactly as received, with its thinking blocks, as the API requires.
+   */
+  private convertMessages(messages: LLMMessage[]): {
     system?: string;
-    messages: AnthropicMessage[];
+    messages: Anthropic.MessageParam[];
   } {
     const systemParts: string[] = [];
-    const anthropicMessages: AnthropicMessage[] = [];
+    const converted: Anthropic.MessageParam[] = [];
 
-    for (const msg of messages) {
-      if (msg.role === 'system') {
-        systemParts.push(msg.content);
-      } else {
-        anthropicMessages.push({
-          role: msg.role === 'user' ? 'user' : 'assistant',
-          content: msg.content,
-        });
+    for (const message of messages) {
+      switch (message.role) {
+        case 'system':
+          systemParts.push(message.content);
+          break;
+        case 'user':
+          converted.push({ role: 'user', content: message.content });
+          break;
+        case 'assistant':
+          converted.push({ role: 'assistant', content: assistantContent(message) });
+          break;
+        case 'tool': {
+          const result: Anthropic.ToolResultBlockParam = {
+            type: 'tool_result',
+            tool_use_id: message.toolCallId,
+            content: message.content,
+          };
+          // Results of the same turn go together in one user message.
+          const previous = converted.at(-1);
+          if (previous?.role === 'user' && Array.isArray(previous.content)) {
+            previous.content.push(result);
+          } else {
+            converted.push({ role: 'user', content: [result] });
+          }
+          break;
+        }
       }
     }
 
     const system = systemParts.length > 0 ? systemParts.join('\n\n') : undefined;
-    return { system, messages: anthropicMessages };
+    return { system, messages: converted };
   }
 
   private convertTools(tools?: LLMRequest['tools']): Anthropic.Tool[] | undefined {
@@ -124,15 +152,14 @@ export class AnthropicProvider implements LLMProvider {
 
   private convertResponse(response: Anthropic.Message, model: string): LLMResponse {
     const contentParts: string[] = [];
-    const toolCalls: Array<{
-      function: { name: string; arguments: string };
-    }> = [];
+    const toolCalls: LLMToolCall[] = [];
 
     for (const block of response.content) {
       if (block.type === 'text') {
         contentParts.push(block.text);
       } else if (block.type === 'tool_use') {
         toolCalls.push({
+          id: block.id,
           function: {
             name: block.name,
             arguments: JSON.stringify(block.input),
@@ -146,6 +173,10 @@ export class AnthropicProvider implements LLMProvider {
     return {
       content,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+      // Kept for the next turn when the model called a tool: see convertMessages.
+      ...(toolCalls.length > 0
+        ? { vendorContent: { provider: 'anthropic', content: response.content } }
+        : {}),
       model: response.model || model,
       usage: response.usage
         ? {
@@ -199,4 +230,29 @@ function defaultMaxTokens(model: string): number {
   if (!version) return 4_096;
   if (version.family === 'opus' && version.major === 4 && version.minor <= 1) return 8_192;
   return 16_000;
+}
+
+/** An assistant turn: as this vendor returned it when available, else rebuilt from its parts. */
+function assistantContent(
+  message: Extract<LLMMessage, { role: 'assistant' }>
+): Anthropic.MessageParam['content'] {
+  if (message.vendorContent?.provider === 'anthropic') {
+    // Blocks returned by the Messages API are valid input for the same API.
+    return message.vendorContent.content as Anthropic.ContentBlockParam[];
+  }
+  if (!message.toolCalls || message.toolCalls.length === 0) {
+    return message.content;
+  }
+  const blocks: Anthropic.ContentBlockParam[] = message.content
+    ? [{ type: 'text', text: message.content }]
+    : [];
+  for (const [index, call] of message.toolCalls.entries()) {
+    blocks.push({
+      type: 'tool_use',
+      id: call.id ?? `toolu_${index}`,
+      name: call.function.name,
+      input: JSON.parse(call.function.arguments || '{}') as unknown,
+    });
+  }
+  return blocks;
 }

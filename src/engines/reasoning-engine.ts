@@ -1,6 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import { LLMProviderError } from '../errors/index.js';
-import type { LLMProvider, LLMResponse } from '../providers/llm-provider.js';
+import type { LLMMessage, LLMProvider, LLMResponse } from '../providers/llm-provider.js';
 import { FallbackProvider } from '../providers/fallback-provider.js';
 import type { ProviderSettings } from '../types/agent.js';
 import type { IEventStore } from '../stores/event-store.js';
@@ -13,8 +14,10 @@ import { zodSchemaToJsonSchema } from '../utils/zod-to-json-schema.js';
 export interface ReasoningContext {
   runId: string;
   agentId: string;
+  /** The user's message for this step; empty when the step continues after tool results. */
   input: string;
-  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
+  /** Earlier turns, tool calls and their results included (see LLMMessage). */
+  conversationHistory: LLMMessage[];
   availableTools: Tool[];
   systemPrompt?: string;
   model?: string;
@@ -33,6 +36,11 @@ export interface ReasoningStep {
   intention: Intention;
   /** Tokens the call used, when the provider reports them. */
   usage?: LLMResponse['usage'];
+  /**
+   * For a tool call: the model's turn to add to the conversation before the tool's result,
+   * with the call's id (the result refers to it).
+   */
+  assistantTurn?: Extract<LLMMessage, { role: 'assistant' }>;
 }
 
 export class ReasoningEngine {
@@ -164,7 +172,19 @@ export class ReasoningEngine {
         answeredBy
       );
 
-      return { intention: this.parseIntention(response), usage: response.usage };
+      const intention = this.parseIntention(response);
+      const call = response.toolCalls?.[0];
+      const assistantTurn =
+        intention.type === 'tool_call' && call
+          ? {
+              role: 'assistant' as const,
+              content: response.content ?? '',
+              // Only the call the SDK runs: each call of a turn needs its result.
+              toolCalls: [{ ...call, id: call.id ?? `call_${randomUUID().replaceAll('-', '')}` }],
+              ...(response.vendorContent ? { vendorContent: response.vendorContent } : {}),
+            }
+          : undefined;
+      return { intention, usage: response.usage, ...(assistantTurn ? { assistantTurn } : {}) };
     } catch (error) {
       if (abortSignal?.aborted) {
         throw new Error('Run cancelled');
@@ -300,34 +320,19 @@ export class ReasoningEngine {
     };
   }
 
-  private buildMessages(context: ReasoningContext): Array<{
-    role: 'system' | 'user' | 'assistant';
-    content: string;
-  }> {
-    const messages: Array<{
-      role: 'system' | 'user' | 'assistant';
-      content: string;
-    }> = [];
-
+  private buildMessages(context: ReasoningContext): LLMMessage[] {
+    const messages: LLMMessage[] = [];
     if (context.systemPrompt) {
-      messages.push({
-        role: 'system',
-        content: context.systemPrompt,
-      });
+      messages.push({ role: 'system', content: context.systemPrompt });
     }
-
-    for (const entry of context.conversationHistory) {
-      messages.push({
-        role: entry.role,
-        content: entry.content,
-      });
+    messages.push(
+      ...(this.provider.nativeToolMessages === true
+        ? context.conversationHistory
+        : asPlainText(context.conversationHistory))
+    );
+    if (context.input) {
+      messages.push({ role: 'user', content: context.input });
     }
-
-    messages.push({
-      role: 'user',
-      content: context.input,
-    });
-
     return messages;
   }
 
@@ -352,4 +357,27 @@ export class ReasoningEngine {
   private zodSchemaToJsonSchema(schema: unknown): Record<string, unknown> {
     return zodSchemaToJsonSchema(schema as z.ZodSchema);
   }
+}
+
+/**
+ * The conversation as providers without native tool messages have always received it: a tool
+ * call and its result become an assistant line saying the tool ran and a user line with the
+ * result. Assistant turns that only call a tool are described by those lines.
+ */
+function asPlainText(history: LLMMessage[]): LLMMessage[] {
+  return history.flatMap((message): LLMMessage[] => {
+    if (message.role === 'tool') {
+      return [
+        {
+          role: 'assistant',
+          content: `Tool ${message.toolName} executed with result: ${message.content}`,
+        },
+        { role: 'user', content: `Previous tool result: ${message.content}. Continue.` },
+      ];
+    }
+    if (message.role === 'assistant' && message.toolCalls && message.toolCalls.length > 0) {
+      return [];
+    }
+    return [message];
+  });
 }

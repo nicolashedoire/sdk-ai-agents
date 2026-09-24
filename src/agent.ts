@@ -1,6 +1,7 @@
 import type { ActionEngine } from './engines/action-engine.js';
 import type { PolicyEngine } from './engines/policy-engine.js';
 import type { ReasoningEngine, ReasoningStep } from './engines/reasoning-engine.js';
+import type { LLMMessage } from './providers/llm-provider.js';
 import type { IEventStore } from './stores/event-store.js';
 import type { Event } from './types/events.js';
 import type { Agent, ProviderSettings } from './types/agent.js';
@@ -11,7 +12,8 @@ import { DEFAULT_MAX_STEPS, DEFAULT_TIMEOUT_MS } from './utils/constants.js';
 import { generateEventId, generateRunId } from './utils/id.js';
 
 interface RunState {
-  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
+  conversationHistory: LLMMessage[];
+  /** The user's message still to send; empty once it is in the history. */
   currentInput: string;
   step: number;
   /** Tokens the run's model calls used so far. */
@@ -124,7 +126,7 @@ export class AgentImpl {
       this.checkTimeout(state);
 
       try {
-        const { intention, usage } = await this.generateStep(runId, state);
+        const { intention, usage, assistantTurn } = await this.generateStep(runId, state);
         await this.recordTokens(state, usage);
 
         this.checkCancellation(runId, state);
@@ -134,7 +136,7 @@ export class AgentImpl {
         }
 
         if (intention.type === 'tool_call') {
-          await this.handleToolCall(runId, state, intention);
+          await this.handleToolCall(runId, state, intention, assistantTurn);
           this.checkCancellation(runId, state);
         }
 
@@ -236,7 +238,8 @@ export class AgentImpl {
   private async handleToolCall(
     runId: string,
     state: RunState,
-    intention: Intention
+    intention: Intention,
+    assistantTurn: ReasoningStep['assistantTurn']
   ): Promise<void> {
     if (state.abortController?.signal.aborted) {
       throw new Error('Run cancelled');
@@ -252,17 +255,32 @@ export class AgentImpl {
       allowedTools: this.agent.tools.map((tool) => tool.name),
     });
 
+    // The turn so far: the user's message, the model's call, then the tool's result, which
+    // refers to the call by its id. The next step continues from there, with no new input.
+    const toolName = intention.toolName ?? '';
+    const call = assistantTurn?.toolCalls?.[0];
+    if (state.currentInput) {
+      state.conversationHistory.push({ role: 'user', content: state.currentInput });
+    }
+    state.conversationHistory.push(
+      assistantTurn ?? {
+        role: 'assistant',
+        content: '',
+        toolCalls: [
+          {
+            id: `call_${state.step}`,
+            function: { name: toolName, arguments: JSON.stringify(intention.parameters ?? {}) },
+          },
+        ],
+      }
+    );
     state.conversationHistory.push({
-      role: 'user',
-      content: state.currentInput,
+      role: 'tool',
+      toolCallId: call?.id ?? `call_${state.step}`,
+      toolName,
+      content: JSON.stringify(result.result) ?? 'null',
     });
-
-    state.conversationHistory.push({
-      role: 'assistant',
-      content: `Tool ${intention.toolName} executed with result: ${JSON.stringify(result.result)}`,
-    });
-
-    state.currentInput = `Previous tool result: ${JSON.stringify(result.result)}. Continue.`;
+    state.currentInput = '';
   }
 
   private async completeRun(runId: string, output: string | undefined): Promise<RunResult> {
