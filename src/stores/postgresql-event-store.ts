@@ -63,7 +63,7 @@ export class PostgreSQLEventStore extends SQLEventStore {
   /**
    * Override schema initialization for PostgreSQL-specific syntax.
    */
-  protected async initializeSchema(): Promise<void> {
+  protected async initializeSchema(connection: SQLConnection): Promise<void> {
     const createTableSQL = `
       CREATE TABLE IF NOT EXISTS ${this.tableName} (
         id VARCHAR(255) PRIMARY KEY,
@@ -78,18 +78,18 @@ export class PostgreSQLEventStore extends SQLEventStore {
 
     // Create indexes for common queries
     const createIndexesSQL = [
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_run_id ON ${this.tableName}(run_id)`,
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_type ON ${this.tableName}(type)`,
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_timestamp ON ${this.tableName}(timestamp)`,
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_run_timestamp ON ${this.tableName}(run_id, timestamp)`,
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_type_timestamp ON ${this.tableName}(type, timestamp)`,
+      `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_run_id ON ${this.tableName}(run_id)`,
+      `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_type ON ${this.tableName}(type)`,
+      `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_timestamp ON ${this.tableName}(timestamp)`,
+      `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_run_timestamp ON ${this.tableName}(run_id, timestamp)`,
+      `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_type_timestamp ON ${this.tableName}(type, timestamp)`,
       // GIN indexes for JSONB queries (PostgreSQL-specific)
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_metadata_gin ON ${this.tableName} USING GIN (metadata)`,
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_data_gin ON ${this.tableName} USING GIN (data)`,
+      `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_metadata_gin ON ${this.tableName} USING GIN (metadata)`,
+      `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_data_gin ON ${this.tableName} USING GIN (data)`,
       // Indexes on specific JSONB fields for common queries
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_metadata_agent_id ON ${this.tableName} ((metadata->>'agentId')) WHERE metadata->>'agentId' IS NOT NULL`,
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_metadata_user_id ON ${this.tableName} ((metadata->>'userId')) WHERE metadata->>'userId' IS NOT NULL`,
-      `CREATE INDEX IF NOT EXISTS idx_${this.tableName}_metadata_session_id ON ${this.tableName} ((metadata->>'sessionId')) WHERE metadata->>'sessionId' IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_metadata_agent_id ON ${this.tableName} ((metadata->>'agentId')) WHERE metadata->>'agentId' IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_metadata_user_id ON ${this.tableName} ((metadata->>'userId')) WHERE metadata->>'userId' IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_metadata_session_id ON ${this.tableName} ((metadata->>'sessionId')) WHERE metadata->>'sessionId' IS NOT NULL`,
     ];
 
     // Create runs table if it doesn't exist (for foreign key reference)
@@ -101,11 +101,11 @@ export class PostgreSQLEventStore extends SQLEventStore {
       )
     `;
 
-    await this.connection.execute(createRunsTableSQL);
-    await this.connection.execute(createTableSQL);
+    await connection.execute(createRunsTableSQL);
+    await connection.execute(createTableSQL);
 
     for (const indexSQL of createIndexesSQL) {
-      await this.connection.execute(indexSQL);
+      await connection.execute(indexSQL);
     }
   }
 
