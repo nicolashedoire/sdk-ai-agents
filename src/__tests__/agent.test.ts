@@ -94,6 +94,19 @@ describe('AgentImpl', () => {
       expect(provider.requests[0]?.messages).toEqual([{ role: 'user', content: '' }]);
     });
 
+    it('should keep an empty first message ahead of a tool call', async () => {
+      const provider = new ScriptedLLMProvider().enqueue(
+        CHANNEL,
+        { toolCall: { name: 'test-tool', arguments: { value: 'x' } } },
+        { content: 'Done' }
+      );
+
+      await agentWith(provider).run({ message: '' });
+
+      // The conversation still opens with the user's (empty) message.
+      expect(provider.requests[1]?.messages[0]).toEqual({ role: 'user', content: '' });
+    });
+
     it('should respect maxSteps', async () => {
       agentData.config.maxSteps = 2;
       // An empty answer is a `continue` intention: the agent asks the model again.

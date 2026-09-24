@@ -260,7 +260,8 @@ export class AgentImpl {
 
     // The turn so far: the user's message, the model's call, then the tool's result, which
     // refers to the call by its id. The next step continues from there, with no new input.
-    if (state.currentInput) {
+    // The user's message opens the conversation, even when empty (it must come first).
+    if (state.currentInput || state.conversationHistory.length === 0) {
       state.conversationHistory.push({ role: 'user', content: state.currentInput });
     }
     state.conversationHistory.push(toolCall.turn, {
