@@ -114,7 +114,8 @@ describe('SDK with Anthropic Provider', () => {
       expect(request?.headers['anthropic-version']).toBeDefined();
       expect(server.jsonBody(0)).toMatchObject({
         model: 'claude-opus-4-1-20250805',
-        max_tokens: 4096,
+        // Opus 4.1 thinks within max_tokens; its vendor client caps non-streaming calls at 8 192.
+        max_tokens: 8192,
         temperature: 0.7,
         // Anthropic takes the system prompt apart from the conversation.
         system: 'You are a calculator assistant',

@@ -7,13 +7,16 @@ interface AnthropicMessage {
   content: string | Anthropic.MessageParam['content'];
 }
 
+/** Model used when neither the request nor the configuration names one. */
+export const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-5';
+
 export class AnthropicProvider implements LLMProvider {
   private client: Anthropic;
   private defaultModel: string;
 
   constructor(
     apiKey: string,
-    defaultModel = 'claude-3-5-sonnet-20241022',
+    defaultModel = DEFAULT_ANTHROPIC_MODEL,
     options: VendorClientOptions = {}
   ) {
     if (!apiKey || apiKey.trim() === '') {
@@ -42,10 +45,13 @@ export class AnthropicProvider implements LLMProvider {
 
       const params: Anthropic.MessageCreateParams = {
         model,
-        max_tokens: request.maxTokens || 4096,
+        max_tokens: request.maxTokens || defaultMaxTokens(model),
         system,
         messages,
-        temperature: request.temperature,
+        // Recent models refuse sampling parameters with a 400: temperature is not sent to them.
+        ...(request.temperature !== undefined && acceptsSampling(model)
+          ? { temperature: request.temperature }
+          : {}),
       };
 
       if (tools && tools.length > 0) {
@@ -159,4 +165,38 @@ export class AnthropicProvider implements LLMProvider {
     }
     return new LLMProviderError('anthropic', new Error(String(error)), true);
   }
+}
+
+/** A model named `claude-<family>-<major>[-<minor>]`, the naming of Claude 4 and later. */
+function modelVersion(model: string): { family: string; major: number; minor: number } | undefined {
+  const match = /^claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d{1,2}))?(?:-|$)/.exec(model);
+  if (!match?.[1] || !match[2]) return undefined;
+  return { family: match[1], major: Number(match[2]), minor: Number(match[3] ?? 0) };
+}
+
+/**
+ * Whether the model takes `temperature`. Claude Opus 4.7 and later, Sonnet 5 and later, and the
+ * Fable and Mythos models reject sampling parameters with a 400; older models accept them.
+ */
+export function acceptsSampling(model: string): boolean {
+  const version = modelVersion(model);
+  if (!version) return true;
+  const { family, major, minor } = version;
+  if (family === 'fable' || family === 'mythos') return false;
+  if (family === 'opus') return major < 4 || (major === 4 && minor < 7);
+  return major < 5;
+}
+
+/**
+ * Output budget when the request sets none. Claude 4 and later think before answering, and
+ * their thinking counts in `max_tokens`: 4 096 would cut answers short, so they get 16 000
+ * (the vendor client refuses a non-streaming call above about 21 000). Opus 4 and 4.1 are
+ * capped at 8 192 without streaming by that client, and Claude 3 models accept at most 4 096
+ * to 8 192 output tokens, so they keep lower budgets.
+ */
+function defaultMaxTokens(model: string): number {
+  const version = modelVersion(model);
+  if (!version) return 4_096;
+  if (version.family === 'opus' && version.major === 4 && version.minor <= 1) return 8_192;
+  return 16_000;
 }

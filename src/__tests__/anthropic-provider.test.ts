@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LLMProviderError } from '../errors/index.js';
-import { AnthropicProvider } from '../providers/anthropic-provider.js';
+import {
+  AnthropicProvider,
+  DEFAULT_ANTHROPIC_MODEL,
+  acceptsSampling,
+} from '../providers/anthropic-provider.js';
 import { isTransientError } from '../resilience/retry.js';
 import { LocalHttpServer } from './support/local-http-server.js';
 import { anthropicError, anthropicMessage } from './support/vendor-api.js';
 
-const BUILT_IN_DEFAULT_MODEL = 'claude-3-5-sonnet-20241022';
+const BUILT_IN_DEFAULT_MODEL = 'claude-opus-5';
 const REQUESTED_MODEL = 'claude-3-5-haiku-20241022';
 
 /** Settles with the LLMProviderError a call fails with, and fails the test otherwise. */
@@ -104,6 +108,7 @@ describe('AnthropicProvider', () => {
         messages: [{ role: 'user', content: 'Hello' }],
       });
 
+      expect(DEFAULT_ANTHROPIC_MODEL).toBe(BUILT_IN_DEFAULT_MODEL);
       expect(server.jsonBody(0)).toMatchObject({ model: BUILT_IN_DEFAULT_MODEL });
     });
 
@@ -139,6 +144,68 @@ describe('AnthropicProvider', () => {
   describe('getProviderName', () => {
     it('should return "anthropic"', () => {
       expect(provider.getProviderName()).toBe('anthropic');
+    });
+  });
+
+  describe('parameters that depend on the model', () => {
+    const ask = (model: string, extra: { temperature?: number; maxTokens?: number } = {}) =>
+      provider.generateCompletion({ model, messages: [{ role: 'user', content: 'Hi' }], ...extra });
+
+    it('should not send a temperature to models that refuse sampling parameters', async () => {
+      server.reply(anthropicMessage({ text: ['OK'] }));
+
+      await ask('claude-opus-5', { temperature: 0.7 });
+
+      // Opus 5 answers a 400 to a request carrying `temperature`.
+      expect(server.jsonBody(0)).not.toHaveProperty('temperature');
+    });
+
+    it('should still send a temperature to models that take it', async () => {
+      server.reply(anthropicMessage({ text: ['OK'] }));
+
+      await ask('claude-sonnet-4-6', { temperature: 0.7 });
+
+      expect(server.jsonBody(0)).toMatchObject({ temperature: 0.7 });
+    });
+
+    it('should know which models take sampling parameters', () => {
+      const takes = [
+        'claude-3-5-sonnet-20241022',
+        'claude-opus-4-20250514',
+        'claude-opus-4-1-20250805',
+        'claude-opus-4-6',
+        'claude-sonnet-4-5-20250929',
+        'claude-sonnet-4-6',
+        'claude-haiku-4-5',
+      ];
+      const refuses = [
+        'claude-opus-4-7',
+        'claude-opus-4-8',
+        'claude-opus-5',
+        'claude-opus-5-5',
+        'claude-sonnet-5',
+        'claude-fable-5-1',
+        'claude-mythos-5-1',
+      ];
+      expect(takes.filter((model) => !acceptsSampling(model))).toEqual([]);
+      expect(refuses.filter((model) => acceptsSampling(model))).toEqual([]);
+    });
+
+    it('should give recent models room to think when no max_tokens is set', async () => {
+      server.reply(
+        anthropicMessage({ text: ['OK'] }),
+        anthropicMessage({ text: ['OK'] }),
+        anthropicMessage({ text: ['OK'] })
+      );
+
+      await ask('claude-opus-5');
+      await ask('claude-opus-4-1-20250805');
+      await ask('claude-3-5-haiku-20241022');
+
+      expect(server.jsonBody(0)).toMatchObject({ max_tokens: 16000 });
+      // The vendor client refuses more than 8 192 without streaming for Opus 4 and 4.1.
+      expect(server.jsonBody(1)).toMatchObject({ max_tokens: 8192 });
+      expect(server.jsonBody(2)).toMatchObject({ max_tokens: 4096 });
     });
   });
 

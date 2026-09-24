@@ -2,12 +2,13 @@ import { ValidationError } from '../errors/index.js';
 import type { RetryPolicy } from '../resilience/retry.js';
 import { RetryingLLMProvider, type ProviderRetryInfo } from '../resilience/retrying-provider.js';
 import type { SDKConfig } from '../types/sdk.js';
+import { DEFAULT_ANTHROPIC_MODEL } from './anthropic-provider.js';
 import { FallbackProvider } from './fallback-provider.js';
 import type { LLMProvider } from './llm-provider.js';
 import { ProviderFactory } from './provider-factory.js';
 import { UnconfiguredLLMProvider } from './unconfigured-provider.js';
 
-const DEFAULT_MODELS = { openai: 'gpt-4', anthropic: 'claude-3-5-sonnet-20241022' } as const;
+const DEFAULT_MODELS = { openai: 'gpt-4', anthropic: DEFAULT_ANTHROPIC_MODEL } as const;
 
 export interface ProviderSetup {
   /** When set, each vendor provider retries with this policy and its own client retries are disabled. */

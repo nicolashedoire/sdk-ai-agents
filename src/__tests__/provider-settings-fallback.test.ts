@@ -30,7 +30,15 @@ describe('Provider Settings with FallbackProvider', () => {
       provider: 'openai',
       providerConfig: { openai: { baseURL: `${openaiAddress}/v1` } },
       fallbackProviders: [
-        { provider: 'anthropic', config: { apiKey: 'anthropic-key', baseURL: anthropicAddress } },
+        {
+          provider: 'anthropic',
+          // A model that takes a temperature, so every setting can be checked on the request.
+          config: {
+            apiKey: 'anthropic-key',
+            baseURL: anthropicAddress,
+            defaultModel: 'claude-sonnet-4-6',
+          },
+        },
       ],
       // One attempt per provider: the primary fails over at once, without backoff delays.
       retry: { maxRetries: 0 },
@@ -75,14 +83,14 @@ describe('Provider Settings with FallbackProvider', () => {
     expect(result).toMatchObject({ status: 'completed', output: 'Hello from Anthropic' });
     await expectFailoverToAnthropic(result.runId);
     // Each vendor receives its own settings and a model it serves: OpenAI (gpt-4, 0.5, 1000),
-    // then Anthropic (its default Claude model, 0.8, 2000).
+    // then Anthropic (its configured Claude model, 0.8, 2000).
     expect(openai.jsonBody(0)).toMatchObject({
       model: 'gpt-4',
       temperature: 0.5,
       max_tokens: 1000,
     });
     expect(anthropic.jsonBody(0)).toMatchObject({
-      model: expect.stringMatching(/^claude-/),
+      model: 'claude-sonnet-4-6',
       temperature: 0.8,
       max_tokens: 2000,
     });

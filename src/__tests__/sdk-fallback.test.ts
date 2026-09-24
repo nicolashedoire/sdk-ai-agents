@@ -105,10 +105,11 @@ describe('SDK with Fallback Providers', () => {
       expect(anthropic.requests).toHaveLength(1);
       expect(anthropic.requests[0]?.url).toBe('/v1/messages');
       expect(anthropic.requests[0]?.headers['x-api-key']).toBe('test-anthropic-key');
-      // The conversation is translated to the Anthropic format.
+      // The conversation is translated to the Anthropic format, for the default Claude model.
       expect(anthropic.jsonBody(0)).toMatchObject({
+        model: 'claude-opus-5',
         messages: [{ role: 'user', content: 'Hello' }],
-        max_tokens: 4096,
+        max_tokens: 16000,
       });
     });
 
