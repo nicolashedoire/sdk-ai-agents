@@ -232,7 +232,7 @@ const agent = sdk.createAgent({
 });
 ```
 
-예산과 시간 제한은 통제형 에이전트 실행에서 도구를 호출하기 전마다, 그 실행의 진행 상황에 따라 확인됩니다. `maxSteps`는 이미 진행한 단계 수(첫 호출은 0단계), `maxTokens`는 모델 호출이 사용한 토큰 수, `maxDuration`은 실행 시작 이후 경과한 시간입니다. 제한은 도구 호출을 거부하고, 그 결과 실행이 실패합니다. 모델 호출을 중단하지는 않습니다. 기간별 토큰·비용 예산(`maxTokens` 또는 `maxCost`를 지정한 `budgetLimit`)은 통제형 에이전트의 모델 호출 토큰과 비용을 집계하며, 리플레이도 원래 실행과 같은 방식으로 `maxSteps`, `maxTokens`, `maxDuration`을 적용합니다(기간별 예산은 현재 기간의 사용량을 기준으로 합니다). 인지 에이전트에는 자체 제한(`maxSteps`, `maxToolCalls`, `timeoutMs`)이 있습니다.
+예산과 시간 제한은 통제형 에이전트 실행에서 도구를 호출하기 전마다, 그 실행의 진행 상황에 따라 확인됩니다. `maxSteps`는 이미 진행한 단계 수(첫 호출은 0단계), `maxTokens`는 모델 호출이 사용한 토큰 수, `maxDuration`은 실행 시작 이후 경과한 시간입니다. 제한은 도구 호출을 거부하고, 그 결과 실행이 실패합니다. 모델 호출을 중단하지는 않습니다. 기간별 토큰·비용 예산(`maxTokens` 또는 `maxCost`를 지정한 `budgetLimit`)은 통제형 에이전트의 모델 호출 토큰과 비용을 집계하며, 리플레이도 원래 실행과 같은 방식으로 `maxSteps`, `maxTokens`, `maxDuration`을 적용합니다(기간별 예산은 현재 기간의 사용량을 기준으로 합니다). 인지 에이전트에는 자체 제한(`maxSteps`, `maxToolCalls`, `timeoutMs`)이 있습니다. 정책은 적용될 때(`defineGlobalPolicy`, 에이전트의 `policies`) 검사됩니다. `maxSteps`, `maxTokens`, `maxDuration` 값은 0보다 큰 숫자여야 하며, `budgetLimit`에는 `period`와 최소 하나의 한도(`maxTokens`, `maxToolCalls`, `maxCost`)가 필요하고 한도는 각각 0 이상의 숫자여야 합니다(0은 아무것도 허용하지 않음). 설정 파일에서 읽은 문자열(`'10'`), `NaN`, 음수 같은 다른 값은 해당 필드를 알려 주는 `ValidationError`를 던집니다.
 
 ### 4. 트레이스 {#_4-traces}
 

@@ -3,7 +3,7 @@ import type { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { AgentImpl } from './agent.js';
 import { ActionEngine } from './engines/action-engine.js';
-import { PolicyEngine } from './engines/policy-engine.js';
+import { assertCheckableLimits, PolicyEngine } from './engines/policy-engine.js';
 import { ReasoningEngine } from './engines/reasoning-engine.js';
 import { ReplayEngine } from './engines/replay-engine.js';
 import { ApprovalManager } from './managers/approval-manager.js';
@@ -320,6 +320,7 @@ export class SDKImpl implements SDK {
   }
 
   createCognitiveAgent(config: CognitiveAgentConfig): CognitiveAgent {
+    for (const policy of config.policies ?? []) assertCheckableLimits(policy);
     const agentId = uuidv4();
     for (const tool of config.tools ?? []) {
       if (!this.toolRegistry.getTool(tool.name)) {
@@ -499,6 +500,8 @@ export class SDKImpl implements SDK {
   }
 
   createAgent(config: AgentConfig): AgentImpl {
+    // Before anything is registered: a policy that cannot be checked creates no agent.
+    for (const policy of config.policies ?? []) assertCheckableLimits(policy);
     const now = Date.now();
     const configHash = this.computeConfigHash(config);
     const agent: Agent = {

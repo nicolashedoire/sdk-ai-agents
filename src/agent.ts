@@ -83,8 +83,9 @@ export class AgentImpl {
   }
 
   setPolicy(policy: Policy): void {
-    this.agent.policies.push(policy);
+    // Applied first: a policy the engine refuses is not listed as the agent's.
     this.policyEngine.applyAgentPolicy(this.agent.id, policy);
+    this.agent.policies.push(policy);
   }
 
   async stop(runId?: string): Promise<void> {

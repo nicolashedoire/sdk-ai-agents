@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { PolicyEngine } from '../engines/policy-engine.js'
+import { ValidationError } from '../errors/index.js'
 import type { Policy, PolicyContext } from '../types/policy.js'
 import type { Intention } from '../types/run.js'
 
@@ -395,6 +396,67 @@ describe('PolicyEngine', () => {
       expect(policies.map((p) => p.id)).toContain('agent-1')
     })
   })
+
+  describe('limits that cannot be checked', () => {
+    function budget(rules: Policy['rules'], enabled = true): Policy {
+      return { id: 'limits', type: 'budget', rules, scope: 'global', enabled }
+    }
+
+    it('refuses a run limit that is not a count above 0', () => {
+      // NaN, 0 or a missing value used to turn the limit off; a string was compared as text.
+      const cases: [string, unknown, string][] = [
+        ['maxSteps', Number.NaN, 'NaN'],
+        ['maxSteps', 0, '0'],
+        ['maxTokens', '1000', '"1000"'],
+        ['maxDuration', -1, '-1'],
+        ['maxDuration', undefined, 'undefined'],
+      ]
+      for (const [condition, value, shown] of cases) {
+        const rule = { condition, action: 'deny' as const, metadata: { value } }
+        expect(() => engine.applyGlobalPolicy(budget([rule]))).toThrow(
+          `Validation failed: policy 'limits' rules[0].metadata.value - ${condition} must be a finite number > 0, got ${shown}`
+        )
+        expect(() => engine.applyAgentPolicy('agent-1', budget([rule]))).toThrow(ValidationError)
+      }
+      expect(engine.getActivePolicies('agent-1')).toEqual([])
+    })
+
+    it('refuses a budgetLimit that cannot be checked, naming the field', () => {
+      const cases: [unknown, string][] = [
+        [undefined, ' - must be an object, got undefined'],
+        [{ period: 'year', maxTokens: 10 }, '.period - must be one of hour, day, week, month, all, got "year"'],
+        [{ period: 'day' }, ' - sets no cap (maxTokens, maxToolCalls, maxCost)'],
+        [{ period: 'day', maxToolCalls: Number.NaN }, '.maxToolCalls - must be a finite number >= 0, got NaN'],
+        [{ period: 'day', maxTokens: '500' }, '.maxTokens - must be a finite number >= 0, got "500"'],
+        [{ period: 'day', maxTokens: null }, '.maxTokens - must be a finite number >= 0, got null'],
+        [{ period: 'day', maxCost: 1, agentId: 7 }, '.agentId - must be a string, got 7'],
+      ]
+      for (const [budgetLimit, message] of cases) {
+        const rule = { condition: 'budgetLimit', action: 'deny' as const, metadata: { budgetLimit } }
+        expect(() => engine.applyGlobalPolicy(budget([rule]))).toThrow(
+          `Validation failed: policy 'limits' rules[0].metadata.budgetLimit${message}`
+        )
+      }
+    })
+
+    it('names the rule at fault and accepts caps of 0', () => {
+      const valid = { condition: 'maxSteps', action: 'deny' as const, metadata: { value: 5 } }
+      const nothingAllowed = {
+        condition: 'budgetLimit',
+        action: 'deny' as const,
+        metadata: { budgetLimit: { period: 'all', maxToolCalls: 0, maxCost: 0 } },
+      }
+      engine.applyGlobalPolicy(budget([valid, nothingAllowed]))
+      expect(engine.getActivePolicies('agent-1')).toHaveLength(1)
+
+      const broken = { condition: 'maxDuration', action: 'deny' as const, metadata: { value: '30s' } }
+      expect(() => engine.applyGlobalPolicy(budget([valid, broken]))).toThrow('rules[1].metadata.value')
+    })
+
+    it('does not check a disabled policy, which is never applied', () => {
+      const rule = { condition: 'maxSteps', action: 'deny' as const, metadata: { value: 'ten' } }
+      expect(() => engine.applyGlobalPolicy(budget([rule], false))).not.toThrow()
+      expect(engine.getActivePolicies('agent-1')).toEqual([])
+    })
+  })
 })
-
-

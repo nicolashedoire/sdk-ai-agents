@@ -232,7 +232,7 @@ const agent = sdk.createAgent({
 });
 ```
 
-预算和时长限制会在受治理智能体一次运行中的每次工具调用之前，根据该运行的进度进行检查：`maxSteps` 统计已完成的步骤（第一次调用位于第 0 步），`maxTokens` 统计其模型调用消耗的令牌数，`maxDuration` 统计自运行开始以来的时间。限制会拒绝该工具调用，从而使运行失败；它从不中断模型调用。按时间段计算的令牌和费用预算（带 `maxTokens` 或 `maxCost` 的 `budgetLimit`）会统计受治理智能体模型调用的令牌和费用，回放也会像原始运行一样应用 `maxSteps`、`maxTokens` 和 `maxDuration`（按时间段计算的预算看到的是当前时间段的用量）。认知智能体有自己的限制（`maxSteps`、`maxToolCalls`、`timeoutMs`）。
+预算和时长限制会在受治理智能体一次运行中的每次工具调用之前，根据该运行的进度进行检查：`maxSteps` 统计已完成的步骤（第一次调用位于第 0 步），`maxTokens` 统计其模型调用消耗的令牌数，`maxDuration` 统计自运行开始以来的时间。限制会拒绝该工具调用，从而使运行失败；它从不中断模型调用。按时间段计算的令牌和费用预算（带 `maxTokens` 或 `maxCost` 的 `budgetLimit`）会统计受治理智能体模型调用的令牌和费用，回放也会像原始运行一样应用 `maxSteps`、`maxTokens` 和 `maxDuration`（按时间段计算的预算看到的是当前时间段的用量）。认知智能体有自己的限制（`maxSteps`、`maxToolCalls`、`timeoutMs`）。策略在应用时（`defineGlobalPolicy`、智能体的 `policies`）会被检查：`maxSteps`、`maxTokens` 或 `maxDuration` 的值必须是大于 0 的数字；`budgetLimit` 需要一个 `period` 和至少一个上限（`maxTokens`、`maxToolCalls`、`maxCost`），每个上限都是 ≥ 0 的数字（0 表示什么都不允许）。其他任何值，例如从配置文件读取的字符串（`'10'`）、`NaN` 或负数，都会抛出一个指明字段的 `ValidationError`。
 
 ### 4. 追踪记录 {#_4-traces}
 

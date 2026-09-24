@@ -11,6 +11,7 @@ import type { BudgetTracker } from '../managers/budget-tracker.js';
 import type { PolicyAuditEntry } from '../types/audit.js';
 import type { IEventStore } from '../stores/event-store.js';
 import { ConditionEvaluator } from '../evaluators/condition-evaluator.js';
+import { ValidationError } from '../errors/index.js';
 import { generateEventId } from '../utils/id.js';
 import { costOf, DEFAULT_PRICING, findModelPrice, type PricingTable } from '../costs/pricing.js';
 import type { LLMResponse } from '../providers/llm-provider.js';
@@ -82,11 +83,13 @@ export class PolicyEngine {
 
   applyGlobalPolicy(policy: Policy): void {
     if (!policy.enabled) return;
+    assertCheckableLimits(policy);
     this.globalPolicies.set(policy.id, policy);
   }
 
   applyAgentPolicy(agentId: string, policy: Policy): void {
     if (!policy.enabled) return;
+    assertCheckableLimits(policy);
 
     if (!this.agentPolicies.has(agentId)) {
       this.agentPolicies.set(agentId, new Map());
@@ -522,16 +525,13 @@ export class PolicyEngine {
       return null; // This limit doesn't apply to this tool
     }
 
-    // The limit is plain data from the caller: a cost cap that is not an amount cannot be
-    // checked, and refuses like one whose spend is unknown.
-    const maxCost: unknown = budgetLimit.maxCost;
-    if (
-      maxCost !== undefined &&
-      !(typeof maxCost === 'number' && Number.isFinite(maxCost) && maxCost >= 0)
-    ) {
+    // Checked when the policy was defined; a limit changed since then that is no longer a
+    // count or an amount cannot be checked, and refuses like a cost that is unknown.
+    const problem = budgetLimitProblem(budgetLimit);
+    if (problem) {
       return {
         allowed: false,
-        reason: `Cost budget cannot be checked: maxCost must be a finite number >= 0 (USD), got ${shownValue(maxCost)}`,
+        reason: `Budget cannot be checked: budgetLimit${problem.field} ${problem.reason}`,
         violatedPolicies: [policyId],
       };
     }
@@ -700,6 +700,69 @@ export class PolicyEngine {
 
 const PERIODS = new Set(['hour', 'day', 'week', 'month', 'all']);
 
+/** Limits of one run, read from `metadata.value`: a step or token count, or milliseconds. */
+const RUN_LIMITS = new Set(['maxSteps', 'maxTokens', 'maxDuration']);
+
+/** The caps of a budget per period; 0 allows nothing. */
+const BUDGET_CAPS = ['maxTokens', 'maxToolCalls', 'maxCost'] as const;
+
+/**
+ * Refuses a policy whose built-in limits cannot be checked. Policies are plain data, often read
+ * from a config file: a limit that is a string, NaN, negative or missing was ignored at run
+ * time (NaN, 0 or a missing value turned a run limit off) or refused everything.
+ */
+export function assertCheckableLimits(policy: Policy): void {
+  if (!policy.enabled) return;
+  policy.rules.forEach((rule, index) => {
+    const at = `policy '${policy.id}' rules[${index}].metadata`;
+    if (typeof rule.condition === 'string' && RUN_LIMITS.has(rule.condition)) {
+      const value: unknown = rule.metadata?.value;
+      if (!isAmount(value) || value === 0) {
+        throw new ValidationError(
+          `${at}.value`,
+          `${rule.condition} must be a finite number > 0, got ${shownValue(value)}`
+        );
+      }
+    } else if (rule.condition === 'budgetLimit') {
+      const problem = budgetLimitProblem(rule.metadata?.budgetLimit);
+      if (problem) throw new ValidationError(`${at}.budgetLimit${problem.field}`, problem.reason);
+    }
+  });
+}
+
+/** What makes a `budgetLimit` impossible to check, if anything. */
+function budgetLimitProblem(limit: unknown): { field: string; reason: string } | undefined {
+  if (typeof limit !== 'object' || limit === null) {
+    return { field: '', reason: `must be an object, got ${shownValue(limit)}` };
+  }
+  const period: unknown = Reflect.get(limit, 'period');
+  if (typeof period !== 'string' || !PERIODS.has(period)) {
+    const periods = [...PERIODS].join(', ');
+    return { field: '.period', reason: `must be one of ${periods}, got ${shownValue(period)}` };
+  }
+  for (const key of ['agentId', 'toolName']) {
+    const value: unknown = Reflect.get(limit, key);
+    if (value !== undefined && typeof value !== 'string') {
+      return { field: `.${key}`, reason: `must be a string, got ${shownValue(value)}` };
+    }
+  }
+  const caps = BUDGET_CAPS.filter((key) => Reflect.get(limit, key) !== undefined);
+  if (caps.length === 0) {
+    return { field: '', reason: `sets no cap (${BUDGET_CAPS.join(', ')})` };
+  }
+  for (const key of caps) {
+    const value: unknown = Reflect.get(limit, key);
+    if (!isAmount(value)) {
+      return { field: `.${key}`, reason: `must be a finite number >= 0, got ${shownValue(value)}` };
+    }
+  }
+  return undefined;
+}
+
+function isAmount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
 /** A value from plain policy data, as a reason can show it ("0.5" for a string, not 0.5). */
 function shownValue(value: unknown): string {
   if (typeof value === 'string') return JSON.stringify(value);
@@ -720,7 +783,7 @@ function isToolCallLimit(value: unknown): value is BudgetLimit & { maxToolCalls:
   return (
     typeof period === 'string' &&
     PERIODS.has(period) &&
-    typeof maxToolCalls === 'number' &&
+    isAmount(maxToolCalls) &&
     (agentId === undefined || typeof agentId === 'string') &&
     (toolName === undefined || typeof toolName === 'string')
   );
