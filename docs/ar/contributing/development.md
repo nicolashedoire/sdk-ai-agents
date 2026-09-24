@@ -96,6 +96,14 @@ npm run test:coverage
 npx vitest src/__tests__/agent.test.ts
 ```
 
+### اختبارات PostgreSQL {#postgresql-tests}
+
+تتحقّق مجموعة الاختبارات من شيفرة SQL التي يرسلها مخزن أحداث PostgreSQL عبر اتصال يسجّلها. لتشغيلها أيضًا على خادم حقيقي، أعطِ عنوان URL لقاعدة بيانات: يعمل الاختبار في مخطط (schema) خاص به ويحذفه في النهاية. لا يضبط التكامل المستمر (CI) هذا المتغير، لذا يظهر الاختبار هناك على أنه متخطّى.
+
+```bash
+SDK_TEST_POSTGRES_URL=postgres://postgres@localhost:5432/postgres npx vitest run src/__tests__/postgresql-live.test.ts
+```
+
 ## جودة الشيفرة {#code-quality}
 
 ### التدقيق (Linting) {#linting}

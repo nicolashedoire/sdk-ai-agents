@@ -96,6 +96,14 @@ npm run test:coverage
 npx vitest src/__tests__/agent.test.ts
 ```
 
+### Pruebas de PostgreSQL {#postgresql-tests}
+
+La batería comprueba el SQL que envía el almacén de eventos de PostgreSQL con una conexión que lo graba. Para ejecutarla también contra un servidor real, indica la URL de una base de datos: la prueba trabaja en un esquema propio y lo elimina al terminar. La CI no define la variable, así que allí la prueba aparece como omitida.
+
+```bash
+SDK_TEST_POSTGRES_URL=postgres://postgres@localhost:5432/postgres npx vitest run src/__tests__/postgresql-live.test.ts
+```
+
 ## Calidad del código {#code-quality}
 
 ### Linting {#linting}

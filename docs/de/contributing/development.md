@@ -96,6 +96,14 @@ npm run test:coverage
 npx vitest src/__tests__/agent.test.ts
 ```
 
+### PostgreSQL-Tests {#postgresql-tests}
+
+Die Testsuite prüft das SQL, das der PostgreSQL-Ereignisspeicher sendet, mit einer Verbindung, die es aufzeichnet. Um sie zusätzlich gegen einen echten Server laufen zu lassen, geben Sie eine Datenbank-URL an: Der Test arbeitet in einem eigenen Schema und löscht es am Ende. Die CI setzt die Variable nicht, dort wird der Test daher als übersprungen gemeldet.
+
+```bash
+SDK_TEST_POSTGRES_URL=postgres://postgres@localhost:5432/postgres npx vitest run src/__tests__/postgresql-live.test.ts
+```
+
 ## Codequalität {#code-quality}
 
 ### Linting {#linting}

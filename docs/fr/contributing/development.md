@@ -96,6 +96,14 @@ npm run test:coverage
 npx vitest src/__tests__/agent.test.ts
 ```
 
+### Tests PostgreSQL {#postgresql-tests}
+
+La suite vérifie le SQL qu'envoie le magasin d'événements PostgreSQL avec une connexion qui l'enregistre. Pour l'exécuter aussi sur un vrai serveur, donnez l'URL d'une base : le test travaille dans un schéma à lui et le supprime à la fin. La CI ne définit pas la variable : le test y est donc signalé comme ignoré.
+
+```bash
+SDK_TEST_POSTGRES_URL=postgres://postgres@localhost:5432/postgres npx vitest run src/__tests__/postgresql-live.test.ts
+```
+
 ## Qualité du code {#code-quality}
 
 ### Analyse statique {#linting}

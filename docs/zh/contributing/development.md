@@ -96,6 +96,14 @@ npm run test:coverage
 npx vitest src/__tests__/agent.test.ts
 ```
 
+### PostgreSQL 测试 {#postgresql-tests}
+
+测试套件通过一个记录请求的连接，检查 PostgreSQL 事件存储发送的 SQL。若还要在真实的服务器上运行，请提供一个数据库 URL：测试会在自己的模式（schema）中运行，并在结束时将其删除。CI 不设置该变量，因此在 CI 中该测试会显示为已跳过。
+
+```bash
+SDK_TEST_POSTGRES_URL=postgres://postgres@localhost:5432/postgres npx vitest run src/__tests__/postgresql-live.test.ts
+```
+
 ## 代码质量 {#code-quality}
 
 ### 代码检查 {#linting}

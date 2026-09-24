@@ -275,7 +275,7 @@ interface ModelCostLine {
 | `countEventsAdvanced(filter)` | `Promise<number>` |
 | `getEventStatistics(filter)` | `Promise<{ total, byType, byAgent }>` |
 
-필터에는 **범위**(`runId`, 없으면 모든 실행, 그리고 `since`, `until`)와 **조건**(`type`, `agentId`, `userId`, `sessionId`, `dataFilters`(`{ path, operator, value?, regex? }`), `metadataFilters`(`{ field, operator, value? }`))이 있습니다. 조건은 `logic`(기본값 `and`, `or`는 적어도 하나)으로 결합된 뒤 `not`으로 부정됩니다. 범위는 절대 부정되지 않습니다. 기본 제공 저장소는 모두 답합니다. 파일 저장소는 쿼리마다 각 실행 파일을 한 번만 읽고, SQL 저장소는 데이터베이스에 질의합니다. 모든 조건이 성립해야 할 때는 데이터베이스가 직접 종류와 id로 이벤트를 걸러 냅니다. `or`나 `not`을 쓰면 저장소가 범위 안의 모든 이벤트를 돌려주고 조건은 메모리에서 검사되므로, 큰 데이터베이스에서는 비용이 더 듭니다. 같은 시각의 이벤트는 id 순으로 정렬됩니다.
+필터에는 **범위**(`runId`, 없으면 모든 실행, 그리고 `since`, `until`)와 **조건**(`type`, `agentId`, `userId`, `sessionId`, `dataFilters`(`{ path, operator, value?, regex? }`), `metadataFilters`(`{ field, operator, value? }`))이 있습니다. 조건은 `logic`(기본값 `and`, `or`는 적어도 하나)으로 결합된 뒤 `not`으로 부정됩니다. 범위는 절대 부정되지 않습니다. 기본 제공 저장소는 모두 답합니다. 파일 저장소는 쿼리마다 각 실행 파일을 한 번만 읽고, SQL 저장소는 데이터베이스에 질의합니다. 모든 조건이 성립해야 할 때는 데이터베이스가 직접 종류와 id로 이벤트를 걸러 냅니다. `or`나 `not`을 쓰면 저장소가 범위 안의 모든 이벤트를 돌려주고 조건은 메모리에서 검사되므로, 큰 데이터베이스에서는 비용이 더 듭니다. 같은 밀리초의 이벤트는 실행 안의 순서를 유지합니다. 실행은 id 순으로, 각 실행 안에서는 기록된 순서대로 정렬됩니다.
 
 ## 실시간 이벤트 {#live-events}
 

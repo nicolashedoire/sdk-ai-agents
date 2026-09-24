@@ -275,7 +275,7 @@ interface ModelCostLine {
 | `countEventsAdvanced(filter)` | `Promise<number>` |
 | `getEventStatistics(filter)` | `Promise<{ total, byType, byAgent }>` |
 
-过滤器有一个**范围**：`runId`（没有它则为所有运行）、`since`、`until`；还有一些**条件**：`type`、`agentId`、`userId`、`sessionId`、`dataFilters`（`{ path, operator, value?, regex? }`）和 `metadataFilters`（`{ field, operator, value? }`）。条件用 `logic` 组合（默认为 `and`；`or` 表示至少满足一个），再由 `not` 取反；范围从不取反。所有内置存储都能回答：文件存储每次查询时对每个运行文件只读一次，SQL 存储则查询数据库。当所有条件都必须满足时，数据库会自己按类型和 id 筛选事件；使用 `or` 或 `not` 时，存储会返回范围内的所有事件，条件在内存中检查，这在大型数据库上开销更大。同一时刻的事件按 id 排序。
+过滤器有一个**范围**：`runId`（没有它则为所有运行）、`since`、`until`；还有一些**条件**：`type`、`agentId`、`userId`、`sessionId`、`dataFilters`（`{ path, operator, value?, regex? }`）和 `metadataFilters`（`{ field, operator, value? }`）。条件用 `logic` 组合（默认为 `and`；`or` 表示至少满足一个），再由 `not` 取反；范围从不取反。所有内置存储都能回答：文件存储每次查询时对每个运行文件只读一次，SQL 存储则查询数据库。当所有条件都必须满足时，数据库会自己按类型和 id 筛选事件；使用 `or` 或 `not` 时，存储会返回范围内的所有事件，条件在内存中检查，这在大型数据库上开销更大。同一毫秒内的事件保持其在运行中的顺序：运行按 id 排序，每次运行内部按记录的先后排列。
 
 ## 实时事件 {#live-events}
 

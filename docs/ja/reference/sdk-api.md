@@ -275,7 +275,7 @@ interface ModelCostLine {
 | `countEventsAdvanced(filter)` | `Promise<number>` |
 | `getEventStatistics(filter)` | `Promise<{ total, byType, byAgent }>` |
 
-フィルターには **範囲**（`runId`、これがなければすべての実行、`since`、`until`）と **条件**（`type`、`agentId`、`userId`、`sessionId`、`dataFilters`（`{ path, operator, value?, regex? }`）、`metadataFilters`（`{ field, operator, value? }`））があります。条件は `logic`（デフォルトは `and`、`or` は少なくとも 1 つ）で組み合わされ、そのあと `not` で反転されます。範囲が反転されることはありません。組み込みのストアはどれでも答えます。ファイルストアはクエリごとに各実行のファイルを 1 回だけ読み、SQL のストアはデータベースに問い合わせます。すべての条件を満たす必要があるときは、データベース自身が種類と id でイベントを絞り込みます。`or` や `not` を使うと、ストアは範囲内のすべてのイベントを返し、条件はメモリー上でチェックされるため、大きなデータベースではコストが上がります。同じ時刻のイベントは id 順に並びます。
+フィルターには **範囲**（`runId`、これがなければすべての実行、`since`、`until`）と **条件**（`type`、`agentId`、`userId`、`sessionId`、`dataFilters`（`{ path, operator, value?, regex? }`）、`metadataFilters`（`{ field, operator, value? }`））があります。条件は `logic`（デフォルトは `and`、`or` は少なくとも 1 つ）で組み合わされ、そのあと `not` で反転されます。範囲が反転されることはありません。組み込みのストアはどれでも答えます。ファイルストアはクエリごとに各実行のファイルを 1 回だけ読み、SQL のストアはデータベースに問い合わせます。すべての条件を満たす必要があるときは、データベース自身が種類と id でイベントを絞り込みます。`or` や `not` を使うと、ストアは範囲内のすべてのイベントを返し、条件はメモリー上でチェックされるため、大きなデータベースではコストが上がります。同じミリ秒のイベントは実行の中での順序を保ちます。実行は id 順、各実行の中では記録された順です。
 
 ## リアルタイムのイベント {#live-events}
 
