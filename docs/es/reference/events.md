@@ -34,6 +34,7 @@ interface Event {
 | `tool.retry` | `toolName`, `retry`, `delayMs`, `error` |
 | `provider.fallback` | `primaryProvider`, `usedProvider`, `attemptedProviders` |
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
+| `provider.answer_discarded` | `provider`, `model`, `usage`, `reason` — una respuesta facturada por el fabricante, con el consumo del que informó, que el proveedor no pudo usar (una respuesta de OpenAI sin ninguna opción); se cuenta en los costes y los presupuestos |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` del contenido servido (el propio contenido no se guarda) |
 
 `tool.failed`, `intention.rejected` y `error.occurred` forman parte del tipo `EventType`, pero el SDK nunca los registra: una llamada a herramienta que falla es un evento `action.failed`; una rechazada por una política, un evento `policy.violated`, y una rechazada en la aprobación, un evento `approval.rejected`.
@@ -44,13 +45,13 @@ interface Event {
 | --- | --- |
 | `cognition.started` | `schemaVersion` (2; ausente en las ejecuciones más antiguas), `goal`, `context?`, `observations` (dadas con el problema), `commitRules`, `knowledge?` (`scope`, `items` recuperados de ejecuciones anteriores, `error?` cuando falló el almacén), `profile`, `controller`, `assessor`, `evaluator?`, `allowedTools`, `limits` |
 | `cognition.operation_selected` | `step`, `operation`, `controller`, `available`, `stepsRemaining`, `forced?` (el motor impuso una decisión), `confidence?`, `probabilities?`, `rationale?`, `fallbackFrom?` |
-| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`) |
-| `cognition.operation_failed` | `step`, `operation`, `error`, `recovery?` |
+| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — llamadas que no informaron de ningún número de tokens) |
+| `cognition.operation_failed` | `step`, `operation`, `error`, `recovery?` — y además `model?`, `requestedModel?`, `usage?` para una operación interrumpida por una parada o un tiempo límite tras intentos facturados |
 | `cognition.evaluated` | `step`, `predictionId`, `hypothesisId`, `evaluator` (`id`, `version`), `verdict`, `observed?`, `summary?`, `context?`, `metrics?`, `causeCandidates?`, `reason?`, `durationMs` — el informe completo de una prueba de predicción |
 | `cognition.concluded` | `decision`, `status` (`committed`, `provisional`, `abstain`), `confidence`, `steps`, `evidenceRevision`, `hypotheses`, `predictions` |
 | `cognition.knowledge_recorded` | `scope`, `findings` (afirmación, tipo, ámbito, `revises?`, `difference?`, `evidence`: cada prueba con `runId`, `predictionId`, `verdict`, `expected`, `observed`, evaluador), `error?` cuando falló el almacén. Se añade después de `run.completed`, `run.failed` o `run.cancelled`, y solo cuando la ejecución puso algo a prueba |
 | `cognition.feedback` | `feedback` (`verdict`, `agreement?`, `wrongAbout?`, …), `profileId`, `profileVersionBefore`, `profileVersionAfter` |
-| `decision.evaluated` | `client`, `purpose` (`operation_selection`, `hypothesis_assessment`, `direct`), `model`, `state`, `questions`, `answers`, `usage`, `step?` |
+| `decision.evaluated` | `client`, `purpose` (`operation_selection`, `hypothesis_assessment`, `direct`), `model`, `state`, `questions`, `answers` (vacío si se rechazó la respuesta), `usage?` (ausente si el backend no informó de ningún número de tokens), `error?` (por qué se rechazó una respuesta facturada), `step?` |
 
 ## Operación en producción {#operations}
 

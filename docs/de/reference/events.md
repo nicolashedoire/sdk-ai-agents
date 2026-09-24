@@ -34,6 +34,7 @@ interface Event {
 | `tool.retry` | `toolName`, `retry`, `delayMs`, `error` |
 | `provider.fallback` | `primaryProvider`, `usedProvider`, `attemptedProviders` |
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
+| `provider.answer_discarded` | `provider`, `model`, `usage`, `reason` — eine Antwort, die der Hersteller berechnet hat, mit dem gemeldeten Verbrauch, die der Anbieter nicht verwenden konnte (eine OpenAI-Antwort ohne jede Auswahl); zählt in Kosten und Budgets |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` des ausgelieferten Inhalts (der Inhalt selbst wird nicht gespeichert) |
 
 `tool.failed`, `intention.rejected` und `error.occurred` gehören zum Typ `EventType`, werden vom SDK aber nie aufgezeichnet: Ein fehlgeschlagener Tool-Aufruf ist ein Ereignis `action.failed`, ein von einer Richtlinie abgelehnter ein Ereignis `policy.violated` und ein bei der Freigabe abgelehnter ein Ereignis `approval.rejected`.
@@ -44,13 +45,13 @@ interface Event {
 | --- | --- |
 | `cognition.started` | `schemaVersion` (2; bei älteren Läufen nicht vorhanden), `goal`, `context?`, `observations` (mit dem Problem übergeben), `commitRules`, `knowledge?` (`scope`, `items`, die aus früheren Läufen abgerufen wurden, `error?`, wenn der Speicher fehlgeschlagen ist), `profile`, `controller`, `assessor`, `evaluator?`, `allowedTools`, `limits` |
 | `cognition.operation_selected` | `step`, `operation`, `controller`, `available`, `stepsRemaining`, `forced?` (die Engine hat eine Entscheidung erzwungen), `confidence?`, `probabilities?`, `rationale?`, `fallbackFrom?` |
-| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`) |
-| `cognition.operation_failed` | `step`, `operation`, `error`, `recovery?` |
+| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — Aufrufe, die keine Token-Anzahl gemeldet haben) |
+| `cognition.operation_failed` | `step`, `operation`, `error`, `recovery?` — dazu `model?`, `requestedModel?`, `usage?` für eine Operation, die ein Stopp oder ein Zeitlimit nach berechneten Versuchen abgebrochen hat |
 | `cognition.evaluated` | `step`, `predictionId`, `hypothesisId`, `evaluator` (`id`, `version`), `verdict`, `observed?`, `summary?`, `context?`, `metrics?`, `causeCandidates?`, `reason?`, `durationMs` – der vollständige Bericht eines Vorhersagetests |
 | `cognition.concluded` | `decision`, `status` (`committed`, `provisional`, `abstain`), `confidence`, `steps`, `evidenceRevision`, `hypotheses`, `predictions` |
 | `cognition.knowledge_recorded` | `scope`, `findings` (Aussage, Art, Geltungsbereich, `revises?`, `difference?`, `evidence`: jeder Test mit `runId`, `predictionId`, `verdict`, `expected`, `observed`, Evaluator), `error?`, wenn der Speicher fehlgeschlagen ist. Angehängt nach `run.completed`, `run.failed` oder `run.cancelled`, und nur, wenn der Lauf etwas getestet hat |
 | `cognition.feedback` | `feedback` (`verdict`, `agreement?`, `wrongAbout?`, …), `profileId`, `profileVersionBefore`, `profileVersionAfter` |
-| `decision.evaluated` | `client`, `purpose` (`operation_selection`, `hypothesis_assessment`, `direct`), `model`, `state`, `questions`, `answers`, `usage`, `step?` |
+| `decision.evaluated` | `client`, `purpose` (`operation_selection`, `hypothesis_assessment`, `direct`), `model`, `state`, `questions`, `answers` (leer, wenn die Antwort abgelehnt wurde), `usage?` (fehlt, wenn das Backend keine Token-Anzahl gemeldet hat), `error?` (warum eine berechnete Antwort abgelehnt wurde), `step?` |
 
 ## Betrieb {#operations}
 

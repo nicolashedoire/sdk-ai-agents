@@ -128,7 +128,7 @@ Throws a `ValidationError` when no backend is configured.
 
 | Method | Returns |
 | --- | --- |
-| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage, runId }` — answers typed from the questions |
+| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage?, runId }` — answers typed from the questions; no `usage` when the backend reported no token counts |
 | `choose({ context, question, options, minConfidence? })` | `{ choice, confidence, probabilities, confident, runId }` |
 | `selectMany({ context, question, options, threshold? })` | `{ selected, probabilities, runId }` |
 | `check({ context, question, criteria?, threshold? })` | `{ probability, yes, runId }` |
@@ -144,6 +144,43 @@ Question helpers: `noul(instructions, criteria?)`, `choice(instructions, options
 | `getIncidents(runId)` | `Promise<Incident[]>` |
 | `approveAction(approvalId, by, reason?)`, `rejectAction(...)`, `getPendingApprovals(runId?)` | Human approvals |
 | `getBudgetUsage(limit)`, `getPolicyAuditTrail(runId)` | Budgets and policy audit |
+
+### `RunCostReport`
+
+What `getRunCost(runId)` returns: every model call of the run that the vendor answered, failed steps included — see [API costs](../guide/costs).
+
+```ts
+interface RunCostReport {
+  runId: string;
+  currency: 'USD';
+  totalUsd: number;
+  complete: boolean;
+  lines: ModelCostLine[];
+  unpricedModels: string[];
+  unpricedCalls: number;
+  unmeteredCalls: number;
+  unmeteredModels: string[];
+}
+
+interface ModelCostLine {
+  model: string;
+  requestedModel?: string;
+  source: 'llm' | 'decision';
+  calls: number;
+  unmeteredCalls?: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd?: number;
+}
+```
+
+| Field | |
+| --- | --- |
+| `totalUsd` | Cost of the calls whose cost is known; only a lower bound when `complete` is `false` |
+| `complete` | `false` when the cost of some calls is unknown: `unpricedCalls` or `unmeteredCalls` above 0 |
+| `unpricedModels`, `unpricedCalls` | Models without a price in `pricing`, and their calls that reported their tokens |
+| `unmeteredModels`, `unmeteredCalls` | Models of the calls that reported no input or output token counts, and those calls |
+| `lines` | One per model and source: calls, tokens of the calls that reported them, `unmeteredCalls` when there are any, `costUsd` when the model has a price; `model` is `unknown` for a call that recorded no model name |
 
 ## Traces, replay and testing
 

@@ -128,7 +128,7 @@ interface OutcomeEvaluator {
 
 | 方法 | 返回值 |
 | --- | --- |
-| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage, runId }`——答案的类型根据问题推断 |
+| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage?, runId }`——答案的类型根据问题推断；后端没有报告 token 数时没有 `usage` |
 | `choose({ context, question, options, minConfidence? })` | `{ choice, confidence, probabilities, confident, runId }` |
 | `selectMany({ context, question, options, threshold? })` | `{ selected, probabilities, runId }` |
 | `check({ context, question, criteria?, threshold? })` | `{ probability, yes, runId }` |
@@ -144,6 +144,43 @@ interface OutcomeEvaluator {
 | `getIncidents(runId)` | `Promise<Incident[]>` |
 | `approveAction(approvalId, by, reason?)`、`rejectAction(...)`、`getPendingApprovals(runId?)` | 人工审批 |
 | `getBudgetUsage(limit)`、`getPolicyAuditTrail(runId)` | 预算与策略审计 |
+
+### `RunCostReport` {#runcostreport}
+
+`getRunCost(runId)` 的返回值：运行中厂商已应答的每一次模型调用，包括失败的步骤——参见 [API 成本](../guide/costs)。
+
+```ts
+interface RunCostReport {
+  runId: string;
+  currency: 'USD';
+  totalUsd: number;
+  complete: boolean;
+  lines: ModelCostLine[];
+  unpricedModels: string[];
+  unpricedCalls: number;
+  unmeteredCalls: number;
+  unmeteredModels: string[];
+}
+
+interface ModelCostLine {
+  model: string;
+  requestedModel?: string;
+  source: 'llm' | 'decision';
+  calls: number;
+  unmeteredCalls?: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd?: number;
+}
+```
+
+| 字段 | |
+| --- | --- |
+| `totalUsd` | 成本已知的调用的成本；当 `complete` 为 `false` 时只是一个下限 |
+| `complete` | 当部分调用的成本未知，即 `unpricedCalls` 或 `unmeteredCalls` 大于 0 时为 `false` |
+| `unpricedModels`、`unpricedCalls` | 在 `pricing` 中没有价格的模型，以及它们报告了 token 数的调用 |
+| `unmeteredModels`、`unmeteredCalls` | 既没有报告输入 token 数也没有报告输出 token 数的调用所用的模型，以及这些调用 |
+| `lines` | 每个模型和来源一行：调用次数、报告了 token 数的调用的 token 数、存在时的 `unmeteredCalls`、模型有价格时的 `costUsd`；没有记录模型名的调用，其 `model` 为 `unknown` |
 
 ## 追踪记录、回放与测试 {#traces-replay-and-testing}
 

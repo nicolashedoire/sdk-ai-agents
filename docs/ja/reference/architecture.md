@@ -268,6 +268,7 @@ type EventType =
   | 'resource.read'
   | 'provider.fallback'
   | 'provider.retry'
+  | 'provider.answer_discarded'
   | 'tool.retry'
   | 'incident.reported'
   | 'error.occurred' // never recorded by the SDK

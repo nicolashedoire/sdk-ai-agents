@@ -34,6 +34,7 @@ interface Event {
 | `tool.retry` | `toolName`、`retry`、`delayMs`、`error` |
 | `provider.fallback` | `primaryProvider`、`usedProvider`、`attemptedProviders` |
 | `provider.retry` | `provider`、`model`、`retry`、`delayMs`、`error` |
+| `provider.answer_discarded` | `provider`、`model`、`usage`、`reason`。ベンダーが課金し、使用量を報告したにもかかわらず、プロバイダーが使えなかった応答（選択肢を一つも含まない OpenAI の応答）。コストと予算に数えられる |
 | `resource.read` | `uri`、`mimeType?`、`bytes`、提供した内容の `sha256`（内容そのものは保存されない） |
 
 `tool.failed`、`intention.rejected`、`error.occurred` は `EventType` 型に含まれますが、SDK がこれらを記録することはありません。失敗したツール呼び出しは `action.failed` イベントに、ポリシーに拒否された呼び出しは `policy.violated` イベントに、承認で却下された呼び出しは `approval.rejected` イベントになります。
@@ -44,13 +45,13 @@ interface Event {
 | --- | --- |
 | `cognition.started` | `schemaVersion`（2。古い実行にはない）、`goal`、`context?`、`observations`（問題と一緒に渡されたもの）、`commitRules`、`knowledge?`（`scope`、以前の実行から呼び出された `items`、ストアが失敗した場合は `error?`）、`profile`、`controller`、`assessor`、`evaluator?`、`allowedTools`、`limits` |
 | `cognition.operation_selected` | `step`、`operation`、`controller`、`available`、`stepsRemaining`、`forced?`（エンジンが決定を強制した）、`confidence?`、`probabilities?`、`rationale?`、`fallbackFrom?` |
-| `cognition.thought` | `step`、`operation`、`patch`、`issues`、`failed`、`ignoredFields?`、`model?`、`requestedModel?`、`usage?`（`promptTokens`、`completionTokens`、`calls`） |
-| `cognition.operation_failed` | `step`、`operation`、`error`、`recovery?` |
+| `cognition.thought` | `step`、`operation`、`patch`、`issues`、`failed`、`ignoredFields?`、`model?`、`requestedModel?`、`usage?`（`promptTokens`、`completionTokens`、`calls`、`unmeteredCalls?`。`unmeteredCalls` はトークン数を報告しなかった呼び出しの数） |
+| `cognition.operation_failed` | `step`、`operation`、`error`、`recovery?`。課金された試行の後、停止やタイムアウトで打ち切られたオペレーションでは、さらに `model?`、`requestedModel?`、`usage?` |
 | `cognition.evaluated` | `step`、`predictionId`、`hypothesisId`、`evaluator`（`id`、`version`）、`verdict`、`observed?`、`summary?`、`context?`、`metrics?`、`causeCandidates?`、`reason?`、`durationMs`。予測のテストの完全なレポート |
 | `cognition.concluded` | `decision`、`status`（`committed`、`provisional`、`abstain`）、`confidence`、`steps`、`evidenceRevision`、`hypotheses`、`predictions` |
 | `cognition.knowledge_recorded` | `scope`、`findings`（言明、種類、スコープ、`revises?`、`difference?`、`evidence`：各テストについて `runId`、`predictionId`、`verdict`、`expected`、`observed`、評価器）、ストアが失敗した場合は `error?`。`run.completed`、`run.failed`、`run.cancelled` の後に追記され、実行が何かをテストした場合にだけ記録される |
 | `cognition.feedback` | `feedback`（`verdict`、`agreement?`、`wrongAbout?`、…）、`profileId`、`profileVersionBefore`、`profileVersionAfter` |
-| `decision.evaluated` | `client`、`purpose`（`operation_selection`、`hypothesis_assessment`、`direct`）、`model`、`state`、`questions`、`answers`、`usage`、`step?` |
+| `decision.evaluated` | `client`、`purpose`（`operation_selection`、`hypothesis_assessment`、`direct`）、`model`、`state`、`questions`、`answers`（回答が拒否された場合は空）、`usage?`（バックエンドがトークン数を報告しなかった場合はなし）、`error?`（課金された回答が拒否された理由）、`step?` |
 
 ## 運用 {#operations}
 
