@@ -26,6 +26,8 @@ const sdk = createSDK({
 | `model` | `jev-latest` | 동작을 고정하려면 버전이 붙은 id를 지정하세요 |
 | `timeoutMs` | `30000` | 시도당 |
 | `maxRetries` | `2` | 408, 429, 5xx, 529 및 네트워크 오류일 때, `retry-after`를 존중하며 |
+| `retryBaseDelayMs` | `500` | 첫 대기 시간, 재시도마다 두 배가 됨 |
+| `maxRetryDelayMs` | `30000` | 각 대기의 상한, `retry-after` 포함 |
 | `fetch` | 전역 `fetch` | 프록시를 인식하는 전송 계층을 주입합니다 |
 
 ### Vercel AI Gateway를 통해 {#through-vercel-ai-gateway}
