@@ -118,7 +118,7 @@ async function main() {
 
   const agent = sdk.createAgent({
     name: 'math-assistant',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
     tools: [calculatorTool, weatherTool],
     capabilities: ['math'],
     policies: [
@@ -216,7 +216,7 @@ async function main() {
     // Create an agent with many steps for the demo
     const longRunningAgent = sdk.createAgent({
       name: 'long-running-agent',
-      model: 'gpt-4',
+      model: 'gpt-5.4',
       tools: [calculatorTool],
       maxSteps: 100, // Many steps to allow stopping
     });

@@ -25,16 +25,20 @@ const sdk = createSDK(config);
 
 ### OpenAI models
 
-OpenAI reasoning models — the o-series (`o1`, `o3`, `o4-mini`…) and GPT-5 and later (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…), also dated or fine-tuned (`ft:o4-mini-…`) — refuse `temperature` and `max_tokens`. The OpenAI provider recognizes them by name: it sends them `maxTokens` as `max_completion_tokens`, which also counts their reasoning tokens, and the reasoning effort, but never a temperature, not even with the effort `none`. Other models get `temperature` and `max_tokens`, which every OpenAI-compatible server knows.
+OpenAI reasoning models — the o-series (`o1`, `o3`, `o4-mini`…) and GPT-5 and later (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…), also dated or fine-tuned (`ft:o4-mini-…`) — refuse `max_tokens`, and `temperature` unless their reasoning effort is `none`. The OpenAI provider recognizes them by name, in any case: it sends them `maxTokens` as `max_completion_tokens`, which also counts their reasoning tokens, and the reasoning effort. As the default effort varies by model, it never sends them a temperature: the temperature of the agent or of the engine is ignored for them. Other models get `temperature` and `max_tokens`, which every OpenAI-compatible server knows.
+
+::: warning Tools and the reasoning effort
+The SDK calls OpenAI through Chat Completions, where GPT-5.4 and later models call tools only with the effort `none`. The default model, `gpt-5.4`, uses `none` unless you set another effort. GPT-5.5, GPT-5.6 and GPT-6 Sol and Luna default to `medium`: an agent with tools fails on them (`Function tools with reasoning_effort are not supported`) unless you set `reasoningEffort: 'none'`. GPT-6 Astra cannot call tools through Chat Completions at all. The SDK sends the effort you set unchanged.
+:::
 
 | Option | Default | |
 | --- | --- | --- |
 | `defaultModel` | `gpt-5.4` | Model of a request that names none, and of a fallback that does not serve the agent's model |
 | `reasoningModels` | Detected from the name | `true` or `false`: every model of this provider is, or is not, a reasoning model. A list: these names are (Azure deployments, gateway aliases), the others are detected |
-| `reasoningEffort` | The model's | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`, sent to reasoning models only. Each model accepts some of these values, and the API refuses the others |
-| `nativeToolMessages` | `true` | `false` for a compatible server that does not support `tool_calls` and `tool` messages: tool calls and results are then sent as plain text, to every provider of the chain when this one is a fallback |
+| `reasoningEffort` | The model's | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`, sent as given to reasoning models only. Each model accepts some of these values, and the API refuses the others |
+| `nativeToolMessages` | `true` | `false` for a compatible server that does not accept assistant `tool_calls` and `tool` messages in the conversation: earlier tool calls and results are then sent as plain text, while tools are still offered and the tool calls of replies still read. `false` on the primary or on any fallback applies to the whole chain |
 
-These options go in `providerConfig.openai` or in the `config` of an OpenAI fallback. A fallback of another vendor takes each option its `config` does not set from `providerConfig.openai`; a fallback of the primary's vendor takes none. An agent or a run sets its own effort in `providerSettings.openai.reasoningEffort`: the run's wins, then the agent's, then the provider's.
+These options go in `providerConfig.openai` or in the `config` of an OpenAI fallback. A fallback of another vendor takes each option its `config` does not set from `providerConfig.openai`; a fallback of the primary's vendor takes none. An agent or a run sets its own effort in `providerSettings.openai.reasoningEffort`: the run's wins, then the agent's, then the provider's. A cognitive agent applies it to tool selection only; its thoughts, which offer no tools, take its `reasoningEffort` option.
 
 ```ts
 const sdk = createSDK({
@@ -83,8 +87,8 @@ const analyst = sdk.createAgent({
 | `knowledge` | — | Memory across runs: `{ store, scope, recallLimit? (10), record? (true) }`, see [Memory across runs](../guide/memory) |
 | `evaluator` | — | An `OutcomeEvaluator` that tests predictions; enables `test_prediction` |
 | `generator` | LLM generator on `model` | Your own `ThoughtGenerator` (observation comparisons included); its thoughts still go through the engine's admission rules |
-| `temperature`, `maxTokens` | `0.4`, — | Thought generation settings |
-| `providerSettings` | — | Settings for tool selection (native reasoning engine) |
+| `temperature`, `maxTokens`, `reasoningEffort` | `0.4`, —, — | Thought generation settings (`reasoningEffort`: OpenAI reasoning models only) |
+| `providerSettings` | — | Settings for tool selection (native reasoning engine), `openai.reasoningEffort` included |
 
 ### `CognitiveRunResult`
 

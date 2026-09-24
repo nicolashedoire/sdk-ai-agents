@@ -25,16 +25,20 @@ const sdk = createSDK(config);
 
 ### OpenAI मॉडल {#openai-models}
 
-OpenAI के reasoning मॉडल — o सीरीज़ (`o1`, `o3`, `o4-mini`…) और GPT-5 व उसके बाद के मॉडल (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…), तारीख़ वाले या fine-tuned (`ft:o4-mini-…`) भी — `temperature` और `max_tokens` को ठुकरा देते हैं। OpenAI प्रदाता उन्हें नाम से पहचानता है: वह उन्हें `maxTokens` को `max_completion_tokens` के रूप में भेजता है, जिसमें उनके reasoning tokens भी गिने जाते हैं, और साथ में reasoning effort भी, पर temperature कभी नहीं, effort `none` होने पर भी नहीं। बाकी मॉडलों को `temperature` और `max_tokens` मिलते हैं, जिन्हें हर OpenAI-संगत सर्वर जानता है।
+OpenAI के reasoning मॉडल — o सीरीज़ (`o1`, `o3`, `o4-mini`…) और GPT-5 व उसके बाद के मॉडल (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…), तारीख़ वाले या fine-tuned (`ft:o4-mini-…`) भी — `max_tokens` को ठुकरा देते हैं, और `temperature` को भी, जब तक उनका reasoning effort `none` न हो। OpenAI प्रदाता उन्हें नाम से पहचानता है, अक्षर छोटे हों या बड़े: वह उन्हें `maxTokens` को `max_completion_tokens` के रूप में भेजता है, जिसमें उनके reasoning tokens भी गिने जाते हैं, और साथ में reasoning effort भी। चूँकि डिफ़ॉल्ट effort हर मॉडल का अलग होता है, वह उन्हें temperature कभी नहीं भेजता: उनके लिए एजेंट या engine का temperature अनदेखा होता है। बाकी मॉडलों को `temperature` और `max_tokens` मिलते हैं, जिन्हें हर OpenAI-संगत सर्वर जानता है।
+
+::: warning टूल और reasoning effort
+SDK, OpenAI को Chat Completions के ज़रिए बुलाता है, जहाँ GPT-5.4 और उसके बाद के मॉडल सिर्फ़ effort `none` पर ही टूल बुलाते हैं। डिफ़ॉल्ट मॉडल `gpt-5.4` तब तक `none` इस्तेमाल करता है जब तक आप कोई दूसरा effort तय न करें। GPT-5.5, GPT-5.6 और GPT-6 Sol व Luna का डिफ़ॉल्ट `medium` है: जब तक आप `reasoningEffort: 'none'` तय न करें, टूल वाला एजेंट इन पर विफल होता है (`Function tools with reasoning_effort are not supported`)। GPT-6 Astra, Chat Completions से टूल बिल्कुल नहीं बुला सकता। SDK आपका तय किया effort बिना बदले भेजता है।
+:::
 
 | विकल्प | डिफ़ॉल्ट | |
 | --- | --- | --- |
 | `defaultModel` | `gpt-5.4` | उस request का मॉडल जो कोई मॉडल नहीं बताती, और उस फ़ॉलबैक का जो एजेंट का मॉडल सर्व नहीं करता |
 | `reasoningModels` | नाम से पहचाना जाता है | `true` या `false`: इस प्रदाता के सभी मॉडल reasoning मॉडल हैं, या कोई भी नहीं है। एक सूची: ये नाम reasoning मॉडल हैं (Azure deployments, gateway aliases), बाकी नाम से पहचाने जाते हैं |
-| `reasoningEffort` | मॉडल का अपना | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` या `max`, सिर्फ़ reasoning मॉडलों को भेजा जाता है। हर मॉडल इनमें से कुछ मान स्वीकार करता है, और API बाकी को ठुकरा देती है |
-| `nativeToolMessages` | `true` | ऐसे संगत सर्वर के लिए `false` जो `tool_calls` और `tool` messages सपोर्ट नहीं करता: तब टूल कॉल और उनके नतीजे text के रूप में भेजे जाते हैं, और अगर यह प्रदाता फ़ॉलबैक है तो chain के हर प्रदाता को |
+| `reasoningEffort` | मॉडल का अपना | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` या `max`, बिना बदले सिर्फ़ reasoning मॉडलों को भेजा जाता है। हर मॉडल इनमें से कुछ मान स्वीकार करता है, और API बाकी को ठुकरा देती है |
+| `nativeToolMessages` | `true` | ऐसे संगत सर्वर के लिए `false` जो बातचीत में assistant के `tool_calls` और `tool` messages स्वीकार नहीं करता: तब पिछली टूल कॉल और उनके नतीजे text के रूप में भेजे जाते हैं, जबकि टूल अब भी पेश किए जाते हैं और जवाबों की टूल कॉल अब भी पढ़ी जाती हैं। मुख्य प्रदाता या किसी भी फ़ॉलबैक पर `false` पूरी chain पर लागू होता है |
 
-ये विकल्प `providerConfig.openai` में या OpenAI फ़ॉलबैक के `config` में रखे जाते हैं। दूसरे vendor का फ़ॉलबैक हर वह विकल्प `providerConfig.openai` से लेता है जो उसका `config` तय नहीं करता; मुख्य प्रदाता के ही vendor का फ़ॉलबैक कोई विकल्प नहीं लेता। कोई एजेंट या run अपना effort `providerSettings.openai.reasoningEffort` में तय करता है: पहले run का मान चलता है, फिर एजेंट का, फिर प्रदाता का।
+ये विकल्प `providerConfig.openai` में या OpenAI फ़ॉलबैक के `config` में रखे जाते हैं। दूसरे vendor का फ़ॉलबैक हर वह विकल्प `providerConfig.openai` से लेता है जो उसका `config` तय नहीं करता; मुख्य प्रदाता के ही vendor का फ़ॉलबैक कोई विकल्प नहीं लेता। कोई एजेंट या run अपना effort `providerSettings.openai.reasoningEffort` में तय करता है: पहले run का मान चलता है, फिर एजेंट का, फिर प्रदाता का। संज्ञानात्मक एजेंट इसे सिर्फ़ टूल के चुनाव पर लागू करता है; उसके विचार, जो कोई टूल पेश नहीं करते, उसका `reasoningEffort` विकल्प लेते हैं।
 
 ```ts
 const sdk = createSDK({
@@ -83,8 +87,8 @@ const analyst = sdk.createAgent({
 | `knowledge` | — | runs के बीच स्मृति: `{ store, scope, recallLimit? (10), record? (true) }`, देखें [runs के बीच स्मृति](../guide/memory) |
 | `evaluator` | — | पूर्वानुमानों को परखने वाला एक `OutcomeEvaluator`; `test_prediction` चालू करता है |
 | `generator` | `model` पर LLM जनरेटर | आपका अपना `ThoughtGenerator` (अवलोकनों की तुलना सहित); इसके विचार फिर भी इंजन के प्रवेश-नियमों से होकर गुज़रते हैं |
-| `temperature`, `maxTokens` | `0.4`, — | विचार बनाने की सेटिंग |
-| `providerSettings` | — | टूल के चुनाव की सेटिंग (मूल तर्क इंजन) |
+| `temperature`, `maxTokens`, `reasoningEffort` | `0.4`, —, — | विचार बनाने की सेटिंग (`reasoningEffort`: सिर्फ़ OpenAI के reasoning मॉडल) |
+| `providerSettings` | — | टूल के चुनाव की सेटिंग (मूल तर्क इंजन), `openai.reasoningEffort` समेत |
 
 ### `CognitiveRunResult` {#cognitiverunresult}
 

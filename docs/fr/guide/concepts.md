@@ -25,7 +25,7 @@ Un **agent** est un système de prise de décision gouverné qui utilise un LLM 
 ```typescript
 const agent = sdk.createAgent({
   name: 'math-assistant',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
   tools: [calculatorTool],
   version: '1.0.0',
   capabilities: ['math']
@@ -84,7 +84,7 @@ const mathCapability = sdk.defineCapability({
 
 const agent = sdk.createAgent({
   name: 'math-assistant',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
   capabilities: ['math']
 })
 ```
@@ -103,7 +103,7 @@ const mathCapability = sdk.defineCapability({
 
 const agent = sdk.createAgent({
   name: 'math-assistant',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
   capabilities: ['math']
 })
 ```

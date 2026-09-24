@@ -31,7 +31,7 @@ describe('Agent', () => {
 
     const agent = sdk.createAgent({
       name: 'test-agent',
-      model: 'gpt-4',
+      model: 'gpt-5.4',
       tools: [calculatorTool],
     });
 

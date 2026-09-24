@@ -149,7 +149,7 @@ const myTool = sdk.defineTool({
 ```typescript
 const agent = sdk.createAgent({
   name: 'my-agent',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
   tools: [myTool]
 });
 ```

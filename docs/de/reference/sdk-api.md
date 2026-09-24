@@ -25,16 +25,20 @@ const sdk = createSDK(config);
 
 ### OpenAI-Modelle {#openai-models}
 
-Die Reasoning-Modelle von OpenAI – die o-Serie (`o1`, `o3`, `o4-mini`…) sowie GPT-5 und spätere (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…), auch mit Datum oder feinabgestimmt (`ft:o4-mini-…`) – lehnen `temperature` und `max_tokens` ab. Der OpenAI-Anbieter erkennt sie am Namen: Er sendet ihnen `maxTokens` als `max_completion_tokens`, das auch ihre Reasoning-Tokens zählt, und den Reasoning-Aufwand, aber nie eine Temperatur, auch nicht beim Aufwand `none`. Andere Modelle erhalten `temperature` und `max_tokens`, die jeder OpenAI-kompatible Server kennt.
+Die Reasoning-Modelle von OpenAI – die o-Serie (`o1`, `o3`, `o4-mini`…) sowie GPT-5 und spätere (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…), auch mit Datum oder feinabgestimmt (`ft:o4-mini-…`) – lehnen `max_tokens` ab, und `temperature`, sofern ihr Reasoning-Aufwand nicht `none` ist. Der OpenAI-Anbieter erkennt sie am Namen, unabhängig von der Groß- und Kleinschreibung: Er sendet ihnen `maxTokens` als `max_completion_tokens`, das auch ihre Reasoning-Tokens zählt, und den Reasoning-Aufwand. Da der Standardaufwand je nach Modell verschieden ist, sendet er ihnen nie eine Temperatur: Die Temperatur des Agenten oder der Engine wird für sie ignoriert. Andere Modelle erhalten `temperature` und `max_tokens`, die jeder OpenAI-kompatible Server kennt.
+
+::: warning Tools und Reasoning-Aufwand
+Das SDK ruft OpenAI über Chat Completions auf, wo Modelle ab GPT-5.4 Tools nur mit dem Aufwand `none` aufrufen. Das Standardmodell `gpt-5.4` nutzt `none`, solange Sie keinen anderen Aufwand setzen. GPT-5.5, GPT-5.6 sowie GPT-6 Sol und Luna haben standardmäßig `medium`: Ein Agent mit Tools schlägt auf ihnen fehl (`Function tools with reasoning_effort are not supported`), wenn Sie nicht `reasoningEffort: 'none'` setzen. GPT-6 Astra kann über Chat Completions überhaupt keine Tools aufrufen. Das SDK sendet den gesetzten Aufwand unverändert.
+:::
 
 | Option | Standard | |
 | --- | --- | --- |
 | `defaultModel` | `gpt-5.4` | Modell einer Anfrage, die keines nennt, und eines Fallbacks, der das Modell des Agenten nicht anbietet |
 | `reasoningModels` | Am Namen erkannt | `true` oder `false`: Alle Modelle dieses Anbieters sind Reasoning-Modelle bzw. keines ist eines. Eine Liste: Diese Namen sind es (Azure-Deployments, Gateway-Aliase), die übrigen werden am Namen erkannt |
-| `reasoningEffort` | Der des Modells | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` oder `max`, nur an Reasoning-Modelle gesendet. Jedes Modell akzeptiert einige dieser Werte, die API lehnt die übrigen ab |
-| `nativeToolMessages` | `true` | `false` für einen kompatiblen Server, der weder `tool_calls` noch `tool`-Nachrichten unterstützt: Tool-Aufrufe und ihre Ergebnisse werden dann als Text gesendet, an jeden Anbieter der Kette, wenn dieser ein Fallback ist |
+| `reasoningEffort` | Der des Modells | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` oder `max`, unverändert nur an Reasoning-Modelle gesendet. Jedes Modell akzeptiert einige dieser Werte, die API lehnt die übrigen ab |
+| `nativeToolMessages` | `true` | `false` für einen kompatiblen Server, der in der Konversation weder `tool_calls` des Assistenten noch `tool`-Nachrichten akzeptiert: Frühere Tool-Aufrufe und ihre Ergebnisse werden dann als Text gesendet, während die Tools weiter angeboten und die Tool-Aufrufe der Antworten weiter gelesen werden. `false` beim primären Anbieter oder bei einem beliebigen Fallback gilt für die ganze Kette |
 
-Diese Optionen gehören in `providerConfig.openai` oder in die `config` eines OpenAI-Fallbacks. Ein Fallback eines anderen Herstellers übernimmt aus `providerConfig.openai` jede Option, die seine `config` nicht setzt; ein Fallback desselben Herstellers wie der primäre Anbieter übernimmt keine. Ein Agent oder ein Lauf setzt seinen eigenen Aufwand in `providerSettings.openai.reasoningEffort`: Der des Laufs hat Vorrang, dann der des Agenten, dann der des Anbieters.
+Diese Optionen gehören in `providerConfig.openai` oder in die `config` eines OpenAI-Fallbacks. Ein Fallback eines anderen Herstellers übernimmt aus `providerConfig.openai` jede Option, die seine `config` nicht setzt; ein Fallback desselben Herstellers wie der primäre Anbieter übernimmt keine. Ein Agent oder ein Lauf setzt seinen eigenen Aufwand in `providerSettings.openai.reasoningEffort`: Der des Laufs hat Vorrang, dann der des Agenten, dann der des Anbieters. Ein kognitiver Agent wendet ihn nur auf die Tool-Auswahl an; seine Gedanken, die keine Tools anbieten, nehmen seine Option `reasoningEffort`.
 
 ```ts
 const sdk = createSDK({
@@ -83,8 +87,8 @@ const analyst = sdk.createAgent({
 | `knowledge` | — | Gedächtnis über Läufe hinweg: `{ store, scope, recallLimit? (10), record? (true) }`, siehe [Gedächtnis über Läufe hinweg](../guide/memory) |
 | `evaluator` | — | Ein `OutcomeEvaluator`, der Vorhersagen testet; aktiviert `test_prediction` |
 | `generator` | LLM-Generator auf `model` | Ihr eigener `ThoughtGenerator` (Vergleiche von Beobachtungen eingeschlossen); seine Gedanken durchlaufen trotzdem die Aufnahmeregeln der Engine |
-| `temperature`, `maxTokens` | `0.4`, — | Einstellungen der Gedankengenerierung |
-| `providerSettings` | — | Einstellungen für die Tool-Auswahl (native Reasoning Engine) |
+| `temperature`, `maxTokens`, `reasoningEffort` | `0.4`, —, — | Einstellungen der Gedankengenerierung (`reasoningEffort`: nur Reasoning-Modelle von OpenAI) |
+| `providerSettings` | — | Einstellungen für die Tool-Auswahl (native Reasoning Engine), einschließlich `openai.reasoningEffort` |
 
 ### `CognitiveRunResult` {#cognitiverunresult}
 

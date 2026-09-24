@@ -25,7 +25,7 @@ SDK AI Agents 是一套面向 AI 智能体的治理基础设施，它把推理�
 ```typescript
 const agent = sdk.createAgent({
   name: 'math-assistant',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
   tools: [calculatorTool],
   version: '1.0.0',
   capabilities: ['math']
@@ -84,7 +84,7 @@ const mathCapability = sdk.defineCapability({
 
 const agent = sdk.createAgent({
   name: 'math-assistant',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
   capabilities: ['math']
 })
 ```
@@ -103,7 +103,7 @@ const mathCapability = sdk.defineCapability({
 
 const agent = sdk.createAgent({
   name: 'math-assistant',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
   capabilities: ['math']
 })
 ```

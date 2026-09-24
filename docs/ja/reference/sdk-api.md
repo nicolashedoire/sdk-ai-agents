@@ -25,16 +25,20 @@ const sdk = createSDK(config);
 
 ### OpenAI のモデル {#openai-models}
 
-OpenAI の推論モデル（o シリーズの `o1`、`o3`、`o4-mini`… と、GPT-5 以降の `gpt-5`、`gpt-5.4-mini`、`gpt-6-sol`…。日付付きやファインチューニング済みの `ft:o4-mini-…` なども含む）は、`temperature` と `max_tokens` を拒否します。OpenAI プロバイダーはこれらを名前で判別し、`maxTokens` を `max_completion_tokens`（推論トークンも数えます）として、推論の努力度とともに送ります。温度は、努力度が `none` のときも含めて一切送りません。それ以外のモデルには、OpenAI 互換のどのサーバーも理解する `temperature` と `max_tokens` を送ります。
+OpenAI の推論モデル（o シリーズの `o1`、`o3`、`o4-mini`… と、GPT-5 以降の `gpt-5`、`gpt-5.4-mini`、`gpt-6-sol`…。日付付きやファインチューニング済みの `ft:o4-mini-…` なども含む）は、`max_tokens` を拒否し、推論の努力度が `none` でない限り `temperature` も拒否します。OpenAI プロバイダーは大文字・小文字を問わず名前でこれらを判別し、`maxTokens` を `max_completion_tokens`（推論トークンも数えます）として、推論の努力度とともに送ります。デフォルトの努力度はモデルによって異なるため、温度は一切送りません。エージェントやエンジンの温度は、これらのモデルでは無視されます。それ以外のモデルには、OpenAI 互換のどのサーバーも理解する `temperature` と `max_tokens` を送ります。
+
+::: warning ツールと推論の努力度
+SDK は Chat Completions を通じて OpenAI を呼び出します。Chat Completions では、GPT-5.4 以降のモデルは努力度が `none` のときにしかツールを呼び出しません。デフォルトのモデル `gpt-5.4` は、別の努力度を指定しない限り `none` を使います。GPT-5.5、GPT-5.6、GPT-6 Sol と Luna のデフォルトは `medium` なので、`reasoningEffort: 'none'` を指定しない限り、ツールを持つエージェントはこれらのモデルで失敗します（`Function tools with reasoning_effort are not supported`）。GPT-6 Astra は Chat Completions ではツールをまったく呼び出せません。SDK は指定された努力度をそのまま送ります。
+:::
 
 | オプション | デフォルト | |
 | --- | --- | --- |
 | `defaultModel` | `gpt-5.4` | モデルを指定しないリクエストと、エージェントのモデルに対応していないフォールバックが使うモデル |
 | `reasoningModels` | 名前から判別 | `true` または `false`：このプロバイダーのすべてのモデルを推論モデルとして扱うか、扱わないか。リスト：挙げた名前（Azure のデプロイ、ゲートウェイのエイリアス）は推論モデルで、ほかは名前から判別される |
-| `reasoningEffort` | モデルのデフォルト | `none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max` のいずれか。推論モデルにだけ送られる。各モデルが受け付けるのはこのうち一部の値で、API はそれ以外を拒否する |
-| `nativeToolMessages` | `true` | `tool_calls` と `tool` メッセージに対応していない互換サーバーでは `false`：ツール呼び出しとその結果はテキストで送られる。このプロバイダーがフォールバックなら、チェーンのすべてのプロバイダーに対してそうなる |
+| `reasoningEffort` | モデルのデフォルト | `none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max` のいずれか。推論モデルにだけ、そのまま送られる。各モデルが受け付けるのはこのうち一部の値で、API はそれ以外を拒否する |
+| `nativeToolMessages` | `true` | 会話の中でアシスタントの `tool_calls` と `tool` メッセージを受け付けない互換サーバーでは `false`：それまでのツール呼び出しとその結果はテキストで送られる。ツールは引き続き提示され、応答に含まれるツール呼び出しも引き続き読み取られる。主プロバイダーまたはいずれかのフォールバックで `false` にすると、チェーン全体に適用される |
 
-これらのオプションは `providerConfig.openai`、または OpenAI のフォールバックの `config` に指定します。別のベンダーのフォールバックは、自身の `config` が指定していないオプションを `providerConfig.openai` から取ります。主プロバイダーと同じベンダーのフォールバックは何も引き継ぎません。エージェントや実行は、`providerSettings.openai.reasoningEffort` で独自の努力度を指定できます。実行の値が最優先で、次にエージェント、最後にプロバイダーの値が使われます。
+これらのオプションは `providerConfig.openai`、または OpenAI のフォールバックの `config` に指定します。別のベンダーのフォールバックは、自身の `config` が指定していないオプションを `providerConfig.openai` から取ります。主プロバイダーと同じベンダーのフォールバックは何も引き継ぎません。エージェントや実行は、`providerSettings.openai.reasoningEffort` で独自の努力度を指定できます。実行の値が最優先で、次にエージェント、最後にプロバイダーの値が使われます。認知エージェントはこれをツール選択にだけ適用し、ツールを提示しない思考には、エージェントの `reasoningEffort` オプションが使われます。
 
 ```ts
 const sdk = createSDK({
@@ -83,8 +87,8 @@ const analyst = sdk.createAgent({
 | `knowledge` | — | 実行をまたぐ記憶：`{ store, scope, recallLimit? (10), record? (true) }`。[実行をまたぐ記憶](../guide/memory) を参照 |
 | `evaluator` | — | 予測をテストする `OutcomeEvaluator`。`test_prediction` を有効にする |
 | `generator` | `model` を使う LLM ジェネレーター | 独自の `ThoughtGenerator`（観測の比較も含む）。その思考も、エンジンの受け入れ規則を通る |
-| `temperature`、`maxTokens` | `0.4`、— | 思考の生成の設定 |
-| `providerSettings` | — | ツール選択の設定（ネイティブの推論エンジン） |
+| `temperature`、`maxTokens`、`reasoningEffort` | `0.4`、—、— | 思考の生成の設定（`reasoningEffort`：OpenAI の推論モデルのみ） |
+| `providerSettings` | — | ツール選択の設定（ネイティブの推論エンジン）。`openai.reasoningEffort` を含む |
 
 ### `CognitiveRunResult` {#cognitiverunresult}
 

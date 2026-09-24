@@ -25,16 +25,20 @@ const sdk = createSDK(config);
 
 ### Modèles OpenAI {#openai-models}
 
-Les modèles de raisonnement d'OpenAI — la série o (`o1`, `o3`, `o4-mini`…) et GPT-5 et les suivants (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…), y compris datés ou affinés (`ft:o4-mini-…`) — refusent `temperature` et `max_tokens`. Le fournisseur OpenAI les reconnaît à leur nom : il leur envoie `maxTokens` sous la forme de `max_completion_tokens`, qui compte aussi leurs tokens de raisonnement, ainsi que l'effort de raisonnement, mais jamais de température, pas même avec l'effort `none`. Les autres modèles reçoivent `temperature` et `max_tokens`, que tout serveur compatible avec OpenAI connaît.
+Les modèles de raisonnement d'OpenAI — la série o (`o1`, `o3`, `o4-mini`…) et GPT-5 et les suivants (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…), y compris datés ou affinés (`ft:o4-mini-…`) — refusent `max_tokens`, et `temperature` sauf quand leur effort de raisonnement est `none`. Le fournisseur OpenAI les reconnaît à leur nom, quelle que soit la casse : il leur envoie `maxTokens` sous la forme de `max_completion_tokens`, qui compte aussi leurs tokens de raisonnement, ainsi que l'effort de raisonnement. Comme l'effort par défaut varie d'un modèle à l'autre, il ne leur envoie jamais de température : celle de l'agent ou du moteur est ignorée pour eux. Les autres modèles reçoivent `temperature` et `max_tokens`, que tout serveur compatible avec OpenAI connaît.
+
+::: warning Outils et effort de raisonnement
+Le SDK appelle OpenAI par Chat Completions, où les modèles GPT-5.4 et suivants n'appellent des outils qu'avec l'effort `none`. Le modèle par défaut, `gpt-5.4`, utilise `none` tant que vous ne fixez pas un autre effort. GPT-5.5, GPT-5.6 et GPT-6 Sol et Luna ont `medium` par défaut : un agent doté d'outils échoue sur eux (`Function tools with reasoning_effort are not supported`) à moins de fixer `reasoningEffort: 'none'`. GPT-6 Astra ne peut pas du tout appeler d'outils par Chat Completions. Le SDK envoie l'effort que vous fixez tel quel.
+:::
 
 | Option | Valeur par défaut | |
 | --- | --- | --- |
 | `defaultModel` | `gpt-5.4` | Modèle d'une requête qui n'en nomme aucun, et d'un repli qui ne sert pas le modèle de l'agent |
 | `reasoningModels` | Déduit du nom | `true` ou `false` : tous les modèles de ce fournisseur sont, ou ne sont pas, des modèles de raisonnement. Une liste : ces noms en sont (déploiements Azure, alias de passerelle), les autres sont reconnus à leur nom |
-| `reasoningEffort` | Celui du modèle | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` ou `max`, envoyé aux seuls modèles de raisonnement. Chaque modèle accepte certaines de ces valeurs, et l'API refuse les autres |
-| `nativeToolMessages` | `true` | `false` pour un serveur compatible qui ne prend en charge ni `tool_calls` ni les messages `tool` : les appels d'outils et leurs résultats sont alors envoyés en texte, à tous les fournisseurs de la chaîne quand celui-ci est un repli |
+| `reasoningEffort` | Celui du modèle | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` ou `max`, envoyé tel quel aux seuls modèles de raisonnement. Chaque modèle accepte certaines de ces valeurs, et l'API refuse les autres |
+| `nativeToolMessages` | `true` | `false` pour un serveur compatible qui n'accepte pas, dans la conversation, les `tool_calls` de l'assistant ni les messages `tool` : les appels d'outils précédents et leurs résultats sont alors envoyés en texte, tandis que les outils restent proposés et que les appels d'outils des réponses sont toujours lus. `false` sur le fournisseur principal ou sur n'importe quel repli s'applique à toute la chaîne |
 
-Ces options se placent dans `providerConfig.openai` ou dans le `config` d'un repli OpenAI. Un repli d'un autre éditeur prend dans `providerConfig.openai` chaque option que son `config` ne fixe pas ; un repli du même éditeur que le principal n'en prend aucune. Un agent ou une exécution fixe son propre effort dans `providerSettings.openai.reasoningEffort` : celui de l'exécution l'emporte, puis celui de l'agent, puis celui du fournisseur.
+Ces options se placent dans `providerConfig.openai` ou dans le `config` d'un repli OpenAI. Un repli d'un autre éditeur prend dans `providerConfig.openai` chaque option que son `config` ne fixe pas ; un repli du même éditeur que le principal n'en prend aucune. Un agent ou une exécution fixe son propre effort dans `providerSettings.openai.reasoningEffort` : celui de l'exécution l'emporte, puis celui de l'agent, puis celui du fournisseur. Un agent cognitif ne l'applique qu'à la sélection d'outil ; ses pensées, qui ne proposent pas d'outils, prennent son option `reasoningEffort`.
 
 ```ts
 const sdk = createSDK({
@@ -83,8 +87,8 @@ const analyst = sdk.createAgent({
 | `knowledge` | — | Mémoire entre exécutions : `{ store, scope, recallLimit? (10), record? (true) }`, voir [Mémoire entre exécutions](../guide/memory) |
 | `evaluator` | — | Un `OutcomeEvaluator` qui teste les prédictions ; active `test_prediction` |
 | `generator` | générateur LLM sur `model` | Votre propre `ThoughtGenerator` (comparaisons d'observations comprises) ; ses pensées passent tout de même par les règles d'admission du moteur |
-| `temperature`, `maxTokens` | `0.4`, — | Réglages de la génération des pensées |
-| `providerSettings` | — | Réglages de la sélection d'outil (moteur de raisonnement natif) |
+| `temperature`, `maxTokens`, `reasoningEffort` | `0.4`, —, — | Réglages de la génération des pensées (`reasoningEffort` : modèles de raisonnement d'OpenAI uniquement) |
+| `providerSettings` | — | Réglages de la sélection d'outil (moteur de raisonnement natif), `openai.reasoningEffort` compris |
 
 ### `CognitiveRunResult` {#cognitiverunresult}
 
