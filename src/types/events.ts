@@ -1,5 +1,10 @@
 export type RunStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
+/**
+ * Every event type a trace can hold. Three are never recorded by the SDK and stay for events
+ * appended by your own code: `intention.rejected` (a refused call is `policy.violated` or
+ * `approval.rejected`), `tool.failed` (a failed call is `action.failed`) and `error.occurred`.
+ */
 export type EventType =
   | 'run.started'
   | 'run.completed'
@@ -7,7 +12,7 @@ export type EventType =
   | 'run.cancelled'
   | 'run.stopped'
   | 'intention.generated'
-  | 'intention.rejected'
+  | 'intention.rejected' // never recorded by the SDK
   | 'action.executing'
   | 'action.executed'
   | 'action.failed'
@@ -17,13 +22,13 @@ export type EventType =
   | 'approval.approved'
   | 'approval.rejected'
   | 'tool.called'
-  | 'tool.failed'
+  | 'tool.failed' // never recorded by the SDK
   | 'resource.read'
   | 'provider.fallback'
   | 'provider.retry'
   | 'tool.retry'
   | 'incident.reported'
-  | 'error.occurred'
+  | 'error.occurred' // never recorded by the SDK
   | 'cognition.started'
   | 'cognition.operation_selected'
   | 'cognition.thought'
