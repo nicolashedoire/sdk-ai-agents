@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { LLMProviderError } from '../errors/index.js';
+import { LLMProviderError, ValidationError } from '../errors/index.js';
 import { createSDK, type SDK } from '../sdk.js';
 import { FileEventStore } from '../stores/file-event-store.js';
 import type { SDKConfig } from '../types/sdk.js';
@@ -275,6 +275,60 @@ describe('SDK with Fallback Providers', () => {
       expect(openai.requests).toHaveLength(1);
       expect(anthropic.requests).toHaveLength(1);
       expect(await eventsOf(sdk, result.runId, 'provider.retry')).toEqual([]);
+    });
+  });
+
+  describe('keys and settings of a fallback', () => {
+    it('should refuse a fallback of another vendor that has no key of its own', () => {
+      // The primary's OpenAI key must never be sent to Anthropic.
+      expect(() =>
+        buildSDK({
+          fallbackProviders: [{ provider: 'anthropic', config: { baseURL: anthropicURL } }],
+        })
+      ).toThrow(ValidationError);
+      expect(() =>
+        buildSDK({
+          fallbackProviders: [{ provider: 'anthropic', config: { baseURL: anthropicURL } }],
+        })
+      ).toThrow('fallbackProviders[0]');
+      expect(anthropic.requests).toHaveLength(0);
+    });
+
+    it("should take a fallback's key and address from its vendor's providerConfig", async () => {
+      openai.reply(openAIError(500, 'The server had an error'));
+      anthropic.reply(anthropicMessage({ text: ['Hello from Anthropic'] }));
+      const sdk = buildSDK({
+        providerConfig: {
+          openai: { baseURL: openaiURL },
+          anthropic: { apiKey: 'anthropic-vendor-key', baseURL: anthropicURL },
+        },
+        fallbackProviders: [{ provider: 'anthropic' }],
+      });
+
+      const result = await runAgent(sdk);
+
+      expect(result).toMatchObject({ status: 'completed', output: 'Hello from Anthropic' });
+      expect(anthropic.requests[0]?.headers['x-api-key']).toBe('anthropic-vendor-key');
+      expect(openai.requests[0]?.headers.authorization).toBe('Bearer test-openai-key');
+    });
+
+    it('should give the primary key to a fallback of the same vendor', async () => {
+      const backup = new LocalHttpServer();
+      const backupURL = `${await backup.start()}/v1`;
+      try {
+        openai.reply(openAIError(500, 'The server had an error'));
+        backup.reply(openAIChat({ content: 'Hello from the backup' }));
+        const sdk = buildSDK({
+          fallbackProviders: [{ provider: 'openai', config: { baseURL: backupURL } }],
+        });
+
+        const result = await runAgent(sdk);
+
+        expect(result).toMatchObject({ status: 'completed', output: 'Hello from the backup' });
+        expect(backup.requests[0]?.headers.authorization).toBe('Bearer test-openai-key');
+      } finally {
+        await backup.stop();
+      }
     });
   });
 });

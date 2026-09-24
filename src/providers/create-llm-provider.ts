@@ -1,3 +1,4 @@
+import { ValidationError } from '../errors/index.js';
 import type { RetryPolicy } from '../resilience/retry.js';
 import { RetryingLLMProvider, type ProviderRetryInfo } from '../resilience/retrying-provider.js';
 import type { SDKConfig } from '../types/sdk.js';
@@ -59,13 +60,27 @@ export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}):
   if (!config.fallbackProviders || config.fallbackProviders.length === 0) {
     return primary;
   }
-  const fallbacks = config.fallbackProviders.map((fallback) =>
-    build(
+  const fallbacks = config.fallbackProviders.map((fallback, index) => {
+    // A fallback's own config first, then the settings of its vendor in providerConfig.
+    const vendorConfig = config.providerConfig?.[fallback.provider];
+    // The primary's key only goes to a fallback of the same vendor: an OpenAI key must never
+    // be sent to Anthropic (or to the address configured for it), nor the other way round.
+    const apiKey =
+      fallback.config?.apiKey ||
+      vendorConfig?.apiKey ||
+      (fallback.provider === primaryName ? primaryKey : undefined);
+    if (!apiKey) {
+      throw new ValidationError(
+        `fallbackProviders[${index}]`,
+        `no API key for "${fallback.provider}": set fallbackProviders[${index}].config.apiKey or providerConfig.${fallback.provider}.apiKey`
+      );
+    }
+    return build(
       fallback.provider,
-      fallback.config?.apiKey || config.apiKey,
-      fallback.config?.defaultModel,
-      fallback.config?.baseURL
-    )
-  );
+      apiKey,
+      fallback.config?.defaultModel || vendorConfig?.defaultModel,
+      fallback.config?.baseURL || vendorConfig?.baseURL
+    );
+  });
   return new FallbackProvider(primary, fallbacks);
 }
