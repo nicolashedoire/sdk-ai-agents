@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { ValidationError } from '../errors/index.js';
+import { AnthropicProvider } from '../providers/anthropic-provider.js';
 import type { LLMProvider, LLMRequest, LLMResponse } from '../providers/llm-provider.js';
+import { OpenAIProvider } from '../providers/openai-provider.js';
 import { createSDK, type SDK } from '../sdk.js';
 import { FileEventStore } from '../stores/file-event-store.js';
 import type { Event } from '../types/events.js';
@@ -372,7 +375,127 @@ describe('streaming the text of a governed run', () => {
     expect(openai.jsonBody(0)).toMatchObject({ stream_options: { include_usage: true } });
   });
 
-  it('records neither callbacks nor signal in the input of a replay', async () => {
+  it('gives an OpenAI fallback of another vendor the includeStreamUsage of providerConfig', async () => {
+    anthropic.reply(anthropicError(400, 'Invalid request'));
+    openai.reply(openAIChatStream({ content: 'From the fallback' }));
+    const sdk = buildSDK({
+      provider: 'anthropic',
+      apiKey: 'test-anthropic-key',
+      providerConfig: {
+        anthropic: { baseURL: anthropicURL },
+        openai: { apiKey: 'test-openai-key', baseURL: openaiURL, includeStreamUsage: true },
+      },
+      fallbackProviders: [{ provider: 'openai' }],
+    });
+
+    const result = await sdk
+      .createAgent({ name: 'greeter', model: 'claude-3-5-haiku-20241022' })
+      .run({ message: 'Hello', onText: () => {} });
+
+    expect(result.output).toBe('From the fallback');
+    expect(openai.jsonBody(0)).toMatchObject({ stream_options: { include_usage: true } });
+  });
+
+  it('refuses a timeout or an includeStreamUsage that cannot be used, naming where it is set', () => {
+    const failureOf = (build: () => unknown): unknown => {
+      try {
+        build();
+      } catch (error) {
+        return error;
+      }
+      throw new Error('expected a ValidationError');
+    };
+    const cases: Array<[() => unknown, string]> = [
+      [
+        () => buildSDK({ providerConfig: { openai: { baseURL: openaiURL, timeout: 0 } } }),
+        'providerConfig.openai.timeout - must be a number of milliseconds above 0',
+      ],
+      [
+        // As read from a JSON configuration.
+        () => buildSDK({ providerConfig: { anthropic: { timeout: '30s' as unknown as number } } }),
+        'providerConfig.anthropic.timeout - must be a number of milliseconds above 0 and at most 2147483647, got "30s"',
+      ],
+      [
+        // Longer than a timer can wait: it would fire at once.
+        () =>
+          buildSDK({
+            fallbackProviders: [
+              { provider: 'anthropic', config: { apiKey: 'k', timeout: 2 ** 31 } },
+            ],
+          }),
+        'fallbackProviders[0].config.timeout',
+      ],
+      [() => new OpenAIProvider('test-key', 'gpt-4', { timeout: Number.NaN }), 'options.timeout'],
+      [
+        () =>
+          buildSDK({
+            providerConfig: {
+              openai: { baseURL: openaiURL, includeStreamUsage: 'yes' as unknown as boolean },
+            },
+          }),
+        'providerConfig.openai.includeStreamUsage - must be true or false, got "yes"',
+      ],
+      [() => new AnthropicProvider('test-key', undefined, { timeout: -1 }), 'options.timeout'],
+    ];
+
+    for (const [build, message] of cases) {
+      const error = failureOf(build);
+      expect(error).toBeInstanceOf(ValidationError);
+      expect((error as Error).message).toContain(message);
+    }
+  });
+
+  it('cuts a stalled stream after the timeout of providerConfig, for the primary and a fallback', async () => {
+    const stalled = { status: 200, stream: { events: [], then: 'hang' as const } };
+    openai.reply(stalled);
+    anthropic.reply(stalled);
+    const sdk = buildSDK({
+      providerConfig: {
+        openai: { baseURL: openaiURL, timeout: 600 },
+        // A fallback of another vendor takes its vendor's entry.
+        anthropic: { apiKey: 'test-anthropic-key', baseURL: anthropicURL, timeout: 600 },
+      },
+      fallbackProviders: [{ provider: 'anthropic' }],
+      retry: { maxRetries: 0 },
+    });
+
+    const result = await sdk
+      .createAgent({ name: 'greeter', model: 'gpt-4' })
+      .run({ message: 'Hello', onText: () => {} });
+
+    expect(result.status).toBe('failed');
+    expect(result.error?.message).toMatch(
+      /openai: The answer stream sent nothing for 600 ms.*anthropic: The answer stream sent nothing for 600 ms/
+    );
+  });
+
+  it('gives a fallback the timeout of its own config', async () => {
+    const stalled = { status: 200, stream: { events: [], then: 'hang' as const } };
+    openai.reply(stalled);
+    anthropic.reply(stalled);
+    const sdk = buildSDK({
+      provider: 'anthropic',
+      apiKey: 'test-anthropic-key',
+      providerConfig: { anthropic: { baseURL: anthropicURL, timeout: 600 } },
+      fallbackProviders: [
+        {
+          provider: 'openai',
+          config: { apiKey: 'test-openai-key', baseURL: openaiURL, timeout: 600 },
+        },
+      ],
+      retry: { maxRetries: 0 },
+    });
+
+    const result = await sdk
+      .createAgent({ name: 'greeter', model: 'claude-3-5-haiku-20241022' })
+      .run({ message: 'Hello', onText: () => {} });
+
+    expect(result.error?.message).toMatch(
+      /anthropic: The answer stream sent nothing for 600 ms.*openai: The answer stream sent nothing for 600 ms/
+    );
+  });
+
+  it('records neither callbacks, listener nor signal in the input of a replay', async () => {
     openai.reply(openAIChat({ content: 'Original' }));
     const sdk = buildSDK();
     const original = await sdk
@@ -380,8 +503,13 @@ describe('streaming the text of a governed run', () => {
       .run({ message: 'Hi' });
 
     const replay = await sdk.replay(original.runId, {
-      // @ts-expect-error A replay does not stream: its input takes no callbacks.
-      input: { message: 'Replayed', onText: () => {}, signal: new AbortController().signal },
+      input: {
+        message: 'Replayed',
+        // @ts-expect-error A replay does not stream: its input takes no callbacks.
+        onText: () => {},
+        onEvent: () => {},
+        signal: new AbortController().signal,
+      },
     });
 
     const [started] = await eventsOf(sdk, replay.runId, 'run.started');
@@ -399,6 +527,8 @@ interface ScriptedCall {
   restartFirst?: boolean;
   /** Passed to `onTextDelta` after the call answered (a misbehaving provider). */
   late?: string;
+  /** Restarts after the call answered (a misbehaving provider). */
+  lateRestart?: boolean;
 }
 
 /** A custom provider whose calls are scripted, streaming or not. */
@@ -413,6 +543,9 @@ class ScriptedTextProvider implements LLMProvider {
     if (call.late) {
       const late = call.late;
       setTimeout(() => request.onTextDelta?.(late), 0);
+    }
+    if (call.lateRestart) {
+      setTimeout(() => request.onTextRestart?.(), 0);
     }
     return {
       content: call.content ?? null,
@@ -474,6 +607,19 @@ describe('streaming with a custom provider', () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(result.output).toBe('Answer');
+    expect(listener.heard).toEqual(['Answer']);
+  });
+
+  it('passes on no restart once the call is over', async () => {
+    const listener = new Listener();
+
+    await runWith(
+      new ScriptedTextProvider([{ content: 'Answer', stream: ['Answer'], lateRestart: true }]),
+      listener.callbacks
+    );
+    // Give the late restart its chance to arrive.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
     expect(listener.heard).toEqual(['Answer']);
   });
 

@@ -15,11 +15,17 @@ export interface VendorConfig {
   /** Model used when a request names none, or names one this vendor does not serve (fallbacks). */
   defaultModel?: string;
   baseURL?: string;
+  /**
+   * Longest wait for an answer, in milliseconds (the vendor client's default: 10 minutes). A
+   * streamed answer that sends nothing for this long is cut, and fails as a connection failure.
+   */
+  timeout?: number;
 }
 
 /**
  * OpenAI settings: those of every vendor, and how requests are shaped for OpenAI models and
- * compatible servers (`reasoningModels`, `reasoningEffort`, `nativeToolMessages`).
+ * compatible servers (`reasoningModels`, `reasoningEffort`, `nativeToolMessages`,
+ * `includeStreamUsage`).
  */
 export interface OpenAIVendorConfig extends VendorConfig, OpenAIRequestOptions {}
 
@@ -47,8 +53,9 @@ export interface SDKConfig {
   /**
    * Settings of each vendor, used by the primary provider and by any fallback of that vendor
    * (a fallback's own `config` takes precedence). `baseURL` points a provider at a compatible
-   * endpoint or a proxy. `includeStreamUsage` (OpenAI): whether a streamed answer is asked for
-   * its usage; by default only on OpenAI's own API.
+   * endpoint or a proxy, and `timeout` bounds the wait for an answer. `includeStreamUsage`
+   * (OpenAI): whether a streamed answer is asked for its usage; by default only on OpenAI's
+   * own API.
    */
   providerConfig?: {
     openai?: OpenAIVendorConfig;

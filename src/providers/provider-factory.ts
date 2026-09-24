@@ -10,6 +10,8 @@ export interface ProviderConfig {
   clientMaxRetries?: number;
   /** Address of the API (the vendor's own when omitted). */
   baseURL?: string;
+  /** Longest wait for an answer, in milliseconds (the vendor client's default when omitted). */
+  timeout?: number;
   /**
    * How the OpenAI provider shapes its requests (reasoning models, native tool messages, the
    * usage of streamed answers).
@@ -53,5 +55,6 @@ function clientOptions(config: ProviderConfig): VendorClientOptions {
   return {
     ...(config.clientMaxRetries !== undefined ? { maxRetries: config.clientMaxRetries } : {}),
     ...(config.baseURL !== undefined ? { baseURL: config.baseURL } : {}),
+    ...(config.timeout !== undefined ? { timeout: config.timeout } : {}),
   };
 }

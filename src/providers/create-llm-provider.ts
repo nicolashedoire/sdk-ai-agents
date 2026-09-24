@@ -11,6 +11,7 @@ import {
   type OpenAIRequestOptions,
 } from './openai-provider.js';
 import { ProviderFactory } from './provider-factory.js';
+import { assertVendorTimeout } from './vendor-timeout.js';
 import { UnconfiguredLLMProvider } from './unconfigured-provider.js';
 
 const DEFAULT_MODELS = {
@@ -31,10 +32,16 @@ export interface ProviderSetup {
 export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}): LLMProvider {
   // Before anything is built, and named as in the configuration.
   assertOpenAIRequestOptions(config.providerConfig?.openai, 'providerConfig.openai');
+  assertVendorTimeout(config.providerConfig?.openai?.timeout, 'providerConfig.openai.timeout');
+  assertVendorTimeout(
+    config.providerConfig?.anthropic?.timeout,
+    'providerConfig.anthropic.timeout'
+  );
   for (const [index, fallback] of (config.fallbackProviders ?? []).entries()) {
     if (fallback.provider === 'openai') {
       assertOpenAIRequestOptions(fallback.config, `fallbackProviders[${index}].config`);
     }
+    assertVendorTimeout(fallback.config?.timeout, `fallbackProviders[${index}].config.timeout`);
   }
   const canFailOver = (config.fallbackProviders?.length ?? 0) > 0;
   // With a fallback available, do not wait on a long retry-after: fail over instead.
@@ -48,7 +55,8 @@ export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}):
     apiKey: string | undefined,
     defaultModel?: string,
     baseURL?: string,
-    openai?: OpenAIRequestOptions
+    openai?: OpenAIRequestOptions,
+    timeout?: number
   ) => {
     const vendor = ProviderFactory.createProvider({
       provider,
@@ -57,6 +65,7 @@ export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}):
       ...(retryPolicy ? { clientMaxRetries: 0 } : {}),
       ...(baseURL ? { baseURL } : {}),
       ...(openai ? { openai } : {}),
+      ...(timeout !== undefined ? { timeout } : {}),
     });
     return retryPolicy ? new RetryingLLMProvider(vendor, retryPolicy, setup.onRetry) : vendor;
   };
@@ -73,7 +82,8 @@ export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}):
     primaryKey,
     primaryConfig?.defaultModel,
     primaryConfig?.baseURL,
-    primaryName === 'openai' ? openAIRequestOptions(config.providerConfig?.openai) : undefined
+    primaryName === 'openai' ? openAIRequestOptions(config.providerConfig?.openai) : undefined,
+    primaryConfig?.timeout
   );
 
   if (!config.fallbackProviders || config.fallbackProviders.length === 0) {
@@ -105,7 +115,8 @@ export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}):
             fallback.config,
             sameVendor ? undefined : config.providerConfig?.openai
           )
-        : undefined
+        : undefined,
+      fallback.config?.timeout ?? vendorConfig?.timeout
     );
   });
   return new FallbackProvider(primary, fallbacks);

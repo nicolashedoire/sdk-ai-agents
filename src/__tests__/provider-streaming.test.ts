@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LLMProviderError } from '../errors/index.js';
 import { AnthropicProvider } from '../providers/anthropic-provider.js';
 import { FallbackProvider } from '../providers/fallback-provider.js';
-import type { LLMProvider, LLMRequest, LLMResponse } from '../providers/llm-provider.js';
+import type {
+  DiscardedAnswer,
+  LLMProvider,
+  LLMRequest,
+  LLMResponse,
+} from '../providers/llm-provider.js';
 import { OpenAIProvider, asksForStreamUsage } from '../providers/openai-provider.js';
 import { isTransientError } from '../resilience/retry.js';
 import { RetryingLLMProvider } from '../resilience/retrying-provider.js';
@@ -85,6 +90,9 @@ const calculator = {
 };
 
 const hello = [{ role: 'user' as const, content: 'Hello' }];
+
+/** Client timeout of the idle-stream tests, well above the 100 ms between steady events. */
+const IDLE_MS = 600;
 
 describe('OpenAIProvider streaming', () => {
   let server: LocalHttpServer;
@@ -326,7 +334,7 @@ describe('OpenAIProvider streaming', () => {
     const patient = new OpenAIProvider('test-api-key', 'gpt-4', {
       baseURL,
       maxRetries: 0,
-      timeout: 300,
+      timeout: IDLE_MS,
     });
     const events = openAIChatEvents({ content: 'First words, then silence' });
     server.reply({ status: 200, stream: { events: events.slice(0, 3), then: 'hang' } });
@@ -337,7 +345,7 @@ describe('OpenAIProvider streaming', () => {
     );
 
     expect(error).toBeInstanceOf(LLMProviderError);
-    expect((error as Error).message).toContain('The answer stream sent nothing for 300 ms');
+    expect((error as Error).message).toContain(`The answer stream sent nothing for ${IDLE_MS} ms`);
     expect((error as LLMProviderError).connectionFailure).toBe(true);
     expect(isTransientError(error)).toBe(true);
     expect(listener.deltas).toEqual(['Firs', 't wo']);
@@ -348,7 +356,7 @@ describe('OpenAIProvider streaming', () => {
     const patient = new OpenAIProvider('test-api-key', 'gpt-4', {
       baseURL,
       maxRetries: 0,
-      timeout: 300,
+      timeout: IDLE_MS,
     });
     server.reply({ status: 200, stream: { events: [], then: 'hang' } });
 
@@ -356,7 +364,7 @@ describe('OpenAIProvider streaming', () => {
       patient.generateCompletion({ model: 'gpt-4', messages: hello, onTextDelta: () => {} })
     );
 
-    expect((error as Error).message).toContain('The answer stream sent nothing for 300 ms');
+    expect((error as Error).message).toContain(`The answer stream sent nothing for ${IDLE_MS} ms`);
     expect((error as LLMProviderError).connectionFailure).toBe(true);
   });
 
@@ -364,9 +372,9 @@ describe('OpenAIProvider streaming', () => {
     const patient = new OpenAIProvider('test-api-key', 'gpt-4', {
       baseURL,
       maxRetries: 0,
-      timeout: 300,
+      timeout: IDLE_MS,
     });
-    // Nine events, 100 ms apart: longer than the timeout in all, never silent for as long.
+    // Events 100 ms apart: longer than the timeout in all, never silent for as long.
     const events = openAIChatEvents({ content: 'Slow but steady answer' });
     server.reply({ status: 200, stream: { events, intervalMs: 100 } });
 
@@ -376,7 +384,8 @@ describe('OpenAIProvider streaming', () => {
       onTextDelta: () => {},
     });
 
-    expect(events.length).toBeGreaterThan(5);
+    // Longer in all than the timeout, so it would be cut if the timer did not restart.
+    expect(events.length * 100).toBeGreaterThan(IDLE_MS);
     expect(response.content).toBe('Slow but steady answer');
   });
 
@@ -482,6 +491,11 @@ describe('OpenAIProvider streaming', () => {
   it("asks for the usage only on OpenAI's own API, unless told otherwise", async () => {
     expect(asksForStreamUsage('https://api.openai.com/v1')).toBe(true);
     expect(asksForStreamUsage('https://api.openai.com/v1/')).toBe(true);
+    // Regional hosts are OpenAI's own API too.
+    expect(asksForStreamUsage('https://eu.api.openai.com/v1')).toBe(true);
+    expect(asksForStreamUsage('https://us.api.openai.com/v1/')).toBe(true);
+    expect(asksForStreamUsage('https://api.openai.com.example.net/v1')).toBe(false);
+    expect(asksForStreamUsage('https://proxy.example.net/api.openai.com/v1')).toBe(false);
     expect(asksForStreamUsage('https://api.openai.com/v1', false)).toBe(false);
     expect(asksForStreamUsage('http://127.0.0.1:8080/v1')).toBe(false);
     expect(asksForStreamUsage('http://127.0.0.1:8080/v1', true)).toBe(true);
@@ -551,13 +565,16 @@ describe('OpenAIProvider streaming', () => {
   });
 
   it('answers in one piece, without streaming, a model the API refuses to stream', async () => {
+    const unverified = openAIError(
+      400,
+      'Your organization must be verified to stream this model. Please go to: https://platform.openai.com/settings/organization/general and click on Verify Organization.',
+      undefined,
+      { type: 'invalid_request_error', param: 'stream', code: 'unsupported_value' }
+    );
     server.reply(
-      openAIError(
-        400,
-        'Your organization must be verified to stream this model. Please go to: https://platform.openai.com/settings/organization/general and click on Verify Organization.',
-        undefined,
-        { type: 'invalid_request_error', param: 'stream', code: 'unsupported_value' }
-      ),
+      // Refused with stream_options, then again without it: streaming is what is refused.
+      unverified,
+      unverified,
       openAIChat({ content: 'Whole answer', usage: { prompt: 10, completion: 3 } }),
       openAIChat({ content: 'Whole again' }),
       openAIChatStream({ content: 'Streamed' })
@@ -594,7 +611,120 @@ describe('OpenAIProvider streaming', () => {
     expect(other.heard.length).toBeGreaterThan(1);
     expect(
       server.requests.map((request) => (JSON.parse(request.body) as { stream?: boolean }).stream)
-    ).toEqual([true, undefined, undefined, true]);
+    ).toEqual([true, true, undefined, undefined, true]);
+    // The refusal was not about stream_options: the usage is still asked for.
+    expect(server.jsonBody(1)).not.toHaveProperty('stream_options');
+    expect(server.jsonBody(4)).toHaveProperty('stream_options');
+  });
+
+  it('recognizes a refusal to stream by its message, whatever its param', async () => {
+    const compatible = new OpenAIProvider('test-api-key', 'gpt-4', { baseURL, maxRetries: 0 });
+    server.reply(
+      openAIError(400, 'Your organization must be verified to stream this model.', undefined, {
+        type: 'invalid_request_error',
+        param: null,
+      }),
+      openAIChat({ content: 'Whole answer' })
+    );
+    const listener = new Listener();
+
+    const response = await compatible.generateCompletion({
+      model: 'o3',
+      messages: hello,
+      ...listener.callbacks,
+    });
+
+    expect(response.content).toBe('Whole answer');
+    expect(listener.heard).toEqual(['Whole answer']);
+  });
+
+  /** A server that refuses stream_options with `refusal`, then streams. */
+  async function refusedThenAnswered(refusal: { status: number; body: unknown }) {
+    server.reply(refusal, openAIChatStream({ content: 'Answer' }), openAIChatStream({}));
+
+    const response = await provider.generateCompletion({
+      model: 'gpt-4',
+      messages: hello,
+      onTextDelta: () => {},
+    });
+    await provider.generateCompletion({ model: 'gpt-4', messages: hello, onTextDelta: () => {} });
+
+    expect(response.content).toBe('Answer');
+    expect(server.jsonBody(0)).toHaveProperty('stream_options');
+    expect(server.jsonBody(1)).not.toHaveProperty('stream_options');
+    expect(server.jsonBody(2)).not.toHaveProperty('stream_options');
+  }
+
+  it('asks again without stream_options after a 422 that is not in the OpenAI format', async () => {
+    // A FastAPI server's validation error: the client reads no OpenAI error in it.
+    await refusedThenAnswered({
+      status: 422,
+      body: {
+        detail: [
+          {
+            loc: ['body', 'stream_options'],
+            msg: 'Extra inputs are not permitted',
+            type: 'extra_forbidden',
+          },
+        ],
+      },
+    });
+  });
+
+  it('asks again without stream_options after a 400 with its error at the top level', async () => {
+    // As some compatible servers answer: no `error` object for the client to read.
+    await refusedThenAnswered({
+      status: 400,
+      body: { object: 'error', message: 'Unknown field', type: 'BadRequestError', code: 400 },
+    });
+  });
+
+  it('keeps asking for the usage when the request was refused for another reason', async () => {
+    const tooLong = openAIError(
+      400,
+      "This model's maximum context length is 128000 tokens.",
+      undefined,
+      {
+        type: 'invalid_request_error',
+        param: 'messages',
+        code: 'context_length_exceeded',
+      }
+    );
+    server.reply(tooLong, tooLong, openAIChatStream({ content: 'Shorter' }));
+
+    const error = await failure(
+      provider.generateCompletion({ model: 'gpt-4', messages: hello, onTextDelta: () => {} })
+    );
+    const next = await provider.generateCompletion({
+      model: 'gpt-4',
+      messages: hello,
+      onTextDelta: () => {},
+    });
+
+    expect((error as Error).message).toContain('maximum context length');
+    expect(next.content).toBe('Shorter');
+    // Refused without the field too: the field was not the problem, and is still sent.
+    expect(server.jsonBody(1)).not.toHaveProperty('stream_options');
+    expect(server.jsonBody(2)).toHaveProperty('stream_options');
+  });
+
+  it('asks again without stream_options even when a concurrent call turned it off first', async () => {
+    const refusal = openAIError(400, 'Unknown field', undefined, { param: 'stream_options' });
+    // The second refusal arrives once the first call has been answered without the field.
+    server.reply(
+      refusal,
+      { ...refusal, delayMs: 300 },
+      openAIChatStream({ content: 'First' }),
+      openAIChatStream({ content: 'Second' })
+    );
+
+    const answers = await Promise.all([
+      provider.generateCompletion({ model: 'gpt-4', messages: hello, onTextDelta: () => {} }),
+      provider.generateCompletion({ model: 'gpt-4', messages: hello, onTextDelta: () => {} }),
+    ]);
+
+    expect(answers.map((answer) => answer.content).sort()).toEqual(['First', 'Second']);
+    expect(server.requests).toHaveLength(4);
   });
 
   it('answers without streaming when nobody listens to the text', async () => {
@@ -607,15 +737,51 @@ describe('OpenAIProvider streaming', () => {
     expect(server.jsonBody(0)).not.toHaveProperty('stream_options');
   });
 
-  it('fails like the non-streaming API when the answer has no choice', async () => {
+  it('fails like the non-streaming API when the answer has no choice, reporting its usage once', async () => {
     server.reply(openAIChatStream({ choices: [], usage: { prompt: 10, completion: 0 } }));
+    const discarded: DiscardedAnswer[] = [];
 
     const error = await failure(
-      provider.generateCompletion({ model: 'gpt-4', messages: hello, onTextDelta: () => {} })
+      provider.generateCompletion({
+        model: 'gpt-4',
+        messages: hello,
+        onTextDelta: () => {},
+        onDiscardedAnswer: (answer) => discarded.push(answer),
+      })
     );
 
     expect(error).toBeInstanceOf(LLMProviderError);
     expect((error as Error).message).toContain('No response from LLM');
+    expect(discarded).toEqual([
+      {
+        provider: 'openai',
+        model: 'gpt-4',
+        usage: { promptTokens: 10, completionTokens: 0, totalTokens: 10 },
+        reason: 'No response from LLM',
+      },
+    ]);
+  });
+
+  it('reports once the usage of an empty answer given without streaming', async () => {
+    const compatible = new OpenAIProvider('test-api-key', 'gpt-4', { baseURL, maxRetries: 0 });
+    server.reply(
+      openAIError(400, 'Streaming is not supported for this model', undefined, { param: 'stream' }),
+      openAIChat({ choices: [], usage: { prompt: 7, completion: 0 } })
+    );
+    const discarded: DiscardedAnswer[] = [];
+
+    const error = await failure(
+      compatible.generateCompletion({
+        model: 'o3',
+        messages: hello,
+        onTextDelta: () => {},
+        onDiscardedAnswer: (answer) => discarded.push(answer),
+      })
+    );
+
+    expect((error as Error).message).toContain('No response from LLM');
+    expect(discarded).toHaveLength(1);
+    expect(discarded[0]?.usage).toEqual({ promptTokens: 7, completionTokens: 0, totalTokens: 7 });
   });
 });
 
@@ -856,7 +1022,7 @@ describe('AnthropicProvider streaming', () => {
     const patient = new AnthropicProvider('test-api-key', MODEL, {
       baseURL,
       maxRetries: 0,
-      timeout: 300,
+      timeout: IDLE_MS,
     });
     const events = anthropicMessageEvents({ text: ['First words, then silence'] });
     server.reply({ status: 200, stream: { events: events.slice(0, 5), then: 'hang' } });
@@ -867,7 +1033,7 @@ describe('AnthropicProvider streaming', () => {
     );
 
     expect(error).toBeInstanceOf(LLMProviderError);
-    expect((error as Error).message).toContain('The answer stream sent nothing for 300 ms');
+    expect((error as Error).message).toContain(`The answer stream sent nothing for ${IDLE_MS} ms`);
     expect((error as LLMProviderError).connectionFailure).toBe(true);
     expect(isTransientError(error)).toBe(true);
     expect(listener.deltas).toEqual(['Firs', 't wo']);
@@ -878,7 +1044,7 @@ describe('AnthropicProvider streaming', () => {
     const patient = new AnthropicProvider('test-api-key', MODEL, {
       baseURL,
       maxRetries: 0,
-      timeout: 300,
+      timeout: IDLE_MS,
     });
     server.reply({
       status: 200,
@@ -889,7 +1055,7 @@ describe('AnthropicProvider streaming', () => {
       patient.generateCompletion({ model: MODEL, messages: hello, onTextDelta: () => {} })
     );
 
-    expect((error as Error).message).toContain('The answer stream sent nothing for 300 ms');
+    expect((error as Error).message).toContain(`The answer stream sent nothing for ${IDLE_MS} ms`);
     expect((error as LLMProviderError).connectionFailure).toBe(true);
   });
 
@@ -897,7 +1063,7 @@ describe('AnthropicProvider streaming', () => {
     const patient = new AnthropicProvider('test-api-key', MODEL, {
       baseURL,
       maxRetries: 0,
-      timeout: 300,
+      timeout: IDLE_MS,
     });
     const events = anthropicMessageEvents({ text: ['Slow but steady answer'] });
     server.reply({ status: 200, stream: { events, intervalMs: 100 } });
@@ -908,7 +1074,8 @@ describe('AnthropicProvider streaming', () => {
       onTextDelta: () => {},
     });
 
-    expect(events.length).toBeGreaterThan(5);
+    // Longer in all than the timeout, so it would be cut if the timer did not restart.
+    expect(events.length * 100).toBeGreaterThan(IDLE_MS);
     expect(response.content).toBe('Slow but steady answer');
   });
 });
@@ -1095,7 +1262,7 @@ describe('retries and fallbacks of a streamed answer', () => {
     const patient = new OpenAIProvider('test-openai-key', 'gpt-4', {
       baseURL: openaiURL,
       maxRetries: 0,
-      timeout: 300,
+      timeout: IDLE_MS,
     });
     openai.reply(
       {

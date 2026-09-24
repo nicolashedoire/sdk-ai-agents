@@ -8,6 +8,7 @@ import type {
   OpenAIReasoningEffort,
   VendorClientOptions,
 } from './llm-provider.js';
+import { assertVendorTimeout } from './vendor-timeout.js';
 
 /**
  * Model used when neither the request nor the configuration names one (`gpt-4` shuts down on
@@ -17,15 +18,15 @@ import type {
  */
 export const DEFAULT_OPENAI_MODEL = 'gpt-5.4';
 
-/** Address of OpenAI's own API. */
-const OPENAI_API = 'https://api.openai.com/v1';
+/** OpenAI's own API: `https://api.openai.com/v1`, or a regional host such as `eu.api.openai.com`. */
+const OPENAI_API = /^https:\/\/(?:[a-z0-9-]+\.)*api\.openai\.com\/v1\/*$/i;
 
 /**
  * Whether a streamed request asks for its usage (`stream_options.include_usage`): as set, else
  * only on OpenAI's own API, since a compatible server may refuse the field or ignore it.
  */
 export function asksForStreamUsage(baseURL: string, includeStreamUsage?: boolean): boolean {
-  return includeStreamUsage ?? baseURL.replace(/\/+$/, '') === OPENAI_API;
+  return includeStreamUsage ?? OPENAI_API.test(baseURL);
 }
 
 /** How the OpenAI provider shapes its requests, for OpenAI models and compatible servers. */
@@ -97,6 +98,7 @@ export class OpenAIProvider implements LLMProvider {
       throw new Error('OpenAI API key is required');
     }
     assertOpenAIRequestOptions(options, 'options');
+    assertVendorTimeout(options.timeout, 'options.timeout');
     this.client = new OpenAI({
       apiKey,
       ...(options.maxRetries !== undefined ? { maxRetries: options.maxRetries } : {}),
@@ -211,27 +213,34 @@ export class OpenAIProvider implements LLMProvider {
     return completion;
   }
 
-  /** Sends the streamed request; a server that refuses `stream_options` gets it without. */
+  /**
+   * Sends the streamed request. A 400 or 422 to a request with `stream_options` may be the
+   * server refusing the field, whatever its body says: the request is sent once more without
+   * it, and when that one is accepted, the field is never sent again.
+   */
   private async openStream(
     body: ChatCompletionBody,
     signal: AbortSignal
   ): Promise<AsyncIterable<OpenAI.ChatCompletionChunk>> {
-    const send = () =>
+    const send = (withUsage: boolean) =>
       this.client.chat.completions.create(
         {
           ...(body as OpenAI.ChatCompletionCreateParamsNonStreaming),
           stream: true,
-          ...(this.streamUsage ? { stream_options: { include_usage: true } } : {}),
+          ...(withUsage ? { stream_options: { include_usage: true } } : {}),
         },
         { signal }
       );
+    // Read once: a concurrent request may turn it off meanwhile.
+    const withUsage = this.streamUsage;
     try {
-      return await send();
+      return await send(withUsage);
     } catch (error) {
-      if (!this.streamUsage || !refusesStreamUsage(error)) throw error;
-      // Asked once more without it, and never again: its answers then carry no usage.
+      if (!withUsage || !isRequestRefusal(error)) throw error;
+      const stream = await send(false);
+      // Taken without the field: its answers carry no usage from now on.
       this.streamUsage = false;
-      return await send();
+      return stream;
     }
   }
 
@@ -464,13 +473,9 @@ function shownValue(value: unknown): string {
   return String(value);
 }
 
-/** A 400 (or 422) naming `stream_options`: a compatible server that does not take it. */
-function refusesStreamUsage(error: unknown): boolean {
-  return (
-    error instanceof OpenAI.APIError &&
-    (error.status === 400 || error.status === 422) &&
-    (error.param === 'stream_options' || error.message.includes('stream_options'))
-  );
+/** A 400 or 422: the server refuses the request as it was sent. */
+function isRequestRefusal(error: unknown): boolean {
+  return error instanceof OpenAI.APIError && (error.status === 400 || error.status === 422);
 }
 
 /**

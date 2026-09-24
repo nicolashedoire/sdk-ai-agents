@@ -8,6 +8,7 @@ import type {
   LLMToolCall,
   VendorClientOptions,
 } from './llm-provider.js';
+import { assertVendorTimeout } from './vendor-timeout.js';
 
 /** Model used when neither the request nor the configuration names one. */
 export const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-5';
@@ -25,6 +26,7 @@ export class AnthropicProvider implements LLMProvider {
     if (!apiKey || apiKey.trim() === '') {
       throw new Error('Anthropic API key is required');
     }
+    assertVendorTimeout(options.timeout, 'options.timeout');
     this.client = new Anthropic({
       apiKey,
       // Only the given key authenticates: the client would otherwise also send the
