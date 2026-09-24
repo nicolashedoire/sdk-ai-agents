@@ -232,7 +232,7 @@ const agent = sdk.createAgent({
 });
 ```
 
-Budget and timeout limits are checked before each tool call of a governed agent's run, against the run's progress: `maxSteps` counts the steps already taken (the first call is at step 0), `maxTokens` the tokens its model calls used, `maxDuration` the time since the run started. A limit refuses the tool call, which fails the run; it never interrupts a model call. Token budgets per period (`budgetLimit` with `maxTokens`) count the tokens of governed agents' model calls, and a replay applies `maxSteps`, `maxTokens` and `maxDuration` as the original run did (per-period budgets see the current period's usage). Cognitive agents have their own limits (`maxSteps`, `maxToolCalls`, `timeoutMs`).
+Budget and timeout limits are checked before each tool call of a governed agent's run, against the run's progress: `maxSteps` counts the steps already taken (the first call is at step 0), `maxTokens` the tokens its model calls used, `maxDuration` the time since the run started. A limit refuses the tool call, which fails the run; it never interrupts a model call. Token and cost budgets per period (`budgetLimit` with `maxTokens` or `maxCost`) count the tokens and cost of governed agents' model calls, and a replay applies `maxSteps`, `maxTokens` and `maxDuration` as the original run did (per-period budgets see the current period's usage). Cognitive agents have their own limits (`maxSteps`, `maxToolCalls`, `timeoutMs`).
 
 ### 4. Traces
 

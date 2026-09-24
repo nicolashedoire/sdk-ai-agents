@@ -129,6 +129,10 @@ export interface SDK {
     periodEnd: number;
     tokensUsed: number;
     toolCallsCount: number;
+    /** USD spent by model calls with a price; unpriced and unmetered calls have none. */
+    costUsd: number;
+    unpricedCalls: number;
+    unmeteredCalls: number;
     lastUpdated: number;
   }>;
   getPolicyAuditTrail(runId: string): Array<{
@@ -1153,6 +1157,10 @@ export class SDKImpl implements SDK {
     periodEnd: number;
     tokensUsed: number;
     toolCallsCount: number;
+    /** USD spent by model calls with a price; unpriced and unmetered calls have none. */
+    costUsd: number;
+    unpricedCalls: number;
+    unmeteredCalls: number;
     lastUpdated: number;
   }> {
     const usage = await this.budgetTracker.getUsage(limit);
@@ -1164,6 +1172,9 @@ export class SDKImpl implements SDK {
       periodEnd: usage.periodEnd,
       tokensUsed: usage.tokensUsed,
       toolCallsCount: usage.toolCallsCount,
+      costUsd: usage.costUsd,
+      unpricedCalls: usage.unpricedCalls,
+      unmeteredCalls: usage.unmeteredCalls,
       lastUpdated: usage.lastUpdated,
     };
   }

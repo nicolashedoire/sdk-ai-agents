@@ -12,7 +12,7 @@ import type { PolicyAuditEntry } from '../types/audit.js';
 import type { IEventStore } from '../stores/event-store.js';
 import { ConditionEvaluator } from '../evaluators/condition-evaluator.js';
 import { generateEventId } from '../utils/id.js';
-import { costOf, findModelPrice, type PricingTable } from '../costs/pricing.js';
+import { costOf, DEFAULT_PRICING, findModelPrice, type PricingTable } from '../costs/pricing.js';
 import type { LLMResponse } from '../providers/llm-provider.js';
 
 /**
@@ -31,7 +31,7 @@ export class PolicyEngine {
   private globalPolicies: Map<string, Policy> = new Map();
   private agentPolicies: Map<string, Map<string, Policy>> = new Map();
   private budgetTracker?: BudgetTracker;
-  private pricing: PricingTable = {};
+  private pricing: PricingTable = DEFAULT_PRICING;
   private conditionEvaluator: ConditionEvaluator;
   private eventStore?: IEventStore;
   private auditEntries: Map<string, PolicyAuditEntry[]> = new Map();
@@ -62,12 +62,22 @@ export class PolicyEngine {
     call: { model?: string; requestedModel?: string; usage?: LLMResponse['usage'] }
   ): Promise<void> {
     if (!this.budgetTracker) return;
-    const input = call.usage?.promptTokens ?? 0;
-    const output = call.usage?.completionTokens ?? 0;
-    const tokens = call.usage?.totalTokens ?? input + output;
+    const { usage } = call;
+    const input = usage?.promptTokens;
+    const output = usage?.completionTokens;
+    const tokens = usage?.totalTokens ?? (input ?? 0) + (output ?? 0);
+    // Without input or output counts (none at all, or a total alone) the cost is unknown.
+    if (input === undefined && output === undefined) {
+      await this.budgetTracker.recordModelUsage(agentId, { tokens, uncosted: 'no-usage' });
+      return;
+    }
     const price = findModelPrice(this.pricing, call.model, call.requestedModel);
-    const costUsd = price && call.usage ? costOf(price, input, output) : undefined;
-    await this.budgetTracker.recordModelUsage(agentId, { tokens, costUsd });
+    await this.budgetTracker.recordModelUsage(
+      agentId,
+      price
+        ? { tokens, costUsd: costOf(price, input ?? 0, output ?? 0) }
+        : { tokens, uncosted: 'no-price' }
+    );
   }
 
   applyGlobalPolicy(policy: Policy): void {
