@@ -38,12 +38,6 @@ export interface OperationOutcome {
   discarded?: DiscardedAnswer[];
 }
 
-const MAX_MESSAGE_LENGTH = 500;
-
-export function truncate(text: string, max: number = MAX_MESSAGE_LENGTH): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
-}
-
 export function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }

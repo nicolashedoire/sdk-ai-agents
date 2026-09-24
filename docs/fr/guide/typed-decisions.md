@@ -141,7 +141,7 @@ Les deux se replient sur le LLM ou sur le contrôleur heuristique quand Jev n'es
 
 ## Traçabilité et coût {#traceability-and-cost}
 
-Chaque décision typée est inscrite sous forme d'événement `decision.evaluated` avec son contexte, ses questions, ses réponses et sa consommation de tokens — dans le `runId` que vous passez, ou dans un flux `decision_*` dédié. Jev est facturé **0,042 $ par million de tokens en entrée, sortie gratuite** (selon la documentation au 2026-09-23), si bien que `sdk.getRunCost(runId)` l'inclut d'emblée.
+Chaque décision typée est inscrite sous forme d'événement `decision.evaluated` avec son contexte, ses questions, ses réponses et sa consommation de tokens — dans le `runId` que vous passez, ou dans un flux `decision_*` dédié. Jev est facturé **0,042 $ par million de tokens en entrée, sortie gratuite** (selon la documentation au 2026-09-23), si bien que `sdk.getRunCost(runId)` l'inclut d'emblée. Chaque décision compte aussi dans les budgets par période — pour l'`agentId` qu'elle nomme, et dans les plafonds qui ne nomment aucun agent — et un budget ne la refuse jamais (voir [Coûts d'API](./costs#budgets)).
 
 Une réponse qui ne correspond pas aux questions (un choix qui ne fait pas partie des options, une réponse manquante ou du mauvais type) a tout de même été facturée : elle est elle aussi enregistrée, avec son `error` et des `answers` vides, avant que l'erreur soit levée. Quand le backend ne rapporte aucun nombre de tokens, l'événement n'a pas de `usage` et le coût de l'appel est indiqué comme inconnu, jamais comme 0 $ — voir [Coûts d'API](./costs#unknown-costs).
 

@@ -6,14 +6,18 @@ import { HypothesisAssessmentError, type HypothesisAssessor } from './hypothesis
 import type { InformationSeeker } from './information-seeker.js';
 import type { ThoughtGenerator } from './llm-thought-generator.js';
 import type { MentalState } from './mental-state.js';
-import { failureOutcome, toError, truncate, type OperationOutcome } from './operation-outcome.js';
+import { truncate } from '../utils/truncate.js';
+import { failureOutcome, toError, type OperationOutcome } from './operation-outcome.js';
 import type { PredictionTester } from './outcome-evaluator.js';
+import type { CognitiveRunMeter } from './run-meter.js';
 import type { ThinkerProfile } from './thinker-profile.js';
 
 export interface OperationPerformerDependencies {
   generator: ThoughtGenerator;
   seeker: InformationSeeker;
   recorder: CognitiveRunRecorder;
+  /** Progress of the run, given with its tool calls. */
+  meter: CognitiveRunMeter;
   assessor?: HypothesisAssessor;
   tester?: PredictionTester;
 }
@@ -62,7 +66,13 @@ export class OperationPerformer {
     // Components get a copy: whatever they do with it cannot alter the recorded state.
     const state = isolatedCopy(input.state);
     if (operation === 'seek_information') {
-      return await this.deps.seeker.investigate({ runId, state, profile, signal });
+      return await this.deps.seeker.investigate({
+        runId,
+        state,
+        profile,
+        signal,
+        meter: this.deps.meter,
+      });
     }
     if (operation === 'test_prediction') {
       return this.deps.tester

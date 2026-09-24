@@ -78,7 +78,7 @@ const analyst = sdk.createAgent({
 | --- | --- | --- |
 | `name`، `model` | — | مطلوبان |
 | `profile` | `DEFAULT_THINKER_PROFILE` | كيف يستدل الوكيل |
-| `tools`، `policies` | `[]` | خاضعة للحوكمة كما في كل مكان آخر |
+| `tools`، `policies` | `[]` | خاضعة للحوكمة كما في كل مكان آخر؛ وتُفحَص سياسات الميزانية والمهلة الزمنية أيضًا قبل كل خطوة، انظر [الحدود والسياسات](../guide/cognitive-agents#limits-and-policies) |
 | `systemPrompt` | — | تعليمات إضافية لكل موجّه |
 | `limits` | انظر [الوكلاء المعرفيون](../guide/cognitive-agents#limits) | `maxSteps`، `timeoutMs`، `maxHypotheses`، `maxToolCalls`، `decisionThreshold`، `maxConsecutiveFailures`، `maxPredictionTests`، `preferenceWeight`، `minProposalSupport` |
 | `controller` | `'auto'` | `'heuristic'` أو `'typed'` أو `CognitiveController` |

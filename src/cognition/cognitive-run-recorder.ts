@@ -5,22 +5,31 @@ import type { DecisionEvaluationRecord } from './cognitive-controller.js';
 import type { MentalState } from './mental-state.js';
 import type { OperationOutcome } from './operation-outcome.js';
 import type { OperationSelection } from './operation-selector.js';
+import type { CognitiveRunMeter } from './run-meter.js';
 import type { ThinkerProfile } from './thinker-profile.js';
 import type { Decision, ThoughtPatch } from './thought-patch.js';
 
 /**
  * Writes the events of a cognitive run. Keeping the event shapes in one place keeps them
  * aligned with `rebuildMentalState` and `buildControllerDataset`, which read them back.
+ * Every model call it records (thoughts, typed decisions, operations cut short after billed
+ * attempts, answers a provider discarded) is counted by the run's `meter` as `getRunCost`
+ * reads it, so run limits and budgets count what the run's cost report prices.
  */
 export class CognitiveRunRecorder {
   constructor(
     private readonly eventStore: IEventStore,
     private readonly agent: { id: string; version: string },
-    private readonly currentProfile: () => ThinkerProfile
+    private readonly currentProfile: () => ThinkerProfile,
+    private readonly meter?: CognitiveRunMeter
   ) {}
 
-  /** Appends an event and returns its id, so observations can point to their source. */
+  /**
+   * Appends an event and returns its id, so observations can point to their source. The model
+   * calls it records are counted first: a store that fails does not leave them out of budgets.
+   */
   async record(runId: string, type: Event['type'], data: Record<string, unknown>): Promise<string> {
+    await this.meter?.countRecorded({ type, data });
     const profile = this.currentProfile();
     const id = generateEventId();
     await this.eventStore.append(runId, {

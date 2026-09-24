@@ -27,7 +27,8 @@ interface Event {
 | टाइप | डेटा |
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` — या संज्ञानात्मक अंतिम उत्तर के लिए `intention` |
-| `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools` जब कॉल करने वाले ने ऐसा टूल इस्तेमाल किया जो उसे नहीं दिया गया था; बजट नीति का id जब उसका कॉल-बजट खत्म हो चुका हो) |
+| `policy.checked` | `intention`, `validation`: किसी टूल कॉल पर एक्शन इंजन का फ़ैसला। नीति इंजन भी हर जाँची गई नीति के लिए एक इवेंट दर्ज करता है — `policyId`, `policyType`, `intention`, `conditionEvaluated?`, `validationResult`, `applied` (`true` जब नीति लागू हुई और उसने ठुकराया) और `reason` — टूल कॉल से पहले, और संज्ञानात्मक run के हर कदम से पहले उन बजट और timeout नीतियों के लिए जो किसी कदम पर लागू हो सकती हैं (तब `intention` होता है `{ type: 'continue' }`) |
+| `policy.violated` | `intention`, `reason`, `violatedPolicies` (`allowed-tools` जब कॉल करने वाले ने ऐसा टूल इस्तेमाल किया जो उसे नहीं दिया गया था; बजट नीति का id जब उसका कॉल-बजट खत्म हो चुका हो), और `step` जब किसी बजट या timeout नीति ने संज्ञानात्मक run का कोई कदम ठुकराया हो (तब `intention` होता है `{ type: 'continue' }`) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval` जब टूल के अपने `metadata.requiresApproval` ने इसकी माँग की), `reason?` (`cancelled before a decision` जब कॉल करने वाला हार मान गया या run रुक गया, `no decision within N ms` `approvalTimeoutMs` के बाद) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` — `action.failed` उस कॉल को भी दर्ज करता है जो अमान्य arguments के कारण (किसी भी नीति से पहले) ठुकराई गई, या इसलिए कि कॉल करने वाला मंज़ूरी के बाद चला गया |
 | `tool.called` | `toolName`, `parameters` |

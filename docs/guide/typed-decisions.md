@@ -141,7 +141,7 @@ Both fall back to the LLM or the heuristic controller when Jev is unsure or unav
 
 ## Traceability and cost
 
-Every typed decision is written as a `decision.evaluated` event with its context, questions, answers and token usage — in the `runId` you pass, or in a dedicated `decision_*` stream. Jev is priced at **$0.042 per million input tokens, output free** (as documented on 2026-09-23), so `sdk.getRunCost(runId)` includes it out of the box.
+Every typed decision is written as a `decision.evaluated` event with its context, questions, answers and token usage — in the `runId` you pass, or in a dedicated `decision_*` stream. Jev is priced at **$0.042 per million input tokens, output free** (as documented on 2026-09-23), so `sdk.getRunCost(runId)` includes it out of the box. Each decision also counts in budgets per period — for the `agentId` it names, and in limits that name no agent — and a budget never refuses it (see [API costs](./costs#budgets)).
 
 An answer that does not match the questions (a choice that is not one of the options, a missing or mistyped answer) was billed all the same: it is recorded too, with the `error` and empty `answers`, before the error is thrown. When the backend reports no token counts, the event has no `usage` and the call's cost is reported as unknown, never as $0 — see [API costs](./costs#unknown-costs).
 

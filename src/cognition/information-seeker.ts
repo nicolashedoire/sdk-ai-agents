@@ -8,7 +8,9 @@ import { nextUnknownToInvestigate } from './cognitive-operations.js';
 import type { ThoughtGenerator } from './llm-thought-generator.js';
 import { activeFacts, type MentalState } from './mental-state.js';
 import { observationFromTool } from './observation-records.js';
-import { failureOutcome, toError, truncate, type OperationOutcome } from './operation-outcome.js';
+import { truncate } from '../utils/truncate.js';
+import { failureOutcome, toError, type OperationOutcome } from './operation-outcome.js';
+import type { CognitiveRunMeter } from './run-meter.js';
 import type { ThinkerProfile } from './thinker-profile.js';
 
 export interface InformationSeekerDependencies {
@@ -29,9 +31,10 @@ export interface InformationSeekerDependencies {
 
 /**
  * Performs `seek_information`: the native reasoning engine picks a tool for the next open
- * unknown, the governed ActionEngine executes it (policies, approvals and budgets apply),
- * the engine records the result as an observation linked to its `action.executed` event,
- * and the thought generator integrates it into the mental state.
+ * unknown, the governed ActionEngine executes it (policies, approvals and budgets apply, run
+ * limits against the run's progress), the engine records the result as an observation linked
+ * to its `action.executed` event, and the thought generator integrates it into the mental
+ * state.
  */
 export class InformationSeeker {
   constructor(private readonly deps: InformationSeekerDependencies) {}
@@ -41,14 +44,16 @@ export class InformationSeeker {
     state: MentalState;
     profile: ThinkerProfile;
     signal: AbortSignal;
+    /** The run's progress, and where the model calls of its tool selection are counted. */
+    meter: CognitiveRunMeter;
   }): Promise<OperationOutcome> {
-    const { runId, state, profile, signal } = input;
+    const { runId, state, profile, signal, meter } = input;
     const unknown = nextUnknownToInvestigate(state);
     if (!unknown) {
       return { failure: new Error('no open unknown to investigate') };
     }
 
-    const intention = await this.deps.reasoningEngine.generateIntention(
+    const { intention } = await this.deps.reasoningEngine.generateStep(
       {
         runId,
         agentId: this.deps.agentId,
@@ -68,6 +73,10 @@ export class InformationSeeker {
           }`,
         ].join('\n'),
         ...(this.deps.providerSettings ? { providerSettings: this.deps.providerSettings } : {}),
+        // Every answer the vendor billed — this one, as soon as it arrives (also when its tool
+        // arguments are then unreadable), and those a provider discarded — counts in the run's
+        // tokens before the tool call is checked, and in the agent's budgets.
+        onModelUsage: (call) => meter.countModelCall(call),
       },
       this.deps.eventStore,
       signal
@@ -93,6 +102,8 @@ export class InformationSeeker {
       const action = await this.deps.actionEngine.executeIntention(intention, {
         runId,
         agentId: this.deps.agentId,
+        // What budget and timeout policies check: the run's steps, tokens and start time.
+        run: meter.progress(),
         abortSignal: signal,
         allowedTools: this.deps.tools.map((tool) => tool.name),
       });

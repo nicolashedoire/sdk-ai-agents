@@ -128,7 +128,7 @@ sdk.createCognitiveAgent({
 
 ## 추론 안에서의 도구 {#tools-inside-reasoning}
 
-`seek_information`은 **네이티브 추론 엔진과 액션 엔진**을 사용합니다. LLM이 열린 미지수에 맞는 도구 하나를 고르면, 액션 엔진은 그 도구가 **이 에이전트에게 주어졌는지** 확인하고, 호출을 정책, 승인, 예산에 대해 검증합니다. 결과는 해당 `action.executed` 이벤트를 가리키는 **관찰**로 기록된 다음, `source: "tool"`인 사실로 통합됩니다. 해석에 실패하더라도 관찰은 보관됩니다. 거부되거나, 차단되거나, 실패한 도구는 기록된 실패가 되고, 추론은 계속됩니다.
+`seek_information`은 **네이티브 추론 엔진과 액션 엔진**을 사용합니다. LLM이 열린 미지수에 맞는 도구 하나를 고르면, 액션 엔진은 그 도구가 **이 에이전트에게 주어졌는지** 확인하고, 호출을 정책(실행 한도 포함, [한도와 정책](#limits-and-policies) 참고), 승인, 예산에 대해 검증합니다. 결과는 해당 `action.executed` 이벤트를 가리키는 **관찰**로 기록된 다음, `source: "tool"`인 사실로 통합됩니다. 해석에 실패하더라도 관찰은 보관됩니다. 거부되거나, 차단되거나, 실패한 도구는 기록된 실패가 되고, 추론은 계속됩니다.
 
 ## 한도 {#limits}
 
@@ -153,6 +153,21 @@ sdk.createCognitiveAgent({
 ```
 
 한도는 에이전트를 만들 때 검증됩니다. `maxSteps: 0`이나 타이머가 지원하는 범위를 넘는 타임아웃은 안전장치를 조용히 꺼 버리는 대신 `ValidationError`를 던집니다. `minProposalSupport`는 `decisionThreshold`를 넘을 수 없습니다. 증거만으로 답이 확정되게 하려면 `decisionThreshold`와 같은 값으로 설정하세요. `minProposalSupport`를 설정하지 않고 `decisionThreshold`를 낮추면, 하한도 함께 내려갑니다.
+
+### 한도와 정책 {#limits-and-policies}
+
+에이전트에 적용되는 예산 정책과 타임아웃 정책(에이전트의 `policies`에 있는 정책과 전역 정책)은 **각 단계 전에**, 그 단계의 어떤 모델 호출보다도 먼저 검사되고, 각 도구 호출 전에 다시 검사됩니다. 이 정책들은 실행의 진행 상황을 봅니다. `maxSteps`는 이미 진행한 단계 수, `maxTokens`는 실행의 모델 호출(사고와 그 수정, 도구 선택, 타입 지정 결정, 프로바이더가 쓸 수 없었던 응답)이 사용한 토큰 수, `maxDuration`은 실행 시작 이후 경과한 시간입니다. 기간별 토큰·비용 예산(`toolName` 없이 `maxTokens` 또는 `maxCost`를 지정한 `budgetLimit`)도 각 단계 전에 검사되며, 실행이 기록하는 모든 모델 호출이 여기에 집계됩니다([API 비용](./costs#budgets) 참고). 단계는 유형이 `continue`인 의도로 검사됩니다. 조건이 도구 호출을 요구하는(`intention.type`이 `tool_call`인) 정책은 도구 호출에만 적용됩니다. 허용 목록, 커스텀 정책, 호출 예산(`maxToolCalls`), 승인은 도구 호출에만 관련되며, 동작이 `require_approval`인 한도 규칙도 마찬가지입니다. 단계는 승인을 기다리지 않습니다. 각 단계의 검사는 단계에 적용될 수 있는 정책에 한해 정책 감사(`sdk.getPolicyAuditTrail`)에 남습니다.
+
+가장 먼저 도달한 한도가 실행을 끝내며(도구 호출 한도는 호출을 건너뛰게 할 뿐입니다), 두 종류의 한도는 실행을 같은 방식으로 끝내지 않습니다.
+
+| 한도 | 에이전트의 `limits` | 정책 |
+| --- | --- | --- |
+| 단계 | `maxSteps`: 마지막 단계가 결정합니다. `committed`, `provisional`, `abstain` 중 하나의 결정과 함께 `completed` | `maxSteps`: 다음 단계가 거부됩니다. `failed` |
+| 시간 | `timeoutMs`: 실행이 중단되고, 진행 중인 호출은 중단 신호를 받습니다. `failed`, `Timeout exceeded (… ms)` | `maxDuration`: 단계 사이와 도구 호출 전에 검사되며, 진행 중인 호출은 계속됩니다. `failed`, `Timeout (… ms) exceeded` |
+| 토큰, 비용 | — | `maxTokens`, 기간별 예산: 다음 단계가 거부됩니다. `failed` |
+| 도구 호출 | `maxToolCalls`: `seek_information`이 더 이상 제시되지 않습니다 | 거부된 호출은 기록된 실패가 되고, 추론은 계속됩니다 |
+
+거부된 단계는 `policy.violated`(`intention: { type: 'continue' }`, 단계 `step`, 이유 `reason`, 위반한 정책 `violatedPolicies` 포함)로 기록되고, 이어서 정책의 이유와 함께 `run.failed`가 기록됩니다. 결과는 `status: 'failed'`이고 `error`는 `PolicyViolationError`입니다. 실행 한도에 거부된 도구 호출은 `policy.violated`와 실패한 연산으로 기록됩니다. 한도는 여전히 초과된 상태이므로 다음 단계가 거부되고 실행은 실패합니다. 거부가 아니라 결정으로 끝내려면 에이전트의 `maxSteps`를 정책의 `maxSteps` 이하로 두세요. 그러면 정책이 무언가를 거부하기 전에 마지막 단계가 결정합니다.
 
 ## 잘못된 모델 출력 {#invalid-model-output}
 
@@ -186,6 +201,6 @@ const result = await pending; // status: 'cancelled'
 인지 실행도 평범한 실행입니다.
 
 - `sdk.getTrace(runId)`는 `policy.checked`, `tool.called`, … 옆에 `cognition.*` 이벤트를 보여 줍니다.
-- `sdk.replay(runId)`는 LLM을 호출하지 않고 도구 호출을 다시 실행하고 최종 답을 재현합니다. 원래 실행과 같은 도구 제한이 적용되므로, 에이전트에게 거부되었던 도구는 다시 거부됩니다.
+- `sdk.replay(runId)`는 LLM을 호출하지 않고 도구 호출을 다시 실행하고 최종 답을 재현합니다. 원래 실행과 같은 도구 제한과 각 호출 시점의 실행 진행 상황이 적용되므로, 에이전트에게 거부되었던 도구는 다시 거부되고, 실행 한도에 거부되었던 호출도 다시 거부됩니다.
 - `sdk.getMentalState(runId)`는 상태를 재구성합니다.
 - `sdk.exportControllerDataset()`은 실행을 학습 데이터로 바꿉니다([사고자 프로필](./thinker-profiles#train-your-own-controller) 참고).

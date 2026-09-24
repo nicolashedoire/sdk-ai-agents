@@ -10,6 +10,8 @@
     "src/__tests__/cognition-core.test.ts",
     "src/__tests__/cognition-guards.test.ts",
     "src/__tests__/cognitive-agent.test.ts",
+    "src/__tests__/cognitive-budgets.test.ts",
+    "src/__tests__/cognitive-policies.test.ts",
     "src/__tests__/decision-service.test.ts",
     "src/__tests__/epistemic-guards.test.ts",
     "src/__tests__/epistemic-liveness.test.ts",

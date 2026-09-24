@@ -2,7 +2,7 @@ import { ValidationError } from '../errors/index.js';
 import type { Event } from '../types/events.js';
 import { rebuildMentalState } from './mental-state-replay.js';
 import type { MentalState } from './mental-state.js';
-import { truncate } from './operation-outcome.js';
+import { truncate } from '../utils/truncate.js';
 import {
   reasoningFeedbackSchema,
   refineProfile,

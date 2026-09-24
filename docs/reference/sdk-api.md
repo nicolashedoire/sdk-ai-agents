@@ -78,7 +78,7 @@ const analyst = sdk.createAgent({
 | --- | --- | --- |
 | `name`, `model` | — | Required |
 | `profile` | `DEFAULT_THINKER_PROFILE` | How the agent reasons |
-| `tools`, `policies` | `[]` | Governed like everywhere else |
+| `tools`, `policies` | `[]` | Governed like everywhere else; budget and timeout policies are also checked before each step, see [Limits and policies](../guide/cognitive-agents#limits-and-policies) |
 | `systemPrompt` | — | Extra instructions for every prompt |
 | `limits` | see [Cognitive agents](../guide/cognitive-agents#limits) | `maxSteps`, `timeoutMs`, `maxHypotheses`, `maxToolCalls`, `decisionThreshold`, `maxConsecutiveFailures`, `maxPredictionTests`, `preferenceWeight`, `minProposalSupport` |
 | `controller` | `'auto'` | `'heuristic'`, `'typed'` or a `CognitiveController` |

@@ -1,3 +1,4 @@
+import type { PolicyEngine } from '../engines/policy-engine.js';
 import type { IEventStore } from '../stores/event-store.js';
 import { generateEventId, generateId } from '../utils/id.js';
 import {
@@ -68,12 +69,16 @@ export interface RateResult {
  * Typed decisions with context injection, single and multiple choice, yes/no checks and
  * ratings. Every call is written to the event log as `decision.evaluated`, with its usage,
  * so it is traceable and priced like any other model call — also a call whose answer the
- * client rejected (recorded with its `error`, then the error is thrown).
+ * client rejected (recorded with its `error`, then the error is thrown). With `budgets` (the
+ * SDK's policy engine), each of these calls is also counted in budgets per period: for the
+ * agent it names, and for limits that name no agent. Budgets never refuse a decision: they
+ * refuse tool calls and cognitive steps.
  */
 export class DecisionService {
   constructor(
     private readonly client: TypedDecisionClient,
-    private readonly eventStore: IEventStore
+    private readonly eventStore: IEventStore,
+    private readonly budgets?: Pick<PolicyEngine, 'recordModelUsage'>
   ) {}
 
   /** Asks any set of typed questions about one context in a single request. */
@@ -97,7 +102,12 @@ export class DecisionService {
       // A store that cannot record it does not replace the client's error.
       const rejected = rejectedDecision(error);
       if (rejected) {
-        await this.record(runId, input, { answers: {}, ...rejected }).catch(() => undefined);
+        await this.record(runId, input, { answers: {}, ...rejected }).catch((failure: unknown) => {
+          console.warn(
+            `The rejected decision of run ${runId} could not be recorded:`,
+            failure instanceof Error ? failure.message : String(failure)
+          );
+        });
       }
       throw error;
     }
@@ -114,6 +124,19 @@ export class DecisionService {
     input: AskInput<TypedQuestions>,
     outcome: { model: string; answers: object; usage?: DecisionUsage; error?: string }
   ): Promise<void> {
+    // Counted first: a call the backend billed stays in budgets even if the store fails. A
+    // backend that reports no usage made a call whose token counts, and cost, are unknown.
+    await this.budgets?.recordModelUsage(input.agentId, {
+      model: outcome.model,
+      ...(outcome.usage
+        ? {
+            usage: {
+              promptTokens: outcome.usage.inputTokens,
+              completionTokens: outcome.usage.outputTokens,
+            },
+          }
+        : {}),
+    });
     await this.eventStore.append(runId, {
       id: generateEventId(),
       runId,

@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { truncate } from '../cognition/operation-outcome.js';
 import { DecisionClientError, ValidationError } from '../errors/index.js';
+import { truncate } from '../utils/truncate.js';
 
 /**
  * Typed decisions ("System One" questions).

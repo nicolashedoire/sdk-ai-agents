@@ -128,7 +128,7 @@ sdk.createCognitiveAgent({
 
 ## 推論の中のツール {#tools-inside-reasoning}
 
-`seek_information` は **ネイティブの推論エンジンとアクションエンジン** を使います。LLM が未解決の未知事項に対して 1 つのツールを選び、アクションエンジンがそのツールが **このエージェントに渡されたもの** であることを確認し、ポリシー、承認、予算に照らして呼び出しを検証します。結果は、その `action.executed` イベントを指す **観測** として記録され、その後 `source: "tool"` の事実として統合されます。解釈に失敗しても、観測は残ります。拒否された、ブロックされた、あるいは失敗したツールは記録された失敗となり、推論は続行されます。
+`seek_information` は **ネイティブの推論エンジンとアクションエンジン** を使います。LLM が未解決の未知事項に対して 1 つのツールを選び、アクションエンジンがそのツールが **このエージェントに渡されたもの** であることを確認し、ポリシー（実行制限を含みます。[制限とポリシー](#limits-and-policies) を参照）、承認、予算に照らして呼び出しを検証します。結果は、その `action.executed` イベントを指す **観測** として記録され、その後 `source: "tool"` の事実として統合されます。解釈に失敗しても、観測は残ります。拒否された、ブロックされた、あるいは失敗したツールは記録された失敗となり、推論は続行されます。
 
 ## 制限 {#limits}
 
@@ -153,6 +153,21 @@ sdk.createCognitiveAgent({
 ```
 
 制限はエージェントの作成時に検証されます。`maxSteps: 0` や、タイマーが扱える範囲を超えるタイムアウトを指定すると、安全装置を黙って無効にする代わりに `ValidationError` を投げます。`minProposalSupport` は `decisionThreshold` を超えてはいけません。`decisionThreshold` と同じ値にすれば、証拠だけが回答を確定できるようになります。`minProposalSupport` を設定せずに `decisionThreshold` を下げた場合、下限もそれに合わせて下がります。
+
+### 制限とポリシー {#limits-and-policies}
+
+エージェントに適用される予算とタイムアウトのポリシー（その `policies` にあるものとグローバルなもの）は、**各ステップの前**、そのステップのモデル呼び出しより前に確認され、さらに各ツール呼び出しの前にも確認されます。これらのポリシーは実行の進み具合を見ます。`maxSteps` はすでに済んだステップ数、`maxTokens` は実行のモデル呼び出し（思考とその修復、ツールの選択、型付き決定、プロバイダーが使えなかった応答）のトークン数、`maxDuration` は実行開始からの経過時間です。期間ごとのトークン予算と費用予算（`toolName` を指定せず、`maxTokens` または `maxCost` を指定した `budgetLimit`）も各ステップの前に確認され、実行が記録するモデル呼び出しはすべてそこに数えられます（[API コスト](./costs#budgets) を参照）。ステップは種類が `continue` の意図として確認されます。条件がツール呼び出しを必要とする（`intention.type` が `tool_call` に等しい）ポリシーは、ツール呼び出しにだけ適用されます。許可リスト、カスタムポリシー、呼び出し予算（`maxToolCalls`）、承認は、ツール呼び出しだけに関わります。アクションが `require_approval` の制限ルールも同様で、ステップが承認を待つことはありません。各ステップの確認は、ステップに適用されうるポリシーについて、ポリシーの監査（`sdk.getPolicyAuditTrail`）に記録されます。
+
+最初に達した制限が実行を終わらせます（ツール呼び出しの制限は呼び出しを飛ばすだけです）が、2 種類の制限は同じ終わらせ方をしません。
+
+| 制限 | エージェントの `limits` | ポリシー |
+| --- | --- | --- |
+| ステップ | `maxSteps`：最後のステップが決定します。`completed` で、決定は `committed`、`provisional`、`abstain` のいずれか | `maxSteps`：次のステップが拒否されます。`failed` |
+| 時間 | `timeoutMs`：実行が中断され、実行中の呼び出しには中断シグナルが届きます。`failed`、`Timeout exceeded (… ms)` | `maxDuration`：ステップの合間とツール呼び出しの前に確認され、実行中の呼び出しはそのまま続きます。`failed`、`Timeout (… ms) exceeded` |
+| トークン、費用 | — | `maxTokens`、期間ごとの予算：次のステップが拒否されます。`failed` |
+| ツール呼び出し | `maxToolCalls`：`seek_information` が提示されなくなります | 拒否された呼び出しは記録された失敗となり、推論は続行されます |
+
+拒否されたステップは `policy.violated`（`intention: { type: 'continue' }`、ステップ `step`、理由 `reason`、違反したポリシー `violatedPolicies` を含む）として記録され、続いてポリシーの理由とともに `run.failed` が記録されます。結果は `status: 'failed'` で、`error` は `PolicyViolationError` です。実行制限に拒否されたツール呼び出しは、`policy.violated` として、また失敗したオペレーションとして記録されます。制限は超えたままなので、次のステップが拒否され、実行は失敗します。拒否ではなく決定で終わらせるには、エージェントの `maxSteps` をポリシーの `maxSteps` 以下にしてください。そうすれば、ポリシーが何かを拒否する前に、最後のステップが決定します。
 
 ## 不正なモデル出力 {#invalid-model-output}
 
@@ -186,6 +201,6 @@ const result = await pending; // status: 'cancelled'
 認知エージェントの実行も、通常の実行です。
 
 - `sdk.getTrace(runId)` は、`policy.checked`、`tool.called` などと並べて `cognition.*` イベントを表示します。
-- `sdk.replay(runId)` は、LLM を呼び出さずにツール呼び出しを再実行し、最終回答を再現します。元の実行と同じツール制限が適用されるので、エージェントが拒否されたツールは再び拒否されます。
+- `sdk.replay(runId)` は、LLM を呼び出さずにツール呼び出しを再実行し、最終回答を再現します。元の実行と同じツール制限と、各呼び出し時点での実行の進み具合が適用されるので、エージェントが拒否されたツールは再び拒否され、実行制限に拒否された呼び出しも再び拒否されます。
 - `sdk.getMentalState(runId)` は状態を再構築します。
 - `sdk.exportControllerDataset()` は、実行を学習データに変換します（[思考者プロファイル](./thinker-profiles#train-your-own-controller) を参照）。

@@ -78,7 +78,7 @@ const analyst = sdk.createAgent({
 | --- | --- | --- |
 | `name`、`model` | — | 必需 |
 | `profile` | `DEFAULT_THINKER_PROFILE` | 智能体如何推理 |
-| `tools`、`policies` | `[]` | 与其他地方一样受治理 |
+| `tools`、`policies` | `[]` | 与其他地方一样受治理；预算和超时策略还会在每一步之前检查，参见[限制与策略](../guide/cognitive-agents#limits-and-policies) |
 | `systemPrompt` | — | 附加到每个 prompt 的额外指令 |
 | `limits` | 参见[认知智能体](../guide/cognitive-agents#limits) | `maxSteps`、`timeoutMs`、`maxHypotheses`、`maxToolCalls`、`decisionThreshold`、`maxConsecutiveFailures`、`maxPredictionTests`、`preferenceWeight`、`minProposalSupport` |
 | `controller` | `'auto'` | `'heuristic'`、`'typed'` 或一个 `CognitiveController` |

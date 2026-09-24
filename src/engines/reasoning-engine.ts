@@ -155,19 +155,28 @@ export class ReasoningEngine {
         });
       } catch (error) {
         // The provider's failure is what the caller needs to see: a store that cannot record
-        // the discarded answers does not replace it (they are still counted in budgets).
-        await this.recordDiscardedAnswers(context, eventStore, discarded).catch(() => undefined);
+        // the discarded answers does not replace it (they are counted in budgets first).
+        await this.countDiscardedAnswers(context, discarded)
+          .then(() => this.appendDiscardedAnswers(context, eventStore, discarded))
+          .catch((failure: unknown) => {
+            console.warn(
+              `Discarded answers of run ${context.runId} could not be recorded:`,
+              failure instanceof Error ? failure.message : String(failure)
+            );
+          });
         throw error;
       }
-      await this.recordDiscardedAnswers(context, eventStore, discarded);
       const { response, requestedModel, answeredBy } = answer;
 
-      // Counted before the answer is read, so that a step failing on it still counts it.
+      // Every answer the vendor billed is counted before anything is recorded, and before the
+      // answer is read: a store that fails, or a step failing on the answer, still counts it.
+      await this.countDiscardedAnswers(context, discarded);
       await context.onModelUsage?.({
         model: response.model,
         ...(requestedModel ? { requestedModel } : {}),
         usage: response.usage,
       });
+      await this.appendDiscardedAnswers(context, eventStore, discarded);
       if (answer.fallback) {
         await this.logFallbackEvent(context, eventStore, answer.fallback);
       }
@@ -276,16 +285,23 @@ export class ReasoningEngine {
 
   /**
    * Counts each answer a provider discarded after the vendor billed it (an empty answer the
-   * provider failed on or failed over from) like any other model call, then records it.
+   * provider failed on or failed over from) like any other model call.
    */
-  private async recordDiscardedAnswers(
+  private async countDiscardedAnswers(
     context: ReasoningContext,
-    eventStore: IEventStore,
     answers: DiscardedAnswer[]
   ): Promise<void> {
     for (const answer of answers) {
       await context.onModelUsage?.({ model: answer.model, usage: answer.usage });
     }
+  }
+
+  /** Records each discarded answer as a `provider.answer_discarded` event, priced at its model. */
+  private async appendDiscardedAnswers(
+    context: ReasoningContext,
+    eventStore: IEventStore,
+    answers: DiscardedAnswer[]
+  ): Promise<void> {
     for (const answer of answers) {
       await eventStore.append(context.runId, {
         id: generateEventId(),

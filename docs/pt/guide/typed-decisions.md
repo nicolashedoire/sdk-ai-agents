@@ -141,7 +141,7 @@ Ambos recorrem ao LLM ou ao controlador heurístico quando o Jev não tem certez
 
 ## Rastreabilidade e custo {#traceability-and-cost}
 
-Cada decisão tipada é gravada como um evento `decision.evaluated` com o seu contexto, perguntas, respostas e consumo de tokens — no `runId` que você passar, ou em um fluxo `decision_*` dedicado. O Jev custa **US$ 0,042 por milhão de tokens de entrada, com saída gratuita** (conforme documentado em 2026-09-23), então `sdk.getRunCost(runId)` já o inclui desde o início.
+Cada decisão tipada é gravada como um evento `decision.evaluated` com o seu contexto, perguntas, respostas e consumo de tokens — no `runId` que você passar, ou em um fluxo `decision_*` dedicado. O Jev custa **US$ 0,042 por milhão de tokens de entrada, com saída gratuita** (conforme documentado em 2026-09-23), então `sdk.getRunCost(runId)` já o inclui desde o início. Cada decisão também conta nos orçamentos por período — para o `agentId` que ela nomeia, e nos limites que não nomeiam nenhum agente — e um orçamento nunca a recusa (veja [Custos de API](./costs#budgets)).
 
 Uma resposta que não corresponde às perguntas (uma escolha que não está entre as opções, uma resposta ausente ou de outro tipo) foi cobrada mesmo assim: ela também é registrada, com o `error` e `answers` vazio, antes de o erro ser lançado. Quando o backend não informa nenhuma contagem de tokens, o evento não tem `usage` e o custo da chamada é indicado como desconhecido, nunca como US$ 0 — veja [Custos de API](./costs#unknown-costs).
 

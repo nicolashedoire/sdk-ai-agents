@@ -128,7 +128,7 @@ sdk.createCognitiveAgent({
 
 ## Tools im Denkprozess {#tools-inside-reasoning}
 
-`seek_information` verwendet die **native Reasoning Engine und Action Engine**: Das LLM wählt ein Tool für die offene Unbekannte, die Action Engine prüft, dass das Tool **diesem Agenten gegeben wurde**, validiert den Aufruf gegen Richtlinien, Freigaben und Budgets, und das Ergebnis wird als **Beobachtung** aufgezeichnet, die auf ihr Ereignis `action.executed` verweist, und dann als Fakten mit `source: "tool"` eingearbeitet. Die Beobachtung bleibt erhalten, auch wenn ihre Interpretation fehlschlägt. Ein abgelehntes, blockiertes oder fehlschlagendes Tool wird zu einem aufgezeichneten Fehlschlag, und das Denken geht weiter.
+`seek_information` verwendet die **native Reasoning Engine und Action Engine**: Das LLM wählt ein Tool für die offene Unbekannte, die Action Engine prüft, dass das Tool **diesem Agenten gegeben wurde**, validiert den Aufruf gegen Richtlinien (Laufzeitlimits eingeschlossen, siehe [Limits und Richtlinien](#limits-and-policies)), Freigaben und Budgets, und das Ergebnis wird als **Beobachtung** aufgezeichnet, die auf ihr Ereignis `action.executed` verweist, und dann als Fakten mit `source: "tool"` eingearbeitet. Die Beobachtung bleibt erhalten, auch wenn ihre Interpretation fehlschlägt. Ein abgelehntes, blockiertes oder fehlschlagendes Tool wird zu einem aufgezeichneten Fehlschlag, und das Denken geht weiter.
 
 ## Limits {#limits}
 
@@ -153,6 +153,21 @@ sdk.createCognitiveAgent({
 ```
 
 Die Limits werden beim Erstellen des Agenten validiert: `maxSteps: 0` oder ein Timeout, das über das hinausgeht, was ein Timer unterstützt, wirft einen `ValidationError`, statt stillschweigend eine Schutzvorkehrung abzuschalten. `minProposalSupport` darf `decisionThreshold` nicht übersteigen; setzen Sie es gleich `decisionThreshold`, damit nur die Belege eine Antwort verbindlich machen können. Wenn Sie `decisionThreshold` senken, ohne `minProposalSupport` zu setzen, sinkt die Untergrenze mit.
+
+### Limits und Richtlinien {#limits-and-policies}
+
+Die Budget- und Timeout-Richtlinien, die für den Agenten gelten – die aus seinen `policies` und die globalen –, werden **vor jedem Schritt** geprüft, vor jedem seiner Modellaufrufe, und erneut vor jedem Tool-Aufruf. Sie sehen den Fortschritt des Laufs: `maxSteps` zählt die bereits erledigten Schritte, `maxTokens` die Tokens der Modellaufrufe des Laufs (Gedanken und ihre Reparaturen, Tool-Auswahl, typisierte Entscheidungen, Antworten, die der Anbieter nicht verwenden konnte), `maxDuration` die Zeit seit dem Start des Laufs. Token- und Kostenbudgets pro Zeitraum (`budgetLimit` mit `maxTokens` oder `maxCost`, ohne `toolName`) werden ebenfalls vor jedem Schritt geprüft, und jeder Modellaufruf, den der Lauf aufzeichnet, zählt darin (siehe [API-Kosten](./costs#budgets)). Ein Schritt wird als Intention vom Typ `continue` geprüft: Eine Richtlinie, deren Bedingungen einen Tool-Aufruf verlangen (`intention.type` gleich `tool_call`), gilt nur für Tool-Aufrufe. Allowlists, eigene Richtlinien (Custom), Aufrufbudgets (`maxToolCalls`) und Freigaben betreffen nur Tool-Aufrufe, ebenso eine Limit-Regel, deren Aktion `require_approval` ist: Ein Schritt wartet nie auf eine Freigabe. Die Prüfung jedes Schritts steht im Audit der Richtlinien (`sdk.getPolicyAuditTrail`), für die Richtlinien, die für einen Schritt gelten können.
+
+Das erste erreichte Limit beendet den Lauf (Limits für Tool-Aufrufe lassen nur Aufrufe aus), und die beiden Arten von Limits beenden ihn nicht auf dieselbe Weise:
+
+| Limit | `limits` des Agenten | Richtlinien |
+| --- | --- | --- |
+| Schritte | `maxSteps`: Der letzte Schritt entscheidet; `completed`, mit einer Entscheidung `committed`, `provisional` oder `abstain` | `maxSteps`: Der nächste Schritt wird abgelehnt; `failed` |
+| Zeit | `timeoutMs`: Der Lauf wird abgebrochen, ein laufender Aufruf erhält das Abbruchsignal; `failed`, `Timeout exceeded (… ms)` | `maxDuration`: geprüft zwischen den Schritten und vor Tool-Aufrufen, ein laufender Aufruf läuft weiter; `failed`, `Timeout (… ms) exceeded` |
+| Tokens, Kosten | — | `maxTokens`, Budgets pro Zeitraum: Der nächste Schritt wird abgelehnt; `failed` |
+| Tool-Aufrufe | `maxToolCalls`: `seek_information` wird nicht mehr angeboten | Ein abgelehnter Aufruf ist ein aufgezeichneter Fehlschlag, und das Denken geht weiter |
+
+Ein abgelehnter Schritt wird als `policy.violated` aufgezeichnet – mit `intention: { type: 'continue' }`, dem Schritt (`step`), dem Grund (`reason`) und den verletzten Richtlinien (`violatedPolicies`) –, danach `run.failed` mit dem Grund der Richtlinie; das Ergebnis hat `status: 'failed'` und einen `PolicyViolationError` als `error`. Ein Tool-Aufruf, den ein Laufzeitlimit ablehnt, wird als `policy.violated` und als fehlgeschlagene Operation aufgezeichnet; da das Limit weiterhin überschritten ist, wird der nächste Schritt abgelehnt, und der Lauf schlägt fehl. Um mit einer Entscheidung statt mit einer Ablehnung zu enden, setzen Sie das `maxSteps` des Agenten höchstens so hoch wie das der Richtlinie: Sein letzter Schritt entscheidet dann, bevor die Richtlinie etwas ablehnt.
 
 ## Ungültige Modellausgabe {#invalid-model-output}
 
@@ -186,6 +201,6 @@ Das Ereignisprotokoll speichert das Ziel, den Kontext und jeden Gedanken, und di
 Ein kognitiver Lauf ist ein normaler Lauf:
 
 - `sdk.getTrace(runId)` zeigt die Ereignisse `cognition.*` neben `policy.checked`, `tool.called`, …
-- `sdk.replay(runId)` führt seine Tool-Aufrufe erneut aus, ohne das LLM aufzurufen, und reproduziert die endgültige Antwort – mit derselben Tool-Beschränkung wie der ursprüngliche Lauf, sodass ein Tool, das dem Agenten verweigert wurde, erneut verweigert wird;
+- `sdk.replay(runId)` führt seine Tool-Aufrufe erneut aus, ohne das LLM aufzurufen, und reproduziert die endgültige Antwort – mit derselben Tool-Beschränkung wie der ursprüngliche Lauf, sodass ein Tool, das dem Agenten verweigert wurde, erneut verweigert wird, und mit dem Fortschritt des Laufs bei jedem Aufruf, sodass ein Aufruf, den ein Laufzeitlimit abgelehnt hat, erneut abgelehnt wird;
 - `sdk.getMentalState(runId)` rekonstruiert den Zustand;
 - `sdk.exportControllerDataset()` macht aus Läufen Trainingsdaten (siehe [Denkerprofile](./thinker-profiles#train-your-own-controller)).

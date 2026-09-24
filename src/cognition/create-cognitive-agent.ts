@@ -1,4 +1,5 @@
 import type { ActionEngine } from '../engines/action-engine.js';
+import type { PolicyEngine } from '../engines/policy-engine.js';
 import { ReasoningEngine } from '../engines/reasoning-engine.js';
 import { ValidationError } from '../errors/index.js';
 import type { TypedDecisionClient } from '../decisions/typed-decisions.js';
@@ -101,6 +102,11 @@ export interface CognitiveAgentEnvironment {
   eventStore: IEventStore;
   actionEngine: ActionEngine;
   decisionClient?: TypedDecisionClient;
+  /**
+   * The policies of `actionEngine`, checked before each step and counting each model call in
+   * budgets per period (see `CognitiveAgentDependencies.policyEngine`). `createSDK` gives it.
+   */
+  policyEngine?: PolicyEngine;
 }
 
 /** Assembles a cognitive agent from its configuration and the SDK's shared services. */
@@ -169,6 +175,7 @@ export function assembleCognitiveAgent(
       ...(config.providerSettings ? { providerSettings: config.providerSettings } : {}),
     }),
     eventStore: environment.eventStore,
+    ...(environment.policyEngine ? { policyEngine: environment.policyEngine } : {}),
   });
 }
 

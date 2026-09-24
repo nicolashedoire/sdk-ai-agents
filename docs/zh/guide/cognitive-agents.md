@@ -128,7 +128,7 @@ sdk.createCognitiveAgent({
 
 ## 推理中的工具 {#tools-inside-reasoning}
 
-`seek_information` 使用**原生的推理引擎和动作引擎**：LLM 为未决的未知项挑选一个工具，动作引擎检查这个工具是否**交给了这个智能体**，按策略、审批和预算验证这次调用，结果被记录为一条指向其 `action.executed` 事件的**观测**，然后作为 `source: "tool"` 的事实整合进来。即使对它的解读失败，这条观测也会保留。被拒绝、被拦截或出错的工具会变成一条已记录的失败，推理继续进行。
+`seek_information` 使用**原生的推理引擎和动作引擎**：LLM 为未决的未知项挑选一个工具，动作引擎检查这个工具是否**交给了这个智能体**，按策略（包括运行限制，参见[限制与策略](#limits-and-policies)）、审批和预算验证这次调用，结果被记录为一条指向其 `action.executed` 事件的**观测**，然后作为 `source: "tool"` 的事实整合进来。即使对它的解读失败，这条观测也会保留。被拒绝、被拦截或出错的工具会变成一条已记录的失败，推理继续进行。
 
 ## 限制 {#limits}
 
@@ -153,6 +153,21 @@ sdk.createCognitiveAgent({
 ```
 
 限制会在创建智能体时验证：`maxSteps: 0` 或超出计时器所能支持范围的超时，会抛出 `ValidationError`，而不是悄无声息地让一道安全保障失效。`minProposalSupport` 不能超过 `decisionThreshold`；把它设为等于 `decisionThreshold`，就只有证据能让答案被确定。如果你调低了 `decisionThreshold` 而没有设置 `minProposalSupport`，这个下限会随之降低。
+
+### 限制与策略 {#limits-and-policies}
+
+适用于该智能体的预算和超时策略——它的 `policies` 中的策略以及全局策略——会在**每一步之前**、在这一步的任何模型调用之前检查，并在每次工具调用之前再次检查。它们看到的是运行的进度：`maxSteps` 统计已完成的步骤，`maxTokens` 统计该运行的模型调用（思维及其修复、工具选择、类型化决策、提供商无法使用的应答）的 token 数，`maxDuration` 统计自运行开始以来的时间。按时间段计算的 token 和费用预算（带 `maxTokens` 或 `maxCost`、不带 `toolName` 的 `budgetLimit`）也会在每一步之前检查，运行记录的每次模型调用都会计入其中（参见 [API 成本](./costs#budgets)）。一个步骤会被当作类型为 `continue` 的意图来检查：条件要求工具调用（`intention.type` 等于 `tool_call`）的策略只适用于工具调用。允许列表、自定义策略、调用预算（`maxToolCalls`）和审批只涉及工具调用，动作为 `require_approval` 的限制规则也是如此：步骤从不等待审批。每一步的检查都会记录在策略审计（`sdk.getPolicyAuditTrail`）中，但只针对可能适用于步骤的策略。
+
+最先达到的限制会结束运行（工具调用的限制只会跳过调用），而两类限制结束运行的方式不同：
+
+| 限制 | 智能体的 `limits` | 策略 |
+| --- | --- | --- |
+| 步骤 | `maxSteps`：最后一步做出决定；`completed`，决定为 `committed`、`provisional` 或 `abstain` | `maxSteps`：下一步被拒绝；`failed` |
+| 时间 | `timeoutMs`：运行被中止，进行中的调用会收到中止信号；`failed`，`Timeout exceeded (… ms)` | `maxDuration`：在步骤之间和工具调用之前检查，进行中的调用会继续；`failed`，`Timeout (… ms) exceeded` |
+| token、费用 | — | `maxTokens`、按时间段计算的预算：下一步被拒绝；`failed` |
+| 工具调用 | `maxToolCalls`：不再提供 `seek_information` | 被拒绝的调用是一条已记录的失败，推理继续进行 |
+
+被拒绝的步骤会记录为 `policy.violated`——带有 `intention: { type: 'continue' }`、步骤 `step`、原因 `reason` 和被违反的策略 `violatedPolicies`——随后是带有该策略原因的 `run.failed`；结果带有 `status: 'failed'`，其 `error` 为 `PolicyViolationError`。被运行限制拒绝的工具调用会记录为 `policy.violated`，同时记录为一次失败的操作；由于限制仍然超出，下一步会被拒绝，运行失败。若想以决定而不是拒绝结束，请让智能体的 `maxSteps` 不超过策略的 `maxSteps`：这样它的最后一步会在策略拒绝任何东西之前做出决定。
 
 ## 模型输出无效 {#invalid-model-output}
 
@@ -186,6 +201,6 @@ const result = await pending; // status: 'cancelled'
 认知运行就是一次普通的运行：
 
 - `sdk.getTrace(runId)` 会在 `policy.checked`、`tool.called` 等事件旁边显示 `cognition.*` 事件；
-- `sdk.replay(runId)` 会在不调用 LLM 的情况下重新执行它的工具调用，并重现最终答案——工具限制与原始运行相同，所以智能体当初被拒绝使用的工具会再次被拒绝；
+- `sdk.replay(runId)` 会在不调用 LLM 的情况下重新执行它的工具调用，并重现最终答案——工具限制与原始运行相同，所以智能体当初被拒绝使用的工具会再次被拒绝；每次调用也使用原始运行当时的进度，所以被运行限制拒绝的调用会再次被拒绝；
 - `sdk.getMentalState(runId)` 会重建状态；
 - `sdk.exportControllerDataset()` 会把运行转换成训练数据（参见[思考者画像](./thinker-profiles#train-your-own-controller)）。

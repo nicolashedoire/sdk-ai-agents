@@ -1,6 +1,13 @@
 import type { Event } from '../types/events.js';
 import type { ReasoningGraph, ReasoningNode, ReasoningEdge } from '../types/reasoning-graph.js';
 import { generateEventId } from './id.js';
+import { readPolicyCheck } from './policy-check.js';
+
+const POLICY_EDGE_LABELS = {
+  allowed: 'Allowed',
+  requires_approval: 'Requires Approval',
+  denied: 'Denied',
+} as const;
 
 export class ReasoningGraphBuilder {
   /**
@@ -74,28 +81,15 @@ export class ReasoningGraphBuilder {
         case 'policy.checked':
           {
             const nodeId = `policy-${event.id}`;
-            const policyData = event.data as {
-              rule?: string;
-              allowed?: boolean;
-              requiresApproval?: boolean;
-              reason?: string;
-            };
+            const check = readPolicyCheck(event.data);
 
             const node: ReasoningNode = {
               id: nodeId,
               type: 'policy',
-              label: `Policy Check: ${policyData.rule || 'unknown'}`,
+              label: `Policy Check: ${check.rule}`,
               timestamp: event.timestamp,
               data: {
-                policy: {
-                  rule: policyData.rule || 'unknown',
-                  result: policyData.requiresApproval
-                    ? 'requires_approval'
-                    : policyData.allowed
-                      ? 'allowed'
-                      : 'denied',
-                  reason: policyData.reason,
-                },
+                policy: { rule: check.rule, result: check.result, reason: check.reason },
               },
               metadata: event.metadata,
             };
@@ -108,11 +102,7 @@ export class ReasoningGraphBuilder {
                 source: lastNodeId,
                 target: nodeId,
                 type: 'validates',
-                label: policyData.allowed
-                  ? 'Allowed'
-                  : policyData.requiresApproval
-                    ? 'Requires Approval'
-                    : 'Denied',
+                label: POLICY_EDGE_LABELS[check.result],
               });
             }
             lastNodeId = nodeId;

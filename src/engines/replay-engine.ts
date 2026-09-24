@@ -10,6 +10,9 @@ import type {
   RunResult,
 } from '../types/run.js';
 import { generateEventId, generateRunId } from '../utils/id.js';
+import { modelCallsOf } from '../costs/run-cost.js';
+import { uniqueById } from '../utils/unique-events.js';
+import { tokensOfUsage } from '../utils/usage-tokens.js';
 import { type ActionEngine, TOOL_APPROVAL_POLICY } from './action-engine.js';
 
 export class ReplayEngine {
@@ -23,7 +26,9 @@ export class ReplayEngine {
     modifications?: ReplayModifications,
     options: ReplayOptions = {}
   ): Promise<RunResult> {
-    const originalEvents = await this.eventStore.getEvents(runId);
+    // An event stored twice (an at-least-once store) is one event: every reading below —
+    // intentions, approvals, progress — sees the same list, so their positions match.
+    const originalEvents = uniqueById(await this.eventStore.getEvents(runId));
     this.validateEvents(originalEvents, runId);
 
     const newRunId = generateRunId();
@@ -53,8 +58,7 @@ export class ReplayEngine {
       intentions,
       approved,
       allowedTools,
-      // Cognitive runs gave no run progress to their calls: their replay gives none either.
-      allowedTools ? undefined : recordedProgress(originalEvents)
+      allowedTools ? recordedCognitiveProgress(originalEvents) : recordedProgress(originalEvents)
     );
 
     if (result.hasError && result.error) {
@@ -361,7 +365,7 @@ function recordedProgress(
     if (event.type !== 'intention.generated' && event.type !== 'provider.answer_discarded') {
       continue;
     }
-    tokensUsed += tokensOf(event.data.usage);
+    tokensUsed += tokensOfUsage(event.data.usage);
     if (event.type === 'intention.generated') {
       progress.push({
         step: progress.length,
@@ -373,12 +377,34 @@ function recordedProgress(
   return progress;
 }
 
-function tokensOf(usage: unknown): number {
-  if (!usage || typeof usage !== 'object') return 0;
-  const { totalTokens, promptTokens, completionTokens } = usage as Record<string, unknown>;
-  if (typeof totalTokens === 'number') return totalTokens;
-  return (
-    (typeof promptTokens === 'number' ? promptTokens : 0) +
-    (typeof completionTokens === 'number' ? completionTokens : 0)
-  );
+/**
+ * The progress of a cognitive run when each of its intentions was generated: the steps it had
+ * completed, the tokens of every model call recorded so far — thoughts, typed decisions, tool
+ * selections (this very call's included), answers a provider discarded, operations cut short
+ * after billed attempts: the calls `getRunCost` reads, as the run counted them — and the time
+ * elapsed. That is what its tool calls were checked against.
+ */
+function recordedCognitiveProgress(
+  events: Event[]
+): Array<{ step: number; tokensUsed: number; elapsedMs: number }> {
+  const startedAt = events.find((event) => event.type === 'run.started')?.timestamp;
+  let step = 1;
+  let tokensUsed = 0;
+  const progress: Array<{ step: number; tokensUsed: number; elapsedMs: number }> = [];
+  for (const event of events) {
+    if (event.type === 'cognition.operation_selected' && typeof event.data.step === 'number') {
+      step = event.data.step;
+    }
+    if (modelCallsOf(event)) {
+      tokensUsed += tokensOfUsage(event.data.usage);
+    }
+    if (event.type === 'intention.generated') {
+      progress.push({
+        step: step - 1,
+        tokensUsed,
+        elapsedMs: startedAt === undefined ? 0 : Math.max(0, event.timestamp - startedAt),
+      });
+    }
+  }
+  return progress;
 }

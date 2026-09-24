@@ -78,7 +78,7 @@ const analyst = sdk.createAgent({
 | --- | --- | --- |
 | `name`, `model` | — | 필수 |
 | `profile` | `DEFAULT_THINKER_PROFILE` | 에이전트가 추론하는 방식 |
-| `tools`, `policies` | `[]` | 다른 곳과 똑같이 통제됩니다 |
+| `tools`, `policies` | `[]` | 다른 곳과 똑같이 통제됩니다. 예산 정책과 타임아웃 정책은 각 단계 전에도 검사됩니다. [한도와 정책](../guide/cognitive-agents#limits-and-policies)을 보세요 |
 | `systemPrompt` | — | 모든 프롬프트에 붙는 추가 지시문 |
 | `limits` | [인지 에이전트](../guide/cognitive-agents#limits) 참고 | `maxSteps`, `timeoutMs`, `maxHypotheses`, `maxToolCalls`, `decisionThreshold`, `maxConsecutiveFailures`, `maxPredictionTests`, `preferenceWeight`, `minProposalSupport` |
 | `controller` | `'auto'` | `'heuristic'`, `'typed'` 또는 `CognitiveController` |

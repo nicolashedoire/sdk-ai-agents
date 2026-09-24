@@ -128,7 +128,7 @@ sdk.createCognitiveAgent({
 
 ## Herramientas dentro del razonamiento {#tools-inside-reasoning}
 
-`seek_information` usa los **motores nativos de razonamiento y de acciones**: el LLM elige una herramienta para la incógnita abierta, el motor de acciones comprueba que la herramienta **se dio a este agente**, valida la llamada contra las políticas, las aprobaciones y los presupuestos, y el resultado se registra como una **observación** que apunta a su evento `action.executed`, y después se integra como hechos con `source: "tool"`. La observación se conserva aunque falle su interpretación. Una herramienta denegada, bloqueada o que falla se convierte en un fallo registrado, y el razonamiento continúa.
+`seek_information` usa los **motores nativos de razonamiento y de acciones**: el LLM elige una herramienta para la incógnita abierta, el motor de acciones comprueba que la herramienta **se dio a este agente**, valida la llamada contra las políticas (límites de ejecución incluidos, consulta [Límites y políticas](#limits-and-policies)), las aprobaciones y los presupuestos, y el resultado se registra como una **observación** que apunta a su evento `action.executed`, y después se integra como hechos con `source: "tool"`. La observación se conserva aunque falle su interpretación. Una herramienta denegada, bloqueada o que falla se convierte en un fallo registrado, y el razonamiento continúa.
 
 ## Límites {#limits}
 
@@ -153,6 +153,21 @@ sdk.createCognitiveAgent({
 ```
 
 Los límites se validan al crear el agente: `maxSteps: 0` o un tiempo límite superior a lo que admite un temporizador lanza un `ValidationError` en lugar de desactivar en silencio una salvaguarda. `minProposalSupport` no puede superar `decisionThreshold`; ponlo igual a `decisionThreshold` para que solo la evidencia pueda hacer firme una respuesta. Si bajas `decisionThreshold` sin fijar `minProposalSupport`, el mínimo baja con él.
+
+### Límites y políticas {#limits-and-policies}
+
+Las políticas de presupuesto y de tiempo límite que se aplican al agente — las de sus `policies` y las globales — se comprueban **antes de cada paso**, antes de cualquiera de sus llamadas al modelo, y de nuevo antes de cada llamada a herramienta. Ven el progreso de la ejecución: `maxSteps` cuenta los pasos ya dados, `maxTokens` los tokens de las llamadas al modelo de la ejecución (pensamientos y sus reparaciones, selecciones de herramienta, decisiones tipadas, respuestas que el proveedor no pudo usar) y `maxDuration` el tiempo transcurrido desde el inicio de la ejecución. Los presupuestos de tokens y de coste por periodo (`budgetLimit` con `maxTokens` o `maxCost`, sin `toolName`) también se comprueban antes de cada paso, y cada llamada al modelo que registra la ejecución cuenta en ellos (consulta [Costes de API](./costs#budgets)). Un paso se comprueba como una intención de tipo `continue`: una política cuyas condiciones exigen una llamada a herramienta (`intention.type` igual a `tool_call`) solo se aplica a las llamadas a herramientas. Las listas de permitidos, las políticas personalizadas, los presupuestos de llamadas (`maxToolCalls`) y las aprobaciones solo afectan a las llamadas a herramientas, igual que una regla de límite cuya acción es `require_approval`: un paso nunca espera una aprobación. La comprobación de cada paso figura en la auditoría de políticas (`sdk.getPolicyAuditTrail`), para las políticas que pueden aplicarse a un paso.
+
+El primer límite alcanzado termina la ejecución (los límites de llamadas a herramientas solo omiten llamadas), y los dos tipos de límites no la terminan de la misma manera:
+
+| Límite | `limits` del agente | Políticas |
+| --- | --- | --- |
+| Pasos | `maxSteps`: el último paso decide; `completed`, con una decisión `committed`, `provisional` o `abstain` | `maxSteps`: el paso siguiente se rechaza; `failed` |
+| Tiempo | `timeoutMs`: la ejecución se interrumpe y una llamada en curso recibe la señal de interrupción; `failed`, `Timeout exceeded (… ms)` | `maxDuration`: se comprueba entre pasos y antes de las llamadas a herramientas, y una llamada en curso sigue; `failed`, `Timeout (… ms) exceeded` |
+| Tokens, coste | — | `maxTokens`, presupuestos por periodo: el paso siguiente se rechaza; `failed` |
+| Llamadas a herramientas | `maxToolCalls`: `seek_information` deja de ofrecerse | Una llamada rechazada es un fallo registrado, y el razonamiento continúa |
+
+Un paso rechazado se registra como `policy.violated` — con `intention: { type: 'continue' }`, el paso (`step`), el motivo (`reason`) y las políticas incumplidas (`violatedPolicies`) — y después `run.failed` con el motivo de la política; el resultado tiene `status: 'failed'` y un `PolicyViolationError` como `error`. Una llamada a herramienta rechazada por un límite de ejecución se registra como `policy.violated` y como una operación fallida; como el límite sigue superado, el paso siguiente se rechaza y la ejecución falla. Para terminar con una decisión en lugar de un rechazo, mantén el `maxSteps` del agente igual o por debajo del de la política: su último paso decide entonces antes de que la política rechace nada.
 
 ## Salida no válida del modelo {#invalid-model-output}
 
@@ -186,6 +201,6 @@ El registro de eventos guarda el objetivo, el contexto y cada pensamiento, y los
 Una ejecución cognitiva es una ejecución normal:
 
 - `sdk.getTrace(runId)` muestra los eventos `cognition.*` junto a `policy.checked`, `tool.called`, …
-- `sdk.replay(runId)` vuelve a ejecutar sus llamadas a herramientas sin llamar al LLM y reproduce la respuesta final — con la misma restricción de herramientas que la ejecución original, de modo que una herramienta que se le denegó al agente se vuelve a denegar;
+- `sdk.replay(runId)` vuelve a ejecutar sus llamadas a herramientas sin llamar al LLM y reproduce la respuesta final — con la misma restricción de herramientas que la ejecución original, de modo que una herramienta que se le denegó al agente se vuelve a denegar, y con el progreso de la ejecución en cada llamada, de modo que una llamada que rechazó un límite de ejecución se vuelve a rechazar;
 - `sdk.getMentalState(runId)` reconstruye el estado;
 - `sdk.exportControllerDataset()` convierte las ejecuciones en datos de entrenamiento (consulta [Perfiles de pensador](./thinker-profiles#train-your-own-controller)).

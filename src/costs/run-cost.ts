@@ -71,7 +71,8 @@ const modelCallSchema = z.object({
   requestedModel: z.string().optional(),
 });
 
-interface UsageRecord {
+/** The model calls one event records, as run costs (and budgets per period) count them. */
+export interface UsageRecord {
   model: string;
   requestedModel?: string;
   source: UsageSource;
@@ -92,13 +93,17 @@ interface UsageRecord {
 export function collectUsage(events: Event[]): UsageRecord[] {
   const records: UsageRecord[] = [];
   for (const event of uniqueById(events)) {
-    const record = usageOf(event);
+    const record = modelCallsOf(event);
     if (record) records.push(record);
   }
   return records;
 }
 
-function usageOf(event: Event): UsageRecord | undefined {
+/**
+ * The model calls an event records, if it records any (see `collectUsage`). Budgets per
+ * period count a cognitive run's calls with it, so that they count what `getRunCost` prices.
+ */
+export function modelCallsOf(event: Pick<Event, 'type' | 'data'>): UsageRecord | undefined {
   const { data } = event;
   switch (event.type) {
     case 'intention.generated':
