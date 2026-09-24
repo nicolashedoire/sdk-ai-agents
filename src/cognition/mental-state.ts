@@ -200,7 +200,10 @@ export interface TrailEntry {
 
 /** Rules the conclusion guard applies. Recorded with the run so a rebuild applies the same ones. */
 export interface CommitRules {
-  /** Minimum evidence support of a committed answer. */
+  /**
+   * Minimum evidence support of a committed answer, except a proposal the thinker clearly
+   * prefers (see `minProposalSupport`); also the fit that makes a proposal clearly preferred.
+   */
   decisionThreshold: number;
   /** Predictions that may be tested in the run; 0 when no evaluator is configured. */
   maxPredictionTests: number;

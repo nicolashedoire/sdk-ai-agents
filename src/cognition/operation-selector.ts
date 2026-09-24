@@ -15,7 +15,11 @@ export interface CognitiveLimits {
   /** Maximum number of hypotheses in play at the same time. */
   maxHypotheses: number;
   maxToolCalls: number;
-  /** Minimum evidence support of a committed answer; exploration may stop above it. */
+  /**
+   * Minimum evidence support of a committed claim, and of a committed proposal the thinker does
+   * not clearly prefer; also the preference fit that makes a proposal clearly preferred.
+   * Exploration may stop above it.
+   */
   decisionThreshold: number;
   /** The run fails after this many operations fail in a row. */
   maxConsecutiveFailures: number;
@@ -25,7 +29,8 @@ export interface CognitiveLimits {
   preferenceWeight: number;
   /**
    * Evidence support a proposal needs when the thinker clearly prefers it (fit at least
-   * `decisionThreshold`). Claims about the world always need `decisionThreshold`.
+   * `decisionThreshold`). Claims about the world always need `decisionThreshold`. At most
+   * `decisionThreshold`; equal to it, preferences no longer help a proposal to be committed.
    */
   minProposalSupport: number;
 }
@@ -33,17 +38,22 @@ export interface CognitiveLimits {
 const MAX_TIMER_MS = 2_147_483_647;
 
 /** Validates limits so a typo cannot silently disable the timeout or the step budget. */
-export const cognitiveLimitsSchema = z.object({
-  maxSteps: z.number().int().min(1).max(200),
-  timeoutMs: z.number().int().min(1).max(MAX_TIMER_MS),
-  maxHypotheses: z.number().int().min(1).max(20),
-  maxToolCalls: z.number().int().min(0),
-  decisionThreshold: z.number().min(0).max(1),
-  maxConsecutiveFailures: z.number().int().min(1),
-  maxPredictionTests: z.number().int().min(0),
-  preferenceWeight: z.number().min(0).max(1),
-  minProposalSupport: z.number().min(0).max(1),
-}) satisfies z.ZodType<CognitiveLimits>;
+export const cognitiveLimitsSchema = z
+  .object({
+    maxSteps: z.number().int().min(1).max(200),
+    timeoutMs: z.number().int().min(1).max(MAX_TIMER_MS),
+    maxHypotheses: z.number().int().min(1).max(20),
+    maxToolCalls: z.number().int().min(0),
+    decisionThreshold: z.number().min(0).max(1),
+    maxConsecutiveFailures: z.number().int().min(1),
+    maxPredictionTests: z.number().int().min(0),
+    preferenceWeight: z.number().min(0).max(1),
+    minProposalSupport: z.number().min(0).max(1),
+  })
+  .refine((limits) => limits.minProposalSupport <= limits.decisionThreshold, {
+    path: ['minProposalSupport'],
+    message: 'must not exceed decisionThreshold',
+  }) satisfies z.ZodType<CognitiveLimits>;
 
 export const DEFAULT_COGNITIVE_LIMITS: CognitiveLimits = {
   maxSteps: 12,

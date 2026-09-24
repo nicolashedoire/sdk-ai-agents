@@ -216,6 +216,17 @@ describe('cognitive agent guards', () => {
     expect(started?.data.commitRules).toMatchObject({ minProposalSupport: 0.35 });
   });
 
+  it('records a default proposal floor lowered with the decision threshold', async () => {
+    env = createTestSDK();
+    scriptBuildOrBuy(env.provider);
+    const agent = env.sdk.createCognitiveAgent({ name: 'a', model: 'test-model', limits: { decisionThreshold: 0.3 } });
+
+    const result = await agent.think({ problem: 'Build or buy?' });
+
+    const started = (await env.sdk.getEvents(result.runId)).find((event) => event.type === 'cognition.started');
+    expect(started?.data.commitRules).toMatchObject({ decisionThreshold: 0.3, minProposalSupport: 0.3 });
+  });
+
   it('abstains instead of failing when the forced decision cannot be produced', async () => {
     env = createTestSDK();
     scriptBuildOrBuy(env.provider).always('decide', { error: new Error('model down') });

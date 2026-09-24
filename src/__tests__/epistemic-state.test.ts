@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { availableOperations, nextRevisionTarget } from '../cognition/cognitive-operations.js';
-import { assessReadiness, rankHypotheses, readyHypothesis, settleDecision } from '../cognition/decision-readiness.js';
+import { assessReadiness, describeBlocker, rankHypotheses, readyHypothesis, settleDecision } from '../cognition/decision-readiness.js';
 import { TypedHypothesisAssessor } from '../cognition/hypothesis-assessor.js';
 import { applyThought } from '../cognition/mental-state-reducer.js';
 import { createMentalState, type MentalState } from '../cognition/mental-state.js';
@@ -324,22 +324,42 @@ describe('conclusion guard', () => {
   });
 
   it('commits a choice the thinker clearly prefers on plausible evidence, never a claim', () => {
-    const judged = (kind: 'proposal' | 'rule', support: number, options: Parameters<typeof createMentalState>[2]) => {
+    const judged = (
+      kind: 'proposal' | 'rule',
+      support: number,
+      options: Parameters<typeof createMentalState>[2],
+      preferenceFit = 0.9
+    ) => {
       let state = createMentalState('Take the bank job?', undefined, options);
       state = think(state, 'represent', { summary: 'r', addFacts: [{ statement: 'The job is stable', source: 'input' }] }).state;
       state = think(state, 'hypothesize', { summary: 'h', addHypotheses: [{ statement: 'Decline the offer', kind }] }).state;
       state = think(state, 'critique', { summary: 'c', critiques: [{ hypothesisId: 'H1', objection: 'Lower salary elsewhere', severity: 'minor' }] }).state;
-      return think(state, 'compare', { summary: 'judged', hypothesisUpdates: [{ hypothesisId: 'H1', support, preferenceFit: 0.9 }] }).state;
+      return think(state, 'compare', { summary: 'judged', hypothesisUpdates: [{ hypothesisId: 'H1', support, preferenceFit }] }).state;
     };
     const withRule = { commitRules: { minProposalSupport: 0.35 } };
 
     expect(assessReadiness(judged('proposal', 0.44, withRule), 'H1').ready).toBe(true);
+    // Both limits are inclusive.
+    expect(assessReadiness(judged('proposal', 0.35, withRule, 0.75), 'H1').ready).toBe(true);
     // The same numbers never make a claim about the world credible.
     expect(assessReadiness(judged('rule', 0.44, withRule), 'H1').ready).toBe(false);
-    // Preference does not override evidence that speaks against the choice.
+    // A clear choice still needs the floor: only the floor is reported missing.
     expect(assessReadiness(judged('proposal', 0.3, withRule), 'H1').blockers).toEqual([
-      { kind: 'low_support', hypothesisId: 'H1', support: 0.3, threshold: 0.75 },
-      { kind: 'low_fit', hypothesisId: 'H1', fit: 0.9, threshold: 0.75, supportFloor: 0.35 },
+      { kind: 'low_support', hypothesisId: 'H1', support: 0.3, threshold: 0.35 },
+    ]);
+    // A choice the thinker does not clearly prefer needs the full evidence threshold.
+    const lukewarm = assessReadiness(judged('proposal', 0.5, withRule, 0.6), 'H1');
+    expect(lukewarm.blockers).toEqual([
+      { kind: 'low_support', hypothesisId: 'H1', support: 0.5, threshold: 0.75 },
+      { kind: 'low_fit', hypothesisId: 'H1', fit: 0.6, threshold: 0.75, supportFloor: 0.35 },
+    ]);
+    expect(lukewarm.blockers.map(describeBlocker)).toEqual([
+      'H1 has evidence support 0.5, below 0.75',
+      "H1 is not clearly the thinker's choice either: its fit with the thinker is 0.6, below 0.75 (a clear choice would need evidence support of 0.35 only)",
+    ]);
+    // With the path switched off (floor = threshold), preferences are not reported as missing.
+    expect(assessReadiness(judged('proposal', 0.5, { commitRules: { minProposalSupport: 0.75 } }, 0.6), 'H1').blockers).toEqual([
+      { kind: 'low_support', hypothesisId: 'H1', support: 0.5, threshold: 0.75 },
     ]);
     // Runs recorded before the rule existed keep the evidence-only rule.
     expect(assessReadiness(judged('proposal', 0.44, {}), 'H1').ready).toBe(false);

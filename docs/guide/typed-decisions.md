@@ -133,7 +133,7 @@ answers.frustration.score;    // number
 With a decision backend configured, cognitive agents use it automatically:
 
 - **controller** — at each step, one request asks which available operation comes next (Choice) and whether the reasoning is ready to decide (Noul);
-- **comparison** — `compare` asks for the evidence support of each hypothesis in a request **without** the thinker's profile, then, for proposals only, their fit with the thinker in a second request. The two scores are kept apart: fit only reorders proposals (`limits.preferenceWeight`, 0.4 by default), never the credibility of a claim — see [Evidence & verification](./evidence-and-verification#evidence-is-not-preference).
+- **comparison** — `compare` asks for the evidence support of each hypothesis in a request **without** the thinker's profile, then, for proposals only, their fit with the thinker in a second request. The two scores are kept apart: fit reorders proposals (`limits.preferenceWeight`, 0.4 by default) and lets a proposal the thinker clearly prefers be committed on plausible evidence (`limits.minProposalSupport`), never the credibility of a claim — see [Evidence & verification](./evidence-and-verification#evidence-is-not-preference).
 
 Both fall back to the LLM or the heuristic controller when Jev is unsure or unavailable.
 

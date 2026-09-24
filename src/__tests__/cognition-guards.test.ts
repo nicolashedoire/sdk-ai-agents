@@ -95,6 +95,12 @@ describe('cognitive guards', () => {
     expect(() => env.sdk.createCognitiveAgent({ name: 'a', model: 'm', limits: { timeoutMs: 3_000_000_000 } })).toThrow(
       ValidationError
     );
+    // A proposal floor above the decision threshold would make preferences a handicap.
+    expect(() => env.sdk.createCognitiveAgent({ name: 'a', model: 'm', limits: { minProposalSupport: 0.8 } })).toThrow(
+      'limits.minProposalSupport'
+    );
+    // Lowering only the threshold lowers the default floor with it.
+    expect(() => env.sdk.createCognitiveAgent({ name: 'a', model: 'm', limits: { decisionThreshold: 0.3 } })).not.toThrow();
   });
 
   it('snapshots the profile for the whole run', async () => {

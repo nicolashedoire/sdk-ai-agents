@@ -27,14 +27,14 @@ features:
     linkText: The cognitive loop
   - icon: 🔬
     title: Believes what it can justify
-    details: Observations keep their provenance, rules come with falsifiable predictions, your own evaluator tests them, refuted rules are revised — and an answer is committed only when the evidence holds.
+    details: Observations keep their provenance, rules come with falsifiable predictions, your own evaluator tests them, refuted rules are revised — and an answer is committed only when it passes a guard written in code.
     link: /guide/evidence-and-verification
     linkText: Evidence & verification
   - icon: 🪞
-    title: Thinks the way you do
-    details: Explain a few topics in your own words, distill your reasoning into a profile, then correct the agent run after run. Lessons are kept and applied.
+    title: Reasons like a given person
+    details: Yes, it can imitate how someone reasons. Explain a few topics in your own words, and it distills your order of attention, priorities and reflexes into a profile written into the instructions of each reasoning step. Each correction is added to it, and your agreement shows how close it gets.
     link: /guide/thinker-profiles
-    linkText: Thinker profiles
+    linkText: Reason like a given person
   - icon: 🎯
     title: Typed decisions with Jev
     details: Inject any context, ask yes/no, single or multiple choice and rating questions, and get calibrated probabilities your code can act on.

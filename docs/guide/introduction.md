@@ -48,14 +48,20 @@ flowchart LR
 
 Both kinds share the same tools, policies, event store, replay, costs and incident alerts.
 
+## Can it reason like a given person?
+
+**Yes.** A cognitive agent can imitate the way a given person reasons. You explain a few topics in your own words; the SDK extracts a **thinker profile** from them: the order in which you look at a problem, your priorities, your reflexes, what makes you reject an idea, your appetite for risk. That profile is written into the instructions of each step of its reasoning. After each run you say how far you agree (for example "60% right, here is where you went wrong"), and the lesson is kept for the next runs.
+
+What it imitates is a **way of reasoning**: it does not know what you never wrote down, it does not decide in your place, and your preferences never make a claim about the world more credible. The SDK does not grade itself: the percentage of agreement you give run after run, on problems it has never seen, is what tells you how close it gets. [Reason like a given person](./thinker-profiles) explains each step.
+
 ## What you get
 
 - **Explicit reasoning** — ten operations on a mental state, with invariants enforced in code (a rejected hypothesis cannot be selected, a fatal critique rejects a hypothesis, the last step always concludes).
 - **Evidence you can audit** — observations with provenance, predictions tested by your own evaluator, refuted rules revised into scoped variants, preferences kept apart from evidence, and a conclusion guard that answers `committed`, `provisional` or `abstain`.
-- **Personal reasoning styles** — distill a thinker profile from topics explained in your own words, then correct the agent with `match`, `partial` or `mismatch` verdicts.
+- **Reasoning like a given person**: distill a thinker profile from topics explained in your own words, then correct the agent with `match`, `partial` or `mismatch` verdicts and a percentage of agreement.
 - **Typed decisions** — [TypeSafe Jev](https://docs.typesafe.ai) or any compatible backend answers Noul, Choice and Score questions with calibrated probabilities.
 - **MCP connectors** — expose your tools as an MCP server, import any MCP server as governed tools.
 - **Operations built in** — per-run API costs, retry policies that do not stack, incident alerts by email or webhook.
 - **Native event sourcing** — replay without the LLM, golden traces, regression detection, reasoning graphs.
 
-Ready? Head to [Getting started](./getting-started).
+New to these terms? [Key terms in plain words](./glossary) explains each one. Ready? Head to [Getting started](./getting-started).
