@@ -10,6 +10,7 @@ import type {
   RunResult,
 } from '../types/run.js';
 import { generateEventId, generateRunId } from '../utils/id.js';
+import { uniqueById } from '../utils/unique-events.js';
 import { type ActionEngine, TOOL_APPROVAL_POLICY } from './action-engine.js';
 
 export class ReplayEngine {
@@ -53,8 +54,7 @@ export class ReplayEngine {
       intentions,
       approved,
       allowedTools,
-      // Cognitive runs gave no run progress to their calls: their replay gives none either.
-      allowedTools ? undefined : recordedProgress(originalEvents)
+      allowedTools ? recordedCognitiveProgress(originalEvents) : recordedProgress(originalEvents)
     );
 
     if (result.hasError && result.error) {
@@ -373,12 +373,47 @@ function recordedProgress(
   return progress;
 }
 
+/**
+ * The progress of a cognitive run when each of its intentions was generated: the steps it had
+ * completed, the tokens of every model call recorded so far (thoughts, typed decisions, tool
+ * selections, the selection of this very call included) and the time elapsed — what its tool
+ * calls were checked against.
+ */
+function recordedCognitiveProgress(
+  events: Event[]
+): Array<{ step: number; tokensUsed: number; elapsedMs: number }> {
+  const startedAt = events.find((event) => event.type === 'run.started')?.timestamp;
+  let step = 1;
+  let tokensUsed = 0;
+  const progress: Array<{ step: number; tokensUsed: number; elapsedMs: number }> = [];
+  for (const event of uniqueById(events)) {
+    if (event.type === 'cognition.operation_selected' && typeof event.data.step === 'number') {
+      step = event.data.step;
+    }
+    if (
+      event.type === 'cognition.thought' ||
+      event.type === 'decision.evaluated' ||
+      event.type === 'intention.generated'
+    ) {
+      tokensUsed += tokensOf(event.data.usage);
+    }
+    if (event.type === 'intention.generated') {
+      progress.push({
+        step: step - 1,
+        tokensUsed,
+        elapsedMs: startedAt === undefined ? 0 : Math.max(0, event.timestamp - startedAt),
+      });
+    }
+  }
+  return progress;
+}
+
+/** Tokens of a recorded usage: a model call's (prompt, completion) or a typed decision's. */
 function tokensOf(usage: unknown): number {
   if (!usage || typeof usage !== 'object') return 0;
-  const { totalTokens, promptTokens, completionTokens } = usage as Record<string, unknown>;
+  const { totalTokens, promptTokens, completionTokens, inputTokens, outputTokens } =
+    usage as Record<string, unknown>;
   if (typeof totalTokens === 'number') return totalTokens;
-  return (
-    (typeof promptTokens === 'number' ? promptTokens : 0) +
-    (typeof completionTokens === 'number' ? completionTokens : 0)
-  );
+  const count = (value: unknown) => (typeof value === 'number' ? value : 0);
+  return count(promptTokens) + count(completionTokens) + count(inputTokens) + count(outputTokens);
 }

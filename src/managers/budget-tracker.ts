@@ -17,10 +17,14 @@ export interface BudgetUsage {
   lastUpdated: number;
 }
 
-/** A model call as budgets count it: its tokens, and its cost or why it has none. */
+/**
+ * A model call as budgets count it: its tokens, and its cost or why it has none. A usage
+ * without a cost may stand for several calls (`calls`, 1 by default), such as a cognitive
+ * thought and its repairs: each of them counts as a call whose cost is unknown.
+ */
 export type ModelCallUsage =
   | { tokens: number; costUsd: number }
-  | { tokens: number; uncosted: 'no-price' | 'no-usage' };
+  | { tokens: number; uncosted: 'no-price' | 'no-usage'; calls?: number };
 
 /** What one operation adds to a scope's usage. */
 interface UsageDelta {
@@ -139,10 +143,11 @@ export class BudgetTracker {
   /**
    * Records a model call: its tokens, and its cost, or why it has none (a model without a
    * price, a call without token counts), for which a `maxCost` limit cannot be checked.
-   * Counted for the agent and for limits that name no agent.
+   * Counted for the agent, if the call has one (a typed decision may not), and for limits
+   * that name no agent.
    */
   async recordModelUsage(
-    agentId: string,
+    agentId: string | undefined,
     call: ModelCallUsage,
     timestamp: number = Date.now()
   ): Promise<void> {
@@ -150,11 +155,11 @@ export class BudgetTracker {
       'costUsd' in call
         ? { tokens: call.tokens, costUsd: call.costUsd }
         : call.uncosted === 'no-price'
-          ? { tokens: call.tokens, unpricedCalls: 1 }
-          : { tokens: call.tokens, unmeteredCalls: 1 };
+          ? { tokens: call.tokens, unpricedCalls: call.calls ?? 1 }
+          : { tokens: call.tokens, unmeteredCalls: call.calls ?? 1 };
     for (const period of ['hour', 'day', 'week', 'month', 'all'] as const) {
       const boundaries = this.getPeriodBoundaries(period, timestamp);
-      this.addUsage(agentId, undefined, period, boundaries, delta, timestamp);
+      if (agentId) this.addUsage(agentId, undefined, period, boundaries, delta, timestamp);
       this.addUsage(undefined, undefined, period, boundaries, delta, timestamp);
     }
   }

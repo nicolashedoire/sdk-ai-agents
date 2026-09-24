@@ -5,18 +5,22 @@ import type { DecisionEvaluationRecord } from './cognitive-controller.js';
 import type { MentalState } from './mental-state.js';
 import type { OperationOutcome } from './operation-outcome.js';
 import type { OperationSelection } from './operation-selector.js';
+import type { CognitiveRunMeter } from './run-meter.js';
 import type { ThinkerProfile } from './thinker-profile.js';
 import type { Decision, ThoughtPatch } from './thought-patch.js';
 
 /**
  * Writes the events of a cognitive run. Keeping the event shapes in one place keeps them
  * aligned with `rebuildMentalState` and `buildControllerDataset`, which read them back.
+ * The model calls it records (thoughts, typed decisions) are counted by the run's `meter`:
+ * run limits and budgets count what the trace shows and `getRunCost` prices.
  */
 export class CognitiveRunRecorder {
   constructor(
     private readonly eventStore: IEventStore,
     private readonly agent: { id: string; version: string },
-    private readonly currentProfile: () => ThinkerProfile
+    private readonly currentProfile: () => ThinkerProfile,
+    private readonly meter?: CognitiveRunMeter
   ) {}
 
   /** Appends an event and returns its id, so observations can point to their source. */
@@ -46,6 +50,14 @@ export class CognitiveRunRecorder {
   ): Promise<void> {
     for (const evaluation of evaluations) {
       await this.record(runId, 'decision.evaluated', { step, ...evaluation });
+      // A custom controller or assessor may leave the usage out: the call then has no counts.
+      const { usage } = evaluation as { usage?: DecisionEvaluationRecord['usage'] };
+      await this.meter?.countModelCall({
+        model: evaluation.model,
+        ...(usage
+          ? { usage: { promptTokens: usage.inputTokens, completionTokens: usage.outputTokens } }
+          : {}),
+      });
     }
   }
 
@@ -90,6 +102,23 @@ export class CognitiveRunRecorder {
       ...(outcome.requestedModel ? { requestedModel: outcome.requestedModel } : {}),
       ...(outcome.usage ? { usage: outcome.usage } : {}),
     });
+    // A thought comes from model calls when it reports their usage or the model that answered
+    // (without usage, their token counts are unknown). One with neither made no known call.
+    if (outcome.usage || outcome.model) {
+      await this.meter?.countModelCall({
+        ...(outcome.model ? { model: outcome.model } : {}),
+        ...(outcome.requestedModel ? { requestedModel: outcome.requestedModel } : {}),
+        ...(outcome.usage
+          ? {
+              usage: {
+                promptTokens: outcome.usage.promptTokens,
+                completionTokens: outcome.usage.completionTokens,
+              },
+              calls: outcome.usage.calls,
+            }
+          : {}),
+      });
+    }
   }
 
   async conclusion(runId: string, state: MentalState, decision: Decision): Promise<void> {

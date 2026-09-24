@@ -338,7 +338,7 @@ export class SDKImpl implements SDK {
           })
         : undefined);
     this.decisionService = this.decisionClient
-      ? new DecisionService(this.decisionClient, this.eventStore)
+      ? new DecisionService(this.decisionClient, this.eventStore, this.policyEngine)
       : undefined;
 
     // ActionEngine and ReplayEngine are shared (stateless)
@@ -379,6 +379,7 @@ export class SDKImpl implements SDK {
       provider: this.provider,
       eventStore: this.eventStore,
       actionEngine: this.actionEngine,
+      policyEngine: this.policyEngine,
       ...(this.decisionClient ? { decisionClient: this.decisionClient } : {}),
     });
     this.cognitiveAgents.set(agentId, agent);

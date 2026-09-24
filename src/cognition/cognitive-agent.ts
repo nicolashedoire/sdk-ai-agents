@@ -1,4 +1,5 @@
-import { ValidationError } from '../errors/index.js';
+import type { PolicyEngine } from '../engines/policy-engine.js';
+import { PolicyViolationError, ValidationError } from '../errors/index.js';
 import type { IEventStore } from '../stores/event-store.js';
 import { checkRunListener, finishWatch, watchRun } from '../stores/observed-event-store.js';
 import type { LiveEventListener, RunStatus } from '../types/events.js';
@@ -29,6 +30,7 @@ import { PredictionTester, type OutcomeEvaluator } from './outcome-evaluator.js'
 import { assembleThought } from './patch-admission.js';
 import { learnFromRun } from './profile-learning.js';
 import { RunKnowledge, type KnowledgeSettings } from './run-knowledge.js';
+import { CognitiveRunMeter } from './run-meter.js';
 import {
   defineThinkerProfile,
   type ReasoningFeedback,
@@ -50,6 +52,13 @@ export interface CognitiveAgentDependencies {
   eventStore: IEventStore;
   /** Memory across runs: recalls what earlier tests established, records what this run's did. */
   knowledge?: KnowledgeSettings;
+  /**
+   * The SDK's policies. Budget and timeout policies are then checked before each step (run
+   * limits, token and cost budgets per period), and each model call of a run is counted in
+   * the agent's budgets per period. Without it, only tool calls are checked (with the run's
+   * progress, by the action engine) and model calls are not counted in budgets.
+   */
+  policyEngine?: PolicyEngine;
 }
 
 export interface ThinkInput {
@@ -94,6 +103,8 @@ interface RunContext {
   profile: ThinkerProfile;
   recorder: CognitiveRunRecorder;
   performer: OperationPerformer;
+  /** Steps, tokens and start time of the run, as budget and timeout policies see them. */
+  meter: CognitiveRunMeter;
 }
 
 /**
@@ -104,7 +115,8 @@ interface RunContext {
  *
  * Every choice and every thought is an event: the run can be audited, its state rebuilt
  * with `rebuildMentalState`, and its tool calls replayed like any other run. Tools go
- * through the regular ActionEngine, so policies, approvals and budgets still apply.
+ * through the regular ActionEngine, so policies, approvals and budgets still apply; budget
+ * and timeout policies are also checked before each step, against the run's progress.
  */
 export class CognitiveAgent {
   private profile: ThinkerProfile;
@@ -149,12 +161,19 @@ export class CognitiveAgent {
     checkRunListener(this.deps.eventStore, input.onEvent);
     const recalled = this.knowledge ? await this.knowledge.recall(problem) : undefined;
 
-    const { limits } = this.deps;
+    const { limits, policyEngine } = this.deps;
     const profile = this.profile;
+    const agentId = this.id;
+    // Each model call of the run counts in the agent's budgets per period, as it is recorded.
+    const meter = new CognitiveRunMeter(
+      Date.now(),
+      policyEngine ? (call) => policyEngine.recordModelUsage(agentId, call) : undefined
+    );
     const recorder = new CognitiveRunRecorder(
       this.deps.eventStore,
       this.deps.identity,
-      () => profile
+      () => profile,
+      meter
     );
     const run: RunContext = {
       runId: generateRunId(),
@@ -164,10 +183,12 @@ export class CognitiveAgent {
       consecutiveFailures: 0,
       profile,
       recorder,
+      meter,
       performer: new OperationPerformer({
         generator: this.deps.generator,
         seeker: this.deps.seeker,
         recorder,
+        meter,
         ...(this.deps.assessor ? { assessor: this.deps.assessor } : {}),
         ...(this.deps.evaluator
           ? { tester: new PredictionTester(this.deps.evaluator, recorder) }
@@ -224,6 +245,7 @@ export class CognitiveAgent {
         if (run.abortController.signal.aborted) {
           throw new Error('Run interrupted');
         }
+        await this.admitStep(run, step);
         const selection = await this.selector.select({
           state,
           profile: run.profile,
@@ -289,6 +311,37 @@ export class CognitiveAgent {
       await finishWatch(watch, [run.abortController.signal, input.signal]);
       clearTimeout(timer);
     }
+  }
+
+  /**
+   * Checks the budget and timeout policies before a step, and before any of its model calls:
+   * past a limit (`maxSteps`, `maxTokens`, `maxDuration`, or a token or cost budget per
+   * period), the step is refused, recorded as `policy.violated`, and the run fails with the
+   * policy's reason.
+   */
+  private async admitStep(run: RunContext, step: number): Promise<void> {
+    const progress = run.meter.startStep(step);
+    const { policyEngine } = this.deps;
+    if (!policyEngine) return;
+    const validation = await policyEngine.validateRunStep({
+      runId: run.runId,
+      agentId: this.id,
+      currentStep: progress.step,
+      tokensUsed: progress.tokensUsed,
+      startTime: progress.startedAt,
+    });
+    if (validation.allowed) return;
+    // A step is checked as an intention to continue the run: no tool is called.
+    const intention = { type: 'continue' as const };
+    const violatedPolicies = validation.violatedPolicies ?? [];
+    const reason = validation.reason ?? 'Policy violation';
+    await run.recorder.record(run.runId, 'policy.violated', {
+      intention,
+      step,
+      reason,
+      violatedPolicies,
+    });
+    throw new PolicyViolationError(violatedPolicies[0] ?? 'unknown', intention, reason);
   }
 
   private async rememberFindings(run: RunContext, state: MentalState): Promise<void> {

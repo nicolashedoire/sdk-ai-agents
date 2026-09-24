@@ -56,21 +56,32 @@ export class PolicyEngine {
   }
 
   /**
-   * Counts a model call of an agent in its budgets per period: its tokens, and its cost from
-   * the price of the model that answered (or of the model requested).
+   * Counts a model call in budgets per period: its tokens, and its cost from the price of the
+   * model that answered (or of the model requested). Counted for `agentId` (a governed or
+   * cognitive agent, or the agent a typed decision names) and for limits that name no agent;
+   * a call without an agent counts only for those. `calls` is the number of model calls
+   * behind the usage (a cognitive thought and its repairs), 1 by default.
    */
   async recordModelUsage(
-    agentId: string,
-    call: { model?: string; requestedModel?: string; usage?: LLMResponse['usage'] }
+    agentId: string | undefined,
+    call: {
+      model?: string;
+      requestedModel?: string;
+      usage?: LLMResponse['usage'];
+      calls?: number;
+    }
   ): Promise<void> {
     if (!this.budgetTracker) return;
     const { usage } = call;
     const input = usage?.promptTokens;
     const output = usage?.completionTokens;
     const tokens = usage?.totalTokens ?? (input ?? 0) + (output ?? 0);
+    // A count a custom component got wrong still counts the call it came with.
+    const calls =
+      call.calls !== undefined && Number.isInteger(call.calls) && call.calls > 0 ? call.calls : 1;
     // Without input or output counts (none at all, or a total alone) the cost is unknown.
     if (input === undefined && output === undefined) {
-      await this.budgetTracker.recordModelUsage(agentId, { tokens, uncosted: 'no-usage' });
+      await this.budgetTracker.recordModelUsage(agentId, { tokens, uncosted: 'no-usage', calls });
       return;
     }
     const price = findModelPrice(this.pricing, call.model, call.requestedModel);
@@ -78,7 +89,7 @@ export class PolicyEngine {
       agentId,
       price
         ? { tokens, costUsd: costOf(price, input ?? 0, output ?? 0) }
-        : { tokens, uncosted: 'no-price' }
+        : { tokens, uncosted: 'no-price', calls }
     );
   }
 
@@ -193,6 +204,41 @@ export class PolicyEngine {
     }
 
     return this.createViolationResult(intention, policies, violatedPolicies, reasons);
+  }
+
+  /**
+   * Checks the next step of a cognitive run against the limits on what a run spends: the
+   * budget and timeout policies that apply to the agent, with `maxSteps`, `maxTokens` and
+   * `maxDuration` against the run's progress, and the token and cost caps of a `budgetLimit`
+   * that names no tool against its period's usage. The step is checked as an intention of
+   * type `continue`, so a policy whose conditions need a tool call does not apply to it.
+   * Allowlists, custom policies, call counts and approvals concern tool calls: `validate`
+   * checks them on each call. Every evaluation goes to the audit trail, like `validate`'s.
+   */
+  async validateRunStep(context: PolicyContext): Promise<PolicyValidationResult> {
+    const step: Intention = { type: 'continue' };
+    const stepContext: PolicyContext = { ...context, intention: { type: step.type } };
+    const policies = this.getActivePolicies(context.agentId).filter(
+      (policy) => policy.type === 'budget' || policy.type === 'timeout'
+    );
+    const violatedPolicies: string[] = [];
+    const reasons = new Map<string, string>();
+
+    for (const policy of policies) {
+      const conditionResult = this.evaluatePolicyConditions(policy, step, stepContext);
+      await this.logPolicyAudit(policy, step, stepContext, conditionResult);
+      if (!conditionResult.conditionsMet) continue;
+
+      const result = await this.validatePolicy(policy, step, stepContext);
+      if (!result.allowed) {
+        violatedPolicies.push(policy.id);
+        if (result.reason) reasons.set(policy.id, result.reason);
+      }
+    }
+
+    return violatedPolicies.length === 0
+      ? { allowed: true }
+      : this.createViolationResult(step, policies, violatedPolicies, reasons);
   }
 
   /**
@@ -551,10 +597,12 @@ export class PolicyEngine {
     // A tool call consumes no tokens: model tokens are recorded as they are used
     // (recordModelUsage), so adding the run's total here would count them twice.
     const additionalTokens = 0;
-    const additionalToolCalls = context.intention?.toolName ? 1 : 0;
+    const toolCall = Boolean(context.intention?.toolName);
+    const additionalToolCalls = toolCall ? 1 : 0;
 
     const checkResult = await this.budgetTracker.checkBudget(
-      budgetLimit,
+      // A step of a cognitive run is not a tool call: only the token and cost caps concern it.
+      toolCall ? budgetLimit : withoutCallCount(budgetLimit),
       additionalTokens,
       additionalToolCalls
     );
@@ -825,6 +873,12 @@ function shownValue(value: unknown): string {
   if (typeof value === 'object' && value !== null)
     return Array.isArray(value) ? 'an array' : 'an object';
   return String(value);
+}
+
+/** A budget limit without its call count, for a check that is not a tool call. */
+function withoutCallCount(limit: BudgetLimit): BudgetLimit {
+  const { maxToolCalls: _calls, ...caps } = limit;
+  return caps;
 }
 
 /** A budget limit with a call count, read from policy metadata (plain data from the caller). */
