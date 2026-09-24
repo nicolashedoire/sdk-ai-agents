@@ -20,7 +20,7 @@ flowchart LR
   end
 ```
 
-1. **At the end of a run**, every rule or explanation with at least one prediction your [outcome evaluator](./evidence-and-verification#predictions-and-the-outcome-evaluator) confirmed or refuted becomes a **finding**: the statement, its scope, the rule it revises, and each test (what was expected, what was observed, which evaluator). The findings are appended to the **journal** of the scope.
+1. **At the end of a run**, every rule or explanation with at least one prediction your [outcome evaluator](./evidence-and-verification#predictions-and-the-outcome-evaluator) confirmed or refuted becomes a **finding**: the statement, its scope, the rule it revises within the run, and each test (what was expected, what was observed, which evaluator). The findings are appended to the **journal** of the scope.
 2. **At the start of the next run** in the same scope, the most relevant items are **recalled** and placed in the mental state as `knowledge`, with ids `M1`, `M2`…
 3. **During the run**:
    - the model sees each item with its status and its latest tests, and is told to reuse a verified rule within its scope, citing it;
@@ -132,7 +132,7 @@ for (const item of await store.list('inclined-plane')) {
 
 - The recalled items are recorded in `cognition.started` (`knowledge.scope`, `knowledge.items`), so `sdk.getMentalState(runId)` rebuilds exactly what the run knew, without reading the store again, even if the store changed since.
 - The findings are recorded in a `cognition.knowledge_recorded` event (`scope`, `findings`).
-- A store that fails never stops a run: a failed recall is recorded as `knowledge.error` in `cognition.started` and the run goes on without memory; a failed recording is recorded as `error` in `cognition.knowledge_recorded`. A store that does not answer within the run's `limits.timeoutMs` is treated as failed. If the event log itself cannot record the findings, a warning is printed and the run's result is returned unchanged.
+- A store that fails never stops a run: a failed recall is recorded as `knowledge.error` in `cognition.started` and the run goes on without memory; a failed recording is recorded as `error` in `cognition.knowledge_recorded`. A store that does not answer within the run's `limits.timeoutMs` is treated as failed (a slow write may still complete afterwards). If the event log itself cannot record the findings, a warning is printed and the run's result is returned unchanged.
 
 ## Limits
 
