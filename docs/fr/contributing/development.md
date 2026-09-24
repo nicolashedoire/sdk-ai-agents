@@ -269,12 +269,13 @@ dist/
 
 - Des tests unitaires pour chaque module
 - Utilise Vitest
-- Simulation (mocking) des dépendances externes (fournisseurs de LLM, magasins d'événements)
+- Aucun test n'appelle un vrai service payant. Les suites des modules récents n'utilisent aucune simulation de modules : les ports du SDK sont implémentés par les doublures de test de `src/__tests__/support/`, et les adaptateurs HTTP tournent contre des serveurs locaux
+- Les suites plus anciennes (point d'entrée du SDK, fournisseurs OpenAI et Anthropic, moteur de raisonnement, repli, exécuteur de tests de régression) remplacent encore les bibliothèques des fournisseurs `openai` et `@anthropic-ai/sdk` par `vi.mock`, et certaines dépendances, comme le magasin d'événements, par `vi.fn()`
 
 ### Tests d'intégration {#integration-tests}
 
 - Des tests d'intégration pour les parcours complets
-- Utilise des simulacres (mocks) pour les fournisseurs de LLM
+- Les fournisseurs de LLM sont remplacés par une bibliothèque de fournisseur simulée (`vi.mock`) ; aucun test n'appelle une vraie API
 - Des tests avec différents magasins d'événements
 
 ### Exemple de structure de test {#example-test-structure}
@@ -354,7 +355,7 @@ Si vous obtenez des erreurs TypeScript :
 
 Si des tests échouent :
 
-1. Vérifiez que les simulacres (mocks) sont corrects
+1. Vérifiez que les doublures de test de `src/__tests__/support/`, ou les simulacres (mocks) des suites plus anciennes, correspondent toujours aux interfaces qu'ils remplacent
 2. Vérifiez que les dépendances sont à jour
 3. Lancez les tests en mode surveillance pour voir les erreurs en temps réel
 

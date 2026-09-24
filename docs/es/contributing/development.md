@@ -269,12 +269,13 @@ dist/
 
 - Pruebas unitarias para cada módulo
 - Usa Vitest
-- Simulación (mocking) de las dependencias externas (proveedores de LLM, almacenes de eventos)
+- Ninguna prueba llama a un servicio de pago real. Las suites de los módulos más recientes no usan mocks de módulos: los puertos del SDK los implementan los dobles de prueba de `src/__tests__/support/`, y los adaptadores HTTP se ejecutan contra servidores locales
+- Las suites más antiguas (punto de entrada del SDK, proveedores de OpenAI y Anthropic, motor de razonamiento, conmutación por error, ejecutor de pruebas de regresión) todavía sustituyen las bibliotecas de los proveedores `openai` y `@anthropic-ai/sdk` con `vi.mock`, y algunas dependencias, como el almacén de eventos, con `vi.fn()`
 
 ### Pruebas de integración {#integration-tests}
 
 - Pruebas de integración de flujos de trabajo completos
-- Usa mocks para los proveedores de LLM
+- Los proveedores de LLM se sustituyen por una biblioteca del proveedor simulada (`vi.mock`); ninguna prueba llama a una API real
 - Pruebas con distintos almacenes de eventos
 
 ### Ejemplo de estructura de una prueba {#example-test-structure}
@@ -354,7 +355,7 @@ Si obtienes errores de TypeScript:
 
 Si fallan las pruebas:
 
-1. Comprueba que los mocks son correctos
+1. Comprueba que los dobles de prueba de `src/__tests__/support/`, o los mocks de las suites más antiguas, siguen coincidiendo con las interfaces que sustituyen
 2. Comprueba que las dependencias están actualizadas
 3. Ejecuta las pruebas en modo watch para ver los errores en tiempo real
 

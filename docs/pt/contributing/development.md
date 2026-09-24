@@ -269,12 +269,13 @@ dist/
 
 - Testes unitários para cada módulo
 - Usa o Vitest
-- Mocking das dependências externas (provedores de LLM, armazenamentos de eventos)
+- Nenhum teste chama um serviço pago real. As suítes dos módulos mais recentes não usam mocks de módulos: as portas do SDK são implementadas pelos dublês de teste de `src/__tests__/support/`, e os adaptadores HTTP rodam contra servidores locais
+- As suítes mais antigas (ponto de entrada do SDK, provedores OpenAI e Anthropic, motor de raciocínio, fallback, executor de testes de regressão) ainda substituem as bibliotecas dos fornecedores `openai` e `@anthropic-ai/sdk` por `vi.mock`, e algumas dependências, como o armazenamento de eventos, por `vi.fn()`
 
 ### Testes de integração {#integration-tests}
 
 - Testes de integração para fluxos completos
-- Usa mocks para os provedores de LLM
+- Os provedores de LLM são substituídos por uma biblioteca do fornecedor mockada (`vi.mock`); nenhum teste chama uma API real
 - Testes com diferentes armazenamentos de eventos
 
 ### Exemplo de estrutura de teste {#example-test-structure}
@@ -354,7 +355,7 @@ Se você receber erros de TypeScript:
 
 Se os testes falharem:
 
-1. Verifique se os mocks estão corretos
+1. Verifique se os dublês de teste de `src/__tests__/support/`, ou os mocks das suítes mais antigas, ainda correspondem às interfaces que substituem
 2. Verifique se as dependências estão atualizadas
 3. Execute os testes em modo watch para ver os erros em tempo real
 
