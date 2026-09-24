@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | 主提供商的密钥（使用 `llmProvider` 时不需要）。完全没有密钥时，工具和 MCP 服务器照常工作，需要模型的调用会失败并给出清晰的错误 |
 | `provider` | `'openai' \| 'anthropic'` | 主提供商，默认 `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | 各提供商的 `apiKey` 和 `defaultModel` |
+| `providerConfig` | `{ openai?, anthropic? }` | 各提供商的 `apiKey`、`defaultModel` 和 `baseURL`（兼容的端点，例如 Azure OpenAI 或本地模型服务器，或代理） |
 | `fallbackProviders` | `Array<{ provider, config? }>` | 主提供商失败时按顺序尝试 |
 | `llmProvider` | `LLMProvider` | 你自己的提供商（本地模型、网关、测试替身） |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM 重试策略，按提供商分别应用，在回退之前 |

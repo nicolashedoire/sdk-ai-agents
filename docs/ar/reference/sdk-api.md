@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | مفتاح المزوّد الأساسي (غير مطلوب مع `llmProvider`). دون أي مفتاح، تعمل الأدوات وخوادم MCP، وتفشل الاستدعاءات التي تحتاج إلى نموذج بخطأ واضح |
 | `provider` | `'openai' \| 'anthropic'` | المزوّد الأساسي، والافتراضي `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey` و`defaultModel` لكل مزوّد |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey` و`defaultModel` و`baseURL` لكل مزوّد (نقطة نهاية متوافقة، مثل Azure OpenAI أو خادم نماذج محلي، أو وكيل proxy) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | تُجرَّب بالترتيب حين يفشل المزوّد الأساسي |
 | `llmProvider` | `LLMProvider` | مزوّدك الخاص (نموذج محلي، أو بوابة، أو بديل اختباري) |
 | `retry` | `Partial<RetryPolicy> \| false` | سياسة إعادة المحاولة للنموذج اللغوي، لكل مزوّد، قبل التحويل إلى البديل |

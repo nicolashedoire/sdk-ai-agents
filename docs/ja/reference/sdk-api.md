@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | 主プロバイダーのキー（`llmProvider` を使う場合は不要）。キーがまったくなくてもツールと MCP サーバーは動作し、モデルを必要とする呼び出しは明確なエラーで失敗する |
 | `provider` | `'openai' \| 'anthropic'` | 主プロバイダー。デフォルトは `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | プロバイダーごとの `apiKey` と `defaultModel` |
+| `providerConfig` | `{ openai?, anthropic? }` | プロバイダーごとの `apiKey`、`defaultModel`、`baseURL`（Azure OpenAI やローカルのモデルサーバーなどの互換エンドポイント、またはプロキシ） |
 | `fallbackProviders` | `Array<{ provider, config? }>` | 主プロバイダーが失敗したときに、順番に試される |
 | `llmProvider` | `LLMProvider` | 独自のプロバイダー（ローカルモデル、ゲートウェイ、テストダブル） |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM のリトライポリシー。プロバイダーごとに、フォールバックの前に適用される |

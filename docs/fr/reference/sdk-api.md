@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Clé du fournisseur principal (inutile avec `llmProvider`). Sans aucune clé, les outils et les serveurs MCP fonctionnent, et les appels qui ont besoin d'un modèle échouent avec une erreur explicite |
 | `provider` | `'openai' \| 'anthropic'` | Fournisseur principal, `openai` par défaut |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey` et `defaultModel` par fournisseur |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` et `baseURL` par fournisseur (un endpoint compatible, comme Azure OpenAI ou un serveur de modèles local, ou un proxy) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | Essayés dans l'ordre quand le fournisseur principal échoue |
 | `llmProvider` | `LLMProvider` | Votre propre fournisseur (modèle local, passerelle, doublure de test) |
 | `retry` | `Partial<RetryPolicy> \| false` | Politique de nouvelles tentatives pour le LLM, par fournisseur, avant le repli |

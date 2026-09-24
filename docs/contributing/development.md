@@ -269,13 +269,12 @@ dist/
 
 - Unit tests for each module
 - Uses Vitest
-- No test calls a real paid service. The suites of the newer modules use no module mocks: the SDK ports are implemented by the test doubles of `src/__tests__/support/`, and HTTP adapters run against local servers
-- The older suites (SDK entry point, OpenAI and Anthropic providers, reasoning engine, fallback, regression runner) still replace the vendor libraries `openai` and `@anthropic-ai/sdk` with `vi.mock`, and some dependencies, such as the event store, with `vi.fn()`
+- No test calls a real paid service, and none uses module mocks or spies: the SDK ports are implemented by the test doubles of `src/__tests__/support/`, and HTTP adapters, the OpenAI and Anthropic providers included, run against local servers. `no-mocks.test.ts` refuses `vi.mock`, `vi.fn` and `vi.spyOn`
 
 ### Integration Tests
 
 - Integration tests for complete workflows
-- LLM providers are replaced by a mocked vendor library (`vi.mock`); no test calls a real API
+- The model is a scripted provider, or the real OpenAI or Anthropic client talking to a local server that answers in the vendor's format; no test calls a real API
 - Tests with different event stores
 
 ### Example Test Structure
@@ -355,7 +354,7 @@ If you get TypeScript errors:
 
 If tests fail:
 
-1. Check that the test doubles of `src/__tests__/support/`, or the mocks of the older suites, still match the interfaces they replace
+1. Check that the test doubles of `src/__tests__/support/` still match the interfaces they replace
 2. Check that dependencies are up to date
 3. Run the tests in watch mode to see errors in real time
 
