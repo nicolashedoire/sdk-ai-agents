@@ -435,10 +435,12 @@ describe('AnthropicProvider', () => {
           abortSignal: abortController.signal,
         })
       ).rejects.toThrow('Request aborted');
+      // An already cancelled request is never sent, so never billed.
+      expect(server.requests).toHaveLength(0);
     });
 
-    it('should discard the answer of a request aborted while in flight', async () => {
-      server.reply({ ...anthropicMessage({ text: ['too late'] }), delayMs: 100 });
+    it('should cancel a request aborted while in flight, without waiting for the answer', async () => {
+      server.reply({ ...anthropicMessage({ text: ['too late'] }), delayMs: 5_000 });
       const abortController = new AbortController();
 
       const completion = provider.generateCompletion({
@@ -451,11 +453,14 @@ describe('AnthropicProvider', () => {
         (error: unknown) => error
       );
       await until(() => server.requests.length === 1);
+      const abortedAt = Date.now();
       abortController.abort();
 
       const failure = await outcome;
       expect(failure).toBeInstanceOf(Error);
       expect(failure).toHaveProperty('message', 'Request aborted');
+      // The HTTP request is cut: the 5 s answer is not waited for.
+      expect(Date.now() - abortedAt).toBeLessThan(1_000);
     });
   });
 });

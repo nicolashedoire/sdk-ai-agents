@@ -19,6 +19,10 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async generateCompletion(request: LLMRequest): Promise<LLMResponse> {
+    if (request.abortSignal?.aborted) {
+      // Never send (nor pay for) a request that is already cancelled.
+      throw new Error('Request aborted');
+    }
     try {
       const model = request.model || this.defaultModel;
       const messages = request.messages.map((msg) => ({
@@ -35,22 +39,18 @@ export class OpenAIProvider implements LLMProvider {
         },
       }));
 
-      const callPromise = this.client.chat.completions.create({
-        model,
-        messages,
-        tools: tools && tools.length > 0 ? tools : undefined,
-        tool_choice: tools && tools.length > 0 ? 'auto' : undefined,
-        temperature: request.temperature,
-        max_tokens: request.maxTokens,
-      });
-
-      if (request.abortSignal) {
-        request.abortSignal.addEventListener('abort', () => {
-          callPromise.catch(() => {});
-        });
-      }
-
-      const response = await callPromise;
+      // The signal cancels the HTTP request itself: the answer is not waited for.
+      const response = await this.client.chat.completions.create(
+        {
+          model,
+          messages,
+          tools: tools && tools.length > 0 ? tools : undefined,
+          tool_choice: tools && tools.length > 0 ? 'auto' : undefined,
+          temperature: request.temperature,
+          max_tokens: request.maxTokens,
+        },
+        { signal: request.abortSignal }
+      );
 
       if (request.abortSignal?.aborted) {
         throw new Error('Request aborted');

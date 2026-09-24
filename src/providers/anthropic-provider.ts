@@ -31,6 +31,10 @@ export class AnthropicProvider implements LLMProvider {
   }
 
   async generateCompletion(request: LLMRequest): Promise<LLMResponse> {
+    if (request.abortSignal?.aborted) {
+      // Never send (nor pay for) a request that is already cancelled.
+      throw new Error('Request aborted');
+    }
     try {
       const model = request.model || this.defaultModel;
       const { system, messages } = this.convertMessages(request.messages);
@@ -49,15 +53,10 @@ export class AnthropicProvider implements LLMProvider {
         params.tool_choice = { type: 'auto' };
       }
 
-      const callPromise = this.client.messages.create(params);
-
-      if (request.abortSignal) {
-        request.abortSignal.addEventListener('abort', () => {
-          callPromise.catch(() => {});
-        });
-      }
-
-      const response = await callPromise;
+      // The signal cancels the HTTP request itself: the answer is not waited for.
+      const response = await this.client.messages.create(params, {
+        signal: request.abortSignal,
+      });
 
       if (request.abortSignal?.aborted) {
         throw new Error('Request aborted');

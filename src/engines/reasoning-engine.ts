@@ -59,8 +59,10 @@ export class ReasoningEngine {
   async generateIntention(
     context: ReasoningContext,
     eventStore: IEventStore,
-    abortSignal?: AbortSignal
+    signal?: AbortSignal
   ): Promise<Intention> {
+    // Either way of passing the signal cancels the call.
+    const abortSignal = signal ?? context.abortSignal;
     if (abortSignal?.aborted) {
       throw new Error('Run cancelled');
     }

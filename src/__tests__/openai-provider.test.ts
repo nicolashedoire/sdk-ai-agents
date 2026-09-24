@@ -280,6 +280,33 @@ describe('OpenAIProvider', () => {
           abortSignal: abortController.signal,
         })
       ).rejects.toThrow('Request aborted');
+      // An already cancelled request is never sent, so never billed.
+      expect(server.requests).toHaveLength(0);
+    });
+
+    it('should cancel a request aborted while in flight, without waiting for the answer', async () => {
+      server.reply({ ...openAIChat({ content: 'too late' }), delayMs: 5_000 });
+      const abortController = new AbortController();
+      const outcome = provider
+        .generateCompletion({
+          model: 'gpt-4',
+          messages: [{ role: 'user', content: 'Hello' }],
+          abortSignal: abortController.signal,
+        })
+        .then(
+          () => 'answered',
+          (error: unknown) => error
+        );
+      while (server.requests.length === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      const abortedAt = Date.now();
+      abortController.abort();
+
+      const failure = await outcome;
+      expect(failure).toHaveProperty('message', 'Request aborted');
+      // The HTTP request is cut: the 5 s answer is not waited for.
+      expect(Date.now() - abortedAt).toBeLessThan(1_000);
     });
 
     it('should handle empty response', async () => {
