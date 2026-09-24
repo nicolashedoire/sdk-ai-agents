@@ -106,12 +106,23 @@ describe('SDK with Fallback Providers', () => {
       expect(anthropic.requests[0]?.url).toBe('/v1/messages');
       expect(anthropic.requests[0]?.headers['x-api-key']).toBe('test-anthropic-key');
       // The conversation is translated to the Anthropic format. The model forwarded to the
-      // fallback vendor is deliberately not asserted: FallbackProvider passes the agent's model
-      // through unchanged, which is under review.
+      // fallback vendor is not asserted here: see the known failure below.
       expect(anthropic.jsonBody(0)).toMatchObject({
         messages: [{ role: 'user', content: 'Hello' }],
         max_tokens: 4096,
       });
+    });
+
+    // Known bug: FallbackProvider forwards the agent's OpenAI model name to Anthropic
+    // (src/providers/fallback-provider.ts), which the real API refuses, so this failover would
+    // fail in production although the local server accepts it. Drop `.fails` once fixed.
+    it.fails('should send the fallback vendor one of its own models', async () => {
+      openai.reply(openAIError(500, 'The server had an error'));
+      anthropic.reply(anthropicMessage({ text: ['Hello from Anthropic'] }));
+
+      await runAgent(buildSDK());
+
+      expect(anthropic.jsonBody(0)).toMatchObject({ model: expect.stringMatching(/^claude-/) });
     });
 
     it('should fallback when the primary vendor cannot be reached', async () => {

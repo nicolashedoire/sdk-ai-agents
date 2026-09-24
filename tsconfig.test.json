@@ -37,6 +37,7 @@
     "src/__tests__/sdk-cognition.test.ts",
     "src/__tests__/sdk-golden-traces.test.ts",
     "src/__tests__/zod-to-json-schema.test.ts",
+    "src/__tests__/agent.test.ts",
     "src/__tests__/openai-provider.test.ts",
     "src/__tests__/anthropic-provider.test.ts",
     "src/__tests__/anthropic-integration.test.ts",

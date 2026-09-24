@@ -43,8 +43,6 @@ describe('ReasoningEngine Isolation', () => {
   afterEach(async () => {
     await server.stop();
     await eventStore.destroy();
-    // Let directory creations started in constructors settle before deleting the folder.
-    await new Promise((resolve) => setTimeout(resolve, 20));
     rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
   });
 

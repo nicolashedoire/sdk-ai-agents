@@ -21,6 +21,9 @@ export class AnthropicProvider implements LLMProvider {
     }
     this.client = new Anthropic({
       apiKey,
+      // Only the given key authenticates: the client would otherwise also send the
+      // ANTHROPIC_AUTH_TOKEN environment variable as a bearer token, to any baseURL.
+      authToken: null,
       ...(options.maxRetries !== undefined ? { maxRetries: options.maxRetries } : {}),
       ...(options.baseURL !== undefined ? { baseURL: options.baseURL } : {}),
     });

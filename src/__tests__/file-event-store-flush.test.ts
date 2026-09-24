@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -6,7 +6,13 @@ import { FileEventStore } from '../stores/file-event-store.js';
 import type { Event } from '../types/events.js';
 
 function event(runId: string, index: number): Event {
-  return { id: `evt_${index}`, runId, type: 'cognition.thought', timestamp: index, data: { step: index } };
+  return {
+    id: `evt_${index}`,
+    runId,
+    type: 'cognition.thought',
+    timestamp: index,
+    data: { step: index },
+  };
 }
 
 describe('FileEventStore concurrent flushes', () => {
@@ -32,8 +38,12 @@ describe('FileEventStore concurrent flushes', () => {
     await Promise.all(listings);
 
     const stored = await store.getEvents('run_a');
-    expect(stored.map((stored) => stored.id)).toEqual(Array.from({ length: 25 }, (_, index) => `evt_${index + 1}`));
-    expect(readdirSync(join(directory, 'events')).filter((file) => file.endsWith('.tmp'))).toEqual([]);
+    expect(stored.map((stored) => stored.id)).toEqual(
+      Array.from({ length: 25 }, (_, index) => `evt_${index + 1}`)
+    );
+    expect(readdirSync(join(directory, 'events')).filter((file) => file.endsWith('.tmp'))).toEqual(
+      []
+    );
   });
 
   it('writes the first run only once its folder exists, however deep', async () => {
@@ -47,5 +57,18 @@ describe('FileEventStore concurrent flushes', () => {
     }
 
     expect((await store.getEvents('run_a')).map((stored) => stored.id)).toHaveLength(10);
+  });
+
+  it('finishes creating its directory before destroy() resolves', async () => {
+    directory = mkdtempSync(join(tmpdir(), 'file-store-'));
+    const eventsDir = join(directory, 'nested', 'events');
+    store = new FileEventStore(eventsDir);
+
+    // Nothing is pending, so destroy() has no write to wait for: it must still wait for the
+    // directory creation started by the constructor, or a caller deleting the folder next
+    // races with it.
+    await store.destroy();
+
+    expect(existsSync(eventsDir)).toBe(true);
   });
 });

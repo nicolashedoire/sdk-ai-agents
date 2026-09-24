@@ -75,8 +75,6 @@ describe('AnthropicProvider Integration', () => {
   afterEach(async () => {
     await server.stop();
     await eventStore.destroy();
-    // Let the directory creation started by the store's constructor settle before deleting it.
-    await new Promise((resolve) => setTimeout(resolve, 20));
     rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
   });
 

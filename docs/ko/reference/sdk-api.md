@@ -11,8 +11,8 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | 기본 프로바이더의 키(`llmProvider`를 쓰면 필요 없음). 키가 전혀 없어도 도구와 MCP 서버는 동작하며, 모델이 필요한 호출은 명확한 오류와 함께 실패합니다 |
 | `provider` | `'openai' \| 'anthropic'` | 기본 프로바이더, 기본값 `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | 프로바이더별 `apiKey`, `defaultModel`, `baseURL`(Azure OpenAI나 로컬 모델 서버 같은 호환 엔드포인트 또는 프록시) |
-| `fallbackProviders` | `Array<{ provider, config? }>` | 기본 프로바이더가 실패하면 순서대로 시도됩니다 |
+| `providerConfig` | `{ openai?, anthropic? }` | 기본 프로바이더의 설정을 그 이름 아래에 둡니다: `apiKey`, `defaultModel`, `baseURL`(Azure OpenAI의 v1 API나 로컬 모델 서버 같은 호환 엔드포인트 또는 프록시) |
+| `fallbackProviders` | `Array<{ provider, config? }>` | 기본 프로바이더가 실패하면 순서대로 시도됩니다. 각 `config`는 자체 `apiKey`, `defaultModel`, `baseURL`을 가집니다 |
 | `llmProvider` | `LLMProvider` | 직접 만든 프로바이더(로컬 모델, 게이트웨이, 테스트 대역) |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM 재시도 정책, 프로바이더별로, 폴백 전에 |
 | `jev` | `JevClientConfig` | 타입 지정 결정을 위해 TypeSafe Jev를 켭니다. 직접 쓰거나, `baseUrl`과 `model: 'typesafe-ai/jev'`로 [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway)를 통해 씁니다 |

@@ -292,6 +292,9 @@ export class FileEventStore implements IEventStore {
       clearInterval(this.flushInterval);
       this.flushInterval = null;
     }
+    // With nothing pending, flush() does no I/O: wait here for the directory creation
+    // started by the constructor, so it cannot run after the caller deletes the directory.
+    await this.ready;
     try {
       await this.flush();
     } catch (error) {

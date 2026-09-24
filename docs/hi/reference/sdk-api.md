@@ -11,8 +11,8 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | मुख्य प्रदाता की key (`llmProvider` के साथ ज़रूरी नहीं)। बिना किसी key के, टूल और MCP सर्वर काम करते हैं और जिन कॉल को मॉडल चाहिए वे एक साफ़ error के साथ विफल होती हैं |
 | `provider` | `'openai' \| 'anthropic'` | मुख्य प्रदाता, डिफ़ॉल्ट `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | हर प्रदाता के लिए `apiKey`, `defaultModel` और `baseURL` (कोई संगत endpoint, जैसे Azure OpenAI या लोकल मॉडल सर्वर, या कोई proxy) |
-| `fallbackProviders` | `Array<{ provider, config? }>` | मुख्य प्रदाता के विफल होने पर क्रम से आज़माए जाते हैं |
+| `providerConfig` | `{ openai?, anthropic? }` | मुख्य प्रदाता की सेटिंग्स, उसके नाम के नीचे: `apiKey`, `defaultModel` और `baseURL` (कोई संगत endpoint, जैसे Azure OpenAI की v1 API या लोकल मॉडल सर्वर, या कोई proxy) |
+| `fallbackProviders` | `Array<{ provider, config? }>` | मुख्य प्रदाता के विफल होने पर क्रम से आज़माए जाते हैं; हर `config` की अपनी `apiKey`, `defaultModel` और `baseURL` होती है |
 | `llmProvider` | `LLMProvider` | आपका अपना प्रदाता (लोकल मॉडल, gateway, टेस्ट के लिए नकली प्रदाता) |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM की retry नीति, हर प्रदाता के लिए, फ़ॉलबैक से पहले |
 | `jev` | `JevClientConfig` | टाइप्ड निर्णयों के लिए TypeSafe Jev चालू करता है — सीधे, या `baseUrl` और `model: 'typesafe-ai/jev'` के साथ [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) के ज़रिए |
