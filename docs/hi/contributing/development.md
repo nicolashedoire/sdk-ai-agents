@@ -377,6 +377,8 @@ describe('MyClass', () => {
 - **MINOR**: पुराने इस्तेमाल के साथ संगत नई सुविधाएँ
 - **PATCH**: पुराने इस्तेमाल के साथ संगत bug fixes
 
+जब तक वर्ज़न `0.` से शुरू होता है, पुराने इस्तेमाल को तोड़ने वाला बदलाव इसके बजाय MINOR बढ़ाता है (`0.2.0` → `0.3.0`) और बाकी सब PATCH: देखें [रिलीज़ करना](./releasing#release-a-version)।
+
 ### रिलीज़ से पहले की जाँच-सूची {#pre-release-checklist}
 
 - [ ] सभी टेस्ट पास होते हैं
@@ -384,12 +386,14 @@ describe('MyClass', () => {
 - [ ] दस्तावेज़ अप-टू-डेट हैं
 - [ ] CHANGELOG.md अपडेट किया गया है
 - [ ] `package.json` में वर्ज़न अपडेट किया गया है
+- [ ] दस्तावेज़ों में दिखने वाला वर्ज़न अपडेट किया गया है (`docs/.vitepress/config.mts` में `const version`)
 
 ### रिलीज़ के लिए बिल्ड {#build-for-release}
 
 ```bash
-# Everything the CI checks, as prepublishOnly does before npm publish
-npm run verify
+# The checks of the CI but coverage and the docs build, on a fresh dist/
+# (what prepublishOnly runs before npm publish)
+npm run clean && npm run verify
 
 # The files that would be published
 npm pack --dry-run

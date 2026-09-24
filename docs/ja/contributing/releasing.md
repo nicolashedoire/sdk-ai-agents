@@ -3,7 +3,7 @@
 この SDK は npm で `@sdk-ai-agents/core` という名前で公開されています。自分のコンピューターから公開する人はいません。`v0.3.0` のようなタグがプッシュされると、GitHub Actions の `Release` ワークフロー（[`release.yml`](https://github.com/nicolashedoire/sdk-ai-agents/blob/main/.github/workflows/release.yml)）がバージョンをチェックして公開します。
 
 ::: tip やさしく言うと
-リリースは 3 つのステップです。新しいバージョン番号と変更内容を書き留め、その変更をマージし、バージョン名のタグをプッシュします。GitHub がすべてのチェックをもう一度実行し、パッケージを npm に公開します。その際、どのコミットとどのワークフローがビルドしたかを示す署名付きの証明も一緒に公開されます。
+リリースは 3 つのステップです。新しいバージョン番号と変更内容を書き留め、その変更をマージし、バージョン名のタグをプッシュします。GitHub がチェックをもう一度実行し、パッケージを npm に公開します。その際、どのコミットとどのワークフローがビルドしたかを示す署名付きの証明も一緒に公開されます。
 :::
 
 ## ワークフローがすること {#what-the-workflow-does}
@@ -72,6 +72,8 @@
    ```
 
 7. **実行を見守る。** リポジトリの *Actions* タブで、*Release* ワークフローを確認します。
+
+8. **リリースの後。** `templates/starter-template/package.json` の `@sdk-ai-agents/core` を新しいバージョン（`^0.3.0`）にします。最初のリリースの後だけは、`docs/npm-install` ブランチのプルリクエストもマージします。パッケージが npm に載るまで、インストール手順は GitHub からインストールする内容になっているからです。
 
 タグは 1 つずつプッシュしてください。一度に 4 つ以上のタグがプッシュされると GitHub はワークフローを 1 つも起動せず、`git push --tags` ではそうなることがあります。プレリリース（`npm version 0.4.0-beta.1 --no-git-tag-version`、タグ `v0.4.0-beta.1`）は dist-tag `next` で公開されます。`@sdk-ai-agents/core@next` でインストールでき、`npm install @sdk-ai-agents/core` は引き続き最新の安定版を返します。
 

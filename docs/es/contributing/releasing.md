@@ -3,7 +3,7 @@
 El SDK se publica en npm con el nombre `@sdk-ai-agents/core`. Nadie lo publica desde su propio ordenador: el flujo de trabajo `Release` de GitHub Actions ([`release.yml`](https://github.com/nicolashedoire/sdk-ai-agents/blob/main/.github/workflows/release.yml)) comprueba y publica una versión cuando se sube una etiqueta como `v0.3.0`.
 
 ::: tip En palabras sencillas
-Publicar una versión lleva tres pasos: anotar el nuevo número de versión y lo que ha cambiado, fusionar ese cambio y después subir una etiqueta con el nombre de la versión. GitHub vuelve a ejecutar todas las comprobaciones y publica el paquete en npm, junto con una declaración firmada que indica qué commit y qué flujo de trabajo lo construyeron.
+Publicar una versión lleva tres pasos: anotar el nuevo número de versión y lo que ha cambiado, fusionar ese cambio y después subir una etiqueta con el nombre de la versión. GitHub vuelve a ejecutar las comprobaciones y publica el paquete en npm, junto con una declaración firmada que indica qué commit y qué flujo de trabajo lo construyeron.
 :::
 
 ## Qué hace el flujo de trabajo {#what-the-workflow-does}
@@ -72,6 +72,8 @@ Estos pasos se hacen una sola vez, y los hace el propietario del repositorio.
    ```
 
 7. **Seguir la ejecución** en la pestaña *Actions* del repositorio, flujo de trabajo *Release*.
+
+8. **Después de publicar.** Pon `@sdk-ai-agents/core` en la nueva versión (`^0.3.0`) en `templates/starter-template/package.json`. Solo tras la primera publicación, fusiona también la pull request de la rama `docs/npm-install`: mientras el paquete no esté en npm, las instrucciones de instalación lo instalan desde GitHub.
 
 Sube una sola etiqueta cada vez: GitHub no inicia ningún flujo de trabajo cuando se suben más de tres etiquetas a la vez, cosa que `git push --tags` puede hacer. Una versión preliminar (`npm version 0.4.0-beta.1 --no-git-tag-version`, etiqueta `v0.4.0-beta.1`) se publica con el dist-tag `next`: se instala con `@sdk-ai-agents/core@next`, y `npm install @sdk-ai-agents/core` sigue dando la última versión estable.
 

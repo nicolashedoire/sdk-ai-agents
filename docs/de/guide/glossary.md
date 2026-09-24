@@ -6,7 +6,7 @@ Jeder Begriff, der in dieser Dokumentation verwendet wird, ohne Fachjargon erkl�
 
 | Begriff | Einfach erklärt |
 | --- | --- |
-| **SDK** | Ein Werkzeugkasten für Entwickler: Code, den Sie Ihrer eigenen Anwendung hinzufügen, statt alles selbst zu schreiben. Dieses SDK ist in TypeScript geschrieben und wird von npm als `@sdk-ai-agents/core` installiert (siehe [Schnellstart](./getting-started)). |
+| **SDK** | Ein Werkzeugkasten für Entwickler: Code, den Sie Ihrer eigenen Anwendung hinzufügen, statt alles selbst zu schreiben. Dieses SDK ist in TypeScript geschrieben; es ist noch nicht auf npm und wird von GitHub installiert (siehe [Schnellstart](./getting-started)). |
 | **Sprachmodell** (Language Model, LLM) | Die KI, die Text liest und schreibt (GPT-4o, Claude…). Hier ist sie eine Komponente unter anderen: Sie schlägt vor, das SDK prüft und entscheidet, was erlaubt ist. |
 | **Prompt** | Die Textanweisungen, die mit jeder Anfrage an ein Sprachmodell gesendet werden. |
 | **Token** | Ein Wortteil. Modellanbieter rechnen pro gelesenem und geschriebenem Token ab, deshalb werden die [Kosten](./costs) in Tokens gezählt. |

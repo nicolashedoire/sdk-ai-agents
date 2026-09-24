@@ -3,7 +3,7 @@
 The SDK is published on npm as `@sdk-ai-agents/core`. Nobody publishes it from their own computer: the `Release` workflow of GitHub Actions ([`release.yml`](https://github.com/nicolashedoire/sdk-ai-agents/blob/main/.github/workflows/release.yml)) checks and publishes a version when a tag such as `v0.3.0` is pushed.
 
 ::: tip In plain words
-A release takes three steps: write down the new version number and what changed, merge that change, then push a tag named after the version. GitHub runs every check again and publishes the package on npm, together with a signed statement saying which commit and which workflow built it.
+A release takes three steps: write down the new version number and what changed, merge that change, then push a tag named after the version. GitHub runs the checks again and publishes the package on npm, together with a signed statement saying which commit and which workflow built it.
 :::
 
 ## What the workflow does
@@ -72,6 +72,8 @@ These steps are done once, by the owner of the repository.
    ```
 
 7. **Follow the run** in the *Actions* tab of the repository, workflow *Release*.
+
+8. **After the release.** Set `@sdk-ai-agents/core` in `templates/starter-template/package.json` to the new version (`^0.3.0`). After the first release only, also merge the pull request of the `docs/npm-install` branch: until the package is on npm, the installation instructions install it from GitHub.
 
 Push one tag at a time: GitHub starts no workflow when more than three tags are pushed at once, which `git push --tags` can do. A pre-release (`npm version 0.4.0-beta.1 --no-git-tag-version`, tag `v0.4.0-beta.1`) is published under the dist-tag `next`: it is installed with `@sdk-ai-agents/core@next`, and `npm install @sdk-ai-agents/core` keeps giving the latest stable version.
 

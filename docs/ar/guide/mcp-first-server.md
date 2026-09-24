@@ -17,7 +17,7 @@ mkdir my-mcp-server
 cd my-mcp-server
 npm init -y
 npm pkg set type=module
-npm install @sdk-ai-agents/core zod@^3.25.28 @modelcontextprotocol/sdk@^1.30.0
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28 @modelcontextprotocol/sdk@^1.30.0
 npm install --save-dev tsx
 ```
 
@@ -27,7 +27,7 @@ npm install --save-dev tsx
 | --- | --- |
 | `npm init -y` | ينشئ `package.json`، الملف الذي يسرد تبعيات مشروعك. |
 | `npm pkg set type=module` | يستخدم وحدات JavaScript الحديثة (`import`). وحزمة SDK تتطلّب ذلك. |
-| `npm install @sdk-ai-agents/core …` | يثبّت حزمة SDK هذه، وzod (لوصف المعاملات)، وحزمة MCP SDK الرسمية، الإصدار 1.30 أو أحدث ضمن 1.x (الإصدار الذي اختُبرت عليه حزمة SDK هذه). |
+| `npm install github:nicolashedoire/sdk-ai-agents …` | يثبّت حزمة SDK هذه (غير منشورة على npm بعد، لذا من GitHub؛ وهي تبني نفسها)، وzod (لوصف المعاملات)، وحزمة MCP SDK الرسمية، الإصدار 1.30 أو أحدث ضمن 1.x (الإصدار الذي اختُبرت عليه حزمة SDK هذه). |
 | `npm install --save-dev tsx` | يشغّل ملفات TypeScript مباشرةً، دون خطوة بناء. |
 
 ## 2. كتابة الخادم {#_2-write-the-server}

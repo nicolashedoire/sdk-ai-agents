@@ -168,12 +168,14 @@ await serveMcpOverStdio(sdk, { name: 'twin', tools: [cognitiveAgentTool(twin, { 
 
 ## Install
 
+Not on npm yet — install from GitHub (the package builds itself on install):
+
 ```sh
-npm install @sdk-ai-agents/core zod@^3.25.28
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
 ```
 
-Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
+Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`).
 
 ## Documentation
 
@@ -203,7 +205,7 @@ The same pages live in [`docs/`](docs) — run `npm run docs:dev` for a local pr
 npm install
 npm run build          # TypeScript → dist/
 npx vitest run         # tests
-npm run verify         # everything the CI checks: lint, format, build, types, tests, translations
+npm run verify         # lint, format, build, types, tests, translations (the CI also runs coverage and the docs build)
 npm run docs:dev       # documentation site
 ```
 

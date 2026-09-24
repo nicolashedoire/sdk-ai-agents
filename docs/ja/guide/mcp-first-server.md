@@ -17,7 +17,7 @@ mkdir my-mcp-server
 cd my-mcp-server
 npm init -y
 npm pkg set type=module
-npm install @sdk-ai-agents/core zod@^3.25.28 @modelcontextprotocol/sdk@^1.30.0
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28 @modelcontextprotocol/sdk@^1.30.0
 npm install --save-dev tsx
 ```
 
@@ -27,7 +27,7 @@ npm install --save-dev tsx
 | --- | --- |
 | `npm init -y` | `package.json` を作成する。プロジェクトの依存関係を列挙するファイル。 |
 | `npm pkg set type=module` | モダンな JavaScript のモジュール（`import`）を使う。SDK がこれを必要とする。 |
-| `npm install @sdk-ai-agents/core …` | この SDK、zod（引数を記述するため）、公式の MCP SDK（1.x 系の 1.30 以降。この SDK がテストされているバージョン）をインストールする。 |
+| `npm install github:nicolashedoire/sdk-ai-agents …` | この SDK（まだ npm にないので GitHub から。インストール時に自動でビルドされる）、zod（引数を記述するため）、公式の MCP SDK（1.x 系の 1.30 以降。この SDK がテストされているバージョン）をインストールする。 |
 | `npm install --save-dev tsx` | ビルドの手順なしで、TypeScript のファイルを直接実行する。 |
 
 ## 2. サーバーを書く {#_2-write-the-server}

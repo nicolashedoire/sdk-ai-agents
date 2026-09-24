@@ -3,7 +3,7 @@
 O SDK é publicado no npm com o nome `@sdk-ai-agents/core`. Ninguém o publica a partir do próprio computador: o workflow `Release` do GitHub Actions ([`release.yml`](https://github.com/nicolashedoire/sdk-ai-agents/blob/main/.github/workflows/release.yml)) verifica e publica uma versão quando uma tag como `v0.3.0` é enviada.
 
 ::: tip Em palavras simples
-Publicar uma versão leva três passos: anotar o novo número de versão e o que mudou, fazer o merge dessa mudança e depois enviar uma tag com o nome da versão. O GitHub executa de novo todas as verificações e publica o pacote no npm, junto com uma declaração assinada que diz qual commit e qual workflow o construíram.
+Publicar uma versão leva três passos: anotar o novo número de versão e o que mudou, fazer o merge dessa mudança e depois enviar uma tag com o nome da versão. O GitHub executa de novo as verificações e publica o pacote no npm, junto com uma declaração assinada que diz qual commit e qual workflow o construíram.
 :::
 
 ## O que o workflow faz {#what-the-workflow-does}
@@ -72,6 +72,8 @@ Estes passos são feitos uma única vez, pelo dono do repositório.
    ```
 
 7. **Acompanhar a execução** na aba *Actions* do repositório, workflow *Release*.
+
+8. **Depois da publicação.** Coloque `@sdk-ai-agents/core` na nova versão (`^0.3.0`) em `templates/starter-template/package.json`. Somente depois da primeira publicação, faça também o merge do pull request do branch `docs/npm-install`: enquanto o pacote não estiver no npm, as instruções de instalação o instalam a partir do GitHub.
 
 Envie uma tag de cada vez: o GitHub não inicia nenhum workflow quando mais de três tags são enviadas ao mesmo tempo, o que `git push --tags` pode fazer. Uma versão prévia (`npm version 0.4.0-beta.1 --no-git-tag-version`, tag `v0.4.0-beta.1`) é publicada com a dist-tag `next`: ela é instalada com `@sdk-ai-agents/core@next`, e `npm install @sdk-ai-agents/core` continua trazendo a última versão estável.
 

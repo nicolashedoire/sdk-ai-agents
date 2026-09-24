@@ -2,20 +2,20 @@
 
 ## 安装 {#install}
 
-从 npm 安装这个包，并一同安装 zod：
+这个包尚未发布到 npm。请从 GitHub 安装——它会在安装时自行构建：
 
 ::: code-group
 
 ```sh [npm]
-npm install @sdk-ai-agents/core zod@^3.25.28
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ```sh [pnpm]
-pnpm add @sdk-ai-agents/core zod@^3.25.28
+pnpm add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ```sh [yarn]
-yarn add @sdk-ai-agents/core zod@^3.25.28
+yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 :::
@@ -24,12 +24,6 @@ yarn add @sdk-ai-agents/core zod@^3.25.28
 
 ```sh
 npm install @modelcontextprotocol/sdk@^1.30.0
-```
-
-如果想试用尚未发布的改动，请改为从 GitHub 安装 `main` 分支——它会在安装时自行构建：
-
-```sh
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ## 1. 创建 SDK {#_1-create-the-sdk}

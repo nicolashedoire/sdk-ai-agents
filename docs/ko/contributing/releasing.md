@@ -3,7 +3,7 @@
 이 SDK는 npm에 `@sdk-ai-agents/core`라는 이름으로 게시됩니다. 누구도 자기 컴퓨터에서 게시하지 않습니다. `v0.3.0` 같은 태그가 푸시되면 GitHub Actions의 `Release` 워크플로([`release.yml`](https://github.com/nicolashedoire/sdk-ai-agents/blob/main/.github/workflows/release.yml))가 버전을 검사하고 게시합니다.
 
 ::: tip 쉽게 말하면
-릴리스는 세 단계입니다. 새 버전 번호와 바뀐 내용을 적고, 그 변경을 병합한 다음, 버전 이름을 붙인 태그를 푸시합니다. GitHub가 모든 검사를 다시 실행하고 패키지를 npm에 게시하며, 어떤 커밋과 어떤 워크플로가 패키지를 빌드했는지 밝히는 서명된 증명도 함께 게시합니다.
+릴리스는 세 단계입니다. 새 버전 번호와 바뀐 내용을 적고, 그 변경을 병합한 다음, 버전 이름을 붙인 태그를 푸시합니다. GitHub가 검사를 다시 실행하고 패키지를 npm에 게시하며, 어떤 커밋과 어떤 워크플로가 패키지를 빌드했는지 밝히는 서명된 증명도 함께 게시합니다.
 :::
 
 ## 워크플로가 하는 일 {#what-the-workflow-does}
@@ -72,6 +72,8 @@
    ```
 
 7. **실행을 지켜봅니다.** 저장소의 *Actions* 탭에서 *Release* 워크플로를 확인합니다.
+
+8. **릴리스 후.** `templates/starter-template/package.json`의 `@sdk-ai-agents/core`를 새 버전(`^0.3.0`)으로 바꾸세요. 첫 릴리스 후에만 `docs/npm-install` 브랜치의 풀 리퀘스트도 병합하세요. 패키지가 npm에 올라가기 전까지 설치 안내는 GitHub에서 설치하도록 되어 있습니다.
 
 태그는 한 번에 하나씩 푸시하세요. 한 번에 세 개가 넘는 태그가 푸시되면 GitHub는 워크플로를 하나도 시작하지 않는데, `git push --tags`가 그렇게 할 수 있습니다. 프리릴리스(`npm version 0.4.0-beta.1 --no-git-tag-version`, 태그 `v0.4.0-beta.1`)는 dist-tag `next`로 게시됩니다. `@sdk-ai-agents/core@next`로 설치하며, `npm install @sdk-ai-agents/core`는 계속 최신 안정 버전을 설치합니다.
 

@@ -377,6 +377,8 @@ TypeScript 오류가 나면:
 - **MINOR**: 하위 호환되는 새 기능
 - **PATCH**: 하위 호환되는 버그 수정
 
+버전이 `0.`으로 시작하는 동안에는 호환되지 않는 변경이 대신 MINOR를 올리고(`0.2.0` → `0.3.0`), 나머지는 PATCH를 올립니다. [릴리스하기](./releasing#release-a-version)를 참고하세요.
+
 ### 릴리스 전 체크리스트 {#pre-release-checklist}
 
 - [ ] 모든 테스트 통과
@@ -384,12 +386,14 @@ TypeScript 오류가 나면:
 - [ ] 문서 최신화
 - [ ] CHANGELOG.md 업데이트
 - [ ] `package.json`의 버전 업데이트
+- [ ] 문서에 표시되는 버전 업데이트(`docs/.vitepress/config.mts`의 `const version`)
 
 ### 릴리스용 빌드 {#build-for-release}
 
 ```bash
-# Everything the CI checks, as prepublishOnly does before npm publish
-npm run verify
+# The checks of the CI but coverage and the docs build, on a fresh dist/
+# (what prepublishOnly runs before npm publish)
+npm run clean && npm run verify
 
 # The files that would be published
 npm pack --dry-run

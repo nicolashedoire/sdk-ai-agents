@@ -50,7 +50,7 @@ La différence ici, c'est que ces éléments partagent un seul journal d'événe
 ## Ce que les autres frameworks font mieux {#what-other-frameworks-do-better}
 
 - **L'écosystème.** Des centaines d'intégrations, de grandes communautés, des exemples pour tout.
-- **La maturité.** Ce SDK est jeune, n'a qu'un seul mainteneur, en est encore aux versions 0.x (où une version mineure peut casser l'API), et n'a été essayé que sur un nombre limité de problèmes réels.
+- **La maturité.** Ce SDK est jeune, n'a qu'un seul mainteneur, n'est pas encore publié sur npm, et n'a été essayé que sur un nombre limité de problèmes réels.
 - **L'orchestration multi-agents, le streaming et les kits d'interface** sont plus riches ailleurs.
 - **Le coût et la latence.** Une réponse cognitive demande une dizaine d'étapes de raisonnement, chacune avec une ou deux requêtes au modèle (avec gpt-4o et Jev, quelques minutes et environ 0,1 USD par problème lors de nos essais), là où une réponse directe demande un seul appel et un agent utilisant des outils, quelques-uns.
 - **La dépendance au modèle.** Les règles tiennent quel que soit le modèle, mais pas la qualité du raisonnement : les petits modèles suivent mal la méthode, et même les modèles puissants finissent souvent sur une réponse provisoire ou une abstention face à des problèmes difficiles.

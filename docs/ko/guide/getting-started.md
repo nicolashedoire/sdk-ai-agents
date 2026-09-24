@@ -2,20 +2,20 @@
 
 ## 설치 {#install}
 
-npm에서 zod와 함께 패키지를 설치하세요.
+패키지는 아직 npm에 게시되지 않았습니다. GitHub에서 설치하세요. 설치할 때 스스로 빌드됩니다.
 
 ::: code-group
 
 ```sh [npm]
-npm install @sdk-ai-agents/core zod@^3.25.28
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ```sh [pnpm]
-pnpm add @sdk-ai-agents/core zod@^3.25.28
+pnpm add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ```sh [yarn]
-yarn add @sdk-ai-agents/core zod@^3.25.28
+yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 :::
@@ -24,12 +24,6 @@ yarn add @sdk-ai-agents/core zod@^3.25.28
 
 ```sh
 npm install @modelcontextprotocol/sdk@^1.30.0
-```
-
-아직 릴리스되지 않은 변경을 써 보려면 대신 GitHub에서 `main` 브랜치를 설치하세요. 설치할 때 스스로 빌드됩니다.
-
-```sh
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ## 1. SDK 만들기 {#_1-create-the-sdk}

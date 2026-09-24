@@ -377,6 +377,8 @@ O projeto usa versionamento semântico (SemVer):
 - **MINOR**: novos recursos compatíveis com versões anteriores
 - **PATCH**: correções de bugs compatíveis com versões anteriores
 
+Enquanto a versão começar com `0.`, uma mudança incompatível aumenta MINOR em vez disso (`0.2.0` → `0.3.0`) e todo o resto PATCH: veja [Publicar uma versão](./releasing#release-a-version).
+
 ### Lista de verificação antes do release {#pre-release-checklist}
 
 - [ ] Todos os testes passam
@@ -384,12 +386,14 @@ O projeto usa versionamento semântico (SemVer):
 - [ ] Documentação atualizada
 - [ ] CHANGELOG.md atualizado
 - [ ] Versão no `package.json` atualizada
+- [ ] Versão exibida na documentação atualizada (`const version` em `docs/.vitepress/config.mts`)
 
 ### Build para release {#build-for-release}
 
 ```bash
-# Everything the CI checks, as prepublishOnly does before npm publish
-npm run verify
+# The checks of the CI but coverage and the docs build, on a fresh dist/
+# (what prepublishOnly runs before npm publish)
+npm run clean && npm run verify
 
 # The files that would be published
 npm pack --dry-run

@@ -15,7 +15,7 @@
 ## التثبيت {#installation}
 
 ```bash
-npm install @sdk-ai-agents/core zod@^3.25.28
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ## أول وكيل في 5 دقائق {#first-agent-in-5-minutes}

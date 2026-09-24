@@ -3,7 +3,7 @@
 本 SDK 以 `@sdk-ai-agents/core` 为名发布在 npm 上。没有人从自己的电脑上发布它：当推送 `v0.3.0` 这样的标签时，GitHub Actions 的 `Release` 工作流（[`release.yml`](https://github.com/nicolashedoire/sdk-ai-agents/blob/main/.github/workflows/release.yml)）会检查并发布这个版本。
 
 ::: tip 通俗地说
-发布一个版本分三步：写下新的版本号和改动内容，合并这项改动，然后推送一个以版本命名的标签。GitHub 会重新运行所有检查，把包发布到 npm，并附上一份签名声明，说明是哪个提交、哪个工作流构建了它。
+发布一个版本分三步：写下新的版本号和改动内容，合并这项改动，然后推送一个以版本命名的标签。GitHub 会重新运行检查，把包发布到 npm，并附上一份签名声明，说明是哪个提交、哪个工作流构建了它。
 :::
 
 ## 工作流做了什么 {#what-the-workflow-does}
@@ -72,6 +72,8 @@
    ```
 
 7. **跟踪运行情况**：在仓库的 *Actions* 标签页中查看 *Release* 工作流。
+
+8. **发布之后。** 把 `templates/starter-template/package.json` 中的 `@sdk-ai-agents/core` 改为新版本（`^0.3.0`）。仅在首次发布之后，还要合并 `docs/npm-install` 分支的拉取请求：在包上线 npm 之前，安装说明都是从 GitHub 安装。
 
 每次只推送一个标签：一次推送超过三个标签时，GitHub 不会启动任何工作流，而 `git push --tags` 可能会这样做。预发布版本（`npm version 0.4.0-beta.1 --no-git-tag-version`，标签 `v0.4.0-beta.1`）以 dist-tag `next` 发布：用 `@sdk-ai-agents/core@next` 安装，而 `npm install @sdk-ai-agents/core` 仍然给出最新的稳定版本。
 

@@ -50,7 +50,7 @@ Der Unterschied besteht hier darin, dass sich diese Bausteine ein Ereignisprotok
 ## Was andere Frameworks besser machen {#what-other-frameworks-do-better}
 
 - **Ökosystem.** Hunderte von Integrationen, große Communitys, Beispiele für alles.
-- **Reife.** Dieses SDK ist jung, hat einen einzigen Maintainer, ist noch bei Versionen 0.x (in denen eine Minor-Version die API brechen kann) und wurde an einer begrenzten Zahl echter Probleme erprobt.
+- **Reife.** Dieses SDK ist jung, hat einen einzigen Maintainer, ist noch nicht auf npm veröffentlicht und wurde an einer begrenzten Zahl echter Probleme erprobt.
 - **Multi-Agenten-Orchestrierung, Streaming und UI-Kits** sind anderswo umfangreicher.
 - **Kosten und Latenz.** Eine kognitive Antwort braucht etwa zehn Denkschritte mit jeweils ein oder zwei Modellanfragen (mit gpt-4o und Jev in unseren Versuchen einige Minuten und rund 0,1 USD pro Problem), während eine direkte Antwort einen einzigen Aufruf braucht und ein Agent mit Tools einige wenige.
 - **Modellabhängigkeit.** Die Regeln gelten unabhängig vom Modell, die Qualität des Denkens aber nicht: Kleine Modelle befolgen die Methode schlecht, und selbst starke enden bei schwierigen Problemen oft vorläufig oder mit einer Enthaltung.

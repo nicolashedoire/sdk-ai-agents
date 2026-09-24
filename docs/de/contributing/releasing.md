@@ -3,7 +3,7 @@
 Das SDK wird auf npm als `@sdk-ai-agents/core` veröffentlicht. Niemand veröffentlicht es vom eigenen Rechner aus: Der GitHub-Actions-Workflow `Release` ([`release.yml`](https://github.com/nicolashedoire/sdk-ai-agents/blob/main/.github/workflows/release.yml)) prüft und veröffentlicht eine Version, sobald ein Tag wie `v0.3.0` gepusht wird.
 
 ::: tip In einfachen Worten
-Ein Release besteht aus drei Schritten: die neue Versionsnummer und die Änderungen festhalten, diese Änderung mergen und dann einen Tag mit dem Namen der Version pushen. GitHub führt alle Prüfungen erneut aus und veröffentlicht das Paket auf npm, zusammen mit einer signierten Erklärung, welcher Commit und welcher Workflow es gebaut haben.
+Ein Release besteht aus drei Schritten: die neue Versionsnummer und die Änderungen festhalten, diese Änderung mergen und dann einen Tag mit dem Namen der Version pushen. GitHub führt die Prüfungen erneut aus und veröffentlicht das Paket auf npm, zusammen mit einer signierten Erklärung, welcher Commit und welcher Workflow es gebaut haben.
 :::
 
 ## Was der Workflow tut {#what-the-workflow-does}
@@ -72,6 +72,8 @@ Diese Schritte erledigt der Eigentümer des Repositorys ein einziges Mal.
    ```
 
 7. **Den Lauf verfolgen**, im Tab *Actions* des Repositorys, Workflow *Release*.
+
+8. **Nach dem Release.** Setzen Sie `@sdk-ai-agents/core` in `templates/starter-template/package.json` auf die neue Version (`^0.3.0`). Nur nach dem ersten Release mergen Sie außerdem den Pull Request des Branches `docs/npm-install`: Solange das Paket nicht auf npm ist, installieren die Installationsanleitungen es von GitHub.
 
 Pushen Sie immer nur einen Tag auf einmal: GitHub startet keinen Workflow, wenn mehr als drei Tags gleichzeitig gepusht werden, was mit `git push --tags` passieren kann. Eine Vorabversion (`npm version 0.4.0-beta.1 --no-git-tag-version`, Tag `v0.4.0-beta.1`) wird unter dem Dist-Tag `next` veröffentlicht: Sie wird mit `@sdk-ai-agents/core@next` installiert, und `npm install @sdk-ai-agents/core` liefert weiterhin die neueste stabile Version.
 

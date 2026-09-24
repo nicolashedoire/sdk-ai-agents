@@ -377,6 +377,8 @@ describe('MyClass', () => {
 - **MINOR**: новые обратно совместимые возможности
 - **PATCH**: обратно совместимые исправления ошибок
 
+Пока версия начинается с `0.`, несовместимое изменение вместо этого увеличивает MINOR (`0.2.0` → `0.3.0`), а всё остальное — PATCH: см. [Выпуск версии](./releasing#release-a-version).
+
 ### Чек-лист перед выпуском {#pre-release-checklist}
 
 - [ ] Все тесты проходят
@@ -384,12 +386,14 @@ describe('MyClass', () => {
 - [ ] Документация актуальна
 - [ ] CHANGELOG.md обновлён
 - [ ] Версия в `package.json` обновлена
+- [ ] Версия, показанная в документации, обновлена (`const version` в `docs/.vitepress/config.mts`)
 
 ### Сборка для выпуска {#build-for-release}
 
 ```bash
-# Everything the CI checks, as prepublishOnly does before npm publish
-npm run verify
+# The checks of the CI but coverage and the docs build, on a fresh dist/
+# (what prepublishOnly runs before npm publish)
+npm run clean && npm run verify
 
 # The files that would be published
 npm pack --dry-run

@@ -17,7 +17,7 @@ mkdir my-mcp-server
 cd my-mcp-server
 npm init -y
 npm pkg set type=module
-npm install @sdk-ai-agents/core zod@^3.25.28 @modelcontextprotocol/sdk@^1.30.0
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28 @modelcontextprotocol/sdk@^1.30.0
 npm install --save-dev tsx
 ```
 
@@ -27,7 +27,7 @@ npm install --save-dev tsx
 | --- | --- |
 | `npm init -y` | 创建 `package.json`，即列出项目依赖的文件。 |
 | `npm pkg set type=module` | 使用现代的 JavaScript 模块（`import`）。SDK 要求这样做。 |
-| `npm install @sdk-ai-agents/core …` | 安装本 SDK、zod（用来描述参数）以及官方的 MCP SDK，版本为 1.30 或 1.x 范围内的更高版本（本 SDK 就是用这个版本测试的）。 |
+| `npm install github:nicolashedoire/sdk-ai-agents …` | 安装本 SDK（尚未发布到 npm，所以从 GitHub 安装；它会自行构建）、zod（用来描述参数）以及官方的 MCP SDK，版本为 1.30 或 1.x 范围内的更高版本（本 SDK 就是用这个版本测试的）。 |
 | `npm install --save-dev tsx` | 直接运行 TypeScript 文件，无需构建步骤。 |
 
 ## 2. 编写服务器 {#_2-write-the-server}

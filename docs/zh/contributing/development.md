@@ -377,6 +377,8 @@ Source map 会在构建时自动生成。它们让你可以直接调试 TypeScri
 - **MINOR**：向后兼容的新功能
 - **PATCH**：向后兼容的缺陷修复
 
+只要版本号以 `0.` 开头，不兼容的变更就改为提升 MINOR（`0.2.0` → `0.3.0`），其他变更提升 PATCH：参见[发布版本](./releasing#release-a-version)。
+
 ### 发布前检查清单 {#pre-release-checklist}
 
 - [ ] 所有测试通过
@@ -384,12 +386,14 @@ Source map 会在构建时自动生成。它们让你可以直接调试 TypeScri
 - [ ] 文档是最新的
 - [ ] CHANGELOG.md 已更新
 - [ ] `package.json` 中的版本已更新
+- [ ] 文档中显示的版本已更新（`docs/.vitepress/config.mts` 中的 `const version`）
 
 ### 为发布进行构建 {#build-for-release}
 
 ```bash
-# Everything the CI checks, as prepublishOnly does before npm publish
-npm run verify
+# The checks of the CI but coverage and the docs build, on a fresh dist/
+# (what prepublishOnly runs before npm publish)
+npm run clean && npm run verify
 
 # The files that would be published
 npm pack --dry-run
