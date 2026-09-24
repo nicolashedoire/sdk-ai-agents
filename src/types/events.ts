@@ -18,6 +18,7 @@ export type EventType =
   | 'approval.rejected'
   | 'tool.called'
   | 'tool.failed'
+  | 'resource.read'
   | 'provider.fallback'
   | 'provider.retry'
   | 'tool.retry'

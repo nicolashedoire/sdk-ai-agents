@@ -235,3 +235,42 @@ export { parseRetryAfter } from './utils/http.js';
 export type { FetchLike, HttpResponseLike } from './utils/http.js';
 export { deriveRunStatus } from './utils/run-status.js';
 export type { LLMProvider, LLMRequest, LLMResponse } from './providers/llm-provider.js';
+
+// Tool sources: a web API, a folder, a database or an agent as tools (and MCP servers)
+export { openApiTools } from './tools/openapi-tools.js';
+export type { OpenApiOperationInfo, OpenApiToolsOptions } from './tools/openapi-tools.js';
+export type { OpenApiFetch, OpenApiSpecSource } from './tools/openapi-spec.js';
+export type { OpenApiResult } from './tools/openapi-call.js';
+export { folderResources, folderTools } from './tools/folder-tools.js';
+export type { FolderToolsOptions } from './tools/folder-tools.js';
+export { DEFAULT_TEXT_EXTENSIONS } from './tools/folder-access.js';
+export type {
+  FileContent,
+  FolderEntry,
+  FolderOptions,
+  SearchMatch,
+} from './tools/folder-access.js';
+export { databaseTools } from './tools/database-tools.js';
+export type {
+  ColumnSummary,
+  DatabaseToolsOptions,
+  ReadOnlyDatabase,
+  ReadOnlyQueryResult,
+  TableSummary,
+} from './tools/database-tools.js';
+export { sqliteReadOnly } from './tools/sqlite-read-only.js';
+export type { SqliteConnectionLike, SqliteStatementLike } from './tools/sqlite-read-only.js';
+export { postgresReadOnly } from './tools/postgres-read-only.js';
+export type {
+  PgClientLike,
+  PgPoolLike,
+  PostgresReadOnlyOptions,
+} from './tools/postgres-read-only.js';
+export { assertSingleQuery } from './tools/sql-statement-guard.js';
+export type { SqlDialect } from './tools/sql-statement-guard.js';
+export { cognitiveAgentTool, governedAgentTool } from './tools/agent-tools.js';
+export type {
+  AgentToolOptions,
+  CognitiveAgentToolResult,
+  GovernedAgentToolResult,
+} from './tools/agent-tools.js';

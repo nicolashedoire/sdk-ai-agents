@@ -23,7 +23,8 @@ sdk-ai-agents/
 │   ├── costs/                  # Pricing tables and run costs
 │   ├── resilience/             # Retry policy and retrying provider
 │   ├── incidents/              # Incident detection and notifiers
-│   ├── mcp/                    # MCP server and client
+│   ├── mcp/                    # MCP server (tools and resources) and client
+│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents
 │   ├── evaluators/             # Policy condition evaluation
 │   ├── errors/                 # Error classes
 │   ├── types/                  # Shared type definitions
@@ -154,11 +155,15 @@ sdk-ai-agents/
 
 ### `src/mcp/` and `src/mcp.ts` (v0.2)
 
-**Purpose:** MCP server exposing governed tools and MCP client importing tools. Published as the `@sdk-ai-agents/core/mcp` entry point so the core does not depend on `@modelcontextprotocol/sdk`.
+**Purpose:** MCP server exposing governed tools and resources (`mcp-server.ts`, `mcp-resources.ts`, `governed-tool-host.ts`) and MCP client importing tools (`mcp-client.ts`). Published as the `@sdk-ai-agents/core/mcp` entry point so the core does not depend on `@modelcontextprotocol/sdk`.
+
+### `src/tools/`
+
+**Purpose:** Tool sources that build `ToolDefinition`s from a system, with no dependency on MCP: `openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts` (web APIs), `folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts` (folders and resources), `sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts` (read-only databases), `agent-tools.ts` (agents as tools), plus `tool-names.ts` and `bounded-text.ts`.
 
 ### `src/__tests__/support/`
 
-**Purpose:** Test doubles implementing the SDK ports (scripted LLM provider, in-memory decision client, local HTTP server) — no module mocks.
+**Purpose:** Test doubles implementing the SDK ports (scripted LLM provider, in-memory decision client, local HTTP server, recording PostgreSQL client, `node:sqlite` loader) — no module mocks.
 
 ## Entry Points
 

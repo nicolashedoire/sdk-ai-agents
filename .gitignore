@@ -27,6 +27,7 @@ coverage/
 # Default output folders of the SDK and its tests
 /events/
 /knowledge/
+/examples/events/
 /test-events/
 /test-events-*/
 /test-events-golden/

@@ -7,8 +7,9 @@ export class ImpactAnalysisManager {
   private analysesCache: Map<string, ImpactAnalysis> = new Map();
 
   constructor(analysesDir = './impact-analyses') {
+    // Created on first use, not at start-up: an SDK used only for tools (an MCP server
+    // started from any working directory) leaves no empty folders behind.
     this.analysesDir = analysesDir;
-    this.ensureAnalysesDir();
   }
 
   private async ensureAnalysesDir(): Promise<void> {

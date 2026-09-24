@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { ToolExecutionError, ToolNotFoundError, ValidationError } from '../errors/index.js';
-import type { Tool, ToolDefinition, ToolResult } from '../types/tool.js';
+import type { Tool, ToolCallContext, ToolDefinition, ToolResult } from '../types/tool.js';
 
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
@@ -68,14 +68,19 @@ export class ToolRegistry {
     return true;
   }
 
-  async executeTool(name: string, parameters: unknown, allowlist?: string[]): Promise<ToolResult> {
+  async executeTool(
+    name: string,
+    parameters: unknown,
+    allowlist?: string[],
+    context?: ToolCallContext
+  ): Promise<ToolResult> {
     this.validateToolAccess(name, allowlist);
 
     const tool = this.getToolOrThrow(name);
 
     try {
       const validated = tool.schema.parse(parameters);
-      const result = await tool.handler(validated);
+      const result = await tool.handler(validated, context);
 
       return {
         success: true,

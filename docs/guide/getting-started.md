@@ -36,7 +36,7 @@ const sdk = createSDK({
 });
 ```
 
-Everything is optional except a way to reach an LLM: an `apiKey` for the built-in OpenAI and Anthropic providers, or your own `llmProvider`.
+Agents need a way to reach an LLM: an `apiKey` for the built-in OpenAI and Anthropic providers, or your own `llmProvider`. Everything else is optional — and without a key the SDK still runs tools and [MCP servers](./mcp-first-server); only a call that needs a model fails, with a message saying so.
 
 ## 2. Define a governed tool
 

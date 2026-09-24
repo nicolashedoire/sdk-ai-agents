@@ -1,11 +1,13 @@
 /**
- * Exposes governed tools to any MCP client (Claude Desktop, IDE assistants, other agents)
- * over stdio. Every call is validated, checked against policies and traced.
+ * Recipe "a function": exposes one governed tool to any MCP client (Claude Desktop, Claude
+ * Code, IDE assistants, other agents) over stdio. Every call is validated, checked against
+ * policies and written to the event log.
  *
- * Run: npm run example:mcp   (an MCP client starts it as a process)
+ * Run: npm run example:mcp   (an MCP client starts it as a process; see docs/guide/mcp-first-server.md)
  */
+import { join } from 'node:path';
 import { z } from 'zod';
-import { createSDK } from '../src/index.js';
+import { FileEventStore, createSDK } from '../src/index.js';
 import { serveMcpOverStdio } from '../src/mcp.js';
 
 const customers = new Map([
@@ -13,14 +15,17 @@ const customers = new Map([
   ['c-7', { plan: 'starter', churnRisk: 'high', seats: 3 }],
 ]);
 
-// MCP tools do not call an LLM, so a placeholder key is enough here.
-const sdk = createSDK({ apiKey: process.env.OPENAI_API_KEY ?? 'not-used-by-mcp-tools' });
+// No model key needed: MCP tools do not call a language model. The event log goes next to
+// this file, because MCP clients start servers from a working directory you do not choose.
+const sdk = createSDK({ eventStore: new FileEventStore(join(import.meta.dirname, 'events')) });
 
 sdk.defineTool({
   name: 'lookup_customer',
   description: 'Returns the plan, churn risk and seats of a customer',
-  schema: z.object({ customerId: z.string() }),
-  handler: async ({ customerId }) => customers.get(customerId) ?? { error: `unknown customer ${customerId}` },
+  schema: z.object({ customerId: z.string().describe('Customer id, e.g. c-42') }),
+  metadata: { readOnly: true },
+  handler: async ({ customerId }) =>
+    customers.get(customerId) ?? { error: `unknown customer ${customerId}` },
 });
 
 await serveMcpOverStdio(sdk, {

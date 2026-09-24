@@ -9,8 +9,9 @@ export class GoldenTraceManager {
   private goldenTracesCache: Map<string, GoldenTrace> = new Map();
 
   constructor(goldenTracesDir = './golden-traces') {
+    // Created on first use, not at start-up: an SDK used only for tools (an MCP server
+    // started from any working directory) leaves no empty folders behind.
     this.goldenTracesDir = goldenTracesDir;
-    this.ensureGoldenTracesDir();
   }
 
   private async ensureGoldenTracesDir(): Promise<void> {

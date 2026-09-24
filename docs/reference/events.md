@@ -17,9 +17,9 @@ interface Event {
 
 | Type | Data |
 | --- | --- |
-| `run.started` | `input`, `mode` (`cognitive`, `tool`, or absent for governed runs), `replayOf?` |
+| `run.started` | `input`, `mode` (`cognitive`, `tool` for a call outside an agent such as an MCP call, `resource` for an MCP resource read, or absent for governed runs), `replayOf?` |
 | `run.completed` | `output`, `decision?` (cognitive) |
-| `run.failed` | `error`, `steps?` |
+| `run.failed` | `error`, `steps?`, `uri?` (failed resource read) |
 | `run.cancelled` / `run.stopped` | `reason` |
 
 ## Reasoning and actions
@@ -29,12 +29,13 @@ interface Event {
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` — or `intention` for a cognitive final answer |
 | `intention.rejected` | `reason` |
 | `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools` when a caller used a tool it was not given) |
-| `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` |
+| `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval` when the tool's own `metadata.requiresApproval` asked for it), `reason?` (`cancelled before a decision` when the caller gave up) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` |
 | `tool.called` | `toolName`, `parameters` |
 | `tool.retry` | `toolName`, `retry`, `delayMs`, `error` |
 | `provider.fallback` | `primaryProvider`, `usedProvider`, `attemptedProviders` |
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
+| `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` of the content served (the content itself is not stored) |
 
 ## Cognition
 

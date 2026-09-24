@@ -8,8 +8,9 @@ export class RegressionTestManager {
   private testSuitesCache: Map<string, RegressionTestSuite> = new Map();
 
   constructor(testSuitesDir = './regression-test-suites') {
+    // Created on first use, not at start-up: an SDK used only for tools (an MCP server
+    // started from any working directory) leaves no empty folders behind.
     this.testSuitesDir = testSuitesDir;
-    this.ensureTestSuitesDir();
   }
 
   private async ensureTestSuitesDir(): Promise<void> {

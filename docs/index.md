@@ -41,8 +41,8 @@ features:
     link: /guide/typed-decisions
     linkText: Decide with confidence
   - icon: 🔌
-    title: MCP in both directions
-    details: Expose your governed tools to Claude Desktop, IDEs and other agents, and import any MCP server as tools your agents can use.
+    title: An MCP server for anything
+    details: Turn a web API, a folder of documents, a read-only database or an agent into an MCP server in one line, governed and traced, and give your agents the tools of any MCP server.
     link: /guide/mcp
     linkText: Connect your systems
   - icon: 🛡️

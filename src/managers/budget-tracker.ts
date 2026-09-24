@@ -146,21 +146,30 @@ export class BudgetTracker {
     timestamp: number = Date.now()
   ): Promise<void> {
     const periods: BudgetLimit['period'][] = ['hour', 'day', 'week', 'month', 'all'];
+    // Every scope a limit can name: this agent and tool, this agent (any tool), this tool
+    // (any agent), everything. A limit naming only the agent must see every call it made.
+    const scopes: Array<[string | undefined, string | undefined]> = [
+      [agentId, toolName],
+      [agentId, undefined],
+      [undefined, toolName],
+      [undefined, undefined],
+    ];
 
     for (const period of periods) {
       const boundaries = this.getPeriodBoundaries(period, timestamp);
-      const toolKey = this.getCacheKey(agentId, toolName, period);
-      await this.updateUsage(
-        toolKey,
-        agentId,
-        toolName,
-        period,
-        boundaries.start,
-        boundaries.end,
-        0,
-        1,
-        timestamp
-      );
+      for (const [scopeAgent, scopeTool] of scopes) {
+        await this.updateUsage(
+          this.getCacheKey(scopeAgent, scopeTool, period),
+          scopeAgent,
+          scopeTool,
+          period,
+          boundaries.start,
+          boundaries.end,
+          0,
+          1,
+          timestamp
+        );
+      }
     }
   }
 

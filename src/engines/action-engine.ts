@@ -10,6 +10,9 @@ import { withRetry } from '../resilience/retry.js';
 import { generateEventId } from '../utils/id.js';
 import type { PolicyEngine } from './policy-engine.js';
 
+/** Policy id recorded for approvals required by a tool's own `metadata.requiresApproval`. */
+export const TOOL_APPROVAL_POLICY = 'tool-requires-approval';
+
 export class ActionEngine {
   constructor(
     private policyEngine: PolicyEngine,
@@ -130,7 +133,12 @@ export class ActionEngine {
     parameters: Record<string, unknown>,
     context: ActionContext
   ): Promise<ToolResult> {
-    const execute = () => this.toolRegistry.executeTool(toolName, parameters);
+    const execute = () =>
+      this.toolRegistry.executeTool(toolName, parameters, undefined, {
+        runId: context.runId,
+        agentId: context.agentId,
+        ...(context.abortSignal ? { signal: context.abortSignal } : {}),
+      });
     const retry = this.toolRegistry.getTool(toolName)?.retry;
     if (!retry || retry.maxRetries <= 0) {
       return await execute();
@@ -181,43 +189,13 @@ export class ActionEngine {
     if (!validation.allowed) {
       // Check if approval is required
       if (validation.requiresApproval && this.approvalManager) {
-        const { approvalId, waitForApproval } = await this.approvalManager.requestApproval(
-          context.runId,
-          context.agentId,
+        await this.awaitApproval(
           intention,
-          validation.violatedPolicies?.[0] || 'unknown'
-        );
-
-        await this.logEvent(context, 'approval.requested', {
-          approvalId,
-          intention,
-          policyId: validation.violatedPolicies?.[0],
-          reason: validation.reason,
-        });
-
-        // Wait for approval decision
-        const approved = await waitForApproval;
-
-        if (approved) {
-          await this.logEvent(context, 'approval.approved', {
-            approvalId,
-            intention,
-            policyId: validation.violatedPolicies?.[0],
-          });
-          // Approval granted, continue execution
-          return;
-        }
-        await this.logEvent(context, 'approval.rejected', {
-          approvalId,
-          intention,
-          policyId: validation.violatedPolicies?.[0],
-        });
-        // Approval rejected, throw error
-        throw new PolicyViolationError(
+          context,
           validation.violatedPolicies?.[0] || 'unknown',
-          intention,
-          validation.reason || 'Approval rejected'
+          validation.reason
         );
+        return;
       }
 
       // No approval manager or not requires approval - treat as violation
@@ -233,6 +211,83 @@ export class ActionEngine {
         validation.reason || 'Policy violation'
       );
     }
+
+    // A tool marked `requiresApproval` waits for a human even when every policy allows it.
+    const tool = intention.toolName ? this.toolRegistry.getTool(intention.toolName) : null;
+    if (tool?.metadata?.requiresApproval) {
+      await this.awaitApproval(
+        intention,
+        context,
+        TOOL_APPROVAL_POLICY,
+        `Tool "${tool.name}" requires approval`
+      );
+    }
+  }
+
+  /**
+   * Waits for a human decision on an intention. Fails closed: without an approval manager,
+   * on rejection, or when the caller gives up (abort signal), the action is refused.
+   */
+  private async awaitApproval(
+    intention: Intention,
+    context: ActionContext,
+    policyId: string,
+    reason: string | undefined
+  ): Promise<void> {
+    if (!this.approvalManager) {
+      await this.logEvent(context, 'policy.violated', {
+        intention,
+        reason: 'approval required but no approval manager is configured',
+        violatedPolicies: [policyId],
+      });
+      throw new PolicyViolationError(policyId, intention, 'approval required');
+    }
+    const manager = this.approvalManager;
+    const { approvalId, waitForApproval } = await manager.requestApproval(
+      context.runId,
+      context.agentId,
+      intention,
+      policyId
+    );
+    await this.logEvent(context, 'approval.requested', {
+      approvalId,
+      intention,
+      policyId,
+      reason,
+    });
+
+    const signal = context.abortSignal;
+    const cancelOnAbort = () => manager.cancel(approvalId);
+    signal?.addEventListener('abort', cancelOnAbort, { once: true });
+    if (signal?.aborted) {
+      cancelOnAbort();
+    }
+    let approved: boolean;
+    try {
+      approved = await waitForApproval;
+    } catch {
+      // Cancelled: the run was stopped or the caller (e.g. an MCP client) gave up waiting.
+      approved = false;
+    } finally {
+      signal?.removeEventListener('abort', cancelOnAbort);
+    }
+
+    if (approved) {
+      await this.logEvent(context, 'approval.approved', { approvalId, intention, policyId });
+      return;
+    }
+    const cancelled = manager.getApproval(approvalId)?.reason === 'Cancelled';
+    await this.logEvent(context, 'approval.rejected', {
+      approvalId,
+      intention,
+      policyId,
+      ...(cancelled ? { reason: 'cancelled before a decision' } : {}),
+    });
+    throw new PolicyViolationError(
+      policyId,
+      intention,
+      cancelled ? 'Approval cancelled before a decision' : reason || 'Approval rejected'
+    );
   }
 
   /** Appends an event and returns it, so callers can reference what was recorded. */

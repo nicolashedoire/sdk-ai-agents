@@ -46,6 +46,7 @@ import type { Policy } from './types/policy.js';
 import type { ReplayModifications, RunResult } from './types/run.js';
 import type { SDKConfig, Trace } from './types/sdk.js';
 import type { Capability, Tool, ToolDefinition } from './types/tool.js';
+import type { ResourceContent } from './types/resource.js';
 import type { ReasoningGraph } from './types/reasoning-graph.js';
 import type { AlternativesAnalysis } from './types/alternatives.js';
 import type { DecisionPatternAnalysis } from './types/decision-patterns.js';
@@ -191,12 +192,35 @@ export interface SDK {
   getIncidents(runId: string): Promise<Incident[]>;
   /** Every registered tool (used to expose them over MCP). */
   listTools(): Tool[];
-  /** Executes a tool through the governed pipeline (policies, approvals, budgets, events). */
+  /**
+   * Executes a tool through the governed pipeline (policies, approvals, budgets, events).
+   * `signal` cancels a pending approval and reaches the tool handler when the caller gives up.
+   */
   executeTool(
     name: string,
     parameters: Record<string, unknown>,
-    options?: { agentId?: string; runId?: string; allowedTools?: string[] }
+    options?: ExecuteToolOptions
   ): Promise<unknown>;
+  /**
+   * Reads a resource (e.g. a document served over MCP) as its own run: `run.started`,
+   * `resource.read` with the URI, size and SHA-256 of the content, then `run.completed` —
+   * or `run.failed` with the error.
+   */
+  traceResourceRead(
+    uri: string,
+    read: () => Promise<ResourceContent>,
+    options?: { agentId?: string }
+  ): Promise<ResourceContent>;
+}
+
+export interface ExecuteToolOptions {
+  agentId?: string;
+  /** Records the call inside an existing run instead of its own run. */
+  runId?: string;
+  /** Tools this caller may use; any other tool is denied before execution. */
+  allowedTools?: string[];
+  /** Aborted when the caller gives up: cancels a pending approval, reaches the handler. */
+  signal?: AbortSignal;
 }
 
 export class SDKImpl implements SDK {
@@ -365,7 +389,7 @@ export class SDKImpl implements SDK {
   async executeTool(
     name: string,
     parameters: Record<string, unknown>,
-    options: { agentId?: string; runId?: string; allowedTools?: string[] } = {}
+    options: ExecuteToolOptions = {}
   ): Promise<unknown> {
     const runId = options.runId ?? `tool_${uuidv4()}`;
     const agentId = options.agentId ?? 'external';
@@ -388,7 +412,12 @@ export class SDKImpl implements SDK {
     try {
       const result = await this.actionEngine.executeIntention(
         { type: 'tool_call', toolName: name, parameters },
-        { runId, agentId, ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}) }
+        {
+          runId,
+          agentId,
+          ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}),
+          ...(options.signal ? { abortSignal: options.signal } : {}),
+        }
       );
       if (!options.runId) {
         await log('run.completed', { output: result.result });
@@ -398,6 +427,44 @@ export class SDKImpl implements SDK {
       if (!options.runId) {
         await log('run.failed', { error: error instanceof Error ? error.message : String(error) });
       }
+      throw error;
+    }
+  }
+
+  async traceResourceRead(
+    uri: string,
+    read: () => Promise<ResourceContent>,
+    options: { agentId?: string } = {}
+  ): Promise<ResourceContent> {
+    const runId = `resource_${uuidv4()}`;
+    const log = (type: Event['type'], data: Record<string, unknown>) =>
+      this.eventStore.append(runId, {
+        id: uuidv4(),
+        runId,
+        type,
+        timestamp: Date.now(),
+        data,
+        metadata: { agentId: options.agentId ?? 'external' },
+      });
+
+    await log('run.started', { input: { message: `resource ${uri}` }, mode: 'resource' });
+    try {
+      const content = await read();
+      const bytes = Buffer.byteLength(content.text, 'utf8');
+      const sha256 = createHash('sha256').update(content.text).digest('hex');
+      await log('resource.read', {
+        uri: content.uri,
+        ...(content.mimeType ? { mimeType: content.mimeType } : {}),
+        bytes,
+        sha256,
+      });
+      await log('run.completed', { output: { uri: content.uri, bytes } });
+      return content;
+    } catch (error) {
+      await log('run.failed', {
+        uri,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }

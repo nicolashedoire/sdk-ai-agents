@@ -15,7 +15,7 @@ Every term used in this documentation, explained without jargon, with a link to 
 | **Tool** | A function your code gives an agent (read a database, send an email…). The agent can only use the tools it was explicitly given. See [Core concepts](./concepts#_2-tool). |
 | **Capability** | A named group of tools you can give to several agents at once. |
 | **Policy** | A rule checked **before** every action: a budget, a timeout, a list of allowed tools, or your own check. |
-| **Approval** | A policy that pauses an action until a human says yes, for anything risky. |
+| **Approval** | A pause before a risky action until a human says yes. A policy can ask for it, or the tool itself (`requiresApproval`); if the caller gives up first, the action never runs. |
 | **Intention** | What a governed agent's model *wants* to do (call a tool, answer…), written down but not executed: the SDK validates it first. |
 | **Schema (Zod)** | A precise description of the shape data must have. Tool calls and the structured replies of the reasoning steps are checked against one; a reply that does not fit is refused. |
 | **JSON** | A plain text format for structured data. Profiles, events and model replies are JSON. |
@@ -98,7 +98,15 @@ Every term used in this documentation, explained without jargon, with a link to 
 | **Noul, Choice, Score** | Jev's three question types: yes or no; one option among a list; a level on a scale. Picking several options asks one yes/no question per option. |
 | **Calibrated** | A probability that matches reality on average: of the answers given with 80% confidence, about 80% are right. |
 | **AI Gateway** | A Vercel service that gives access to several models, Jev included, with a single key. |
-| **MCP** | Model Context Protocol, a standard way to connect AI applications to tools and data. The SDK can offer its tools through MCP and use the tools of any MCP server. See [MCP connectors](./mcp). |
+| **MCP** | Model Context Protocol: one standard "plug" between AI applications (Claude Desktop, Claude Code, IDE assistants, agents) and your systems. The SDK can turn a function, a web API, a folder, a database or an agent into an MCP server, and use the tools of any MCP server. See [MCP in plain words](./mcp). |
+| **MCP server** | A small program in front of one of your systems that tells AI applications what it offers and does the work when asked. See [Your first MCP server](./mcp-first-server). |
+| **MCP client, host** | The host is the AI application the user talks to; inside it, an MCP client holds the connection to one server. |
+| **Resource** | A document an MCP server offers for reading, such as a file of a shared folder. Unlike a tool, the user or the application picks it, not the model. |
+| **Transport** | How an MCP application and a server exchange messages: **stdio** (the application starts the server as a program on the same computer and talks through its input and output) or **Streamable HTTP** (the server is a web service). See [stdio or HTTP?](./mcp-deploy#stdio-or-http). |
+| **OpenAPI** | A standard, machine-readable description of a web API: its addresses, parameters and answers, often published as `openapi.json`. From it, the SDK makes one tool per operation. See [A web API](./mcp-recipes#a-web-api-from-its-openapi-description). |
+| **JSON Schema** | A description of the shape of some data — here, of a tool's arguments — that models and MCP applications read to call the tool correctly. The SDK writes it from your Zod schema or from the OpenAPI description. |
+| **Read-only** | Can look, cannot change. The folder and database sources are read-only by construction; web APIs are read-only by default (only `GET` operations). |
+| **Tool source** | A function that builds ready-made tools from a system: `openApiTools`, `folderTools`, `databaseTools`, `cognitiveAgentTool`. Serve them over MCP in one line, or give them to your own agents. See [An MCP server for anything](./mcp-recipes). |
 
 ## Operating in production
 

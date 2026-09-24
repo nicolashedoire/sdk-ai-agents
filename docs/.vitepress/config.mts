@@ -55,7 +55,10 @@ export default withMermaid(
           text: 'Connect',
           items: [
             { text: 'Typed decisions (Jev)', link: '/guide/typed-decisions' },
-            { text: 'MCP connectors', link: '/guide/mcp' },
+            { text: 'MCP in plain words', link: '/guide/mcp' },
+            { text: 'Your first MCP server', link: '/guide/mcp-first-server' },
+            { text: 'An MCP server for anything', link: '/guide/mcp-recipes' },
+            { text: 'Deploy, secure, troubleshoot', link: '/guide/mcp-deploy' },
           ],
         },
         {

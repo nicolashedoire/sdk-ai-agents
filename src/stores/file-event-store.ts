@@ -13,9 +13,12 @@ export class FileEventStore implements IEventStore {
   private readonly FLUSH_INTERVAL_MS = 100;
   private readonly FLUSH_THRESHOLD = 10;
 
+  /** Settles once the events directory exists (or could not be created, which is reported). */
+  private readonly ready: Promise<void>;
+
   constructor(eventsDir = './events') {
     this.eventsDir = eventsDir;
-    this.ensureEventsDir();
+    this.ready = this.ensureEventsDir();
     this.startFlushInterval();
   }
 
@@ -186,6 +189,8 @@ export class FileEventStore implements IEventStore {
     const pending = this.pendingEvents.get(runId);
     if (!pending || pending.length === 0) return;
 
+    // A write must not overtake the creation of the directory started by the constructor.
+    await this.ready;
     // Take the batch before any I/O: events appended meanwhile stay pending.
     const batch = pending.splice(0);
     const filePath = this.getEventFilePath(runId);
