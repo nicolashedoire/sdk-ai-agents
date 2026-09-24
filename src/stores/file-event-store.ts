@@ -71,6 +71,8 @@ export class FileEventStore implements IEventStore {
 
     const pending = this.getOrCreatePendingEvents(runId);
     pending.push(event);
+    // New events after an exit flush get their own attempt at the next exit.
+    if (this.flushInterval) FileEventStore.open.add(this);
 
     if (pending.length >= this.FLUSH_THRESHOLD) {
       await this.flushRun(runId);

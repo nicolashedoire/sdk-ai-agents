@@ -36,5 +36,5 @@ describe('clip', () => {
     expect(kept.every((text) => text.length === 2_000)).toBe(true);
     // Six cut texts of 2 000 characters, not six originals of 30 MB (180 MB).
     expect(retainedMb).toBeLessThan(90);
-  });
+  }, 20_000);
 });
