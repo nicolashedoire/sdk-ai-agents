@@ -51,4 +51,4 @@ Because usage lives in events, you can also compute costs yourself with `compute
 
 ## Budgets
 
-Cost is only one side; policies can also cap **steps, tokens and tool calls** per agent, tool and period — see [Governed agents](./governed-agents). Cognitive agents have their own limits (`maxSteps`, `maxToolCalls`, `timeoutMs`).
+Cost is only one side; policies can also cap **steps, tokens and tool calls** per agent, tool and period — see [Governed agents](./governed-agents). Cognitive agents have their own limits (`maxSteps`, `maxToolCalls`, `timeoutMs`). A `budgetLimit` with `maxCost` caps the USD an agent's model calls spend per period, priced as above; when a model has no price, the cap cannot be checked and tool calls are refused.

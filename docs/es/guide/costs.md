@@ -51,4 +51,4 @@ Como el consumo vive en los eventos, también puedes calcular tú los costes con
 
 ## Presupuestos {#budgets}
 
-El coste es solo una cara; las políticas también pueden limitar **los pasos, los tokens y las llamadas a herramientas** por agente, por herramienta y por periodo — consulta [Agentes gobernados](./governed-agents). Los agentes cognitivos tienen sus propios límites (`maxSteps`, `maxToolCalls`, `timeoutMs`).
+El coste es solo una cara; las políticas también pueden limitar **los pasos, los tokens y las llamadas a herramientas** por agente, por herramienta y por periodo — consulta [Agentes gobernados](./governed-agents). Los agentes cognitivos tienen sus propios límites (`maxSteps`, `maxToolCalls`, `timeoutMs`). Un `budgetLimit` con `maxCost` limita los dólares que gastan las llamadas al modelo de un agente por periodo, con los precios anteriores; si un modelo no tiene precio, el límite no puede comprobarse y las llamadas a herramientas se rechazan.

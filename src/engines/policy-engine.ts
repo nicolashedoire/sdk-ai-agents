@@ -12,6 +12,8 @@ import type { PolicyAuditEntry } from '../types/audit.js';
 import type { IEventStore } from '../stores/event-store.js';
 import { ConditionEvaluator } from '../evaluators/condition-evaluator.js';
 import { generateEventId } from '../utils/id.js';
+import { costOf, findModelPrice, type PricingTable } from '../costs/pricing.js';
+import type { LLMResponse } from '../providers/llm-provider.js';
 
 /**
  * Rule conditions that name a built-in check rather than a field to evaluate. They must not
@@ -29,6 +31,7 @@ export class PolicyEngine {
   private globalPolicies: Map<string, Policy> = new Map();
   private agentPolicies: Map<string, Map<string, Policy>> = new Map();
   private budgetTracker?: BudgetTracker;
+  private pricing: PricingTable = {};
   private conditionEvaluator: ConditionEvaluator;
   private eventStore?: IEventStore;
   private auditEntries: Map<string, PolicyAuditEntry[]> = new Map();
@@ -45,11 +48,26 @@ export class PolicyEngine {
     this.budgetTracker = tracker;
   }
 
-  /** Counts tokens a model call used for an agent, for token budgets per agent and period. */
-  async recordTokenUsage(agentId: string, tokens: number): Promise<void> {
-    if (tokens > 0) {
-      await this.budgetTracker?.recordUsage(agentId, tokens);
-    }
+  /** Prices used to count the cost of model calls in budgets (`maxCost`). */
+  setPricing(pricing: PricingTable): void {
+    this.pricing = pricing;
+  }
+
+  /**
+   * Counts a model call of an agent in its budgets per period: its tokens, and its cost from
+   * the price of the model that answered (or of the model requested).
+   */
+  async recordModelUsage(
+    agentId: string,
+    call: { model?: string; requestedModel?: string; usage?: LLMResponse['usage'] }
+  ): Promise<void> {
+    if (!this.budgetTracker) return;
+    const input = call.usage?.promptTokens ?? 0;
+    const output = call.usage?.completionTokens ?? 0;
+    const tokens = call.usage?.totalTokens ?? input + output;
+    const price = findModelPrice(this.pricing, call.model, call.requestedModel);
+    const costUsd = price && call.usage ? costOf(price, input, output) : undefined;
+    await this.budgetTracker.recordModelUsage(agentId, { tokens, costUsd });
   }
 
   applyGlobalPolicy(policy: Policy): void {
@@ -495,7 +513,7 @@ export class PolicyEngine {
     }
 
     // A tool call consumes no tokens: model tokens are recorded as they are used
-    // (recordTokenUsage), so adding the run's total here would count them twice.
+    // (recordModelUsage), so adding the run's total here would count them twice.
     const additionalTokens = 0;
     const additionalToolCalls = context.intention?.toolName ? 1 : 0;
 

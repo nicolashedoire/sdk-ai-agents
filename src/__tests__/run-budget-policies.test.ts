@@ -141,6 +141,68 @@ describe('run budget policies', () => {
     expect(lookups).toBe(1);
   });
 
+  describe('cost budgets (maxCost)', () => {
+    function costBudget(maxCost: number): void {
+      env.sdk.defineGlobalPolicy({
+        id: 'hourly-cost',
+        type: 'budget',
+        scope: 'global',
+        enabled: true,
+        rules: [
+          {
+            condition: 'budgetLimit',
+            action: 'deny',
+            metadata: { budgetLimit: { period: 'hour', maxCost } },
+          },
+        ],
+      });
+    }
+
+    it('refuses tool calls once the model calls have cost more than maxCost', async () => {
+      // $10 000 per million tokens: a tool call (50 in, 10 out) costs $0.60, an answer
+      // (100 in, 20 out) $1.20.
+      const provider = new ScriptedLLMProvider().always(CHANNEL, toolCall);
+      provider.enqueue(CHANNEL, toolCall, { content: 'done' });
+      env = createTestSDK(
+        { pricing: { 'gpt-4': { inputPerMillion: 10_000, outputPerMillion: 10_000 } } },
+        provider
+      );
+      lookups = 0;
+      const lookup = env.sdk.defineTool({
+        name: 'lookup',
+        description: 'Looks a key up',
+        schema: z.object({ key: z.string() }),
+        handler: async () => {
+          lookups++;
+          return { value: 'found' };
+        },
+      });
+      const agent = env.sdk.createAgent({ name: 'priced', model: 'gpt-4', tools: [lookup] });
+      costBudget(2);
+
+      // First run: $0.60 before its tool call, $1.80 in all.
+      expect((await agent.run({ message: 'First' })).status).toBe('completed');
+      // Second run: $2.40 before its tool call, over the $2 budget.
+      const second = await agent.run({ message: 'Second' });
+
+      expect(second.status).toBe('failed');
+      expect(second.error?.message).toContain('Cost budget exceeded: $2.4000 > $2');
+      expect(lookups).toBe(1);
+    });
+
+    it('refuses rather than guess when a model has no price', async () => {
+      const provider = new ScriptedLLMProvider().enqueue(CHANNEL, toolCall);
+      const agent = agentWith([], provider);
+      costBudget(100);
+
+      const result = await agent.run({ message: 'Look it up' });
+
+      expect(result.status).toBe('failed');
+      expect(result.error?.message).toContain('Cost budget cannot be checked');
+      expect(lookups).toBe(0);
+    });
+  });
+
   describe('replay', () => {
     it('refuses again a call that maxSteps refused in the original run', async () => {
       const provider = new ScriptedLLMProvider().enqueue(CHANNEL, toolCall, toolCall, {

@@ -51,4 +51,4 @@ Comme la consommation est stockée dans les événements, vous pouvez aussi calc
 
 ## Budgets {#budgets}
 
-Le coût n'est qu'un aspect ; les politiques peuvent aussi plafonner les **étapes, les tokens et les appels d'outils** par agent, par outil et par période — voir [Agents gouvernés](./governed-agents). Les agents cognitifs ont leurs propres limites (`maxSteps`, `maxToolCalls`, `timeoutMs`).
+Le coût n'est qu'un aspect ; les politiques peuvent aussi plafonner les **étapes, les tokens et les appels d'outils** par agent, par outil et par période — voir [Agents gouvernés](./governed-agents). Les agents cognitifs ont leurs propres limites (`maxSteps`, `maxToolCalls`, `timeoutMs`). Un `budgetLimit` avec `maxCost` plafonne les dollars dépensés par les appels au modèle d'un agent sur une période, aux tarifs ci-dessus ; si un modèle n'a pas de tarif, le plafond ne peut pas être vérifié et les appels d'outils sont refusés.

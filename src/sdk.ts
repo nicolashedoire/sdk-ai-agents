@@ -261,6 +261,7 @@ export class SDKImpl implements SDK {
 
     // Connect BudgetTracker and EventStore to PolicyEngine
     this.policyEngine.setBudgetTracker(this.budgetTracker);
+    this.policyEngine.setPricing(this.pricing);
     this.policyEngine.setEventStore(this.eventStore);
 
     // Create provider once (shared, stateless)

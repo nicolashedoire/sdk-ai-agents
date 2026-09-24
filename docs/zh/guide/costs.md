@@ -51,4 +51,4 @@ const sdk = createSDK({
 
 ## 预算 {#budgets}
 
-成本只是一个方面；策略还可以按智能体、工具和时间段为**步数、token 数和工具调用次数**设置上限——参见[受治理智能体](./governed-agents)。认知智能体有它们自己的限制（`maxSteps`、`maxToolCalls`、`timeoutMs`）。
+成本只是一个方面；策略还可以按智能体、工具和时间段为**步数、token 数和工具调用次数**设置上限——参见[受治理智能体](./governed-agents)。认知智能体有它们自己的限制（`maxSteps`、`maxToolCalls`、`timeoutMs`）。 带 `maxCost` 的 `budgetLimit` 会按上面的价格，限制一个智能体的模型调用在每个时间段内花费的美元；如果某个模型没有价格，就无法检查该上限，工具调用会被拒绝。

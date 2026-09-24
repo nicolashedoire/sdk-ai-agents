@@ -51,4 +51,4 @@ Da der Verbrauch in Ereignissen steht, können Sie die Kosten auch selbst mit `c
 
 ## Budgets {#budgets}
 
-Kosten sind nur eine Seite; Richtlinien können außerdem **Schritte, Tokens und Tool-Aufrufe** pro Agent, Tool und Zeitraum begrenzen – siehe [Kontrollierte Agenten](./governed-agents). Kognitive Agenten haben ihre eigenen Limits (`maxSteps`, `maxToolCalls`, `timeoutMs`).
+Kosten sind nur eine Seite; Richtlinien können außerdem **Schritte, Tokens und Tool-Aufrufe** pro Agent, Tool und Zeitraum begrenzen – siehe [Kontrollierte Agenten](./governed-agents). Kognitive Agenten haben ihre eigenen Limits (`maxSteps`, `maxToolCalls`, `timeoutMs`). Ein `budgetLimit` mit `maxCost` begrenzt die US-Dollar, die die Modellaufrufe eines Agenten pro Zeitraum kosten, zu den obigen Preisen; hat ein Modell keinen Preis, lässt sich die Grenze nicht prüfen, und Tool-Aufrufe werden abgelehnt.
