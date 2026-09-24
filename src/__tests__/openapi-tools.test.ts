@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { OpenApiFetch } from '../tools/openapi-spec.js';
 import { openApiTools } from '../tools/openapi-tools.js';
 import type { ToolDefinition } from '../types/tool.js';
 import { LocalHttpServer } from './support/local-http-server.js';
@@ -170,7 +171,7 @@ describe('openApiTools', () => {
 
     await expect(tool(tools, 'show_pet').handler({})).rejects.toThrow('petId - missing required argument');
     // No value can walk up the path, even percent-encoded for a server that decodes it.
-    for (const petId of ['..', '.', 'a/b', 'a\\b', '%2e%2e', '..%2Fadmin', 'a%252Fb', '%252e%252e']) {
+    for (const petId of ['..', '.', 'a/b', 'a\\b', '%2e%2e', '..%2Fadmin', 'a%252Fb', '%252e%252e', '..%2fadmin%zz', '..%2f..%2fadmin%', '%2e%2e%2fadmin%zz']) {
       await expect(tool(tools, 'show_pet').handler({ petId }), petId).rejects.toThrow('is not a valid path parameter');
     }
     await expect(tool(tools, 'listPets').handler({ limit: 1, offset: 3 })).rejects.toThrow('offset - unknown argument (expected: limit, tag, X-Api-Key)');
@@ -262,6 +263,11 @@ describe('openApiTools', () => {
     // A spec downloaded from the API itself may name its own origin.
     const { url } = await api({ status: 200, body: petStore });
     await expect(openApiTools({ spec: `${url}/openapi.json`, headers })).resolves.toHaveLength(4);
+    // A spec fetched in clear text over the network could have been altered on the way.
+    const spec = 'http://specs.example.invalid/openapi.json';
+    const fetchSpec: OpenApiFetch = async () => ({ status: 200, headers: { get: () => 'application/json' }, text: async () => JSON.stringify(petStore) });
+    await expect(openApiTools({ spec, baseUrl: 'https://api.example.com', headers, fetch: fetchSpec })).rejects.toThrow('download the spec over https');
+    await expect(openApiTools({ spec, baseUrl: 'https://api.example.com', fetch: fetchSpec })).resolves.toHaveLength(4);
   });
 
   it('keeps the approval of write operations unless you set it explicitly', async () => {

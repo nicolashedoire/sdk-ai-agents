@@ -269,17 +269,27 @@ export class ActionEngine {
     }
 
     // A tool marked `requiresApproval` waits for a human even when every policy allows it.
-    // A replay does not ask again: whoever starts a replay decides to re-run its actions.
     const tool = intention.toolName ? this.toolRegistry.getTool(intention.toolName) : null;
-    if (tool?.metadata?.requiresApproval && context.mode !== 'replay') {
-      await awaitApproval(
-        this.approvalGate(context),
+    if (!tool?.metadata?.requiresApproval) return;
+    if (context.mode === 'replay') {
+      // A replay repeats only what a human approved in the original run; anything else
+      // (rejected, cancelled, never asked) is refused rather than left waiting.
+      if (context.preApproved) return;
+      const reason = 'not approved in the original run';
+      await this.logEvent(context, 'policy.violated', {
         intention,
-        context,
-        TOOL_APPROVAL_POLICY,
-        `Tool "${tool.name}" requires approval`
-      );
+        reason,
+        violatedPolicies: [TOOL_APPROVAL_POLICY],
+      });
+      throw new PolicyViolationError(TOOL_APPROVAL_POLICY, intention, reason);
     }
+    await awaitApproval(
+      this.approvalGate(context),
+      intention,
+      context,
+      TOOL_APPROVAL_POLICY,
+      `Tool "${tool.name}" requires approval`
+    );
   }
 
   private approvalGate(context: ActionContext): ApprovalGateDependencies {

@@ -57,6 +57,10 @@ describe('assertSingleQuery', () => {
     expect(() => assertSingleQuery('SELECT 1 --\r; DROP TABLE t', 'postgres')).toThrow('only one statement');
     // SQLite does not: the whole rest is a comment.
     expect(() => assertSingleQuery('SELECT 1 --\r; DROP TABLE t', 'sqlite')).not.toThrow();
+    // A string continued on the next line keeps the escapes of E'…': \' does not end it,
+    // the next quote does, and what follows is a second statement.
+    expect(() => assertSingleQuery("SELECT E'x'\n'\\'' ; DELETE FROM t -- '", 'postgres')).toThrow('only one statement');
+    expect(() => assertSingleQuery("SELECT E'x' -- note\n  'y\\'s'", 'postgres')).not.toThrow();
   });
 
   it('refuses unbalanced parentheses, which could step out of a wrapping sub-query', () => {

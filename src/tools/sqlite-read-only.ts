@@ -85,7 +85,7 @@ export function sqliteReadOnly(db: SqliteConnectionLike): ReadOnlyDatabase {
           }
           statement.setReadBigInts?.(true);
           statement.safeIntegers?.(true);
-          // Values are cut as each row arrives: at most one raw row is held at a time.
+          // Values are cut (into copies) as each row arrives: only the row being read is held whole.
           const rows = firstRows(statement, maxRows + 1, (row) => toJsonRow(row, maxTextLength));
           const firstRow = rows[0];
           const columns =

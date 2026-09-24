@@ -28,6 +28,14 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
+/** Waits until the condition holds, for 5 s at most. */
+async function until(condition: () => boolean | Promise<boolean>): Promise<void> {
+  for (const started = Date.now(); Date.now() - started < 5_000; ) {
+    if (await condition()) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 function text(result: unknown): string {
   const content: unknown = typeof result === 'object' && result !== null ? Reflect.get(result, 'content') : undefined;
   const first: unknown = Array.isArray(content) ? content[0] : undefined;
@@ -165,11 +173,13 @@ describe('MCP servers from tool sources', () => {
     const listed = await client.callTool({ name: 'listPets', arguments: {} });
     expect(JSON.parse(text(listed))).toEqual({ status: 200, data: [{ id: 1, name: 'Rex' }] });
 
-    // The client gives up after 100 ms: the pending approval is cancelled, nothing is sent.
-    await expect(client.callTool({ name: 'createPet', arguments: { body: { name: 'Tom' } } }, undefined, { timeout: 100 })).rejects.toThrow('Request timed out');
-    for (let attempt = 0; attempt < 100 && env.sdk.getPendingApprovals().length > 0; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
+    // The client gives up while the approval is pending: it is cancelled, nothing is sent.
+    const caller = new AbortController();
+    const call = client.callTool({ name: 'createPet', arguments: { body: { name: 'Tom' } } }, undefined, { signal: caller.signal });
+    await until(() => env.sdk.getPendingApprovals().length > 0);
+    caller.abort();
+    await expect(call).rejects.toThrow();
+    await until(() => env.sdk.getPendingApprovals().length === 0);
     expect(env.sdk.getPendingApprovals()).toEqual([]);
     expect(api.requests.map((request) => request.method)).toEqual(['GET']);
     expect((await allEvents(env)).map((event) => event.type)).toEqual(expect.arrayContaining(['approval.requested', 'approval.rejected']));
@@ -229,16 +239,19 @@ describe('MCP cancellation', () => {
     const client = new Client({ name: 'test-client', version: '1.0.0' });
     await client.connect(clientTransport);
     try {
-      await expect(client.callTool({ name: 'ask_analyst', arguments: { problem: 'Build or buy?' } }, undefined, { timeout: 60 })).rejects.toThrow(
-        'Request timed out'
-      );
+      // The client gives up once the reasoning has started (its first model call).
+      const caller = new AbortController();
+      const call = client.callTool({ name: 'ask_analyst', arguments: { problem: 'Build or buy?' } }, undefined, { signal: caller.signal });
+      await until(() => env.provider.requests.length > 0);
+      caller.abort();
+      await expect(call).rejects.toThrow();
 
       let types: string[] = [];
-      for (let attempt = 0; attempt < 200 && !types.includes('run.cancelled'); attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 25));
+      await until(async () => {
         const runIds = await env.store.getRunIds();
         types = (await Promise.all(runIds.map((runId) => env.sdk.getEvents(runId)))).flat().map((event) => event.type);
-      }
+        return types.includes('run.cancelled');
+      });
       // The cognitive run was cancelled, not left to spend model calls for nobody.
       expect(types).toContain('run.cancelled');
       expect(types).not.toContain('cognition.concluded');

@@ -186,18 +186,19 @@ function requestUrl(baseUrl: URL, path: string, query: URLSearchParams): string 
  */
 function pathSegment(argument: string, value: unknown): string {
   const text = scalar(argument, value);
+  const refuse = () => new ValidationError(argument, `"${text}" is not a valid path parameter`);
   let decoded = text;
-  for (let round = 0; round < 5; round++) {
+  // Decoded leniently, escape by escape: a malformed escape elsewhere (`%zz`) must not stop
+  // the check, as `decodeURIComponent` would by throwing.
+  for (let round = 0; ; round++) {
     if (decoded === '' || decoded === '.' || decoded === '..' || /[/\\]/.test(decoded)) {
-      throw new ValidationError(argument, `"${text}" is not a valid path parameter`);
+      throw refuse();
     }
-    let next: string;
-    try {
-      next = decodeURIComponent(decoded);
-    } catch {
-      break;
-    }
+    const next = decoded.replace(/%([0-9a-fA-F]{2})/g, (_escape, hex: string) =>
+      String.fromCharCode(Number.parseInt(hex, 16))
+    );
     if (next === decoded) break;
+    if (round === 10) throw refuse();
     decoded = next;
   }
   return encodeURIComponent(text);

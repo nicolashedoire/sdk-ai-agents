@@ -126,7 +126,7 @@ describe('agents as tools', () => {
 
     const pending = governedAgentTool(support).handler({ message: 'Refund o-1' }, { runId: 'r', agentId: 'mcp:test', signal: caller.signal });
     let approval: { id: string } | undefined;
-    for (let attempt = 0; attempt < 100 && !approval; attempt++) {
+    for (const started = Date.now(); !approval && Date.now() - started < 5_000; ) {
       [approval] = env.sdk.getPendingApprovals();
       if (!approval) await new Promise((resolve) => setTimeout(resolve, 5));
     }

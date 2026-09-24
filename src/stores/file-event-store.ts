@@ -52,7 +52,11 @@ export class FileEventStore implements IEventStore {
     // process exits, and it fires again once they are done (with nothing left to write).
     process.on('beforeExit', () => {
       for (const store of FileEventStore.open) {
-        store.flush().catch((error) => store.handleError('Failed to flush events', error));
+        // One attempt at exit: a store that cannot write must not keep the process alive.
+        FileEventStore.open.delete(store);
+        store
+          .flush()
+          .catch((error) => store.handleError('Failed to flush events before exit', error));
       }
     });
   }

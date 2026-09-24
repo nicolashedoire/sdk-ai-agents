@@ -1,6 +1,12 @@
-/** Cuts a text to `max` characters, marking the cut with an ellipsis. */
+/**
+ * Cuts a text to `max` characters, marking the cut with an ellipsis. The kept part is a
+ * copy: a plain `slice` would keep the whole original string alive in memory (V8 "sliced
+ * strings"), however short the result.
+ */
 export function clip(text: string, max: number): string {
-  return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1))}…`;
+  if (text.length <= max) return text;
+  const kept = Buffer.from(text.slice(0, Math.max(0, max - 1)), 'utf8').toString('utf8');
+  return `${kept}…`;
 }
 
 /** The part of a web `ReadableStream` needed to read a body chunk by chunk. */

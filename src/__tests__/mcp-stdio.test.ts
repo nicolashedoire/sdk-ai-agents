@@ -36,32 +36,36 @@ describe('a stdio MCP server whose client leaves', () => {
     directories.push(directory);
     const eventsDir = join(directory, 'events');
     const marker = join(directory, 'tool-ran');
-    const child = spawn(tsx, [server, eventsDir, marker], { stdio: ['pipe', 'pipe', 'pipe'] });
+    // Only stdin is used: the other streams are not read, so they are not piped.
+    const child = spawn(tsx, [server, eventsDir, marker], { stdio: ['pipe', 'ignore', 'ignore'] });
     const exited = new Promise<number | null>((resolve) => child.on('exit', (code) => resolve(code)));
     const send = (message: unknown) => child.stdin.write(`${JSON.stringify(message)}\n`);
 
-    send({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } },
-    });
-    send({ jsonrpc: '2.0', method: 'notifications/initialized' });
-    send({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'refund', arguments: { orderId: 'o-1' } } });
-    const requested = await waitFor(
-      () => eventsIn(eventsDir).some((event) => event.type === 'approval.requested'),
-      10_000
-    );
-    expect(requested).toBe(true);
+    try {
+      send({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } },
+      });
+      send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+      send({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'refund', arguments: { orderId: 'o-1' } } });
+      const requested = await waitFor(
+        () => eventsIn(eventsDir).some((event) => event.type === 'approval.requested'),
+        10_000
+      );
+      expect(requested).toBe(true);
 
-    // The client goes away: its end of stdin closes.
-    child.stdin.end();
-    const code = await Promise.race([exited, new Promise<'still running'>((resolve) => setTimeout(() => resolve('still running'), 10_000))]);
+      // The client goes away: its end of stdin closes.
+      child.stdin.end();
+      const code = await Promise.race([exited, new Promise<'still running'>((resolve) => setTimeout(() => resolve('still running'), 10_000))]);
 
-    if (code === 'still running') child.kill();
-    expect(code).toBe(0);
-    expect(existsSync(marker)).toBe(false);
-    const rejected = eventsIn(eventsDir).find((event) => event.type === 'approval.rejected');
-    expect(rejected?.data.reason).toBe('cancelled before a decision');
+      expect(code).toBe(0);
+      expect(existsSync(marker)).toBe(false);
+      const rejected = eventsIn(eventsDir).find((event) => event.type === 'approval.rejected');
+      expect(rejected?.data.reason).toBe('cancelled before a decision');
+    } finally {
+      child.kill();
+    }
   }, 30_000);
 });

@@ -171,17 +171,25 @@ async function runReadOnly<T>(
   let outcome: Outcome<T>;
   let ours = false;
   try {
-    await client.query('BEGIN READ ONLY');
-    // A connection already inside a transaction ignores BEGIN: our read-only mode would not
-    // apply, and our ROLLBACK would end someone else's transaction. Refuse instead.
-    const { rows } = await client.query('SHOW transaction_read_only');
-    const first = rows[0];
-    if (!isRecord(first) || first.transaction_read_only !== 'on') {
+    // A connection already inside a transaction only warns on BEGIN (and turns that other
+    // transaction read-only): our ROLLBACK would then end it. Outside a transaction, a
+    // statement runs in its own, started with it — so both timestamps are equal.
+    const fresh = await client.query(
+      'SELECT transaction_timestamp() = statement_timestamp() AS fresh'
+    );
+    const state = fresh.rows[0];
+    if (!isRecord(state) || state.fresh !== true) {
       throw new Error(
         'the PostgreSQL connection is already inside a transaction: give postgresReadOnly a dedicated client'
       );
     }
+    await client.query('BEGIN READ ONLY');
     ours = true;
+    const { rows } = await client.query('SHOW transaction_read_only');
+    const first = rows[0];
+    if (!isRecord(first) || first.transaction_read_only !== 'on') {
+      throw new Error('the PostgreSQL transaction is not read-only');
+    }
     await client.query(`SET LOCAL statement_timeout = ${timeoutMs}`);
     // Backslashes in plain strings are literal, as the statement guard assumes.
     await client.query('SET LOCAL standard_conforming_strings = on');

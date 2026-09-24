@@ -151,13 +151,23 @@ function endOfEscapeString(sql: string, index: number): number {
     } else if (char === "'" && sql[position + 1] === "'") {
       position += 2;
     } else if (char === "'") {
-      return position + 1;
+      // `E'a'` + whitespace holding a newline + `'b'` is one string: its next part is read
+      // with the same backslash escapes.
+      const continuation = STRING_CONTINUATION.exec(sql.slice(position + 1));
+      if (!continuation) return position + 1;
+      position += 1 + continuation[0].length;
     } else {
       position++;
     }
   }
   throw new ValidationError('sql', 'unterminated string or quoted identifier');
 }
+
+/**
+ * What separates two parts of one PostgreSQL string: blanks and `--` comments including at
+ * least one line break, then the opening quote of the next part.
+ */
+const STRING_CONTINUATION = /^(?:[ \t\f\v]|--[^\r\n]*)*[\r\n](?:[ \t\f\v\r\n]|--[^\r\n]*)*'/;
 
 /** PostgreSQL block comments nest; SQLite ones do not. An unclosed comment is an error. */
 function endOfBlockComment(sql: string, index: number, nested: boolean): number {

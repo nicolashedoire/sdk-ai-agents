@@ -6,7 +6,9 @@ import type { ReadOnlyDatabase } from '../tools/database-tools.js';
 import type { ToolDefinition } from '../types/tool.js';
 import { RecordingPgClient, RecordingPgPool, type PgReply, type PgStatement } from './support/recording-pg.js';
 
+const FRESH = 'SELECT transaction_timestamp() = statement_timestamp() AS fresh';
 const TRANSACTION_START = [
+  { text: FRESH },
   { text: 'BEGIN READ ONLY' },
   { text: 'SHOW transaction_read_only' },
   { text: 'SET LOCAL statement_timeout = 5000' },
@@ -21,6 +23,9 @@ function pgError(message: string, code: string): Error {
 
 /** Answers like a small PostgreSQL: 3 customers, catalog queries, and read-only refusals. */
 function shop(statement: PgStatement): PgReply {
+  if (statement.text === FRESH) {
+    return { rows: [{ fresh: true }] };
+  }
   if (statement.text === 'SHOW transaction_read_only') {
     return { rows: [{ transaction_read_only: 'on' }] };
   }
@@ -125,8 +130,9 @@ describe('postgresReadOnly', () => {
 
     const texts = client.journal.map((statement) => statement.text);
     expect(texts.filter((text) => text === 'BEGIN READ ONLY')).toHaveLength(3);
-    for (let start = 0; start < texts.length; start += 7) {
-      expect(texts.slice(start, start + 7)).toEqual([
+    for (let start = 0; start < texts.length; start += 8) {
+      expect(texts.slice(start, start + 8)).toEqual([
+        FRESH,
         'BEGIN READ ONLY',
         'SHOW transaction_read_only',
         'SET LOCAL statement_timeout = 5000',
@@ -155,8 +161,8 @@ describe('postgresReadOnly', () => {
     });
     await expect(call(database, 'shop_describe_table', { table: 'invoices' })).rejects.toThrow('no table or view named "invoices"');
 
-    expect(pool.clients[0]?.journal[4]?.values).toEqual([501, ['public']]);
-    expect(pool.clients[1]?.journal[4]?.values).toEqual(['customers', 'public', ['public']]);
+    expect(pool.clients[0]?.journal[5]?.values).toEqual([501, ['public']]);
+    expect(pool.clients[1]?.journal[5]?.values).toEqual(['customers', 'public', ['public']]);
   });
 
   it('rejects an invalid timeout', () => {
@@ -173,14 +179,14 @@ describe('postgresReadOnly', () => {
     expect(pool.releases).toEqual([true]);
   });
 
-  it('refuses a shared client already inside a transaction, without ending that transaction', async () => {
-    const client = new RecordingPgClient((statement) =>
-      statement.text === 'SHOW transaction_read_only' ? { rows: [{ transaction_read_only: 'off' }] } : shop(statement)
-    );
+  it('refuses a shared client already inside a transaction, without touching that transaction', async () => {
+    // Inside an open transaction, its timestamp is older than the statement's.
+    const client = new RecordingPgClient((statement) => (statement.text === FRESH ? { rows: [{ fresh: false }] } : shop(statement)));
     const database = postgresReadOnly({ client });
 
     await expect(call(database, 'shop_query', { sql: 'SELECT 1' })).rejects.toThrow('already inside a transaction');
-    expect(client.journal.map((statement) => statement.text)).toEqual(['BEGIN READ ONLY', 'SHOW transaction_read_only']);
+    // No BEGIN, SET, ROLLBACK nor unlock was sent: the application's transaction and locks are intact.
+    expect(client.journal.map((statement) => statement.text)).toEqual([FRESH]);
   });
 
   it('refuses a pool passed as a single client', () => {

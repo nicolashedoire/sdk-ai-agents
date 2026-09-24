@@ -233,15 +233,24 @@ function assertSafeForCredentials(
       `pass \`baseUrl\` with \`headers\`: the spec alone would decide where your credentials go (${baseUrl.origin})`
     );
   }
-  if (
-    baseUrl.protocol === 'http:' &&
-    !['localhost', '127.0.0.1', '[::1]'].includes(baseUrl.hostname)
-  ) {
+  if (!onThisMachineOrHttps(baseUrl)) {
     throw new ValidationError(
       'baseUrl',
       `${baseUrl.origin} uses http: credentials would travel unencrypted; use https`
     );
   }
+  // A spec altered on its way could add operations (a destructive GET) that your
+  // credentials would then authorize.
+  if (sourceUrl !== undefined && !onThisMachineOrHttps(new URL(sourceUrl))) {
+    throw new ValidationError(
+      'spec',
+      `${sourceUrl} is downloaded over http: with \`headers\`, download the spec over https`
+    );
+  }
+}
+
+function onThisMachineOrHttps(url: URL): boolean {
+  return url.protocol !== 'http:' || ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
 }
 
 /** First server URL, with its variables replaced by their default values. */

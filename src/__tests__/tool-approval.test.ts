@@ -27,7 +27,7 @@ function defineRefundTool(sdk: SDK): string[] {
 }
 
 async function pendingApproval(sdk: SDK): Promise<{ id: string; policyId: string; runId: string }> {
-  for (let attempt = 0; attempt < 100; attempt++) {
+  for (const started = Date.now(); Date.now() - started < 5_000; ) {
     const [approval] = sdk.getPendingApprovals();
     if (approval) return approval;
     await new Promise((resolve) => setTimeout(resolve, 5));
@@ -117,10 +117,10 @@ describe('tools marked requiresApproval', () => {
     env = createTestSDK();
     const executed = defineRefundTool(env.sdk);
 
-    const call = env.sdk.executeTool('refund', { orderId: 'o-4' }, { approvalTimeoutMs: 50 });
+    const call = env.sdk.executeTool('refund', { orderId: 'o-4' }, { approvalTimeoutMs: 300 });
     const approval = await pendingApproval(env.sdk);
 
-    await expect(call).rejects.toThrow('Approval no decision within 50 ms');
+    await expect(call).rejects.toThrow('Approval no decision within 300 ms');
     expect(() => env.sdk.approveAction(approval.id, 'late-approver')).toThrow('already rejected');
     expect(executed).toEqual([]);
   });
@@ -163,9 +163,52 @@ describe('tools marked requiresApproval', () => {
     const original = await run;
     expect(original.status).toBe('completed');
 
-    // Whoever replays decides to run the actions again: no approval waits forever.
+    // What a human approved in the original run replays without asking again.
     const replayed = await within(env.sdk.replay(original.runId), 4_000);
     expect(replayed).toMatchObject({ status: 'completed' });
     expect(executed).toEqual(['o-6', 'o-6']);
+  }, 15_000);
+
+  it('replay only the very call that was approved (same tool, same parameters)', async () => {
+    env = createTestSDK();
+    const executed = defineRefundTool(env.sdk);
+    // A recorded run where the approval found in the log is for another order than the call.
+    const at = (index: number) => ({ id: `evt_${index}`, runId: 'run_recorded', timestamp: index, metadata: { agentId: 'support' } });
+    await env.store.append('run_recorded', { ...at(1), type: 'run.started', data: { input: { message: 'Refund' } } });
+    await env.store.append('run_recorded', {
+      ...at(2),
+      type: 'intention.generated',
+      data: { toolCalls: [{ function: { name: 'refund', arguments: '{"orderId":"o-7"}' } }] },
+    });
+    await env.store.append('run_recorded', {
+      ...at(3),
+      type: 'approval.approved',
+      data: { approvalId: 'a-1', policyId: 'tool-requires-approval', intention: { type: 'tool_call', toolName: 'refund', parameters: { orderId: 'o-8' } } },
+    });
+
+    const replayed = await within(env.sdk.replay('run_recorded'), 4_000);
+
+    expect(replayed).toMatchObject({ status: 'failed' });
+    expect(executed).toEqual([]);
+  });
+
+  it('never replay a call a human rejected', async () => {
+    const provider = new ScriptedLLMProvider()
+      .enqueue('tool-selection', { toolCall: { name: 'refund', arguments: { orderId: 'o-666' } } })
+      .always('tool-selection', { content: 'Done.' });
+    env = createTestSDK({}, provider);
+    const executed = defineRefundTool(env.sdk);
+    const refund = env.sdk.listTools().filter((tool) => tool.name === 'refund');
+    const agent = env.sdk.createAgent({ name: 'support', model: 'test-model', tools: refund, maxSteps: 3 });
+
+    const run = agent.run({ message: 'Refund o-666' });
+    env.sdk.rejectAction((await pendingApproval(env.sdk)).id, 'alice', 'fraud');
+    const original = await run;
+    expect(original.status).toBe('failed');
+
+    const replayed = await within(env.sdk.replay(original.runId), 4_000);
+    expect(replayed).toMatchObject({ status: 'failed' });
+    expect(executed).toEqual([]);
+    expect(env.sdk.getPendingApprovals()).toEqual([]);
   }, 15_000);
 });

@@ -139,6 +139,22 @@ describe('BudgetTracker', () => {
       expect(result.reason).toContain('Token budget exceeded');
     });
 
+    it('admits calls again once a new period starts', () => {
+      const limits = [
+        { policyId: 'hourly', limit: { agentId: 'agent-1', period: 'hour' as const, maxToolCalls: 2 } },
+      ];
+      const start = new Date(2026, 8, 24, 10, 15).getTime();
+
+      expect(tracker.admitToolCall('agent-1', 'tool-1', limits, start)).toBeUndefined();
+      expect(tracker.admitToolCall('agent-1', 'tool-1', limits, start + 60_000)).toBeUndefined();
+      expect(tracker.admitToolCall('agent-1', 'tool-1', limits, start + 120_000)).toMatchObject({ policyId: 'hourly' });
+      // The next hour starts from zero, whatever was counted before.
+      const nextHour = start + 60 * 60_000;
+      expect(tracker.admitToolCall('agent-1', 'tool-1', limits, nextHour)).toBeUndefined();
+      expect(tracker.admitToolCall('agent-1', 'tool-1', limits, nextHour + 60_000)).toBeUndefined();
+      expect(tracker.admitToolCall('agent-1', 'tool-1', limits, nextHour + 120_000)).toMatchObject({ policyId: 'hourly' });
+    });
+
     it('counts tool calls for limits that name only the agent, or only the tool', async () => {
       await tracker.recordToolCall('agent-1', 'tool-1');
       await tracker.recordToolCall('agent-1', 'tool-2');

@@ -50,6 +50,11 @@ export interface ActionContext {
   runId: string;
   agentId: string;
   mode?: 'normal' | 'replay';
+  /**
+   * Replay only: the original run got a human approval for this very call (same tool, same
+   * parameters). Tool-level approvals are then not asked again; any other call is refused.
+   */
+  preApproved?: boolean;
   abortSignal?: AbortSignal;
   /**
    * Tools this caller may use. When set, any other tool is denied before execution, even
