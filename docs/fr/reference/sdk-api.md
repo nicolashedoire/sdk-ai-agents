@@ -11,9 +11,9 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Clé du fournisseur principal (inutile avec `llmProvider`). Sans aucune clé, les outils et les serveurs MCP fonctionnent, et les appels qui ont besoin d'un modèle échouent avec une erreur explicite |
 | `provider` | `'openai' \| 'anthropic'` | Fournisseur principal, `openai` par défaut |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` et `baseURL` de chaque éditeur (`baseURL` : un endpoint compatible, comme l'API v1 d'Azure OpenAI ou un serveur de modèles local, ou un proxy). Le fournisseur principal utilise l'entrée de son éditeur, et un repli d'un autre éditeur celle du sien. Modèles par défaut : `gpt-5.4` et `claude-opus-5`. L'entrée OpenAI accepte aussi `reasoningModels`, `reasoningEffort` et `nativeToolMessages` : voir [Modèles OpenAI](#openai-models) |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` et `baseURL` de chaque éditeur (`baseURL` : un endpoint compatible, comme l'API v1 d'Azure OpenAI ou un serveur de modèles local, ou un proxy). Pour OpenAI, `includeStreamUsage` demande la consommation d'une réponse en streaming (`stream_options`) : par défaut seulement sur l'API d'OpenAI elle-même, car un serveur compatible peut refuser ce champ ou l'ignorer. Le fournisseur principal utilise l'entrée de son éditeur, et un repli d'un autre éditeur celle du sien. Modèles par défaut : `gpt-5.4` et `claude-opus-5`. L'entrée OpenAI accepte aussi `reasoningModels`, `reasoningEffort` et `nativeToolMessages` : voir [Modèles OpenAI](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | Essayés dans l'ordre quand le fournisseur principal échoue ; un `config` l'emporte sur `providerConfig`. Un repli du même éditeur que le principal n'hérite d'aucun de ses réglages (seulement de l'`apiKey` globale) ; un repli d'un autre éditeur a besoin de sa propre clé |
-| `llmProvider` | `LLMProvider` | Votre propre fournisseur (modèle local, passerelle, doublure de test). Il reçoit les appels d'outils et leurs résultats au format natif (`LLMMessage`) s'il déclare `nativeToolMessages`, en texte sinon |
+| `llmProvider` | `LLMProvider` | Votre propre fournisseur (modèle local, passerelle, doublure de test). Il reçoit les appels d'outils et leurs résultats au format natif (`LLMMessage`) s'il déclare `nativeToolMessages`, en texte sinon, et il peut transmettre son texte en streaming (voir [`LLMProvider`](#llmprovider)) |
 | `retry` | `Partial<RetryPolicy> \| false` | Politique de nouvelles tentatives pour le LLM, par fournisseur, avant le repli. Ses `maxRetries` et `initialDelayMs` sont aussi les valeurs par défaut de `jev.maxRetries` et `jev.retryBaseDelayMs` ; ses autres champs n'atteignent pas le client Jev, qui garde ses propres 2 nouvelles tentatives et 500 ms avec `retry: false`. Appliquée à un `llmProvider` injecté seulement si elle est définie explicitement, et jamais à un `FallbackProvider` passé comme `llmProvider` ni à ses fournisseurs |
 | `jev` | `JevClientConfig` | Active TypeSafe Jev pour les décisions typées — directement, ou via [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) avec `baseUrl` et `model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | N'importe quel backend de décisions typées (prioritaire sur `jev`) |
@@ -59,12 +59,21 @@ const analyst = sdk.createAgent({
 });
 ```
 
+### `LLMProvider` {#llmprovider}
+
+Votre propre fournisseur implémente `generateCompletion(request)`, `supportsModel(model)` et `getProviderName()`, et peut déclarer `nativeToolMessages`. Deux champs de la requête concernent le streaming :
+
+| Champ de `LLMRequest` | |
+| --- | --- |
+| `onTextDelta?(delta)` | Défini quand l'appelant veut le texte à mesure qu'il est écrit (une exécution avec `onText`). Appelez-le avec chaque fragment de texte dès qu'il arrive, puis renvoyez comme d'habitude la `LLMResponse` complète : les fragments mis bout à bout doivent former son `content`. Un fournisseur qui ne gère pas le streaming l'ignore, et le SDK transmet tout le `content` d'un seul bloc. Il ne doit pas lever d'exception (celui que fournit le SDK n'en lève jamais) |
+| `onTextRestart?()` | Appelez-le quand vous réessayez après une tentative qui avait déjà transmis du texte (une nouvelle tentative que vous faites vous-même) : ce texte n'est plus valable, et les fragments suivants recommencent la réponse. `RetryingLLMProvider` et `FallbackProvider` l'appellent pour les fournisseurs qu'ils enveloppent |
+
 ## Agents {#agents}
 
 | Méthode | Renvoie | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | Agent gouverné : `run({ message, context?, signal? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. Il ne peut exécuter que ses propres outils (`tools`, `capabilities`), même si le modèle nomme un autre outil enregistré dans le SDK ; `signal` annule l'exécution |
-| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()` |
+| `createAgent(config)` | `AgentImpl` | Agent gouverné : `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. Il ne peut exécuter que ses propres outils (`tools`, `capabilities`), même si le modèle nomme un autre outil enregistré dans le SDK ; `signal` annule l'exécution ; `onText` reçoit le texte que le modèle écrit à mesure qu'il l'écrit, et `onTextRestart` la partie à retirer quand un appel au modèle en échec est retenté (voir [Recevoir la réponse en streaming](../guide/governed-agents#_7-streaming-the-answer)) |
+| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()`. Ses pensées sont structurées et ne sont pas transmises en streaming |
 | `defineTool(definition)` | `Tool` | Enregistre un outil ; le gestionnaire est typé à partir de son schéma Zod |
 | `defineCapability(definition)` | `Capability` | Regroupe des outils |
 | `listTools()` | `Tool[]` | Tous les outils enregistrés |

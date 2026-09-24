@@ -289,6 +289,33 @@ await agent.stop(); // Stop all runs of this agent
 await sdk.stopRun(runId);
 ```
 
+### 7. Streaming the Answer
+
+Show the answer while the model writes it: `onText` receives its text delta by delta.
+
+```typescript
+let shown = '';
+const result = await agent.run({
+  message: 'Summarize the incident report',
+  onText: (delta) => {
+    shown += delta;
+    render(shown);
+  },
+  onTextRestart: (discarded) => {
+    shown = shown.slice(0, shown.length - discarded.length);
+    render(shown);
+  },
+});
+```
+
+- With `onText`, the built-in OpenAI and Anthropic providers call their vendor's streaming API, and the run's result and events stay the same as without it. So do its costs, except with an OpenAI-compatible server (a `baseURL`): the usage of a streamed answer is only asked for on OpenAI's own API, unless `providerConfig.openai.includeStreamUsage` is set, and a call without usage counts as unmetered in budgets.
+- The text of every model call of the run is passed on, one call after the other: what the model writes before calling a tool, then its answer, with a blank line (`\n\n`) before the text of a call when an earlier call wrote some. Tool arguments and Claude's thinking are not.
+- A provider that cannot stream (your own `llmProvider`, unless it reads `onTextDelta`) gives the whole text of each model call in one piece, when the call ends. So does OpenAI for a model it refuses to stream (an organization not verified for it): the provider asks again without streaming, and no longer streams that model. A server that refuses `stream_options` is asked again without it.
+- When a model call fails after part of its text was passed on and is tried again (a retry, or a fallback provider), `onTextRestart` receives that part (`discarded`, the end of what `onText` received, blank line included): drop it, the next attempt writes the answer again. The run still records `provider.retry` or `provider.fallback`. A call that fails for good leaves its text as it was, and the run fails.
+- What the callbacks throw, or reject when they are async, is ignored: the run goes on. To stop it, abort its `signal`. Neither callback is recorded in the run.
+
+Cognitive agents do not stream: each of their model calls returns a structured thought (JSON) that the engine checks and admits as a whole, and half a thought means nothing yet.
+
 ## Typical Workflow
 
 1. **Initialize the SDK** with your API key

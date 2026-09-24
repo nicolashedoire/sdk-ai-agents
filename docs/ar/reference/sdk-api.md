@@ -11,9 +11,9 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | مفتاح المزوّد الأساسي (غير مطلوب مع `llmProvider`). دون أي مفتاح، تعمل الأدوات وخوادم MCP، وتفشل الاستدعاءات التي تحتاج إلى نموذج بخطأ واضح |
 | `provider` | `'openai' \| 'anthropic'` | المزوّد الأساسي، والافتراضي `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey` و`defaultModel` و`baseURL` لكل جهة (`baseURL`: نقطة نهاية متوافقة، مثل واجهة v1 من Azure OpenAI أو خادم نماذج محلي، أو وكيل proxy). يستخدم المزوّد الأساسي مدخل جهته، ويستخدم المزوّد الاحتياطي من جهة أخرى مدخل جهته هو. النماذج الافتراضية: `gpt-5.4` و`claude-opus-5`. ويقبل مدخل OpenAI أيضًا `reasoningModels` و`reasoningEffort` و`nativeToolMessages`: انظر [نماذج OpenAI](#openai-models) |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey` و`defaultModel` و`baseURL` لكل جهة (`baseURL`: نقطة نهاية متوافقة، مثل واجهة v1 من Azure OpenAI أو خادم نماذج محلي، أو وكيل proxy). ولـ OpenAI، يطلب `includeStreamUsage` استهلاك الإجابة المبثوثة (`stream_options`): وافتراضيًا لا يُطلَب إلا على واجهة OpenAI نفسها، إذ قد يرفض الخادم المتوافق هذا الحقل أو يتجاهله. يستخدم المزوّد الأساسي مدخل جهته، ويستخدم المزوّد الاحتياطي من جهة أخرى مدخل جهته هو. النماذج الافتراضية: `gpt-5.4` و`claude-opus-5`. ويقبل مدخل OpenAI أيضًا `reasoningModels` و`reasoningEffort` و`nativeToolMessages`: انظر [نماذج OpenAI](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | تُجرَّب بالترتيب حين يفشل المزوّد الأساسي؛ ويتقدّم `config` على `providerConfig`. لا يرث المزوّد الاحتياطي من جهة المزوّد الأساسي نفسها أيًّا من إعداداته (سوى `apiKey` العام)؛ أما المزوّد من جهة أخرى فيحتاج إلى مفتاحه الخاص |
-| `llmProvider` | `LLMProvider` | مزوّدك الخاص (نموذج محلي، أو بوابة، أو بديل اختباري). يتلقّى استدعاءات الأدوات ونتائجها بالصيغة الأصلية (`LLMMessage`) إن صرّح بـ `nativeToolMessages`، وإلا فنصًّا |
+| `llmProvider` | `LLMProvider` | مزوّدك الخاص (نموذج محلي، أو بوابة، أو بديل اختباري). يتلقّى استدعاءات الأدوات ونتائجها بالصيغة الأصلية (`LLMMessage`) إن صرّح بـ `nativeToolMessages`، وإلا فنصًّا، ويمكنه أن يبثّ نصه تدريجيًا (انظر [`LLMProvider`](#llmprovider)) |
 | `retry` | `Partial<RetryPolicy> \| false` | سياسة إعادة المحاولة للنموذج اللغوي، لكل مزوّد، قبل التحويل إلى البديل. وقيمتا `maxRetries` و`initialDelayMs` فيها هما أيضًا القيمتان الافتراضيتان لـ `jev.maxRetries` و`jev.retryBaseDelayMs`؛ أمّا حقولها الأخرى فلا تصل إلى عميل Jev، الذي يحتفظ مع `retry: false` بإعادتَي المحاولة و500 ms الخاصة به. لا تُطبَّق على `llmProvider` محقون إلا إذا عُيّنت صراحةً، ولا تُطبَّق أبدًا على `FallbackProvider` مُمرَّر بوصفه `llmProvider` ولا على مزوّداته |
 | `jev` | `JevClientConfig` | يفعّل TypeSafe Jev للقرارات المُنمَّطة — مباشرةً، أو عبر [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) مع `baseUrl` و`model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | أي واجهة خلفية للقرارات المُنمَّطة (لها الأولوية على `jev`) |
@@ -59,12 +59,21 @@ const analyst = sdk.createAgent({
 });
 ```
 
+### `LLMProvider` {#llmprovider}
+
+ينفّذ مزوّدك الخاص `generateCompletion(request)` و`supportsModel(model)` و`getProviderName()`، ويمكنه أن يصرّح بـ `nativeToolMessages`. حقلان من الطلب يخصّان البث التدريجي:
+
+| حقل `LLMRequest` | |
+| --- | --- |
+| `onTextDelta?(delta)` | يُعيَّن حين يريد المستدعي النص أثناء كتابته (تشغيل مع `onText`). استدعِه مع كل جزء من النص فور وصوله، ثم أعِد `LLMResponse` كاملةً كالمعتاد: يجب أن تشكّل الأجزاء مجتمعةً `content` الخاص بها. المزوّد الذي لا يستطيع البث التدريجي يتجاهله، فتمرّر حزمة SDK محتوى `content` كاملًا دفعةً واحدة. ويجب ألّا يرمي استثناءً (والدالة التي تضعها حزمة SDK لا ترمي أبدًا) |
+| `onTextRestart?()` | استدعِه حين تعيد المحاولة بعد محاولة كانت قد بثّت نصًّا (إعادة محاولة خاصة بك): يصبح ذلك النص لاغيًا، وتبدأ الأجزاء التالية الإجابة من جديد. ويستدعيه `RetryingLLMProvider` و`FallbackProvider` نيابةً عن المزوّدات التي يغلّفانها |
+
 ## الوكلاء {#agents}
 
 | الدالة | تعيد | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | وكيل خاضع للحوكمة: `run({ message, context?, signal? })`، و`stop(runId?)`، و`addTools()`، و`setPolicy()`، و`id`، و`name`. لا يستطيع تشغيل إلا أدواته الخاصة (`tools`، `capabilities`)، حتى لو ذكر النموذج أداة أخرى مسجَّلة في حزمة SDK؛ ويلغي `signal` التشغيل |
-| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`، و`stop(runId?)`، و`learnFromFeedback(runId, feedback)`، و`getProfile()`، و`setProfile()` |
+| `createAgent(config)` | `AgentImpl` | وكيل خاضع للحوكمة: `run({ message, context?, signal?, onText?, onTextRestart? })`، و`stop(runId?)`، و`addTools()`، و`setPolicy()`، و`id`، و`name`. لا يستطيع تشغيل إلا أدواته الخاصة (`tools`، `capabilities`)، حتى لو ذكر النموذج أداة أخرى مسجَّلة في حزمة SDK؛ ويلغي `signal` التشغيل؛ ويتلقّى `onText` النص الذي يكتبه النموذج أثناء كتابته، و`onTextRestart` الجزء الذي يجب حذفه حين يُعاد تجريب استدعاء فاشل للنموذج (انظر [البث التدريجي للإجابة](../guide/governed-agents#_7-streaming-the-answer)) |
+| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`، و`stop(runId?)`، و`learnFromFeedback(runId, feedback)`، و`getProfile()`، و`setProfile()`. أفكاره مهيكلة ولا تُبثّ تدريجيًا |
 | `defineTool(definition)` | `Tool` | يسجّل أداة؛ ويُستنتَج نوع المعالج من مخطط Zod الخاص بها |
 | `defineCapability(definition)` | `Capability` | يجمّع الأدوات |
 | `listTools()` | `Tool[]` | كل أداة مسجَّلة |

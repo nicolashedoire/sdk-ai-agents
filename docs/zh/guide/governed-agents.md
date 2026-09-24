@@ -289,6 +289,33 @@ await agent.stop(); // Stop all runs of this agent
 await sdk.stopRun(runId);
 ```
 
+### 7. 流式输出回答 {#_7-streaming-the-answer}
+
+在模型写出回答的同时显示它：`onText` 会逐个增量地接收回答的文本。
+
+```typescript
+let shown = '';
+const result = await agent.run({
+  message: 'Summarize the incident report',
+  onText: (delta) => {
+    shown += delta;
+    render(shown);
+  },
+  onTextRestart: (discarded) => {
+    shown = shown.slice(0, shown.length - discarded.length);
+    render(shown);
+  },
+});
+```
+
+- 使用 `onText` 时，内置的 OpenAI 和 Anthropic 提供商会调用各自厂商的流式 API，运行的结果和事件与不使用它时相同。成本也是如此，但兼容 OpenAI 的服务器（`baseURL`）除外：除非设置了 `providerConfig.openai.includeStreamUsage`，否则只有在 OpenAI 自己的 API 上才会为流式输出的回答请求用量，而没有用量的调用在预算中按未计量处理。
+- 运行中每一次模型调用的文本都会被传递出来，一次调用接着一次调用：先是模型在调用工具之前写下的内容，然后是它的回答；如果之前的调用已经写出过文本，一次调用的文本之前会有一个空行（`\n\n`）。工具参数和 Claude 的思考过程不会被传递。
+- 无法流式输出的提供商（你自己的 `llmProvider`，除非它读取 `onTextDelta`）会在每次模型调用结束时，一次性给出该调用的全部文本。对于 OpenAI 拒绝流式输出的模型（组织未针对该模型通过验证），OpenAI 也是如此：提供商会以非流式方式重新请求，并且此后不再对该模型进行流式输出。拒绝 `stream_options` 的服务器会收到一次不带它的重新请求。
+- 当一次模型调用在部分文本已经传递出去之后失败并被再次尝试（一次重试，或一个备用提供商）时，`onTextRestart` 会收到这部分文本（`discarded`，即 `onText` 已收到内容的末尾部分，包括空行）：丢弃它，下一次尝试会重新写出回答。运行仍然会记录 `provider.retry` 或 `provider.fallback`。最终失败的调用会让它的文本保持原样，运行也会失败。
+- 回调抛出的异常，或者异步回调返回的 Promise 被拒绝，都会被忽略：运行会继续。要停止运行，请中止它的 `signal`。这两个回调都不会被记录在运行中。
+
+认知智能体不进行流式输出：它们的每一次模型调用都返回一个结构化的思维（JSON），由引擎整体检查并准入，而半个思维还没有任何意义。
+
 ## 典型工作流程 {#typical-workflow}
 
 1. 用你的 API 密钥**初始化 SDK**

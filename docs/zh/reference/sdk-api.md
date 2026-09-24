@@ -11,9 +11,9 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | 主提供商的密钥（使用 `llmProvider` 时不需要）。完全没有密钥时，工具和 MCP 服务器照常工作，需要模型的调用会失败并给出清晰的错误 |
 | `provider` | `'openai' \| 'anthropic'` | 主提供商，默认 `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | 各厂商的 `apiKey`、`defaultModel` 和 `baseURL`（`baseURL`：兼容的端点，例如 Azure OpenAI 的 v1 API 或本地模型服务器，或代理）。主提供商使用其厂商的条目，其他厂商的回退使用它自己厂商的条目。默认模型：`gpt-5.4` 和 `claude-opus-5`。OpenAI 条目还接受 `reasoningModels`、`reasoningEffort` 和 `nativeToolMessages`，参见 [OpenAI 模型](#openai-models) |
+| `providerConfig` | `{ openai?, anthropic? }` | 各厂商的 `apiKey`、`defaultModel` 和 `baseURL`（`baseURL`：兼容的端点，例如 Azure OpenAI 的 v1 API 或本地模型服务器，或代理）。对于 OpenAI，`includeStreamUsage` 会为流式输出的回答请求其用量（`stream_options`）：默认只在 OpenAI 自己的 API 上请求，因为兼容的服务器可能会拒绝或忽略这个字段。主提供商使用其厂商的条目，其他厂商的回退使用它自己厂商的条目。默认模型：`gpt-5.4` 和 `claude-opus-5`。OpenAI 条目还接受 `reasoningModels`、`reasoningEffort` 和 `nativeToolMessages`，参见 [OpenAI 模型](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | 主提供商失败时按顺序尝试；`config` 优先于 `providerConfig`。与主提供商同一厂商的回退不继承主提供商的任何设置（只继承全局 `apiKey`）；其他厂商的回退需要自己的密钥 |
-| `llmProvider` | `LLMProvider` | 你自己的提供商（本地模型、网关、测试替身）。如果它声明了 `nativeToolMessages`，就以原生格式（`LLMMessage`）接收工具调用及其结果，否则以文本形式接收 |
+| `llmProvider` | `LLMProvider` | 你自己的提供商（本地模型、网关、测试替身）。如果它声明了 `nativeToolMessages`，就以原生格式（`LLMMessage`）接收工具调用及其结果，否则以文本形式接收，并且可以流式输出它的文本（参见 [`LLMProvider`](#llmprovider)） |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM 重试策略，按提供商分别应用，在回退之前。其 `maxRetries` 和 `initialDelayMs` 也是 `jev.maxRetries` 和 `jev.retryBaseDelayMs` 的默认值；其他字段不会传给 Jev 客户端，设为 `retry: false` 时，Jev 客户端保留自己的 2 次重试和 500 ms。仅在显式设置时才应用于注入的 `llmProvider`，且从不应用于作为 `llmProvider` 传入的 `FallbackProvider` 及其内部的提供商 |
 | `jev` | `JevClientConfig` | 为类型化决策启用 TypeSafe Jev——直接使用，或者通过 [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) 并设置 `baseUrl` 和 `model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | 任何类型化决策后端（优先于 `jev`） |
@@ -59,12 +59,21 @@ const analyst = sdk.createAgent({
 });
 ```
 
+### `LLMProvider` {#llmprovider}
+
+你自己的提供商需要实现 `generateCompletion(request)`、`supportsModel(model)` 和 `getProviderName()`，并且可以声明 `nativeToolMessages`。请求中有两个字段与流式输出有关：
+
+| `LLMRequest` 字段 | |
+| --- | --- |
+| `onTextDelta?(delta)` | 当调用方希望在文本写出的同时就收到它（使用 `onText` 的运行）时设置。每收到一段文本，就用这段文本调用它，然后照常返回完整的 `LLMResponse`：各段拼接起来必须正好是它的 `content`。无法流式输出的提供商会忽略它，由 SDK 把整个 `content` 一次性传递出去。它不得抛出异常（SDK 自己设置的从不抛出） |
+| `onTextRestart?()` | 在一次已经流式输出过文本的尝试之后再次尝试时（你自己的重试）调用它：那段文本作废，接下来的各段会从头开始写出回答。`RetryingLLMProvider` 和 `FallbackProvider` 会为它们包装的提供商调用它 |
+
 ## 智能体 {#agents}
 
 | 方法 | 返回值 | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | 受治理智能体：`run({ message, context?, signal? })`、`stop(runId?)`、`addTools()`、`setPolicy()`、`id`、`name`。它只能运行自己的工具（`tools`、`capabilities`），即使模型点名了 SDK 中注册的另一个工具；`signal` 用于取消运行 |
-| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`、`stop(runId?)`、`learnFromFeedback(runId, feedback)`、`getProfile()`、`setProfile()` |
+| `createAgent(config)` | `AgentImpl` | 受治理智能体：`run({ message, context?, signal?, onText?, onTextRestart? })`、`stop(runId?)`、`addTools()`、`setPolicy()`、`id`、`name`。它只能运行自己的工具（`tools`、`capabilities`），即使模型点名了 SDK 中注册的另一个工具；`signal` 用于取消运行；`onText` 在模型写出文本的同时接收这些文本，`onTextRestart` 则在失败的模型调用被再次尝试时接收需要丢弃的部分（参见[流式输出回答](../guide/governed-agents#_7-streaming-the-answer)） |
+| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`、`stop(runId?)`、`learnFromFeedback(runId, feedback)`、`getProfile()`、`setProfile()`。它的思维是结构化的，不进行流式输出 |
 | `defineTool(definition)` | `Tool` | 注册一个工具；处理函数的类型根据其 Zod schema 推导 |
 | `defineCapability(definition)` | `Capability` | 对工具分组 |
 | `listTools()` | `Tool[]` | 所有已注册的工具 |

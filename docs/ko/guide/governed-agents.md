@@ -289,6 +289,33 @@ await agent.stop(); // Stop all runs of this agent
 await sdk.stopRun(runId);
 ```
 
+### 7. 답변 스트리밍하기 {#_7-streaming-the-answer}
+
+모델이 답변을 쓰는 동안 답변을 보여 줍니다. `onText`는 그 텍스트를 델타(새로 쓰인 조각)마다 하나씩 받습니다.
+
+```typescript
+let shown = '';
+const result = await agent.run({
+  message: 'Summarize the incident report',
+  onText: (delta) => {
+    shown += delta;
+    render(shown);
+  },
+  onTextRestart: (discarded) => {
+    shown = shown.slice(0, shown.length - discarded.length);
+    render(shown);
+  },
+});
+```
+
+- `onText`를 주면 내장된 OpenAI와 Anthropic 프로바이더는 공급사의 스트리밍 API를 호출하며, 실행의 결과와 이벤트는 이 옵션이 없을 때와 똑같습니다. 비용도 마찬가지이지만, OpenAI 호환 서버(`baseURL`)는 예외입니다. 스트리밍된 답변의 사용량은 `providerConfig.openai.includeStreamUsage`를 설정하지 않는 한 OpenAI 자체 API에서만 요청하며, 사용량이 없는 호출은 예산에서 측정되지 않은 호출로 집계됩니다.
+- 실행의 모든 모델 호출의 텍스트가 호출 순서대로 하나씩 전달됩니다. 모델이 도구를 호출하기 전에 쓰는 텍스트, 그리고 그다음 답변입니다. 앞선 호출이 텍스트를 썼다면 다음 호출의 텍스트 앞에 빈 줄(`\n\n`)이 들어갑니다. 도구 인자와 Claude의 사고 과정(thinking)은 전달되지 않습니다.
+- 스트리밍할 수 없는 프로바이더는 각 모델 호출의 텍스트 전체를 호출이 끝날 때 한 번에 넘깁니다. 직접 만든 `llmProvider`도 `onTextDelta`를 읽지 않으면 마찬가지입니다. OpenAI가 스트리밍을 거부하는 모델(해당 모델에 대한 인증을 받지 않은 조직)도 그렇습니다. 프로바이더는 스트리밍 없이 다시 요청하고, 그 모델은 더 이상 스트리밍하지 않습니다. `stream_options`를 거부하는 서버에는 그 필드 없이 다시 요청합니다.
+- 모델 호출이 텍스트 일부를 전달한 뒤 실패해 다시 시도되면(재시도, 또는 폴백 프로바이더), `onTextRestart`가 그 부분(`discarded`, 즉 `onText`가 받은 내용의 끝부분, 빈 줄 포함)을 받습니다. 그 부분을 지우세요. 다음 시도가 답변을 다시 씁니다. 실행에는 여전히 `provider.retry` 또는 `provider.fallback`이 기록됩니다. 끝내 실패한 호출은 텍스트를 그대로 남기고, 실행은 실패합니다.
+- 콜백이 던진 오류와, 비동기 콜백이 거부(reject)한 값은 무시되며 실행은 계속됩니다. 실행을 멈추려면 그 `signal`로 중단(abort)하세요. 두 콜백 모두 실행에 기록되지 않습니다.
+
+인지 에이전트는 스트리밍하지 않습니다. 모델 호출마다 구조화된 사고(JSON)를 돌려주고 엔진은 이를 통째로 검사한 뒤 받아들이며, 절반만 쓰인 사고는 아직 아무 의미가 없습니다.
+
 ## 일반적인 작업 흐름 {#typical-workflow}
 
 1. API 키로 **SDK를 초기화합니다**

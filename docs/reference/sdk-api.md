@@ -11,9 +11,9 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Key of the primary provider (not needed with `llmProvider`). Without any key, tools and MCP servers work and calls that need a model fail with a clear error |
 | `provider` | `'openai' \| 'anthropic'` | Primary provider, default `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` and `baseURL` of each vendor (`baseURL`: a compatible endpoint, such as the Azure OpenAI v1 API or a local model server, or a proxy). The primary uses its vendor's entry, and a fallback of another vendor uses its own vendor's entry. Default models: `gpt-5.4` and `claude-opus-5`. The OpenAI entry also takes `reasoningModels`, `reasoningEffort` and `nativeToolMessages`: see [OpenAI models](#openai-models) |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` and `baseURL` of each vendor (`baseURL`: a compatible endpoint, such as the Azure OpenAI v1 API or a local model server, or a proxy). For OpenAI, `includeStreamUsage` asks a streamed answer for its usage (`stream_options`): by default only on OpenAI's own API, since a compatible server may refuse the field or ignore it. The primary uses its vendor's entry, and a fallback of another vendor uses its own vendor's entry. Default models: `gpt-5.4` and `claude-opus-5`. The OpenAI entry also takes `reasoningModels`, `reasoningEffort` and `nativeToolMessages`: see [OpenAI models](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | Tried in order when the primary fails; a `config` overrides `providerConfig`. A fallback of the primary's vendor inherits none of the primary's settings (only the SDK-wide `apiKey`); one of another vendor needs its own key |
-| `llmProvider` | `LLMProvider` | Your own provider (local model, gateway, test double). It gets tool calls and results in the native format (`LLMMessage`) if it declares `nativeToolMessages`, as plain text otherwise |
+| `llmProvider` | `LLMProvider` | Your own provider (local model, gateway, test double). It gets tool calls and results in the native format (`LLMMessage`) if it declares `nativeToolMessages`, as plain text otherwise, and may stream its text (see [`LLMProvider`](#llmprovider)) |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM retry policy, per provider, before fallback. Its `maxRetries` and `initialDelayMs` are also the defaults of `jev.maxRetries` and `jev.retryBaseDelayMs`; its other fields do not reach the Jev client, which keeps its own 2 retries and 500 ms with `retry: false`. Applied to an injected `llmProvider` only when set explicitly, and never to a `FallbackProvider` given as `llmProvider` or to its providers |
 | `jev` | `JevClientConfig` | Enables TypeSafe Jev for typed decisions — directly, or through [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) with `baseUrl` and `model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | Any typed-decision backend (takes precedence over `jev`) |
@@ -59,12 +59,21 @@ const analyst = sdk.createAgent({
 });
 ```
 
+### `LLMProvider`
+
+Your own provider implements `generateCompletion(request)`, `supportsModel(model)` and `getProviderName()`, and may declare `nativeToolMessages`. Two fields of the request are about streaming:
+
+| `LLMRequest` field | |
+| --- | --- |
+| `onTextDelta?(delta)` | Set when the caller wants the text as it is written (a run with `onText`). Call it with each piece of text as it arrives, then return the complete `LLMResponse` as usual: the pieces joined must make its `content`. A provider that cannot stream ignores it, and the SDK passes the whole `content` on in one piece. It must not throw (the SDK's own never does) |
+| `onTextRestart?()` | Call it when you try again after an attempt that had already streamed text (a retry of your own): that text is void, and the next pieces start the answer over. `RetryingLLMProvider` and `FallbackProvider` call it for the providers they wrap |
+
 ## Agents
 
 | Method | Returns | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | Governed agent: `run({ message, context?, signal? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. It can only run its own tools (`tools`, `capabilities`), even if the model names another tool registered in the SDK; `signal` cancels the run |
-| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()` |
+| `createAgent(config)` | `AgentImpl` | Governed agent: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. It can only run its own tools (`tools`, `capabilities`), even if the model names another tool registered in the SDK; `signal` cancels the run; `onText` receives the text the model writes as it is written, and `onTextRestart` the part to drop when a failed model call is tried again (see [Streaming the answer](../guide/governed-agents#_7-streaming-the-answer)) |
+| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()`. Its thoughts are structured and not streamed |
 | `defineTool(definition)` | `Tool` | Registers a tool; the handler is typed from its Zod schema |
 | `defineCapability(definition)` | `Capability` | Groups tools |
 | `listTools()` | `Tool[]` | Every registered tool |

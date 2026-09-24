@@ -224,6 +224,19 @@ export class MyProvider implements LLMProvider {
 }
 ```
 
+텍스트를 스트리밍하려면(`onText`를 준 실행) 모델이 조각을 쓸 때마다 그 조각으로 `request.onTextDelta`를 호출하고, 그래도 응답 전체를 반환하세요. 스트리밍할 수 없는 프로바이더는 이를 무시합니다. 그러면 SDK가 텍스트를 한 번에 넘깁니다.
+
+```typescript
+async generateCompletion(request: LLMRequest): Promise<LLMResponse> {
+  let content = '';
+  for await (const piece of myModel.stream(request.messages, { signal: request.abortSignal })) {
+    content += piece;
+    request.onTextDelta?.(piece);
+  }
+  return { content, model: 'my-model' };
+}
+```
+
 2. `ProviderFactory`에 추가합니다.
 
 ```typescript

@@ -11,9 +11,9 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | मुख्य प्रदाता की key (`llmProvider` के साथ ज़रूरी नहीं)। बिना किसी key के, टूल और MCP सर्वर काम करते हैं और जिन कॉल को मॉडल चाहिए वे एक साफ़ error के साथ विफल होती हैं |
 | `provider` | `'openai' \| 'anthropic'` | मुख्य प्रदाता, डिफ़ॉल्ट `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | हर vendor की `apiKey`, `defaultModel` और `baseURL` (`baseURL`: कोई संगत endpoint, जैसे Azure OpenAI की v1 API या लोकल मॉडल सर्वर, या कोई proxy)। मुख्य प्रदाता अपने vendor की entry इस्तेमाल करता है, और दूसरे vendor का फ़ॉलबैक अपने vendor की। डिफ़ॉल्ट मॉडल: `gpt-5.4` और `claude-opus-5`। OpenAI की entry `reasoningModels`, `reasoningEffort` और `nativeToolMessages` भी लेती है: देखें [OpenAI मॉडल](#openai-models) |
+| `providerConfig` | `{ openai?, anthropic? }` | हर vendor की `apiKey`, `defaultModel` और `baseURL` (`baseURL`: कोई संगत endpoint, जैसे Azure OpenAI की v1 API या लोकल मॉडल सर्वर, या कोई proxy)। OpenAI के लिए, `includeStreamUsage` स्ट्रीम किए गए जवाब से उसका उपयोग माँगता है (`stream_options`): डिफ़ॉल्ट रूप से सिर्फ़ OpenAI की अपनी API पर, क्योंकि कोई संगत सर्वर इस फ़ील्ड को ठुकरा सकता है या अनदेखा कर सकता है। मुख्य प्रदाता अपने vendor की entry इस्तेमाल करता है, और दूसरे vendor का फ़ॉलबैक अपने vendor की। डिफ़ॉल्ट मॉडल: `gpt-5.4` और `claude-opus-5`। OpenAI की entry `reasoningModels`, `reasoningEffort` और `nativeToolMessages` भी लेती है: देखें [OpenAI मॉडल](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | मुख्य प्रदाता के विफल होने पर क्रम से आज़माए जाते हैं; `config`, `providerConfig` से ऊपर होता है। मुख्य प्रदाता के ही vendor का फ़ॉलबैक उसकी कोई सेटिंग नहीं लेता (सिर्फ़ global `apiKey`); दूसरे vendor के फ़ॉलबैक को अपनी key चाहिए |
-| `llmProvider` | `LLMProvider` | आपका अपना प्रदाता (लोकल मॉडल, gateway, टेस्ट के लिए नकली प्रदाता)। अगर वह `nativeToolMessages` घोषित करे तो टूल कॉल और उनके नतीजे native format (`LLMMessage`) में पाता है, वरना text के रूप में |
+| `llmProvider` | `LLMProvider` | आपका अपना प्रदाता (लोकल मॉडल, gateway, टेस्ट के लिए नकली प्रदाता)। अगर वह `nativeToolMessages` घोषित करे तो टूल कॉल और उनके नतीजे native format (`LLMMessage`) में पाता है, वरना text के रूप में, और अपना text स्ट्रीम कर सकता है (देखें [`LLMProvider`](#llmprovider)) |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM की retry नीति, हर प्रदाता के लिए, फ़ॉलबैक से पहले। इसके `maxRetries` और `initialDelayMs`, `jev.maxRetries` और `jev.retryBaseDelayMs` के डिफ़ॉल्ट भी हैं; इसके बाकी फ़ील्ड Jev क्लाइंट तक नहीं पहुँचते, और `retry: false` होने पर Jev क्लाइंट अपनी 2 retries और 500 ms रखता है। जोड़े गए `llmProvider` पर केवल तब लागू होती है जब इसे स्पष्ट रूप से सेट किया जाए, और `llmProvider` के रूप में दिए गए `FallbackProvider` या उसके प्रदाताओं पर कभी नहीं |
 | `jev` | `JevClientConfig` | टाइप्ड निर्णयों के लिए TypeSafe Jev चालू करता है — सीधे, या `baseUrl` और `model: 'typesafe-ai/jev'` के साथ [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) के ज़रिए |
 | `decisionClient` | `TypedDecisionClient` | कोई भी टाइप्ड-निर्णय backend (`jev` पर प्राथमिकता रखता है) |
@@ -59,12 +59,21 @@ const analyst = sdk.createAgent({
 });
 ```
 
+### `LLMProvider` {#llmprovider}
+
+आपका अपना प्रदाता `generateCompletion(request)`, `supportsModel(model)` और `getProviderName()` लागू करता है, और `nativeToolMessages` घोषित कर सकता है। अनुरोध के दो फ़ील्ड स्ट्रीमिंग से जुड़े हैं:
+
+| `LLMRequest` फ़ील्ड | |
+| --- | --- |
+| `onTextDelta?(delta)` | तब सेट होता है जब कॉल करने वाले को text लिखे जाते समय ही चाहिए (`onText` वाला run)। text का हर टुकड़ा आते ही उसके साथ इसे कॉल करें, फिर हमेशा की तरह पूरा `LLMResponse` लौटाएँ: सारे टुकड़े जोड़ने पर उसका `content` बनना चाहिए। जो प्रदाता स्ट्रीम नहीं कर सकता वह इसे अनदेखा करता है, और SDK पूरा `content` एक ही टुकड़े में आगे भेजता है। इसे error नहीं फेंकनी चाहिए (SDK का अपना कभी नहीं फेंकता) |
+| `onTextRestart?()` | इसे तब कॉल करें जब आप ऐसे प्रयास के बाद दोबारा प्रयास करें जो पहले ही text स्ट्रीम कर चुका था (आपका अपना retry): वह text रद्द हो जाता है, और अगले टुकड़े जवाब फिर से शुरू करते हैं। `RetryingLLMProvider` और `FallbackProvider` इसे उन प्रदाताओं की ओर से कॉल करते हैं जिन्हें वे लपेटते हैं |
+
 ## एजेंट {#agents}
 
 | Method | लौटाता है | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | नियंत्रित एजेंट: `run({ message, context?, signal? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`। यह सिर्फ़ अपने टूल (`tools`, `capabilities`) चला सकता है, भले ही मॉडल SDK में रजिस्टर किसी दूसरे टूल का नाम ले; `signal` run को रद्द करता है |
-| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()` |
+| `createAgent(config)` | `AgentImpl` | नियंत्रित एजेंट: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`। यह सिर्फ़ अपने टूल (`tools`, `capabilities`) चला सकता है, भले ही मॉडल SDK में रजिस्टर किसी दूसरे टूल का नाम ले; `signal` run को रद्द करता है; `onText` मॉडल का लिखा text लिखे जाते समय ही पाता है, और `onTextRestart` वह हिस्सा जिसे किसी विफल मॉडल कॉल के दोबारा आज़माए जाने पर हटाना है (देखें [जवाब स्ट्रीम करना](../guide/governed-agents#_7-streaming-the-answer)) |
+| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()`। इसके विचार संरचित होते हैं और स्ट्रीम नहीं किए जाते |
 | `defineTool(definition)` | `Tool` | एक टूल रजिस्टर करता है; handler का टाइप उसके Zod स्कीमा से निकलता है |
 | `defineCapability(definition)` | `Capability` | टूल को समूह में रखता है |
 | `listTools()` | `Tool[]` | हर रजिस्टर किया गया टूल |

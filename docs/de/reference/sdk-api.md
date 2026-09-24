@@ -11,9 +11,9 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Schlüssel des primären Anbieters (mit `llmProvider` nicht nötig). Ohne jeden Schlüssel funktionieren Tools und MCP-Server, und Aufrufe, die ein Modell brauchen, schlagen mit einem klaren Fehler fehl |
 | `provider` | `'openai' \| 'anthropic'` | Primärer Anbieter, Standard `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` und `baseURL` jedes Herstellers (`baseURL`: ein kompatibler Endpunkt wie die v1-API von Azure OpenAI oder ein lokaler Modellserver, oder ein Proxy). Der primäre Anbieter nutzt den Eintrag seines Herstellers, ein Fallback eines anderen Herstellers den seines eigenen. Standardmodelle: `gpt-5.4` und `claude-opus-5`. Der OpenAI-Eintrag nimmt außerdem `reasoningModels`, `reasoningEffort` und `nativeToolMessages`: siehe [OpenAI-Modelle](#openai-models) |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` und `baseURL` jedes Herstellers (`baseURL`: ein kompatibler Endpunkt wie die v1-API von Azure OpenAI oder ein lokaler Modellserver, oder ein Proxy). Für OpenAI fordert `includeStreamUsage` bei einer gestreamten Antwort ihren Verbrauch an (`stream_options`): standardmäßig nur bei der eigenen API von OpenAI, da ein kompatibler Server das Feld ablehnen oder ignorieren kann. Der primäre Anbieter nutzt den Eintrag seines Herstellers, ein Fallback eines anderen Herstellers den seines eigenen. Standardmodelle: `gpt-5.4` und `claude-opus-5`. Der OpenAI-Eintrag nimmt außerdem `reasoningModels`, `reasoningEffort` und `nativeToolMessages`: siehe [OpenAI-Modelle](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | Der Reihe nach versucht, wenn der primäre Anbieter ausfällt; eine `config` hat Vorrang vor `providerConfig`. Ein Fallback desselben Herstellers wie der primäre erbt keine seiner Einstellungen (nur den globalen `apiKey`); einer eines anderen Herstellers braucht einen eigenen Schlüssel |
-| `llmProvider` | `LLMProvider` | Ihr eigener Anbieter (lokales Modell, Gateway, Test-Double). Er erhält Tool-Aufrufe und ihre Ergebnisse im nativen Format (`LLMMessage`), wenn er `nativeToolMessages` angibt, sonst als Text |
+| `llmProvider` | `LLMProvider` | Ihr eigener Anbieter (lokales Modell, Gateway, Test-Double). Er erhält Tool-Aufrufe und ihre Ergebnisse im nativen Format (`LLMMessage`), wenn er `nativeToolMessages` angibt, sonst als Text, und kann seinen Text streamen (siehe [`LLMProvider`](#llmprovider)) |
 | `retry` | `Partial<RetryPolicy> \| false` | Wiederholungsrichtlinie für das LLM, pro Anbieter, vor dem Fallback. Ihre Werte `maxRetries` und `initialDelayMs` sind auch die Standardwerte von `jev.maxRetries` und `jev.retryBaseDelayMs`; ihre übrigen Felder erreichen den Jev-Client nicht, der mit `retry: false` seine eigenen 2 Wiederholungen und 500 ms behält. Gilt für einen eingesetzten `llmProvider` nur, wenn sie ausdrücklich gesetzt ist, und nie für einen als `llmProvider` übergebenen `FallbackProvider` oder dessen Anbieter |
 | `jev` | `JevClientConfig` | Aktiviert TypeSafe Jev für typisierte Entscheidungen – direkt oder über [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) mit `baseUrl` und `model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | Jedes beliebige Backend für typisierte Entscheidungen (hat Vorrang vor `jev`) |
@@ -59,12 +59,21 @@ const analyst = sdk.createAgent({
 });
 ```
 
+### `LLMProvider` {#llmprovider}
+
+Ihr eigener Anbieter implementiert `generateCompletion(request)`, `supportsModel(model)` und `getProviderName()` und kann `nativeToolMessages` angeben. Zwei Felder der Anfrage betreffen das Streaming:
+
+| Feld von `LLMRequest` | |
+| --- | --- |
+| `onTextDelta?(delta)` | Gesetzt, wenn der Aufrufer den Text will, während er geschrieben wird (ein Lauf mit `onText`). Rufen Sie die Funktion mit jedem Textstück auf, sobald es ankommt, und geben Sie dann wie gewohnt die vollständige `LLMResponse` zurück: Aneinandergefügt müssen die Stücke ihren `content` ergeben. Ein Anbieter, der nicht streamen kann, ignoriert sie, und das SDK gibt den ganzen `content` in einem Stück weiter. Sie darf keinen Fehler werfen (die des SDK tut das nie) |
+| `onTextRestart?()` | Rufen Sie die Funktion auf, wenn Sie es nach einem Versuch, der schon Text gestreamt hatte, erneut versuchen (ein eigener Wiederholungsversuch): Dieser Text ist ungültig, und die nächsten Stücke beginnen die Antwort von vorn. `RetryingLLMProvider` und `FallbackProvider` rufen sie im Namen der Anbieter auf, die sie umhüllen |
+
 ## Agenten {#agents}
 
 | Methode | Rückgabe | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | Kontrollierter Agent: `run({ message, context?, signal? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. Er kann nur seine eigenen Tools ausführen (`tools`, `capabilities`), selbst wenn das Modell ein anderes im SDK registriertes Tool nennt; `signal` bricht den Lauf ab |
-| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()` |
+| `createAgent(config)` | `AgentImpl` | Kontrollierter Agent: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. Er kann nur seine eigenen Tools ausführen (`tools`, `capabilities`), selbst wenn das Modell ein anderes im SDK registriertes Tool nennt; `signal` bricht den Lauf ab; `onText` erhält den Text, den das Modell schreibt, während es ihn schreibt, und `onTextRestart` den zu verwerfenden Teil, wenn ein fehlgeschlagener Modellaufruf erneut versucht wird (siehe [Die Antwort streamen](../guide/governed-agents#_7-streaming-the-answer)) |
+| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()`. Seine Gedanken sind strukturiert und werden nicht gestreamt |
 | `defineTool(definition)` | `Tool` | Registriert ein Tool; der Handler wird aus seinem Zod-Schema typisiert |
 | `defineCapability(definition)` | `Capability` | Gruppiert Tools |
 | `listTools()` | `Tool[]` | Jedes registrierte Tool |
