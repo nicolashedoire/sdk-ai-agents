@@ -36,7 +36,7 @@ interface Event {
 | `provider.retry` | `provider`، و`model`، و`retry`، و`delayMs`، و`error` |
 | `resource.read` | `uri`، و`mimeType?`، و`bytes`، و`sha256` للمحتوى المُقدَّم (لا يُخزَّن المحتوى نفسه) |
 
-تنتمي `tool.failed` و`intention.rejected` و`error.occurred` إلى النوع `EventType`، لكن SDK لا يسجّلها أبدًا: استدعاء الأداة الفاشل حدثٌ من نوع `action.failed`، والمرفوض حدثٌ من نوع `policy.violated` أو `approval.rejected`.
+تنتمي `tool.failed` و`intention.rejected` و`error.occurred` إلى النوع `EventType`، لكن حزمة SDK لا تسجّلها أبدًا: استدعاء الأداة الفاشل حدثٌ من نوع `action.failed`، والاستدعاء الذي ترفضه سياسةٌ حدثٌ من نوع `policy.violated`، والذي يُرفض عند الموافقة حدثٌ من نوع `approval.rejected`.
 
 ## الإدراك المعرفي {#cognition}
 

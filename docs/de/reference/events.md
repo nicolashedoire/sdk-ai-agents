@@ -36,7 +36,7 @@ interface Event {
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` des ausgelieferten Inhalts (der Inhalt selbst wird nicht gespeichert) |
 
-`tool.failed`, `intention.rejected` und `error.occurred` gehören zum Typ `EventType`, werden vom SDK aber nie aufgezeichnet: Ein fehlgeschlagener Tool-Aufruf ist ein Ereignis `action.failed`, ein abgelehnter ein Ereignis `policy.violated` oder `approval.rejected`.
+`tool.failed`, `intention.rejected` und `error.occurred` gehören zum Typ `EventType`, werden vom SDK aber nie aufgezeichnet: Ein fehlgeschlagener Tool-Aufruf ist ein Ereignis `action.failed`, ein von einer Richtlinie abgelehnter ein Ereignis `policy.violated` und ein bei der Freigabe abgelehnter ein Ereignis `approval.rejected`.
 
 ## Kognition {#cognition}
 

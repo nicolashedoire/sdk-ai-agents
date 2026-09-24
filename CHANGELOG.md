@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Documentation
-- The event catalog says which `EventType` members the SDK never records (`tool.failed`, `intention.rejected`, `error.occurred`) and drops their rows. The examples README runs the examples with `tsx` (they are not compiled into `dist/`) and lists `example:complete`; the development guide names `npm run test:api` (not `example:test-api`).
+- The event catalog says which `EventType` members the SDK never records (`tool.failed`, `intention.rejected`, `error.occurred`) and drops their rows. The examples README runs the examples with `tsx` (they are not compiled into `dist/`) and lists `example:complete` and `test:api`; the development guide names `npm run test:api` (not `example:test-api`).
 - *Why this SDK*: what it does differently from other agent frameworks, what they also do, what they do better and when to choose it (docs page and README section).
 - The MCP guide becomes four pages — *MCP in plain words*, *Your first MCP server in 5 minutes* (Inspector, Claude Desktop, Claude Code), *An MCP server for anything* (one recipe per source with its options, what the model sees, its security rules and what it does not do) and *Deploy, secure and troubleshoot* (Streamable HTTP with a token and a Host check, policies, budgets, approvals and a protected approval endpoint, checklist, common problems) — with glossary, API reference and event catalog entries. Examples `mcp-openapi.ts`, `mcp-folder.ts`, `mcp-database.ts`, `mcp-postgres.ts`, `mcp-agent.ts`, `mcp-http.ts` and `mcp-approvals.ts`.
 

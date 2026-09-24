@@ -36,7 +36,7 @@ interface Event {
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, 제공한 내용의 `sha256`(내용 자체는 저장되지 않음) |
 
-`tool.failed`, `intention.rejected`, `error.occurred`는 `EventType` 타입에 포함되지만 SDK는 이들을 절대 기록하지 않습니다. 실패한 도구 호출은 `action.failed` 이벤트로, 거부된 도구 호출은 `policy.violated` 또는 `approval.rejected` 이벤트로 기록됩니다.
+`tool.failed`, `intention.rejected`, `error.occurred`는 `EventType` 타입에 포함되지만 SDK는 이들을 절대 기록하지 않습니다. 실패한 도구 호출은 `action.failed` 이벤트로, 정책에 거부된 호출은 `policy.violated` 이벤트로, 승인 단계에서 거절된 호출은 `approval.rejected` 이벤트로 기록됩니다.
 
 ## 인지 {#cognition}
 

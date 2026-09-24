@@ -36,7 +36,7 @@ interface Event {
 | `provider.retry` | `provider`、`model`、`retry`、`delayMs`、`error` |
 | `resource.read` | `uri`、`mimeType?`、`bytes`、提供した内容の `sha256`（内容そのものは保存されない） |
 
-`tool.failed`、`intention.rejected`、`error.occurred` は `EventType` 型に含まれますが、SDK がこれらを記録することはありません。失敗したツール呼び出しは `action.failed` イベントに、拒否されたツール呼び出しは `policy.violated` または `approval.rejected` イベントになります。
+`tool.failed`、`intention.rejected`、`error.occurred` は `EventType` 型に含まれますが、SDK がこれらを記録することはありません。失敗したツール呼び出しは `action.failed` イベントに、ポリシーに拒否された呼び出しは `policy.violated` イベントに、承認で却下された呼び出しは `approval.rejected` イベントになります。
 
 ## 認知 {#cognition}
 

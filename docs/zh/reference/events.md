@@ -36,7 +36,7 @@ interface Event {
 | `provider.retry` | `provider`、`model`、`retry`、`delayMs`、`error` |
 | `resource.read` | `uri`、`mimeType?`、`bytes`、所提供内容的 `sha256`（内容本身不会被保存） |
 
-`tool.failed`、`intention.rejected` 和 `error.occurred` 属于 `EventType` 类型，但 SDK 从不记录它们：失败的工具调用记录为 `action.failed` 事件，被拒绝的工具调用记录为 `policy.violated` 或 `approval.rejected` 事件。
+`tool.failed`、`intention.rejected` 和 `error.occurred` 属于 `EventType` 类型，但 SDK 从不记录它们：失败的工具调用记录为 `action.failed` 事件，被策略拒绝的调用记录为 `policy.violated` 事件，在审批中被驳回的调用记录为 `approval.rejected` 事件。
 
 ## 认知 {#cognition}
 

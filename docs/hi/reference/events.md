@@ -36,7 +36,7 @@ interface Event {
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, सर्व की गई सामग्री का `sha256` (सामग्री खुद सहेजी नहीं जाती) |
 
-`tool.failed`, `intention.rejected` और `error.occurred` टाइप `EventType` का हिस्सा हैं, लेकिन SDK इन्हें कभी दर्ज नहीं करता: विफल टूल कॉल एक `action.failed` इवेंट होती है, और ठुकराई गई टूल कॉल एक `policy.violated` या `approval.rejected` इवेंट।
+`tool.failed`, `intention.rejected` और `error.occurred` टाइप `EventType` का हिस्सा हैं, लेकिन SDK इन्हें कभी दर्ज नहीं करता: विफल टूल कॉल एक `action.failed` इवेंट होती है, किसी नीति द्वारा ठुकराई गई कॉल एक `policy.violated` इवेंट, और मंज़ूरी में अस्वीकार की गई कॉल एक `approval.rejected` इवेंट।
 
 ## संज्ञान (Cognition) {#cognition}
 
