@@ -5,6 +5,7 @@ import type {
   PolicyRule,
   BudgetLimit,
   ConditionExpression,
+  PolicyType,
 } from '../types/policy.js';
 import type { Intention } from '../types/run.js';
 import type { BudgetTracker } from '../managers/budget-tracker.js';
@@ -511,8 +512,10 @@ export class PolicyEngine {
     }
 
     const budgetLimit = rule.metadata?.budgetLimit as BudgetLimit | undefined;
-    if (!budgetLimit) {
-      return null;
+    // Checked when the policy was applied: one removed since then covers everyone.
+    if (typeof budgetLimit !== 'object' || budgetLimit === null) {
+      const problem = budgetLimitProblem(budgetLimit);
+      return uncheckable(`Budget cannot be checked: budgetLimit ${problem?.reason}`, policyId);
     }
 
     // If agentId is specified in limit, it must match context
@@ -525,15 +528,14 @@ export class PolicyEngine {
       return null; // This limit doesn't apply to this tool
     }
 
-    // Checked when the policy was defined; a limit changed since then that is no longer a
-    // count or an amount cannot be checked, and refuses like a cost that is unknown.
+    // A cap changed since the policy was applied that is no longer a count or an amount
+    // refuses the calls it covers, like a cost that is unknown.
     const problem = budgetLimitProblem(budgetLimit);
     if (problem) {
-      return {
-        allowed: false,
-        reason: `Budget cannot be checked: budgetLimit${problem.field} ${problem.reason}`,
-        violatedPolicies: [policyId],
-      };
+      return uncheckable(
+        `Budget cannot be checked: budgetLimit${problem.field} ${problem.reason}`,
+        policyId
+      );
     }
 
     // A tool call consumes no tokens: model tokens are recorded as they are used
@@ -563,8 +565,10 @@ export class PolicyEngine {
     context: PolicyContext,
     policyId: string
   ): PolicyValidationResult | null {
-    const maxSteps = rule.metadata?.value as number | undefined;
-    if (maxSteps && context.currentStep >= maxSteps) {
+    const maxSteps: unknown = rule.metadata?.value;
+    const problem = runLimitProblem('maxSteps', maxSteps);
+    if (problem) return uncheckable(`Limit cannot be checked: ${problem}`, policyId);
+    if (context.currentStep >= (maxSteps as number)) {
       return {
         allowed: false,
         reason: `Max steps (${maxSteps}) exceeded`,
@@ -579,8 +583,10 @@ export class PolicyEngine {
     context: PolicyContext,
     policyId: string
   ): PolicyValidationResult | null {
-    const maxTokens = rule.metadata?.value as number | undefined;
-    if (maxTokens && context.tokensUsed >= maxTokens) {
+    const maxTokens: unknown = rule.metadata?.value;
+    const problem = runLimitProblem('maxTokens', maxTokens);
+    if (problem) return uncheckable(`Limit cannot be checked: ${problem}`, policyId);
+    if (context.tokensUsed >= (maxTokens as number)) {
       return {
         allowed: false,
         reason: `Max tokens (${maxTokens}) exceeded`,
@@ -606,11 +612,12 @@ export class PolicyEngine {
     context: PolicyContext,
     policyId: string
   ): PolicyValidationResult | null {
-    const maxDuration = rule.metadata?.value as number | undefined;
-    if (!maxDuration) return null;
+    const maxDuration: unknown = rule.metadata?.value;
+    const problem = runLimitProblem('maxDuration', maxDuration);
+    if (problem) return uncheckable(`Limit cannot be checked: ${problem}`, policyId);
 
     const elapsed = Date.now() - context.startTime;
-    if (elapsed >= maxDuration) {
+    if (elapsed >= (maxDuration as number)) {
       return {
         allowed: false,
         reason: `Timeout (${maxDuration}ms) exceeded`,
@@ -700,34 +707,67 @@ export class PolicyEngine {
 
 const PERIODS = new Set(['hour', 'day', 'week', 'month', 'all']);
 
-/** Limits of one run, read from `metadata.value`: a step or token count, or milliseconds. */
-const RUN_LIMITS = new Set(['maxSteps', 'maxTokens', 'maxDuration']);
+/** The limits each policy type reads; `allowlist` and `custom` policies read none of them. */
+const LIMITS_READ_BY: Partial<Record<PolicyType, ReadonlySet<string>>> = {
+  budget: new Set(['maxSteps', 'maxTokens', 'budgetLimit']),
+  timeout: new Set(['maxDuration']),
+};
 
-/** The caps of a budget per period; 0 allows nothing. */
+const LIMIT_CONDITIONS = new Set(['maxSteps', 'maxTokens', 'maxDuration', 'budgetLimit']);
+
+/** The caps of a budget per period. */
 const BUDGET_CAPS = ['maxTokens', 'maxToolCalls', 'maxCost'] as const;
 
 /**
  * Refuses a policy whose built-in limits cannot be checked. Policies are plain data, often read
- * from a config file: a limit that is a string, NaN, negative or missing was ignored at run
- * time (NaN, 0 or a missing value turned a run limit off) or refused everything.
+ * from a config file: a limit that was NaN, 0 or missing was off at run time, a numeric string
+ * worked only by coercion, and a limit in a policy type that does not read it did nothing.
  */
 export function assertCheckableLimits(policy: Policy): void {
   if (!policy.enabled) return;
-  policy.rules.forEach((rule, index) => {
-    const at = `policy '${policy.id}' rules[${index}].metadata`;
-    if (typeof rule.condition === 'string' && RUN_LIMITS.has(rule.condition)) {
-      const value: unknown = rule.metadata?.value;
-      if (!isAmount(value) || value === 0) {
-        throw new ValidationError(
-          `${at}.value`,
-          `${rule.condition} must be a finite number > 0, got ${shownValue(value)}`
-        );
-      }
-    } else if (rule.condition === 'budgetLimit') {
-      const problem = budgetLimitProblem(rule.metadata?.budgetLimit);
-      if (problem) throw new ValidationError(`${at}.budgetLimit${problem.field}`, problem.reason);
+  const at = `policy '${policy.id}'`;
+  const rules: unknown = policy.rules;
+  if (!Array.isArray(rules)) {
+    throw new ValidationError(`${at} rules`, `must be an array, got ${shownValue(rules)}`);
+  }
+  const reads = LIMITS_READ_BY[policy.type];
+  rules.forEach((rule: unknown, index) => {
+    const ruleAt = `${at} rules[${index}]`;
+    if (typeof rule !== 'object' || rule === null) {
+      throw new ValidationError(ruleAt, `must be an object, got ${shownValue(rule)}`);
     }
+    const { condition, metadata } = rule as PolicyRule;
+    // A custom or allowlist policy's rules are its own: none of them is read as a limit.
+    if (!reads || typeof condition !== 'string' || !LIMIT_CONDITIONS.has(condition)) return;
+    if (!reads.has(condition)) {
+      const owner = condition === 'maxDuration' ? 'timeout' : 'budget';
+      throw new ValidationError(
+        `${ruleAt}.condition`,
+        `${condition} is read only by a '${owner}' policy, not a '${policy.type}' one`
+      );
+    }
+    if (condition === 'budgetLimit') {
+      const problem = budgetLimitProblem(metadata?.budgetLimit);
+      if (problem) {
+        throw new ValidationError(`${ruleAt}.metadata.budgetLimit${problem.field}`, problem.reason);
+      }
+      return;
+    }
+    const problem = runLimitProblem(condition, metadata?.value);
+    if (problem) throw new ValidationError(`${ruleAt}.metadata.value`, problem);
   });
+}
+
+/** What makes a run limit (`maxSteps`, `maxTokens`, `maxDuration`) impossible to check. */
+function runLimitProblem(condition: string, value: unknown): string | undefined {
+  if (isAmount(value) && value > 0) return undefined;
+  const off = value === 0 ? ' (to turn the limit off, remove the rule or disable the policy)' : '';
+  return `${condition} must be a finite number > 0, got ${shownValue(value)}${off}`;
+}
+
+/** A limit changed after its policy was applied, and no longer checkable, refuses the call. */
+function uncheckable(reason: string, policyId: string): PolicyValidationResult {
+  return { allowed: false, reason, violatedPolicies: [policyId] };
 }
 
 /** What makes a `budgetLimit` impossible to check, if anything. */

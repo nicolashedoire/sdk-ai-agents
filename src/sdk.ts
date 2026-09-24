@@ -252,6 +252,8 @@ export class SDKImpl implements SDK {
   private decisionService?: DecisionService;
 
   constructor(config: SDKConfig) {
+    // Before the event store (a FileEventStore creates its folder and a flush timer).
+    for (const policy of config.defaultPolicies ?? []) assertCheckableLimits(policy);
     const baseStore = config.eventStore || new FileEventStore();
     this.eventStore = config.incidents
       ? new MonitoredEventStore(baseStore, config.incidents)
