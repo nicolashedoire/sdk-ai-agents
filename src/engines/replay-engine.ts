@@ -1,7 +1,7 @@
 import { PolicyViolationError, ToolExecutionError } from '../errors/index.js';
 import type { IEventStore } from '../stores/event-store.js';
 import type { Event } from '../types/events.js';
-import type { Intention, ReplayModifications, RunResult } from '../types/run.js';
+import type { Intention, ReplayModifications, RunProgress, RunResult } from '../types/run.js';
 import { generateEventId, generateRunId } from '../utils/id.js';
 import { type ActionEngine, TOOL_APPROVAL_POLICY } from './action-engine.js';
 
@@ -20,11 +20,14 @@ export class ReplayEngine {
     const approved = approvedIntentions(originalEvents);
     await this.logReplayStart(newRunId, originalEvents, runId, modifications);
 
+    const allowedTools = recordedAllowedTools(originalEvents);
     const result = await this.executeIntentions(
       newRunId,
       intentions,
       approved,
-      recordedAllowedTools(originalEvents)
+      allowedTools,
+      // Cognitive runs gave no run progress to their calls: their replay gives none either.
+      allowedTools ? undefined : recordedProgress(originalEvents)
     );
 
     if (result.hasError && result.error) {
@@ -74,12 +77,20 @@ export class ReplayEngine {
       metadata?: Record<string, unknown>;
     }>,
     approved: ReadonlySet<number>,
-    allowedTools?: string[]
+    allowedTools?: string[],
+    progress?: Array<{ step: number; tokensUsed: number; elapsedMs: number }>
   ): Promise<{ hasError: boolean; finalResult: unknown; error?: string }> {
     let finalResult: unknown = null;
 
     for (const [index, intentionEvent] of intentions.entries()) {
       const intention = intentionEvent.data.intention as Intention;
+      const recorded = progress?.[index];
+      // The original run's progress at this call, with its elapsed time replayed from now.
+      const run: RunProgress | undefined = recorded && {
+        step: recorded.step,
+        tokensUsed: recorded.tokensUsed,
+        startedAt: Date.now() - recorded.elapsedMs,
+      };
 
       try {
         const result = await this.actionEngine.executeIntention(intention, {
@@ -88,6 +99,7 @@ export class ReplayEngine {
           mode: 'replay',
           ...(approved.has(index) ? { preApproved: true } : {}),
           ...(allowedTools ? { allowedTools } : {}),
+          ...(run ? { run } : {}),
         });
 
         if (result.result) {
@@ -304,4 +316,36 @@ function recordedAllowedTools(events: Event[]): string[] | undefined {
   return Array.isArray(tools) && tools.every((tool) => typeof tool === 'string')
     ? tools
     : undefined;
+}
+
+/**
+ * The progress of the original run when each of its intentions was generated: the step, the
+ * tokens used so far and the time elapsed. Budget and timeout policies then decide in the
+ * replay as they did in the original run, so a call they refused is refused again.
+ */
+function recordedProgress(
+  events: Event[]
+): Array<{ step: number; tokensUsed: number; elapsedMs: number }> {
+  const startedAt = events.find((event) => event.type === 'run.started')?.timestamp;
+  let tokensUsed = 0;
+  return events
+    .filter((event) => event.type === 'intention.generated')
+    .map((event, step) => {
+      tokensUsed += tokensOf(event.data.usage);
+      return {
+        step,
+        tokensUsed,
+        elapsedMs: startedAt === undefined ? 0 : Math.max(0, event.timestamp - startedAt),
+      };
+    });
+}
+
+function tokensOf(usage: unknown): number {
+  if (!usage || typeof usage !== 'object') return 0;
+  const { totalTokens, promptTokens, completionTokens } = usage as Record<string, unknown>;
+  if (typeof totalTokens === 'number') return totalTokens;
+  return (
+    (typeof promptTokens === 'number' ? promptTokens : 0) +
+    (typeof completionTokens === 'number' ? completionTokens : 0)
+  );
 }

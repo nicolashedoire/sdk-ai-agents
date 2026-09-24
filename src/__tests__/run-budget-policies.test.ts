@@ -140,4 +140,44 @@ describe('run budget policies', () => {
     expect(second.error?.message).toContain('Token budget exceeded: 240 > 200');
     expect(lookups).toBe(1);
   });
+
+  describe('replay', () => {
+    it('refuses again a call that maxSteps refused in the original run', async () => {
+      const provider = new ScriptedLLMProvider().enqueue(CHANNEL, toolCall, toolCall, {
+        content: 'done',
+      });
+      const agent = agentWith(
+        [policy('budget', { condition: 'maxSteps', action: 'deny', metadata: { value: 1 } })],
+        provider
+      );
+      const original = await agent.run({ message: 'Look it up twice' });
+      expect(lookups).toBe(1);
+
+      const replay = await env.sdk.replay(original.runId);
+
+      // The first call runs again; the second, refused at step 1, is refused again.
+      expect(replay.status).toBe('failed');
+      // A failed replay reports its reason as its output.
+      expect(replay.output).toContain('Max steps (1) exceeded');
+      expect(lookups).toBe(2);
+    });
+
+    it('refuses again a call that maxDuration refused in the original run', async () => {
+      const provider = new ScriptedLLMProvider({ delayMs: 80 }).enqueue(CHANNEL, toolCall);
+      const agent = agentWith(
+        [policy('timeout', { condition: 'maxDuration', action: 'deny', metadata: { value: 50 } })],
+        provider
+      );
+      const original = await agent.run({ message: 'Look it up' });
+      expect(original.status).toBe('failed');
+
+      // The replay makes no model call and runs at once; the elapsed time is the original one.
+      const replay = await env.sdk.replay(original.runId);
+
+      expect(replay.status).toBe('failed');
+      // A failed replay reports its reason as its output.
+      expect(replay.output).toContain('Timeout (50ms) exceeded');
+      expect(lookups).toBe(0);
+    });
+  });
 });
