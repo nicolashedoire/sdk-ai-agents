@@ -39,17 +39,17 @@ No TypeSafe account? Jev is also served by Vercel AI Gateway with the same API: 
 
 Most agent frameworks help a language model **act**. This one makes it **justify what it believes** before it concludes, and can make it **reason the way a given person does**.
 
-| | Usual agent frameworks | SDK AI Agents |
+| | Out of the box elsewhere | SDK AI Agents |
 | --- | --- | --- |
-| Reasoning | Whatever the model writes | Typed mental state; rules enforced in code |
-| Confidence | The model's own claim | The evidence support of the chosen option; the model cannot set it |
-| "I don't know" | Asked for in the prompt | `provisional` or `abstain`, enforced by a conclusion guard |
-| Checking a claim | Another model judges | Your evaluator (measurement, simulator, tests) confirms or refutes predictions stated beforehand |
-| Preferences | Mixed with evidence | Can choose an action, never make a claim more credible |
+| Reasoning | Model output, structured by the graph, prompts or checks you write | Typed mental state; reasoning rules enforced by the SDK |
+| Confidence | Usually not modelled, or the model's own claim | Capped at the evidence support of the chosen option, judged in a separate step |
+| "I don't know" | Asked for in the prompt, or your own output check | `provisional` or `abstain`, enforced by a conclusion guard |
+| Checking a claim | Often another model (LLM-as-judge), or your own code | Your evaluator (measurement, simulator, tests) confirms or refutes predictions stated beforehand |
+| Preferences | Not distinguished from evidence | Can choose an action; in the code, never make a claim more credible |
 | A person's way of thinking | A long system prompt, or stored facts and preferences | A versioned thinker profile, corrected with a percentage of agreement |
-| Audit | Logs, checkpoints | One event log for thoughts and actions; rebuild any mental state |
+| Audit | Traces, logs, checkpoints | One event log for thoughts and actions; rebuild any mental state |
 
-Other frameworks have a much larger ecosystem, more integrations and more maturity, and a cognitive answer costs about ten model calls instead of one. [Why this SDK](https://nicolashedoire.github.io/sdk-ai-agents/guide/why) gives the full comparison, including what others do better and when to choose something lighter.
+Other frameworks have a much larger ecosystem, more integrations and more maturity, and a cognitive answer takes about ten reasoning steps, each with one or two model requests, instead of one or a few calls. [Why this SDK](https://nicolashedoire.github.io/sdk-ai-agents/guide/why) gives the full comparison, including what others do better and when to choose something lighter.
 
 ## Agents that think before they act
 
