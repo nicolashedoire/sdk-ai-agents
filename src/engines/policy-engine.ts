@@ -5,12 +5,14 @@ import type {
   PolicyRule,
   BudgetLimit,
   ConditionExpression,
+  PolicyType,
 } from '../types/policy.js';
 import type { Intention } from '../types/run.js';
 import type { BudgetTracker } from '../managers/budget-tracker.js';
 import type { PolicyAuditEntry } from '../types/audit.js';
 import type { IEventStore } from '../stores/event-store.js';
 import { ConditionEvaluator } from '../evaluators/condition-evaluator.js';
+import { ValidationError } from '../errors/index.js';
 import { generateEventId } from '../utils/id.js';
 import { costOf, DEFAULT_PRICING, findModelPrice, type PricingTable } from '../costs/pricing.js';
 import type { LLMResponse } from '../providers/llm-provider.js';
@@ -81,11 +83,13 @@ export class PolicyEngine {
   }
 
   applyGlobalPolicy(policy: Policy): void {
+    assertCheckableLimits(policy);
     if (!policy.enabled) return;
     this.globalPolicies.set(policy.id, policy);
   }
 
   applyAgentPolicy(agentId: string, policy: Policy): void {
+    assertCheckableLimits(policy);
     if (!policy.enabled) return;
 
     if (!this.agentPolicies.has(agentId)) {
@@ -508,8 +512,20 @@ export class PolicyEngine {
     }
 
     const budgetLimit = rule.metadata?.budgetLimit as BudgetLimit | undefined;
-    if (!budgetLimit) {
-      return null;
+    // Checked when the policy was applied. A limit removed since then, or whose agent or tool
+    // is no longer a name, cannot say whom it covers: it refuses every call it is checked for.
+    if (typeof budgetLimit !== 'object' || budgetLimit === null) {
+      const problem = budgetLimitProblem(budgetLimit);
+      return uncheckable(`Budget cannot be checked: budgetLimit ${problem?.reason}`, policyId);
+    }
+    for (const key of ['agentId', 'toolName'] as const) {
+      const value: unknown = budgetLimit[key];
+      if (value !== undefined && typeof value !== 'string') {
+        return uncheckable(
+          `Budget cannot be checked: budgetLimit.${key} must be a string, got ${shownValue(value)}`,
+          policyId
+        );
+      }
     }
 
     // If agentId is specified in limit, it must match context
@@ -522,18 +538,14 @@ export class PolicyEngine {
       return null; // This limit doesn't apply to this tool
     }
 
-    // The limit is plain data from the caller: a cost cap that is not an amount cannot be
-    // checked, and refuses like one whose spend is unknown.
-    const maxCost: unknown = budgetLimit.maxCost;
-    if (
-      maxCost !== undefined &&
-      !(typeof maxCost === 'number' && Number.isFinite(maxCost) && maxCost >= 0)
-    ) {
-      return {
-        allowed: false,
-        reason: `Cost budget cannot be checked: maxCost must be a finite number >= 0 (USD), got ${shownValue(maxCost)}`,
-        violatedPolicies: [policyId],
-      };
+    // A cap changed since the policy was applied that is no longer a count or an amount
+    // refuses the calls it covers, like a cost that is unknown.
+    const problem = budgetLimitProblem(budgetLimit);
+    if (problem) {
+      return uncheckable(
+        `Budget cannot be checked: budgetLimit${problem.field} ${problem.reason}`,
+        policyId
+      );
     }
 
     // A tool call consumes no tokens: model tokens are recorded as they are used
@@ -563,8 +575,10 @@ export class PolicyEngine {
     context: PolicyContext,
     policyId: string
   ): PolicyValidationResult | null {
-    const maxSteps = rule.metadata?.value as number | undefined;
-    if (maxSteps && context.currentStep >= maxSteps) {
+    const maxSteps: unknown = rule.metadata?.value;
+    const problem = runLimitProblem('maxSteps', maxSteps);
+    if (problem) return uncheckable(`Limit cannot be checked: ${problem}`, policyId);
+    if (context.currentStep >= (maxSteps as number)) {
       return {
         allowed: false,
         reason: `Max steps (${maxSteps}) exceeded`,
@@ -579,8 +593,10 @@ export class PolicyEngine {
     context: PolicyContext,
     policyId: string
   ): PolicyValidationResult | null {
-    const maxTokens = rule.metadata?.value as number | undefined;
-    if (maxTokens && context.tokensUsed >= maxTokens) {
+    const maxTokens: unknown = rule.metadata?.value;
+    const problem = runLimitProblem('maxTokens', maxTokens);
+    if (problem) return uncheckable(`Limit cannot be checked: ${problem}`, policyId);
+    if (context.tokensUsed >= (maxTokens as number)) {
       return {
         allowed: false,
         reason: `Max tokens (${maxTokens}) exceeded`,
@@ -606,11 +622,12 @@ export class PolicyEngine {
     context: PolicyContext,
     policyId: string
   ): PolicyValidationResult | null {
-    const maxDuration = rule.metadata?.value as number | undefined;
-    if (!maxDuration) return null;
+    const maxDuration: unknown = rule.metadata?.value;
+    const problem = runLimitProblem('maxDuration', maxDuration);
+    if (problem) return uncheckable(`Limit cannot be checked: ${problem}`, policyId);
 
     const elapsed = Date.now() - context.startTime;
-    if (elapsed >= maxDuration) {
+    if (elapsed >= (maxDuration as number)) {
       return {
         allowed: false,
         reason: `Timeout (${maxDuration}ms) exceeded`,
@@ -700,6 +717,106 @@ export class PolicyEngine {
 
 const PERIODS = new Set(['hour', 'day', 'week', 'month', 'all']);
 
+/** The limits each policy type reads; `allowlist` and `custom` policies read none of them. */
+const LIMITS_READ_BY = new Map<PolicyType, ReadonlySet<string>>([
+  ['budget', new Set(['maxSteps', 'maxTokens', 'budgetLimit'])],
+  ['timeout', new Set(['maxDuration'])],
+]);
+
+const LIMIT_CONDITIONS = new Set(['maxSteps', 'maxTokens', 'maxDuration', 'budgetLimit']);
+
+/** The caps of a budget per period. */
+const BUDGET_CAPS = ['maxTokens', 'maxToolCalls', 'maxCost'] as const;
+
+/**
+ * Refuses a policy whose built-in limits cannot be checked. Policies are plain data, often read
+ * from a config file: a limit that was NaN, 0 or missing was off at run time, a numeric string
+ * worked only by coercion, and a limit in a policy type that does not read it did nothing.
+ */
+export function assertCheckableLimits(policy: Policy): void {
+  const given: unknown = policy;
+  if (typeof given !== 'object' || given === null) {
+    throw new ValidationError('policy', `must be an object, got ${shownValue(given)}`);
+  }
+  if (!policy.enabled) return;
+  const at = `policy '${policy.id}'`;
+  const rules: unknown = policy.rules;
+  if (!Array.isArray(rules)) {
+    throw new ValidationError(`${at} rules`, `must be an array, got ${shownValue(rules)}`);
+  }
+  const reads = LIMITS_READ_BY.get(policy.type);
+  rules.forEach((rule: unknown, index) => {
+    const ruleAt = `${at} rules[${index}]`;
+    if (typeof rule !== 'object' || rule === null) {
+      throw new ValidationError(ruleAt, `must be an object, got ${shownValue(rule)}`);
+    }
+    const { condition, metadata } = rule as PolicyRule;
+    // A custom or allowlist policy's rules are its own: none of them is read as a limit.
+    if (!reads || typeof condition !== 'string' || !LIMIT_CONDITIONS.has(condition)) return;
+    if (!reads.has(condition)) {
+      const owner = condition === 'maxDuration' ? 'timeout' : 'budget';
+      throw new ValidationError(
+        `${ruleAt}.condition`,
+        `${condition} is read only by a '${owner}' policy, not a '${policy.type}' one`
+      );
+    }
+    if (condition === 'budgetLimit') {
+      const problem = budgetLimitProblem(metadata?.budgetLimit);
+      if (problem) {
+        throw new ValidationError(`${ruleAt}.metadata.budgetLimit${problem.field}`, problem.reason);
+      }
+      return;
+    }
+    const problem = runLimitProblem(condition, metadata?.value);
+    if (problem) throw new ValidationError(`${ruleAt}.metadata.value`, problem);
+  });
+}
+
+/** What makes a run limit (`maxSteps`, `maxTokens`, `maxDuration`) impossible to check. */
+function runLimitProblem(condition: string, value: unknown): string | undefined {
+  if (isAmount(value) && value > 0) return undefined;
+  const off = value === 0 ? ' (to turn the limit off, remove the rule or disable the policy)' : '';
+  return `${condition} must be a finite number > 0, got ${shownValue(value)}${off}`;
+}
+
+/** A limit changed after its policy was applied, and no longer checkable, refuses the call. */
+function uncheckable(reason: string, policyId: string): PolicyValidationResult {
+  return { allowed: false, reason, violatedPolicies: [policyId] };
+}
+
+/** What makes a `budgetLimit` impossible to check, if anything. */
+function budgetLimitProblem(limit: unknown): { field: string; reason: string } | undefined {
+  if (typeof limit !== 'object' || limit === null) {
+    return { field: '', reason: `must be an object, got ${shownValue(limit)}` };
+  }
+  const period: unknown = Reflect.get(limit, 'period');
+  if (typeof period !== 'string' || !PERIODS.has(period)) {
+    const periods = [...PERIODS].join(', ');
+    return { field: '.period', reason: `must be one of ${periods}, got ${shownValue(period)}` };
+  }
+  for (const key of ['agentId', 'toolName']) {
+    const value: unknown = Reflect.get(limit, key);
+    if (value !== undefined && typeof value !== 'string') {
+      return { field: `.${key}`, reason: `must be a string, got ${shownValue(value)}` };
+    }
+  }
+  const caps = BUDGET_CAPS.filter((key) => Reflect.get(limit, key) !== undefined);
+  if (caps.length === 0) {
+    return { field: '', reason: `sets no cap (${BUDGET_CAPS.join(', ')})` };
+  }
+  for (const key of caps) {
+    const value: unknown = Reflect.get(limit, key);
+    if (!isAmount(value)) {
+      return { field: `.${key}`, reason: `must be a finite number >= 0, got ${shownValue(value)}` };
+    }
+  }
+  return undefined;
+}
+
+function isAmount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
 /** A value from plain policy data, as a reason can show it ("0.5" for a string, not 0.5). */
 function shownValue(value: unknown): string {
   if (typeof value === 'string') return JSON.stringify(value);
@@ -720,7 +837,7 @@ function isToolCallLimit(value: unknown): value is BudgetLimit & { maxToolCalls:
   return (
     typeof period === 'string' &&
     PERIODS.has(period) &&
-    typeof maxToolCalls === 'number' &&
+    isAmount(maxToolCalls) &&
     (agentId === undefined || typeof agentId === 'string') &&
     (toolName === undefined || typeof toolName === 'string')
   );

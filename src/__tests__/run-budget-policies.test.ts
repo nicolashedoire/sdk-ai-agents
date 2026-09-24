@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { createSDK, defineTool } from '../index.js';
 import type { Policy, PolicyRule } from '../types/policy.js';
 import type { LLMProvider, LLMRequest, LLMResponse } from '../providers/llm-provider.js';
 import { ScriptedLLMProvider } from './support/scripted-llm-provider.js';
@@ -63,6 +64,84 @@ describe('run budget policies', () => {
   async function violations(runId: string) {
     return (await env.sdk.getEvents(runId)).filter((event) => event.type === 'policy.violated');
   }
+
+  it('refuses an agent whose run limit is not a count', () => {
+    expect(() =>
+      agentWith(
+        [policy('budget', { condition: 'maxSteps', action: 'deny', metadata: { value: '10' } })],
+        new ScriptedLLMProvider()
+      )
+    ).toThrow(
+      `Validation failed: policy 'limit-maxSteps' rules[0].metadata.value - maxSteps must be a finite number > 0, got "10"`
+    );
+  });
+
+  it('registers nothing for an agent refused for a policy', () => {
+    env = createTestSDK({}, new ScriptedLLMProvider());
+    // The package's defineTool registers nothing; createAgent registers an agent's tools.
+    const tool = defineTool({
+      name: 'unregistered',
+      description: 'Never registered',
+      schema: z.object({}),
+      handler: async () => ({}),
+    });
+    const valid = policy('budget', {
+      condition: 'maxSteps',
+      action: 'deny',
+      metadata: { value: 5 },
+    });
+    const broken = policy('budget', {
+      condition: 'budgetLimit',
+      action: 'deny',
+      metadata: { budgetLimit: { period: 'day', maxToolCalls: Number.NaN } },
+    });
+    const config = { name: 'refused', model: 'gpt-4', tools: [tool], policies: [valid, broken] };
+
+    expect(() => env.sdk.createAgent(config)).toThrow('budgetLimit.maxToolCalls');
+    expect(() => env.sdk.createCognitiveAgent(config)).toThrow('budgetLimit.maxToolCalls');
+    expect(env.sdk.listTools().map((t) => t.name)).not.toContain('unregistered');
+  });
+
+  it('checks default policies before creating anything', () => {
+    env = createTestSDK();
+    const broken = policy('budget', {
+      condition: 'budgetLimit',
+      action: 'deny',
+      metadata: { budgetLimit: { period: 'fortnight', maxTokens: 10 } },
+    });
+    // Reading eventStore is the constructor's first step: a FileEventStore would follow.
+    let storeRead = false;
+    const config = {
+      defaultPolicies: [broken],
+      get eventStore() {
+        storeRead = true;
+        return env.store;
+      },
+    };
+
+    expect(() => createSDK(config)).toThrow(
+      `Validation failed: policy 'limit-budgetLimit' rules[0].metadata.budgetLimit.period - must be one of hour, day, week, month, all, got "fortnight"`
+    );
+    expect(storeRead).toBe(false);
+  });
+
+  it('keeps an agent running as before when setPolicy refuses a policy', async () => {
+    const provider = new ScriptedLLMProvider().enqueue(CHANNEL, toolCall, { content: 'done' });
+    // The agent's policy list is the array given to createAgent.
+    const policies: Policy[] = [];
+    const agent = agentWith(policies, provider);
+    const broken = policy('budget', {
+      condition: 'maxSteps',
+      action: 'deny',
+      metadata: { value: 0 },
+    });
+
+    expect(() => agent.setPolicy(broken)).toThrow('maxSteps must be a finite number > 0, got 0');
+    expect(policies).toEqual([]);
+
+    expect((await agent.run({ message: 'Go' })).status).toBe('completed');
+    expect(lookups).toBe(1);
+  });
 
   it('denies a tool call once the run has taken maxSteps steps', async () => {
     const provider = new ScriptedLLMProvider().enqueue(CHANNEL, toolCall, toolCall, {
@@ -297,7 +376,7 @@ describe('run budget policies', () => {
       env = createTestSDK();
     });
 
-    it('refuses rather than guess when maxCost is not an amount', async () => {
+    it('refuses a maxCost that is not an amount when the policy is defined', () => {
       // Policy metadata is plain data: a cap read from a config file may be a string.
       const invalid: [unknown, string][] = [
         ['0.5', '"0.5"'],
@@ -306,33 +385,84 @@ describe('run budget policies', () => {
         [Number.POSITIVE_INFINITY, 'Infinity'],
         [null, 'null'],
       ];
+      pricedAgents(new ScriptedLLMProvider(), ['priced']);
       for (const [maxCost, shown] of invalid) {
+        expect(() => costBudget({ maxCost } as unknown as { maxCost: number })).toThrow(
+          `Validation failed: policy 'cost-cap' rules[0].metadata.budgetLimit.maxCost - must be a finite number >= 0, got ${shown}`
+        );
+      }
+    });
+
+    it('refuses rather than guess when a cap was changed after the policy was defined', async () => {
+      const provider = new ScriptedLLMProvider().always(CHANNEL, toolCall);
+      const [agent] = pricedAgents(provider, ['priced']);
+      const limit: { period: 'all'; maxCost: unknown } = { period: 'all', maxCost: 100 };
+      env.sdk.defineGlobalPolicy(
+        policy('budget', {
+          condition: 'budgetLimit',
+          action: 'deny',
+          metadata: { budgetLimit: limit },
+        })
+      );
+      limit.maxCost = '0.5';
+
+      const result = await agent?.run({ message: 'Look it up' });
+
+      expect(result?.status).toBe('failed');
+      expect(result?.error?.message).toContain(
+        'Budget cannot be checked: budgetLimit.maxCost must be a finite number >= 0, got "0.5"'
+      );
+      expect(lookups).toBe(0);
+    });
+
+    it('refuses every call when a limit no longer says whom it covers', async () => {
+      for (const change of ['removed', 'agentId'] as const) {
         const provider = new ScriptedLLMProvider().always(CHANNEL, toolCall);
-        const [agent] = pricedAgents(provider, ['priced']);
-        env.sdk.defineGlobalPolicy({
-          id: 'cost-cap',
-          type: 'budget',
-          scope: 'global',
-          enabled: true,
-          rules: [
-            {
-              condition: 'budgetLimit',
-              action: 'deny',
-              metadata: { budgetLimit: { period: 'all', maxCost } },
-            },
-          ],
-        });
+        const agent = agentWith([], provider);
+        const metadata: {
+          budgetLimit?: { period: 'all'; maxToolCalls: number; agentId?: unknown };
+        } = {
+          budgetLimit: { period: 'all', maxToolCalls: 5, agentId: 'someone-else' },
+        };
+        env.sdk.defineGlobalPolicy(
+          policy('budget', { condition: 'budgetLimit', action: 'deny', metadata })
+        );
+        if (change === 'removed') delete metadata.budgetLimit;
+        else if (metadata.budgetLimit) metadata.budgetLimit.agentId = 7;
 
-        const result = await agent?.run({ message: 'Look it up' });
+        const result = await agent.run({ message: 'Look it up' });
 
-        expect(result?.status).toBe('failed');
-        expect(result?.error?.message).toContain(
-          `Cost budget cannot be checked: maxCost must be a finite number >= 0 (USD), got ${shown}`
+        expect(result.error?.message).toContain(
+          change === 'removed'
+            ? 'Budget cannot be checked: budgetLimit must be an object, got undefined'
+            : 'Budget cannot be checked: budgetLimit.agentId must be a string, got 7'
         );
         expect(lookups).toBe(0);
         await env.dispose();
       }
       env = createTestSDK();
+    });
+
+    it('refuses rather than count when a call cap was changed after the policy was defined', async () => {
+      const provider = new ScriptedLLMProvider().always(CHANNEL, toolCall);
+      const agent = agentWith([], provider);
+      const limit: { period: 'all'; maxToolCalls: unknown } = { period: 'all', maxToolCalls: 5 };
+      env.sdk.defineGlobalPolicy(
+        policy('budget', {
+          condition: 'budgetLimit',
+          action: 'deny',
+          metadata: { budgetLimit: limit },
+        })
+      );
+      limit.maxToolCalls = '2';
+
+      const result = await agent.run({ message: 'Look it up' });
+
+      expect(result.status).toBe('failed');
+      expect(result.error?.message).toContain(
+        'Budget cannot be checked: budgetLimit.maxToolCalls must be a finite number >= 0, got "2"'
+      );
+      expect(lookups).toBe(0);
     });
   });
 
