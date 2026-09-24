@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ValidationError } from '../errors/index.js';
+import { LiveEventsDroppedError, ValidationError } from '../errors/index.js';
 import type { IEventStore } from '../stores/event-store.js';
 import { FileEventStore } from '../stores/file-event-store.js';
 import { ObservedEventStore } from '../stores/observed-event-store.js';
@@ -339,7 +339,7 @@ describe('ObservedEventStore', () => {
   it('delivers events forwarded from another run in turn with its own, until it is closed', async () => {
     const observed = new ObservedEventStore(fileStore());
     const received: string[] = [];
-    const subscription = observed.subscribe((live) => void received.push(live.id), {
+    const subscription = observed.subscribe((live) => received.push(live.id), {
       runId: 'run_1',
     });
     const [own, nested, later] = [event('run_1'), event('run_2'), event('run_2')];
@@ -360,12 +360,12 @@ describe('ObservedEventStore', () => {
     const byAgent: string[] = [];
     const byType: string[] = [];
     const all: string[] = [];
-    observed.subscribe((live) => void byRun.push(live.id), { runId: 'run_2' });
-    observed.subscribe((live) => void byAgent.push(live.id), { agentId: 'agent-2' });
-    observed.subscribe((live) => void byType.push(live.id), {
+    observed.subscribe((live) => byRun.push(live.id), { runId: 'run_2' });
+    observed.subscribe((live) => byAgent.push(live.id), { agentId: 'agent-2' });
+    observed.subscribe((live) => byType.push(live.id), {
       types: ['run.completed', 'run.failed'],
     });
-    observed.subscribe((live) => void all.push(live.id), {});
+    observed.subscribe((live) => all.push(live.id), {});
     const events = [
       event('run_1', 'run.started', 'agent-1'),
       event('run_2', 'run.started', 'agent-2'),
@@ -415,5 +415,92 @@ describe('ObservedEventStore', () => {
     expect(() => observed.subscribe(() => undefined, { runId: 42 as never })).toThrow(
       'filter.runId'
     );
+  });
+
+  it('keeps at most maxQueued events for a busy listener, and reports each burst of drops once', async () => {
+    const failures: Array<{ error: unknown; eventId: string }> = [];
+    const observed = new ObservedEventStore(fileStore(), {
+      onListenerError: (error, failed) => failures.push({ error, eventId: failed.id }),
+    });
+    const received: string[] = [];
+    const gates = [deferred(), deferred()];
+    let busy = 0;
+    const subscription = observed.subscribe(
+      async (live) => {
+        received.push(live.id);
+        if (live.data.gate !== undefined) await gates[busy++]?.promise;
+      },
+      { maxQueued: 2 }
+    );
+    const burst = (gate?: number) =>
+      Array.from({ length: 5 }, (_, index) => {
+        const appended = event('run_1');
+        if (index === 0 && gate !== undefined) appended.data.gate = gate;
+        return appended;
+      });
+
+    // First burst: one event in the listener's hands, two waiting, two dropped.
+    const first = burst(0);
+    for (const appended of first) await observed.append('run_1', appended);
+    expect(failures).toEqual([]);
+    gates[0]?.resolve();
+    await settle();
+    expect(received).toEqual(first.slice(0, 3).map((appended) => appended.id));
+    expect(failures).toHaveLength(1);
+    expect(failures[0]?.error).toBeInstanceOf(LiveEventsDroppedError);
+    expect(failures[0]?.error).toMatchObject({ dropped: 2, maxQueued: 2 });
+    expect(failures[0]?.eventId).toBe(first[3]?.id);
+
+    // Second burst, reported on its own.
+    const second = burst(1);
+    for (const appended of second) await observed.append('run_1', appended);
+    gates[1]?.resolve();
+    await subscription.close();
+    expect(received).toHaveLength(6);
+    expect(failures.map((failure) => failure.error)).toMatchObject([
+      { dropped: 2 },
+      { dropped: 2 },
+    ]);
+  });
+
+  it('refuses a queue size that is not a whole number of at least 1', () => {
+    const observed = new ObservedEventStore(fileStore());
+
+    for (const maxQueued of [0, 2.5, -1, Number.NaN, '10' as never]) {
+      expect(() => observed.subscribe(() => undefined, { maxQueued })).toThrow('maxQueued');
+    }
+    expect(() =>
+      observed.subscribe(() => undefined, { maxQueued: Number.POSITIVE_INFINITY })
+    ).not.toThrow();
+  });
+
+  it('copies an event JSON cannot hold, rather than sharing it', async () => {
+    const gated = new GatedEventStore();
+    const observed = new ObservedEventStore(gated);
+    const seen: Event[] = [];
+    observed.subscribe((live) => seen.push(live));
+    const appended = event('run_1');
+    appended.data.amount = 10n;
+
+    const appending = observed.append('run_1', appended);
+    await settle();
+    gated.open(0);
+    await appending;
+
+    expect(seen[0]).not.toBe(appended);
+    expect(seen[0]?.data.amount).toBe(10n);
+  });
+
+  it('calls the listeners of a run and those of every run in the order they subscribed', async () => {
+    const observed = new ObservedEventStore(fileStore());
+    const calls: string[] = [];
+    observed.subscribe(() => calls.push('every run 1'));
+    observed.subscribe(() => calls.push('run_1'), { runId: 'run_1' });
+    observed.subscribe(() => calls.push('every run 2'));
+    observed.subscribe(() => calls.push('run_2'), { runId: 'run_2' });
+
+    await observed.append('run_1', event('run_1'));
+
+    expect(calls).toEqual(['every run 1', 'run_1', 'every run 2']);
   });
 });

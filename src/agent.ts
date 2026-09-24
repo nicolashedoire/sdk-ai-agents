@@ -7,7 +7,7 @@ import type {
 } from './engines/reasoning-engine.js';
 import type { LLMMessage } from './providers/llm-provider.js';
 import type { IEventStore } from './stores/event-store.js';
-import { watchRun } from './stores/observed-event-store.js';
+import { finishWatch, watchRun } from './stores/observed-event-store.js';
 import type { Event } from './types/events.js';
 import type { Agent, OpenAIProviderSettings, ProviderSettings } from './types/agent.js';
 import type { Policy } from './types/policy.js';
@@ -62,15 +62,20 @@ export class AgentImpl {
     const runId = generateRunId();
     // Watched before anything is recorded, so the listener gets every event of the run.
     const watch = watchRun(this.eventStore, runId, input.onEvent);
+    const abortController = new AbortController();
     try {
-      return await this.execute(runId, input);
+      return await this.execute(runId, input, abortController);
     } finally {
-      await watch?.close();
+      // Waits for the listener, unless the run was stopped or cancelled, or the caller gives up.
+      await finishWatch(watch, [abortController.signal, input.signal]);
     }
   }
 
-  private async execute(runId: string, input: RunInput): Promise<RunResult> {
-    const abortController = new AbortController();
+  private async execute(
+    runId: string,
+    input: RunInput,
+    abortController: AbortController
+  ): Promise<RunResult> {
     this.activeRuns.set(runId, { cancelled: false, abortController });
     // The caller's signal stops the run: a pending approval is cancelled with it.
     const { signal, onEvent: _listener, ...recorded } = input;

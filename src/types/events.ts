@@ -61,9 +61,10 @@ export interface Event {
 
 /**
  * Receives live events (`RunInput.onEvent`, `ThinkInput.onEvent`, `sdk.subscribe`), one at a
- * time: when it returns a promise, its next event waits until that promise settles.
+ * time: when it returns a promise, its next event waits until that promise settles. Any other
+ * value it returns is ignored.
  */
-export type LiveEventListener = (event: Event) => void | Promise<void>;
+export type LiveEventListener = (event: Event) => unknown;
 
 /** Which live events a subscriber gets. Every field given must match; none means every event. */
 export interface LiveEventFilter {
@@ -73,6 +74,17 @@ export interface LiveEventFilter {
   agentId?: string;
   /** Events of these types. */
   types?: EventType[];
+}
+
+/** A subscription's filter, and how far its listener may fall behind. */
+export interface LiveSubscriptionOptions extends LiveEventFilter {
+  /**
+   * Events that may wait for a listener still busy with an earlier one (an async listener).
+   * Past it, new events are dropped for this listener and reported once per burst to
+   * `onListenerError` (a `LiveEventsDroppedError` saying how many). Default 10 000; `Infinity`
+   * never drops.
+   */
+  maxQueued?: number;
 }
 
 export interface EventFilters {

@@ -26,7 +26,8 @@ export interface ToolCallContext {
    * Set when the caller watches the call live (an MCP client that asked for progress,
    * `executeTool` with `onEvent`). A tool that starts runs of its own passes it as their
    * `onEvent`, so the caller sees them progress too; `governedAgentTool` and
-   * `cognitiveAgentTool` do.
+   * `cognitiveAgentTool` do. Best effort: an agent whose store cannot deliver live events runs
+   * without it.
    */
   onEvent?: LiveEventListener;
 }

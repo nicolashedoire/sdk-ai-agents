@@ -1,5 +1,8 @@
+import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -15,8 +18,10 @@ import { createMcpServer } from '../mcp.js';
 import { progressNotifier } from '../mcp/mcp-progress.js';
 import { defineTool } from '../sdk.js';
 import { cognitiveAgentTool, governedAgentTool } from '../tools/agent-tools.js';
+import { FileEventStore } from '../stores/file-event-store.js';
 import type { Event } from '../types/events.js';
 import type { ToolDefinition } from '../types/tool.js';
+import { handBuiltAgent } from './support/hand-built-agent.js';
 import { ScriptedLLMProvider } from './support/scripted-llm-provider.js';
 import {
   createTestSDK,
@@ -293,13 +298,14 @@ describe('MCP progress notifications', () => {
 
   it('keeps a client that resets its timeout on progress waiting for a call longer than that timeout', async () => {
     const env = environment(new ScriptedLLMProvider({ delayMs: 100 }));
-    // Five model calls of 100 ms: the call lasts at least 500 ms, events come every 100 ms or so.
-    const { client } = await connect(env, [supportAgent(env, 4)]);
-    const call = { name: 'ask_support', arguments: { message: 'Plans of c-0 to c-3?' } };
+    // Ten model calls of 100 ms (the agent's 10 steps): the call lasts at least 1 s, events
+    // come every 100 ms or so, well within a 600 ms timeout.
+    const { client } = await connect(env, [supportAgent(env, 9)]);
+    const call = { name: 'ask_support', arguments: { message: 'Plans of c-0 to c-8?' } };
     let updates = 0;
 
     const result = await client.callTool(call, undefined, {
-      timeout: 400,
+      timeout: 600,
       resetTimeoutOnProgress: true,
       onprogress: () => {
         updates++;
@@ -309,9 +315,9 @@ describe('MCP progress notifications', () => {
     expect(result.isError).toBeFalsy();
     expect(updates).toBeGreaterThan(20);
 
-    // Without progress, the same client gives up after 400 ms, and the run is cancelled.
-    scriptLookups(env, 4);
-    await expect(client.callTool(call, undefined, { timeout: 400 })).rejects.toMatchObject({
+    // Without progress, the same client gives up after 600 ms, and the run is cancelled.
+    scriptLookups(env, 9);
+    await expect(client.callTool(call, undefined, { timeout: 600 })).rejects.toMatchObject({
       code: ErrorCode.RequestTimeout,
     });
     const cancelled = async () => {
@@ -353,5 +359,40 @@ describe('MCP progress notifications', () => {
         params: { progressToken: 'token-1', progress: 2, message: 'policies checked' },
       },
     ]);
+  });
+
+  it('still serves an agent built by hand on a plain store when the client asks for progress', async () => {
+    const env = environment();
+    scriptLookups(env, 1);
+    const directory = mkdtempSync(join(tmpdir(), 'mcp-plain-store-'));
+    const plain = new FileEventStore(join(directory, 'events'));
+    closers.push(async () => {
+      await plain.destroy();
+      rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
+    });
+    const tool = governedAgentTool(handBuiltAgent(plain, env.provider, [lookupCustomer]));
+    const { client, errors } = await connect(env, [tool]);
+    const messages: string[] = [];
+
+    const result = await client.callTool(
+      { name: 'ask_support', arguments: { message: 'Which plan is c-0 on?' } },
+      undefined,
+      { onprogress: (update) => messages.push(update.message ?? '') }
+    );
+
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(String((result.content as Array<{ text: string }>)[0]?.text))).toMatchObject({
+      status: 'completed',
+    });
+    // The agent's own store cannot deliver its events: progress covers the call only.
+    expect(messages).toEqual([
+      'call started',
+      'ask_support requested',
+      'policies checked for ask_support',
+      'tool ask_support called',
+      'tool ask_support done',
+      'call completed',
+    ]);
+    expect(errors).toEqual([]);
   });
 });

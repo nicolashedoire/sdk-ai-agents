@@ -1,6 +1,6 @@
 import { PolicyViolationError, ToolExecutionError } from '../errors/index.js';
 import type { IEventStore } from '../stores/event-store.js';
-import { watchRun } from '../stores/observed-event-store.js';
+import { finishWatch, watchRun } from '../stores/observed-event-store.js';
 import type { Event } from '../types/events.js';
 import type {
   Intention,
@@ -32,7 +32,8 @@ export class ReplayEngine {
     try {
       return await this.replayAs(newRunId, runId, originalEvents, modifications);
     } finally {
-      await watch?.close();
+      // A replay cannot be cancelled: it waits until the listener has settled on every event.
+      await finishWatch(watch, []);
     }
   }
 

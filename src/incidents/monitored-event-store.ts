@@ -48,7 +48,8 @@ export class MonitoredEventStore implements IEventStore {
   private readonly now: () => number;
 
   constructor(
-    private readonly inner: IEventStore,
+    /** The store it wraps, where the events and the incident reports are appended. */
+    readonly inner: IEventStore,
     private readonly options: IncidentMonitorOptions
   ) {
     this.rules = options.rules ?? DEFAULT_INCIDENT_RULES;

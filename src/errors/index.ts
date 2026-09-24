@@ -99,6 +99,25 @@ export interface BilledDecisionCall {
   usage?: { inputTokens: number; outputTokens: number };
 }
 
+/**
+ * Reported to `onListenerError` when a listener fell so far behind that its queue was full:
+ * the events that came meanwhile were not delivered to it. Reported once per burst.
+ */
+export class LiveEventsDroppedError extends SDKError {
+  constructor(
+    /** Events not delivered to the listener during the burst. */
+    public dropped: number,
+    /** The queue size of the subscription (`maxQueued`). */
+    public maxQueued: number
+  ) {
+    super(
+      `${dropped} live event(s) dropped: the listener was ${maxQueued} events behind`,
+      'LIVE_EVENTS_DROPPED'
+    );
+    this.name = 'LiveEventsDroppedError';
+  }
+}
+
 export class DecisionClientError extends SDKError {
   public status?: number;
   public retryable: boolean;

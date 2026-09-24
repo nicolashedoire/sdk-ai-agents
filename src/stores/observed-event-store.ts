@@ -1,17 +1,23 @@
-import { ValidationError } from '../errors/index.js';
+import { LiveEventsDroppedError, ValidationError } from '../errors/index.js';
 import type {
   Event,
   EventFilters,
   EventLog,
   LiveEventFilter,
   LiveEventListener,
+  LiveSubscriptionOptions,
 } from '../types/events.js';
 import type { EventSubscription, IEventStore } from './event-store.js';
 
+/** Events that may wait for a busy listener before new ones are dropped for it. */
+export const DEFAULT_MAX_QUEUED_EVENTS = 10_000;
+
 export interface ObservedEventStoreOptions {
   /**
-   * Called when a listener throws or rejects, with the event it was given; the listener still
-   * gets the next events. Default: one line on standard error (`console.error`).
+   * Called when a listener throws or rejects, with the event it was given, and when events
+   * were dropped for a listener that fell too far behind (a `LiveEventsDroppedError`, with the
+   * first event dropped). The listener still gets the next events. Default: one line on
+   * standard error (`console.error`).
    */
   onListenerError?: (error: unknown, event: Event) => void;
 }
@@ -28,7 +34,7 @@ export interface ObservedEventStoreOptions {
  *   overlap. Each subscriber gets its own copy, as the store reads it back (JSON).
  * - A listener gets one event at a time: when it returns a promise, its next event waits until
  *   that promise settles. The run never waits: `append` only queues the event. A synchronous
- *   listener is called before `append` returns.
+ *   listener is called before `append` returns. At most `maxQueued` events wait for a listener.
  * - A listener that throws or rejects is reported to `onListenerError`, never to the run.
  */
 export class ObservedEventStore implements IEventStore {
@@ -43,7 +49,11 @@ export class ObservedEventStore implements IEventStore {
   /** Restored events are history, not live: they are not delivered. */
   readonly restore?: IEventStore['restore'];
 
-  private readonly subscriptions = new Set<LiveSubscription>();
+  /** Subscriptions to one run, by run id. */
+  private readonly byRun = new Map<string, Set<LiveSubscription>>();
+  /** Subscriptions not limited to a run. */
+  private readonly anyRun = new Set<LiveSubscription>();
+  private subscriptionCount = 0;
   /** Per run, the delivery of the last event appended (settled, never rejected). */
   private readonly lastDelivery = new Map<string, Promise<void>>();
   private readonly reportError: (error: unknown, event: Event) => void;
@@ -100,34 +110,75 @@ export class ObservedEventStore implements IEventStore {
 
   /**
    * Delivers every matching event appended from now on to `listener`. Throws a
-   * `ValidationError` for a listener that is not a function or a malformed filter.
+   * `ValidationError` for a listener that is not a function or malformed options.
    */
-  subscribe(listener: LiveEventListener, filter: LiveEventFilter = {}): LiveSubscription {
+  subscribe(listener: LiveEventListener, options: LiveSubscriptionOptions = {}): LiveSubscription {
     if (typeof listener !== 'function') {
       throw new ValidationError('listener', 'must be a function');
     }
-    assertFilter(filter);
+    const { maxQueued = DEFAULT_MAX_QUEUED_EVENTS, ...filter } = assertOptions(options);
+    const { runId } = filter;
     const subscription = new LiveSubscription(
       listener,
       { ...filter, ...(filter.types ? { types: [...filter.types] } : {}) },
+      maxQueued,
+      this.subscriptionCount++,
       this.reportError,
-      () => this.subscriptions.delete(subscription)
+      () => this.remove(subscription, runId)
     );
-    this.subscriptions.add(subscription);
+    if (runId === undefined) {
+      this.anyRun.add(subscription);
+    } else {
+      const forRun = this.byRun.get(runId) ?? new Set();
+      forRun.add(subscription);
+      this.byRun.set(runId, forRun);
+    }
     return subscription;
   }
 
+  private remove(subscription: LiveSubscription, runId: string | undefined): void {
+    if (runId === undefined) {
+      this.anyRun.delete(subscription);
+      return;
+    }
+    const forRun = this.byRun.get(runId);
+    forRun?.delete(subscription);
+    if (forRun?.size === 0) this.byRun.delete(runId);
+  }
+
   private publish(runId: string, event: Event): void {
-    if (this.subscriptions.size === 0) return;
-    // A copy of the set: a listener may subscribe or unsubscribe while it is called.
-    for (const subscription of [...this.subscriptions]) {
-      if (subscription.matches(runId, event)) subscription.forward(asRecorded(event));
+    const forRun = this.byRun.get(runId);
+    if (!forRun && this.anyRun.size === 0) return;
+    // Taken before any delivery: a listener may subscribe or unsubscribe while it is called.
+    const matching = [...(forRun ?? []), ...this.anyRun].filter((subscription) =>
+      subscription.matches(runId, event)
+    );
+    if (matching.length === 0) return;
+    if (forRun && this.anyRun.size > 0) {
+      matching.sort((first, second) => first.order - second.order);
+    }
+    const copy = copier(event);
+    for (const subscription of matching) {
+      const delivered = copy();
+      if (delivered) {
+        subscription.forward(delivered);
+      } else {
+        this.report(new Error('the event cannot be copied, so it was not delivered'), event);
+      }
+    }
+  }
+
+  private report(error: unknown, event: Event): void {
+    try {
+      this.reportError(error, event);
+    } catch {
+      reportOnStandardError(error, event);
     }
   }
 }
 
 /**
- * One listener's subscription: a queue delivered one event at a time, in order.
+ * One listener's subscription: a bounded queue delivered one event at a time, in order.
  * `unsubscribe` and `close` are safe at any moment, from the listener itself included.
  */
 export class LiveSubscription implements EventSubscription {
@@ -138,15 +189,20 @@ export class LiveSubscription implements EventSubscription {
   /** Unsubscribed: nothing more will be delivered, whatever the listener is still doing. */
   private dropped = false;
   private idleWaiters: Array<() => void> = [];
+  /** Events refused since the queue was last full, and the first of them. */
+  private overflow: { count: number; first: Event } | undefined;
 
   constructor(
     private readonly listener: LiveEventListener,
     private readonly filter: LiveEventFilter,
+    private readonly maxQueued: number,
+    /** @internal Subscription order, kept when a run's subscribers and others are merged. */
+    readonly order: number,
     private readonly reportError: (error: unknown, event: Event) => void,
     private readonly detach: () => void
   ) {}
 
-  /** Whether an event appended to `runId` is one this subscriber asked for. */
+  /** @internal Whether an event appended to `runId` is one this subscriber asked for. */
   matches(runId: string, event: Event): boolean {
     const { runId: wantedRun, agentId, types } = this.filter;
     return (
@@ -157,11 +213,18 @@ export class LiveSubscription implements EventSubscription {
   }
 
   /**
-   * Delivers an event in turn with the others, without checking the filter: used for the
-   * events of runs started on the subscriber's behalf (an agent run by a tool it called).
+   * @internal Delivers an event in turn with the others, without checking the filter: used by
+   * the SDK for the events of runs started on the subscriber's behalf (an agent run by a tool).
    */
   forward(event: Event): void {
     if (!this.open) return;
+    if (this.queue.length >= this.maxQueued) {
+      if (this.overflow) this.overflow.count++;
+      else this.overflow = { count: 1, first: event };
+      return;
+    }
+    // Room again: the burst of dropped events is over.
+    this.reportOverflow();
     this.queue.push(event);
     if (!this.delivering) this.deliver();
   }
@@ -171,6 +234,7 @@ export class LiveSubscription implements EventSubscription {
     this.dropped = true;
     // What was queued is dropped: the listener is not called again.
     this.queue.length = 0;
+    this.overflow = undefined;
     this.detach();
     this.wakeIdleWaiters();
   }
@@ -202,7 +266,15 @@ export class LiveSubscription implements EventSubscription {
       }
     }
     this.delivering = false;
+    this.reportOverflow();
     this.wakeIdleWaiters();
+  }
+
+  private reportOverflow(): void {
+    const overflow = this.overflow;
+    if (!overflow) return;
+    this.overflow = undefined;
+    this.report(new LiveEventsDroppedError(overflow.count, this.maxQueued), overflow.first);
   }
 
   private report(error: unknown, event: Event): void {
@@ -221,53 +293,129 @@ export class LiveSubscription implements EventSubscription {
   }
 }
 
+/** Listeners that forward events to a caller watching a tool call: they are best effort. */
+const forwardingListeners = new WeakSet<LiveEventListener>();
+
 /**
- * Subscribes the `onEvent` listener of a run, before the run records anything. Nothing without
- * a listener; a `ValidationError` for a listener that is not a function, or a store that does
- * not deliver live events.
+ * Marks the listener a tool call gives to the runs its tool starts (`ToolCallContext.onEvent`).
+ * A run whose store cannot deliver live events (an agent built by hand on a plain store) runs
+ * without it instead of refusing it: the caller did not ask for that run's events explicitly.
  */
-export function watchRun<Subscription extends EventSubscription>(
-  store: { subscribe?(listener: LiveEventListener, filter?: LiveEventFilter): Subscription },
-  runId: string,
+export function forwardingListener(listener: (event: Event) => void): LiveEventListener {
+  forwardingListeners.add(listener);
+  return listener;
+}
+
+/**
+ * Throws a `ValidationError` when a run cannot give its events to `listener`: a listener that
+ * is not a function, or a store that does not deliver live events (a forwarding listener
+ * excepted). Checked before the run does anything.
+ */
+export function checkRunListener(
+  store: { subscribe?: unknown },
   listener: LiveEventListener | undefined
-): Subscription | undefined {
-  if (listener === undefined) return undefined;
+): void {
+  if (listener === undefined) return;
   if (typeof listener !== 'function') {
     throw new ValidationError('onEvent', 'must be a function');
   }
-  if (!store.subscribe) {
+  if (!store.subscribe && !forwardingListeners.has(listener)) {
     throw new ValidationError(
       'onEvent',
       'this event store does not deliver live events: wrap it in an ObservedEventStore (createSDK does)'
     );
   }
+}
+
+/**
+ * Subscribes the `onEvent` listener of a run, before the run records anything (see
+ * `checkRunListener` for what is refused). Nothing without a listener, or for a forwarding
+ * listener on a store that does not deliver live events.
+ */
+export function watchRun<Subscription extends EventSubscription>(
+  store: {
+    subscribe?(listener: LiveEventListener, options?: LiveSubscriptionOptions): Subscription;
+  },
+  runId: string,
+  listener: LiveEventListener | undefined
+): Subscription | undefined {
+  checkRunListener(store, listener);
+  if (listener === undefined || !store.subscribe) return undefined;
   return store.subscribe(listener, { runId });
 }
 
-function assertFilter(filter: LiveEventFilter): void {
-  if (typeof filter !== 'object' || filter === null) {
+/**
+ * Ends a run's watch: waits until the listener has settled on every event it took, unless the
+ * run was stopped or cancelled, or its caller gives up (any of `signals` aborts), before or
+ * during the wait. Then the listener is unsubscribed: what it has not received yet is dropped.
+ */
+export async function finishWatch(
+  watch: EventSubscription | undefined,
+  signals: Array<AbortSignal | undefined>
+): Promise<void> {
+  if (!watch) return;
+  const given = signals.filter((signal): signal is AbortSignal => signal !== undefined);
+  const stop = () => watch.unsubscribe();
+  if (given.some((signal) => signal.aborted)) {
+    stop();
+    return;
+  }
+  for (const signal of given) signal.addEventListener('abort', stop, { once: true });
+  try {
+    await watch.close();
+  } finally {
+    for (const signal of given) signal.removeEventListener('abort', stop);
+  }
+}
+
+function assertOptions(options: LiveSubscriptionOptions): LiveSubscriptionOptions {
+  if (typeof options !== 'object' || options === null) {
     throw new ValidationError('filter', 'must be an object');
   }
   for (const field of ['runId', 'agentId'] as const) {
-    if (filter[field] !== undefined && typeof filter[field] !== 'string') {
+    if (options[field] !== undefined && typeof options[field] !== 'string') {
       throw new ValidationError(`filter.${field}`, 'must be a string');
     }
   }
   if (
-    filter.types !== undefined &&
-    !(Array.isArray(filter.types) && filter.types.every((type) => typeof type === 'string'))
+    options.types !== undefined &&
+    !(Array.isArray(options.types) && options.types.every((type) => typeof type === 'string'))
   ) {
     throw new ValidationError('filter.types', 'must be a list of event types');
   }
+  const { maxQueued } = options;
+  if (
+    maxQueued !== undefined &&
+    !(maxQueued === Number.POSITIVE_INFINITY || (Number.isInteger(maxQueued) && maxQueued >= 1))
+  ) {
+    throw new ValidationError('maxQueued', 'must be a whole number of at least 1, or Infinity');
+  }
+  return options;
 }
 
-/** The event as the store reads it back; the event itself if it cannot be written as JSON. */
-function asRecorded(event: Event): Event {
+/**
+ * Makes one copy of an event per call, as the store reads it back: serialized to JSON once,
+ * parsed for each subscriber. An event JSON cannot hold (a bigint, a cycle) is cloned instead;
+ * `undefined` when it cannot be copied at all. The event itself is never shared.
+ */
+function copier(event: Event): () => Event | undefined {
+  let json: string | undefined;
   try {
-    return JSON.parse(JSON.stringify(event)) as Event;
+    json = JSON.stringify(event);
   } catch {
-    return event;
+    json = undefined;
   }
+  if (json !== undefined) {
+    const text = json;
+    return () => JSON.parse(text) as Event;
+  }
+  return () => {
+    try {
+      return structuredClone(event);
+    } catch {
+      return undefined;
+    }
+  };
 }
 
 function isThenable(value: unknown): value is PromiseLike<unknown> {

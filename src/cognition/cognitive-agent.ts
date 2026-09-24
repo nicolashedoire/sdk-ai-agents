@@ -1,6 +1,6 @@
 import { ValidationError } from '../errors/index.js';
 import type { IEventStore } from '../stores/event-store.js';
-import { watchRun } from '../stores/observed-event-store.js';
+import { checkRunListener, finishWatch, watchRun } from '../stores/observed-event-store.js';
 import type { LiveEventListener, RunStatus } from '../types/events.js';
 import type { Tool } from '../types/tool.js';
 import { generateRunId } from '../utils/id.js';
@@ -63,9 +63,11 @@ export interface ThinkInput {
   signal?: AbortSignal;
   /**
    * Called with every event recorded for this run, in order, once the event store has accepted
-   * it; a promise it returns is awaited before its next event. The run never waits for it, and
-   * `think()` resolves once it has settled on every event. Its errors are reported, never
-   * thrown into the run. Not recorded.
+   * it; a promise it returns is awaited before its next event. The run never waits for it.
+   * When the run is over, `think()` waits until the listener has settled on every event, unless
+   * the run was stopped, cancelled or timed out, `signal` aborts, or `limits.timeoutMs` runs
+   * out meanwhile: the listener is then unsubscribed, and the events it had not received yet
+   * are dropped. Its errors are reported, never thrown into the run. Not recorded.
    */
   onEvent?: LiveEventListener;
 }
@@ -144,9 +146,7 @@ export class CognitiveAgent {
       throw new ValidationError('problem', 'a problem to think about is required');
     }
     const observations = this.initialObservations(input.observations ?? []);
-    const runId = generateRunId();
-    // Watched before anything is recorded, so the listener gets every event of the run.
-    const watch = watchRun(this.deps.eventStore, runId, input.onEvent);
+    checkRunListener(this.deps.eventStore, input.onEvent);
     const recalled = this.knowledge ? await this.knowledge.recall(problem) : undefined;
 
     const { limits } = this.deps;
@@ -157,7 +157,7 @@ export class CognitiveAgent {
       () => profile
     );
     const run: RunContext = {
-      runId,
+      runId: generateRunId(),
       abortController: new AbortController(),
       timedOut: false,
       toolCalls: 0,
@@ -196,6 +196,8 @@ export class CognitiveAgent {
       commitRules,
       ...(recalled ? { knowledge: recalled.items } : {}),
     });
+    // Watched before anything is recorded, so the listener gets every event of the run.
+    const watch = watchRun(this.deps.eventStore, run.runId, input.onEvent);
     try {
       await run.recorder.record(run.runId, 'run.started', {
         input: { message: problem, context: input.context, metadata: input.metadata },
@@ -278,12 +280,14 @@ export class CognitiveAgent {
       });
       return { runId: run.runId, status: 'failed', error: failure, state };
     } finally {
-      clearTimeout(timer);
       input.signal?.removeEventListener('abort', cancel);
       this.activeRuns.delete(run.runId);
       // Tests stay valid whatever the run's outcome: a failed or stopped run still learned them.
       await this.rememberFindings(run, state);
-      await watch?.close();
+      // Waits for the listener, unless the run was stopped, cancelled or timed out, or the
+      // caller gives up: `limits.timeoutMs` still counts while it waits.
+      await finishWatch(watch, [run.abortController.signal, input.signal]);
+      clearTimeout(timer);
     }
   }
 

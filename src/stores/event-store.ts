@@ -4,8 +4,8 @@ import type {
   EventLog,
   EventAggregation,
   EventQueryResult,
-  LiveEventFilter,
   LiveEventListener,
+  LiveSubscriptionOptions,
 } from '../types/events.js';
 
 /** A listener's subscription to live events (see `ObservedEventStore`). */
@@ -50,7 +50,7 @@ export interface IEventStore {
    * `ObservedEventStore` and on the stores wrapping one (the SDK's store always is); needed
    * by the `onEvent` option of runs.
    */
-  subscribe?(listener: LiveEventListener, filter?: LiveEventFilter): EventSubscription;
+  subscribe?(listener: LiveEventListener, options?: LiveSubscriptionOptions): EventSubscription;
 }
 
 export interface BackupData {
