@@ -210,14 +210,14 @@ interface ModelCostLine {
 | `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | 同じ差分をリグレッションとして、重大度と影響付きで返す。結果は `no_regression` または `regressions_detected` |
 | `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | 実行をリプレイしてから、そのリプレイを検証する。リプレイはモデルを呼ばないため、`validateAspects: ['tools', 'policies']` で比較する |
 
-実行は **イベントの意味で** 比較され、イベントの id では決して比較されません（id は実行ごとに新しくなります）。イベントは種類と対象（ツール、ポリシー、操作、回答）によって順番に対応づけられ、そのうえでデータが比較されます。比較しないもの：イベントの id、時刻、メタデータ、そしてデータのフィールド `agentId`、`approvalId`、`delayMs`、`duration`、`durationMs`、`elapsedMs`、`eventId`、`observedAt`、`recordedAt`、`replayOf`、`sourceEventId`、`usage`。同じことをもう一度行う実行は合格します。別の引数で呼ばれたツールは、呼び出しが起きた位置で報告されます（`parameters.metric: "churn" → "revenue"`）。`action.executed` が `action.failed` になった場合は、消失と追加ではなく 1 つの変更です。
+実行は **イベントの意味で** 比較され、イベントの id では決して比較されません（id は実行ごとに新しくなります）。イベントは順番に対応づけられます。まず同一のイベント、次に種類と対象（ツール、操作、回答）が同じでデータが変わったイベント、最後に同じ対象で種類が変わったイベントです。比較しないもの：イベントの id、時刻、メタデータ、`incident.reported` イベント（通知の送信と抑制を記録するものです。インシデントを起こしたイベントは比較されます）、そして SDK が書き込み、実行ごとに変わる値（ツール呼び出しの所要時間、トークン使用量、リトライ前の待ち時間、承認の id、リプレイ元の実行、観察の時刻と元のイベント）。モデルがツール呼び出しの横に書くテキストは `intention.generated` の中でだけ比較されます。ツールのパラメーター、結果、入力は、キーの名前にかかわらず常に比較されます。30 から 60 に変わった `duration` 引数は変更です。同じことをもう一度行う実行は合格します。別の引数で呼ばれたツールは、呼び出しが起きた位置で報告されます（`parameters.metric: "churn" → "revenue"`）。同一の呼び出しの前に挿入された呼び出しは、追加された 1 つの呼び出しです。`action.executed` が `action.failed` になった場合は、消失と追加ではなく 1 つの変更です。
 
 | オプション | 対象 | |
 | --- | --- | --- |
 | `ignoreEventTypes`、`validateAspects`（`intentions`、`actions`、`tools`、`policies`） | 検証 | 比較するイベントを減らす |
 | `tolerance.dataFields` | 検証 | 比較から外すデータのフィールドを、どの深さでも追加する |
 | `tolerance.timestampMs`、`ignoreTimestampDiff` | 検証 | タイミングは `timestampMs` があるときだけ、各実行の開始からの時間で比較する |
-| `compareStructureOnly` | 検証 | データの差分は `fail` ではなく `partial` になる |
+| `compareStructureOnly` | 検証 | データの差分は `fail` ではなく `partial` になる。追加、削除、移動されたイベントや種類の変わったイベントは引き続き `fail` |
 | `tolerance.ignoreEventTypes`、`tolerance.ignoreDataFields` | リグレッション | 比較するイベントを減らし、データのフィールドを外す |
 | `tolerance.criticalEventTypes` | リグレッション | 出現、消失、変更が重大とされる種類（デフォルト：`run.failed`、`action.failed`、`tool.failed`、`policy.violated`） |
 | `tolerance.maxEventCountDiff` | リグレッション | この数までの、追加または削除された処理イベント（ポリシーのチェック、リトライ、承認）は許容する。結果の変更は決して許容しない |
@@ -232,9 +232,9 @@ interface ModelCostLine {
 | `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | エージェントのすべてのスイートを古い順に実行する。各テストは入力をエージェントに送り、その実行をゴールデントレースと比較する。`suites` にはスイートごとに 1 つの結果が入る |
 | `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | 1 つのスイートだけ |
 | `runRegressionTestsForCI(agent, options?)` | `Promise<{ results, exitCode }>` | `exitCode`：0 はすべてのテストが合格、1 はリグレッションを見つけたテストがある、2 は実行できなかったテストがある（エラーまたはタイムアウト）。オプションで `exitCode: false` にすると 0 になる |
-| `exportTestResults(results, 'junit' \| 'json' \| 'json-summary', { outputPath?, includeDetails? })` | `Promise<string>` | JUnit XML では、スイートごとに 1 つの `<testsuite>` があり、タイムアウトはエラーとして数える |
+| `exportTestResults(results, 'junit' \| 'json' \| 'json-summary', { outputPath?, includeDetails? })` | `Promise<string>` | JUnit XML では、スイートごとに 1 つの `<testsuite>` がある。実行できなかったテスト（エラーまたはタイムアウト）は `<error>` になり、XML に含められない文字は取り除かれる |
 
-エージェントの id はプロセスごとに新しくなるため、スイートはエージェントの **名前** も記録し、別のプロセスではその名前のエージェントで実行されます（そのエージェントが SDK にあれば、まずスイートのエージェント id を使います）。1 つの SDK の 2 つのエージェントが同じ名前を持つときは、id を指定してください。以前のバージョンで保存されたスイートは名前を持たないため、作成したプロセスでしか実行できません。オプション：`parallel`（1 つのスイートのテストを同時に実行）、`stopOnFirstFailure`（逐次実行のときだけ）、`filterTags`、`excludeTags`、`timeout`（テストごとの ms、デフォルトは 60 000。超えると実行はキャンセルされ、テストは `timeout` になる）、`detection`（上のリグレッションのオプション）。
+エージェントの id はプロセスごとに新しくなるため、スイートはエージェントの **名前** も記録し、別のプロセスではその名前のエージェントで実行されます（そのエージェントが SDK にあれば、まずスイートのエージェント id を使います）。1 つの SDK の中では、エージェントの id はそのエージェントだけのものです。同じ名前の 2 つのエージェント（たとえば 2 つのバージョン）は、それぞれ自分のスイート、アサーション、ゴールデントレースを持ち、名前はそのすべてを指します。`createAgent` で作ったエージェントはすべて SDK に残るため、リクエストごとにエージェントを作るアプリケーションでは名前があいまいになります。id を渡すか、各エージェントを一度だけ作って再利用してください。以前のバージョンで保存されたスイートは名前を持たないため、作成したプロセスでしか実行できません。オプション：`parallel`（1 つのスイートのテストを同時に実行）、`stopOnFirstFailure`（逐次実行のときだけ。合格しなかった最初のテストのあとは、次のスイートも含めて何も実行しない）、`filterTags`、`excludeTags`、`timeout`（テストごとの ms、デフォルトは 60 000、最大 2 147 483 647。超えると実行はキャンセルされ、テストは `timeout` になる）、`detection`（上のリグレッションのオプション）。
 
 ### アサーション {#assertions}
 
@@ -263,9 +263,9 @@ interface ModelCostLine {
 | `getComparisonReport(comparison, 'text' \| 'json' \| 'html')` | `Promise<string>` | |
 | `analyzeImpact(beforeRunIds, afterRunIds, { metrics?, includeRecommendations? })` | `Promise<ImpactAnalysis>` | 変更前と変更後の平均：`duration`（ms）、`cost`（価格のあるモデル呼び出しの USD、`getRunCost` と同じ）、`quality`（失敗したアクションではないイベントの割合）、`success_rate`。振る舞いの変化も含む。`impactAnalysesDir` に保存される |
 | `getImpactAnalysis(analysisId)` | `Promise<ImpactAnalysis>` | |
-| `compareVersions(agent, version1, version2, options?)` | `Promise<ImpactAnalysis>` | ガバナンス付きエージェント（その名前、またはこの SDK のエージェントの id）の実行のうち、各バージョン（`version` または `configHash`）で記録されたものに対する `analyzeImpact`。リプレイは除く。未知のバージョンはエラーになり、記録されているバージョンが一覧される |
+| `compareVersions(agent, version1, version2, options?)` | `Promise<ImpactAnalysis>` | ガバナンス付きエージェント（その名前、またはこの SDK のエージェントの id）の実行のうち、各バージョン（`version` または `configHash`）で記録されたものに対する `analyzeImpact`。その名前のエージェントはすべて対象になる。リプレイは除く。2 つのバージョンは異なり、異なる実行を選ぶ必要がある。未知のバージョンはエラーになり、記録されているバージョンが一覧される |
 
-ガバナンス付きエージェントの実行のライフサイクルイベント（`run.started`、`run.completed` など）は、その `agentName`、`agentVersion`、`configHash` を記録します。同じ名前の 2 つのエージェントは、2 つのバージョンまたは 2 つのプロセスにある 1 つのエージェントです。以前のバージョンで記録された実行には id とバージョンしかありません。
+ガバナンス付きエージェントの実行のライフサイクルイベント（`run.started`、`run.completed` など）は、その `agentName`、`agentVersion`、`configHash` を記録します。同じ名前の 2 つのエージェントは、2 つのバージョンまたは 2 つのプロセスにある 1 つのエージェントです。ハッシュは、モデル、システムプロンプト、`maxSteps` と `timeout`、プロバイダーの設定、`version`、ケイパビリティ、ツール（名前、説明、バージョン、パラメーターのスキーマ、メタデータ、リトライの設定）、エージェント自身のポリシーとそのルールを対象にします。`setPolicy` と `addTools` で変わり、各実行は開始時のハッシュを記録します。以前のバージョンで記録された実行には id とバージョンしかありません。
 
 ### すべての実行にまたがるクエリ {#queries-across-runs}
 
@@ -275,7 +275,7 @@ interface ModelCostLine {
 | `countEventsAdvanced(filter)` | `Promise<number>` |
 | `getEventStatistics(filter)` | `Promise<{ total, byType, byAgent }>` |
 
-フィルターには **範囲**（`runId`、これがなければすべての実行、`since`、`until`）と **条件**（`type`、`agentId`、`userId`、`sessionId`、`dataFilters`（`{ path, operator, value?, regex? }`）、`metadataFilters`（`{ field, operator, value? }`））があります。条件は `logic`（デフォルトは `and`、`or` は少なくとも 1 つ）で組み合わされ、そのあと `not` で反転されます。範囲が反転されることはありません。組み込みのストアはどれでも答えます。ファイルストアはすべての実行を読み、SQL のストアはデータベースに問い合わせます。すべての条件を満たす必要があるときは、データベース自身が種類と id で絞り込みます。
+フィルターには **範囲**（`runId`、これがなければすべての実行、`since`、`until`）と **条件**（`type`、`agentId`、`userId`、`sessionId`、`dataFilters`（`{ path, operator, value?, regex? }`）、`metadataFilters`（`{ field, operator, value? }`））があります。条件は `logic`（デフォルトは `and`、`or` は少なくとも 1 つ）で組み合わされ、そのあと `not` で反転されます。範囲が反転されることはありません。組み込みのストアはどれでも答えます。ファイルストアはクエリごとに各実行のファイルを 1 回だけ読み、SQL のストアはデータベースに問い合わせます。すべての条件を満たす必要があるときは、データベース自身が種類と id でイベントを絞り込みます。`or` や `not` を使うと、ストアは範囲内のすべてのイベントを返し、条件はメモリー上でチェックされるため、大きなデータベースではコストが上がります。同じ時刻のイベントは id 順に並びます。
 
 ## リアルタイムのイベント {#live-events}
 

@@ -136,7 +136,7 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-실행은 이벤트가 뜻하는 바(종류, 순서, 도구, 매개변수, 결과)로 비교되며, 실행마다 새로 생기는 이벤트 id로는 절대 비교되지 않습니다. 시각과 토큰 수도 비교에서 빠집니다. 같은 일을 다시 하는 실행은 통과하고, 다른 인수로 호출된 도구는 호출이 일어난 자리에서 보고됩니다.
+실행은 이벤트가 뜻하는 바(종류, 순서, 도구, 매개변수, 결과)로 비교되며, 실행마다 새로 생기는 이벤트 id로는 절대 비교되지 않습니다. 시각, 토큰 수, 그리고 SDK가 기록하며 실행마다 바뀌는 다른 값도 비교에서 빠지지만, 도구의 매개변수와 결과는 키 이름과 상관없이 항상 비교됩니다. 같은 일을 다시 하는 실행은 통과하고, 다른 인수로 호출된 도구는 호출이 일어난 자리에서 보고됩니다.
 
 ### CI에서의 회귀 테스트 스위트 {#regression-suites-in-ci}
 

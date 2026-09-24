@@ -136,7 +136,7 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-As execuções são comparadas pelo que os seus eventos significam — tipo, ordem, ferramenta, parâmetros, resultados —, nunca pelos ids dos eventos, que são novos em cada execução; os horários e as contagens de tokens também ficam de fora. Uma execução que volta a fazer a mesma coisa passa; uma ferramenta chamada com outros argumentos é apontada onde a chamada aconteceu.
+As execuções são comparadas pelo que os seus eventos significam — tipo, ordem, ferramenta, parâmetros, resultados —, nunca pelos ids dos eventos, que são novos em cada execução; os horários, as contagens de tokens e os outros valores que o SDK escreve e que mudam de uma execução para outra também ficam de fora, mas os parâmetros e os resultados de uma ferramenta são sempre comparados, sejam quais forem os nomes das suas chaves. Uma execução que volta a fazer a mesma coisa passa; uma ferramenta chamada com outros argumentos é apontada onde a chamada aconteceu.
 
 ### Suítes de regressão na CI {#regression-suites-in-ci}
 

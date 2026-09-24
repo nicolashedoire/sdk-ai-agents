@@ -210,14 +210,14 @@ interface ModelCostLine {
 | `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | 把同样的差异作为回归返回，每个回归带有严重程度和影响：`no_regression` 或 `regressions_detected` |
 | `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | 回放这次运行，再验证回放。回放不调用任何模型：请用 `validateAspects: ['tools', 'policies']` 来比较 |
 
-运行按照**事件的含义**来比较，从不按事件 id 比较（每次运行的 id 都是新的）。事件按类型和对象（工具、策略、操作、回答）依次配对，然后再比较它们的数据。从不比较的内容：事件 id、时间、元数据，以及数据字段 `agentId`、`approvalId`、`delayMs`、`duration`、`durationMs`、`elapsedMs`、`eventId`、`observedAt`、`recordedAt`、`replayOf`、`sourceEventId` 和 `usage`。再次做同样事情的运行会通过；用别的参数调用的工具会在调用发生的位置被报告（`parameters.metric: "churn" → "revenue"`）；从 `action.executed` 变成 `action.failed` 算作一处改变，而不是一次丢失加一次新增。
+运行按照**事件的含义**来比较，从不按事件 id 比较（每次运行的 id 都是新的）。事件依次配对：先是完全相同的事件，然后是类型和对象（工具、操作、回答）相同但数据改变的事件，最后是对象相同但类型改变的事件。从不比较的内容：事件 id、时间、元数据、`incident.reported` 事件（它们记录通知的发送和限流；引发事故的那个事件本身会被比较），以及由 SDK 写入、每次运行都会变化的值：工具调用的耗时、token 用量、重试前的等待时间、审批 id、回放所来自的运行、观察的时间和来源事件。模型在工具调用旁边写下的文字只在 `intention.generated` 中比较。工具的参数、结果和输入总是会被比较，无论其键名是什么：从 30 变成 60 的 `duration` 参数就是一处改变。再次做同样事情的运行会通过；用别的参数调用的工具会在调用发生的位置被报告（`parameters.metric: "churn" → "revenue"`）；插在一次相同调用之前的调用算作一次新增的调用；从 `action.executed` 变成 `action.failed` 算作一处改变，而不是一次丢失加一次新增。
 
 | 选项 | 用于 | |
 | --- | --- | --- |
 | `ignoreEventTypes`、`validateAspects`（`intentions`、`actions`、`tools`、`policies`） | 验证 | 比较更少的事件 |
 | `tolerance.dataFields` | 验证 | 在任意层级再排除一些数据字段 |
 | `tolerance.timestampMs`、`ignoreTimestampDiff` | 验证 | 只有设置了 `timestampMs` 才比较时间，且以每次运行的开始为基准 |
-| `compareStructureOnly` | 验证 | 数据差异得到 `partial`，而不是 `fail` |
+| `compareStructureOnly` | 验证 | 数据差异得到 `partial`，而不是 `fail`；新增、删除、移动或类型改变的事件仍然失败 |
 | `tolerance.ignoreEventTypes`、`tolerance.ignoreDataFields` | 回归 | 比较更少的事件，排除一些数据字段 |
 | `tolerance.criticalEventTypes` | 回归 | 出现、丢失或改变即为严重的类型（默认：`run.failed`、`action.failed`、`tool.failed`、`policy.violated`） |
 | `tolerance.maxEventCountDiff` | 回归 | 最多容忍这么多新增或删除的流程事件（策略检查、重试、审批）；结果的改变从不被容忍 |
@@ -232,9 +232,9 @@ interface ModelCostLine {
 | `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | 按从旧到新的顺序运行该智能体的所有套件：每个测试把输入发给智能体，并把这次运行与其黄金追踪记录比较；`suites` 中每个套件对应一个结果 |
 | `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | 只运行一个套件 |
 | `runRegressionTestsForCI(agent, options?)` | `Promise<{ results, exitCode }>` | `exitCode`：0 表示所有测试通过，1 表示有测试发现回归，2 表示有测试无法运行（出错或超时）；在选项中设置 `exitCode: false` 则得到 0 |
-| `exportTestResults(results, 'junit' \| 'json' \| 'json-summary', { outputPath?, includeDetails? })` | `Promise<string>` | JUnit XML：每个套件一个 `<testsuite>`，超时算作错误 |
+| `exportTestResults(results, 'junit' \| 'json' \| 'json-summary', { outputPath?, includeDetails? })` | `Promise<string>` | JUnit XML：每个套件一个 `<testsuite>`；无法运行的测试（出错或超时）写作 `<error>`；XML 无法容纳的字符会被删除 |
 
-智能体的 id 在每个进程中都是新的：套件还会记下其智能体的**名称**，另一个进程会用该名称的智能体来运行它（如果套件记录的智能体 id 就在 SDK 中，则优先用它）。当同一个 SDK 里有两个智能体同名时，请给出 id。旧版本保存的套件没有名称：只能在创建它们的进程中运行。选项：`parallel`（同时运行一个套件的所有测试）、`stopOnFirstFailure`（仅限顺序运行）、`filterTags`、`excludeTags`、`timeout`（每个测试的毫秒数，默认 60 000；超过后运行会被取消，测试结果为 `timeout`）以及 `detection`（上面的回归选项）。
+智能体的 id 在每个进程中都是新的：套件还会记下其智能体的**名称**，另一个进程会用该名称的智能体来运行它（如果套件记录的智能体 id 就在 SDK 中，则优先用它）。在同一个 SDK 中，智能体的 id 只属于它自己：同名的两个智能体（例如两个版本）各自保留自己的套件、断言和黄金追踪记录，而名称指向它们全部。用 `createAgent` 创建的每个智能体都会一直留在它的 SDK 中，因此每个请求都创建一个智能体的应用会让名称变得有歧义：请传入 id，或者每个智能体只创建一次并重复使用。旧版本保存的套件没有名称：只能在创建它们的进程中运行。选项：`parallel`（同时运行一个套件的所有测试）、`stopOnFirstFailure`（仅限顺序运行：第一个未通过的测试之后，包括后续套件在内都不再运行）、`filterTags`、`excludeTags`、`timeout`（每个测试的毫秒数，默认 60 000，最多 2 147 483 647；超过后运行会被取消，测试结果为 `timeout`）以及 `detection`（上面的回归选项）。
 
 ### 断言 {#assertions}
 
@@ -263,9 +263,9 @@ interface ModelCostLine {
 | `getComparisonReport(comparison, 'text' \| 'json' \| 'html')` | `Promise<string>` | |
 | `analyzeImpact(beforeRunIds, afterRunIds, { metrics?, includeRecommendations? })` | `Promise<ImpactAnalysis>` | 变更前后的平均值：`duration`（毫秒）、`cost`（有价格的模型调用的美元花费，与 `getRunCost` 一致）、`quality`（不是失败动作的事件所占比例）和 `success_rate`，并附带行为变化；保存在 `impactAnalysesDir` 中 |
 | `getImpactAnalysis(analysisId)` | `Promise<ImpactAnalysis>` | |
-| `compareVersions(agent, version1, version2, options?)` | `Promise<ImpactAnalysis>` | 对某个受治理智能体（其名称，或本 SDK 中某个智能体的 id）在各个版本（其 `version` 或 `configHash`）下记录的运行执行 `analyzeImpact`。回放不计入；未知版本会抛出错误，并列出已记录的版本 |
+| `compareVersions(agent, version1, version2, options?)` | `Promise<ImpactAnalysis>` | 对某个受治理智能体（其名称，或本 SDK 中某个智能体的 id）在各个版本（其 `version` 或 `configHash`）下记录的运行执行 `analyzeImpact`。所有同名智能体都计入。回放不计入；两个版本必须不同，并选出不同的运行；未知版本会抛出错误，并列出已记录的版本 |
 
-受治理智能体运行的生命周期事件（`run.started`、`run.completed` 等）会记录其 `agentName`、`agentVersion` 和 `configHash`：同名的两个智能体，就是同一个智能体的两个版本，或处在两个进程中。旧版本记录的运行只有 id 和版本。
+受治理智能体运行的生命周期事件（`run.started`、`run.completed` 等）会记录其 `agentName`、`agentVersion` 和 `configHash`：同名的两个智能体，就是同一个智能体的两个版本，或处在两个进程中。该哈希涵盖模型、系统提示、`maxSteps` 与 `timeout`、提供商设置、`version`、能力、工具（名称、描述、版本、参数模式、元数据、重试设置）以及智能体自己的策略及其规则；它会随 `setPolicy` 和 `addTools` 改变，每次运行记录的是它开始时的哈希。旧版本记录的运行只有 id 和版本。
 
 ### 跨所有运行的查询 {#queries-across-runs}
 
@@ -275,7 +275,7 @@ interface ModelCostLine {
 | `countEventsAdvanced(filter)` | `Promise<number>` |
 | `getEventStatistics(filter)` | `Promise<{ total, byType, byAgent }>` |
 
-过滤器有一个**范围**：`runId`（没有它则为所有运行）、`since`、`until`；还有一些**条件**：`type`、`agentId`、`userId`、`sessionId`、`dataFilters`（`{ path, operator, value?, regex? }`）和 `metadataFilters`（`{ field, operator, value? }`）。条件用 `logic` 组合（默认为 `and`；`or` 表示至少满足一个），再由 `not` 取反；范围从不取反。所有内置存储都能回答：文件存储会读取每次运行，SQL 存储则查询数据库，并在所有条件都必须满足时由数据库自己按类型和 id 进行筛选。
+过滤器有一个**范围**：`runId`（没有它则为所有运行）、`since`、`until`；还有一些**条件**：`type`、`agentId`、`userId`、`sessionId`、`dataFilters`（`{ path, operator, value?, regex? }`）和 `metadataFilters`（`{ field, operator, value? }`）。条件用 `logic` 组合（默认为 `and`；`or` 表示至少满足一个），再由 `not` 取反；范围从不取反。所有内置存储都能回答：文件存储每次查询时对每个运行文件只读一次，SQL 存储则查询数据库。当所有条件都必须满足时，数据库会自己按类型和 id 筛选事件；使用 `or` 或 `not` 时，存储会返回范围内的所有事件，条件在内存中检查，这在大型数据库上开销更大。同一时刻的事件按 id 排序。
 
 ## 实时事件 {#live-events}
 

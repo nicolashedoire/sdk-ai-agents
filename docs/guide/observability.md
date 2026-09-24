@@ -136,7 +136,7 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-Runs are compared by what their events mean — type, order, tool, parameters, results — never by event ids, which are new in every run; times and token counts are left out too. A run that does the same thing again passes; a tool called with other arguments is reported where it happened.
+Runs are compared by what their events mean — type, order, tool, parameters, results — never by event ids, which are new in every run; times, token counts and the other values the SDK writes that change from one run to the next are left out too, but a tool's own parameters and results are always compared, whatever their keys. A run that does the same thing again passes; a tool called with other arguments is reported where it happened.
 
 ### Regression suites in CI
 

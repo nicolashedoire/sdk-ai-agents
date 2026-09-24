@@ -136,7 +136,7 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-Läufe werden nach der Bedeutung ihrer Ereignisse verglichen – Typ, Reihenfolge, Tool, Parameter, Ergebnisse –, nie nach Ereignis-IDs, die in jedem Lauf neu sind; Zeitpunkte und Token-Zahlen bleiben ebenfalls außen vor. Ein Lauf, der dasselbe noch einmal tut, besteht; ein Tool, das mit anderen Argumenten aufgerufen wird, wird dort gemeldet, wo der Aufruf stattfand.
+Läufe werden nach der Bedeutung ihrer Ereignisse verglichen – Typ, Reihenfolge, Tool, Parameter, Ergebnisse –, nie nach Ereignis-IDs, die in jedem Lauf neu sind; Zeitpunkte, Token-Zahlen und die anderen Werte, die das SDK schreibt und die sich von Lauf zu Lauf ändern, bleiben ebenfalls außen vor, aber Parameter und Ergebnisse eines Tools werden immer verglichen, wie auch immer ihre Schlüssel heißen. Ein Lauf, der dasselbe noch einmal tut, besteht; ein Tool, das mit anderen Argumenten aufgerufen wird, wird dort gemeldet, wo der Aufruf stattfand.
 
 ### Regressionssuiten in der CI {#regression-suites-in-ci}
 

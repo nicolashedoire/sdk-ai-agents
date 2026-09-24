@@ -136,7 +136,7 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-运行按照事件的含义来比较，即类型、顺序、工具、参数和结果，从不按每次运行都会更新的事件 id 比较；时间和 token 数量也不参与比较。再次做同样事情的运行会通过；用别的参数调用的工具会在调用发生的位置被报告。
+运行按照事件的含义来比较，即类型、顺序、工具、参数和结果，从不按每次运行都会更新的事件 id 比较；时间、token 数量以及由 SDK 写入、每次运行都会变化的其他值也不参与比较，但工具的参数和结果总是会被比较，无论其键名是什么。再次做同样事情的运行会通过；用别的参数调用的工具会在调用发生的位置被报告。
 
 ### 在 CI 中运行回归测试套件 {#regression-suites-in-ci}
 
