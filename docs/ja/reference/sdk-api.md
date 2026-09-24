@@ -73,7 +73,7 @@ const analyst = sdk.createAgent({
 
 | メソッド | 戻り値 | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | ガバナンス付きエージェント：`run({ message, context?, signal?, onText?, onTextRestart? })`、`stop(runId?)`、`addTools()`、`setPolicy()`、`id`、`name`。モデルが SDK に登録されている別のツールの名前を挙げても、実行できるのは自分のツール（`tools`、`capabilities`）だけ。`signal` は実行をキャンセルする。`onText` はモデルが書くテキストを書かれるそばから受け取り、`onTextRestart` は失敗したモデル呼び出しがもう一度試されるときに捨てる部分を受け取る（[回答のストリーミング](../guide/governed-agents#_7-streaming-the-answer) を参照） |
+| `createAgent(config)` | `AgentImpl` | ガバナンス付きエージェント：`run({ message, context?, signal?, onText?, onTextRestart? })`、`stop(runId?)`、`addTools()`、`setPolicy()`、`id`、`name`、`version`、`configHash`。モデルが SDK に登録されている別のツールの名前を挙げても、実行できるのは自分のツール（`tools`、`capabilities`）だけ。`signal` は実行をキャンセルする。`onText` はモデルが書くテキストを書かれるそばから受け取り、`onTextRestart` は失敗したモデル呼び出しがもう一度試されるときに捨てる部分を受け取る（[回答のストリーミング](../guide/governed-agents#_7-streaming-the-answer) を参照） |
 | `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`、`stop(runId?)`、`learnFromFeedback(runId, feedback)`、`getProfile()`、`setProfile()`。その思考は構造化されており、ストリーミングされない |
 | `defineTool(definition)` | `Tool` | ツールを登録する。ハンドラーの型は、その Zod スキーマから決まる |
 | `defineCapability(definition)` | `Capability` | ツールをグループにまとめる |
@@ -199,7 +199,83 @@ interface ModelCostLine {
 | `getTrace(runId)`、`exportTrace(runId, 'json' \| 'text')`、`getEvents(runId, filters?)` | 実行を読む |
 | `replay(runId, modifications?, { onEvent? })` | LLM を使わずに再実行する |
 | `getReasoningGraph`、`exportReasoningGraph`、`getAlternatives`、`getDecisionPatterns`、`getTraceVisualization` | 決定を理解する |
-| `createGoldenTrace`、`getGoldenTraces`、`validateAgainstGoldenTrace`、`replayAndValidate`、`detectRegressions` | エージェントをコードのようにテストする |
+
+### ゴールデントレース {#golden-traces}
+
+| メソッド | 戻り値 | |
+| --- | --- | --- |
+| `createGoldenTrace(runId, { name, description?, metadata? })` | `Promise<GoldenTrace>` | 実行を基準として保存する。その実行を行ったガバナンス付きエージェントの名前（`agentName`）も記録する |
+| `getGoldenTraces(agent?)`、`getGoldenTrace(id)`、`deleteGoldenTrace(id)`、`exportGoldenTrace(id, 'json' \| 'yaml')` | | `agent`：エージェントの id または名前 |
+| `validateAgainstGoldenTrace(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | `pass`、`fail`、`partial` のいずれか。差分ごとに種類（`event_added`、`event_removed`、`event_modified`、`event_order_changed`）と位置が付く |
+| `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | 同じ差分をリグレッションとして、重大度と影響付きで返す。結果は `no_regression` または `regressions_detected` |
+| `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | 実行をリプレイしてから、そのリプレイを検証する。リプレイはモデルを呼ばないため、`validateAspects: ['tools', 'policies']` で比較する |
+
+実行は **イベントの意味で** 比較され、イベントの id では決して比較されません（id は実行ごとに新しくなります）。イベントは種類と対象（ツール、ポリシー、操作、回答）によって順番に対応づけられ、そのうえでデータが比較されます。比較しないもの：イベントの id、時刻、メタデータ、そしてデータのフィールド `agentId`、`approvalId`、`delayMs`、`duration`、`durationMs`、`elapsedMs`、`eventId`、`observedAt`、`recordedAt`、`replayOf`、`sourceEventId`、`usage`。同じことをもう一度行う実行は合格します。別の引数で呼ばれたツールは、呼び出しが起きた位置で報告されます（`parameters.metric: "churn" → "revenue"`）。`action.executed` が `action.failed` になった場合は、消失と追加ではなく 1 つの変更です。
+
+| オプション | 対象 | |
+| --- | --- | --- |
+| `ignoreEventTypes`、`validateAspects`（`intentions`、`actions`、`tools`、`policies`） | 検証 | 比較するイベントを減らす |
+| `tolerance.dataFields` | 検証 | 比較から外すデータのフィールドを、どの深さでも追加する |
+| `tolerance.timestampMs`、`ignoreTimestampDiff` | 検証 | タイミングは `timestampMs` があるときだけ、各実行の開始からの時間で比較する |
+| `compareStructureOnly` | 検証 | データの差分は `fail` ではなく `partial` になる |
+| `tolerance.ignoreEventTypes`、`tolerance.ignoreDataFields` | リグレッション | 比較するイベントを減らし、データのフィールドを外す |
+| `tolerance.criticalEventTypes` | リグレッション | 出現、消失、変更が重大とされる種類（デフォルト：`run.failed`、`action.failed`、`tool.failed`、`policy.violated`） |
+| `tolerance.maxEventCountDiff` | リグレッション | この数までの、追加または削除された処理イベント（ポリシーのチェック、リトライ、承認）は許容する。結果の変更は決して許容しない |
+| `tolerance.maxDurationDiff`、`severityThresholds` | リグレッション | 所要時間はどちらかがあるときだけチェックする。`maxDurationDiff` ms を超えて遅くなった実行はリグレッションとなり、到達した最も高いしきい値の重大度が付く。速くなった実行は決してリグレッションにならない |
+
+### リグレッションスイート {#regression-suites}
+
+| メソッド | 戻り値 | |
+| --- | --- | --- |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | `regressionTestSuitesDir` に保存される。`agent`：この SDK のエージェントの id または名前。各ゴールデントレースは存在している必要がある。`input` のデフォルトは、基準の実行が受け取った入力 |
+| `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | 新しいものから順に |
+| `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | エージェントのすべてのスイートを古い順に実行する。各テストは入力をエージェントに送り、その実行をゴールデントレースと比較する。`suites` にはスイートごとに 1 つの結果が入る |
+| `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | 1 つのスイートだけ |
+| `runRegressionTestsForCI(agent, options?)` | `Promise<{ results, exitCode }>` | `exitCode`：0 はすべてのテストが合格、1 はリグレッションを見つけたテストがある、2 は実行できなかったテストがある（エラーまたはタイムアウト）。オプションで `exitCode: false` にすると 0 になる |
+| `exportTestResults(results, 'junit' \| 'json' \| 'json-summary', { outputPath?, includeDetails? })` | `Promise<string>` | JUnit XML では、スイートごとに 1 つの `<testsuite>` があり、タイムアウトはエラーとして数える |
+
+エージェントの id はプロセスごとに新しくなるため、スイートはエージェントの **名前** も記録し、別のプロセスではその名前のエージェントで実行されます（そのエージェントが SDK にあれば、まずスイートのエージェント id を使います）。1 つの SDK の 2 つのエージェントが同じ名前を持つときは、id を指定してください。以前のバージョンで保存されたスイートは名前を持たないため、作成したプロセスでしか実行できません。オプション：`parallel`（1 つのスイートのテストを同時に実行）、`stopOnFirstFailure`（逐次実行のときだけ）、`filterTags`、`excludeTags`、`timeout`（テストごとの ms、デフォルトは 60 000。超えると実行はキャンセルされ、テストは `timeout` になる）、`detection`（上のリグレッションのオプション）。
+
+### アサーション {#assertions}
+
+| メソッド | 戻り値 | |
+| --- | --- | --- |
+| `defineAssertion(name, condition, { description?, severity?, tags?, agentId?, agentName? })` | `Promise<Assertion>` | すべての実行、または 1 つのエージェントの実行が対象。`agentId` で指定したこの SDK のエージェントは、その名前も記録される。評価できない条件は `ValidationError` で拒否される |
+| `getAssertions(agent?, tags?)` | `Promise<Assertion[]>` | 新しいものから順に |
+| `evaluateAssertions(runId, assertionIds?)` | `Promise<AssertionEvaluationReport>` | 指定したアサーション（未知の id はエラー）。指定しなければ、すべての実行が対象のものと、その実行のエージェントのもの |
+| `deleteAssertion(assertionId)` | `Promise<void>` | |
+
+| `condition.type` | 必要なもの | 合格する条件 |
+| --- | --- | --- |
+| `event_present`、`event_absent` | `eventType` または `eventTypes` | いずれかの種類が現れる／どれも現れない |
+| `event_count` | `eventType` または `eventTypes`、それに `count`、または `minCount` と `maxCount` | その種類のイベントの数が範囲に収まる |
+| `event_order` | `beforeEventType`、`afterEventType` | 一方の最初のイベントが、もう一方の最初のイベントより前にある |
+| `event_value` | `eventType`、`valuePath`、`valueMatcher`（`eq`、`ne`、`gt`、`gte`、`lt`、`lte`、`contains`、`regex`） | その種類のすべてのイベントが一致する |
+| `custom` | `customEvaluator(events) => boolean` | 関数が `true` を返す |
+
+`custom` アサーションは関数を持ち、関数はファイルに書き出せません。そのため **保存されず**、定義した SDK インスタンスが存在する間だけ有効です。起動時にもう一度定義してください。ほかの種類は `assertionsDir` に保存されます。
+
+### 比較と影響 {#comparisons-and-impact}
+
+| メソッド | 戻り値 | |
+| --- | --- | --- |
+| `compareRuns(runId1, runId2, { ignoreEventTypes?, focusAspects?, compareStructureOnly?, includeMetadata? })` | `Promise<RunComparison>` | 上と同じく意味で対応づけた差分：`event_added`、`event_removed`、`event_modified`（種類が変わった）、`data_changed`、`sequence_changed` |
+| `getComparisonReport(comparison, 'text' \| 'json' \| 'html')` | `Promise<string>` | |
+| `analyzeImpact(beforeRunIds, afterRunIds, { metrics?, includeRecommendations? })` | `Promise<ImpactAnalysis>` | 変更前と変更後の平均：`duration`（ms）、`cost`（価格のあるモデル呼び出しの USD、`getRunCost` と同じ）、`quality`（失敗したアクションではないイベントの割合）、`success_rate`。振る舞いの変化も含む。`impactAnalysesDir` に保存される |
+| `getImpactAnalysis(analysisId)` | `Promise<ImpactAnalysis>` | |
+| `compareVersions(agent, version1, version2, options?)` | `Promise<ImpactAnalysis>` | ガバナンス付きエージェント（その名前、またはこの SDK のエージェントの id）の実行のうち、各バージョン（`version` または `configHash`）で記録されたものに対する `analyzeImpact`。リプレイは除く。未知のバージョンはエラーになり、記録されているバージョンが一覧される |
+
+ガバナンス付きエージェントの実行のライフサイクルイベント（`run.started`、`run.completed` など）は、その `agentName`、`agentVersion`、`configHash` を記録します。同じ名前の 2 つのエージェントは、2 つのバージョンまたは 2 つのプロセスにある 1 つのエージェントです。以前のバージョンで記録された実行には id とバージョンしかありません。
+
+### すべての実行にまたがるクエリ {#queries-across-runs}
+
+| メソッド | 戻り値 |
+| --- | --- |
+| `queryEventsAdvanced(filter)` | `Promise<{ events, total, filtered, filters, executionTime }>`：一致するイベント（時刻順、最大 `limit` 件）、範囲内のイベント数、一致したイベント数 |
+| `countEventsAdvanced(filter)` | `Promise<number>` |
+| `getEventStatistics(filter)` | `Promise<{ total, byType, byAgent }>` |
+
+フィルターには **範囲**（`runId`、これがなければすべての実行、`since`、`until`）と **条件**（`type`、`agentId`、`userId`、`sessionId`、`dataFilters`（`{ path, operator, value?, regex? }`）、`metadataFilters`（`{ field, operator, value? }`））があります。条件は `logic`（デフォルトは `and`、`or` は少なくとも 1 つ）で組み合わされ、そのあと `not` で反転されます。範囲が反転されることはありません。組み込みのストアはどれでも答えます。ファイルストアはすべての実行を読み、SQL のストアはデータベースに問い合わせます。すべての条件を満たす必要があるときは、データベース自身が種類と id で絞り込みます。
 
 ## リアルタイムのイベント {#live-events}
 

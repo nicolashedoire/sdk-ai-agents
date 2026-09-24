@@ -136,4 +136,28 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-Regression suites, behavioral assertions, run comparison and impact analysis before deployment are available too — see the [SDK API](../reference/sdk-api).
+Runs are compared by what their events mean — type, order, tool, parameters, results — never by event ids, which are new in every run; times and token counts are left out too. A run that does the same thing again passes; a tool called with other arguments is reported where it happened.
+
+### Regression suites in CI
+
+Group golden traces in a suite once, then run it in CI:
+
+```ts
+// Once, after recording the good runs
+await sdk.createRegressionTestSuite('support-agent', {
+  name: 'refunds',
+  goldenTraces: [{ goldenTraceId: golden.id, name: 'refund flow' }],
+});
+
+// In CI: the same agent, created again
+sdk.createAgent({ name: 'support-agent', model: 'gpt-4o', tools });
+const { results, exitCode } = await sdk.runRegressionTestsForCI('support-agent', {
+  detection: { tolerance: { ignoreEventTypes: ['intention.generated'], ignoreDataFields: ['output'] } },
+});
+await sdk.exportTestResults(results, 'junit', { outputPath: 'regressions.xml' });
+process.exitCode = exitCode;
+```
+
+A suite knows its agent by **name**, since agent ids are new in every process. Every suite of the agent runs, oldest first: each test sends the golden run's input to the agent and compares the new run with the golden trace. The exit code is 0 when every test passed, 1 when one found a regression, 2 when one could not run. A real model words its answers differently from one run to the next: the `detection` above leaves the model's text and the final answer out, and still checks every tool call with its arguments.
+
+Assertions on a run's events, the comparison of two runs, the impact of a new version of an agent and queries across runs are in the [SDK API](../reference/sdk-api#assertions).

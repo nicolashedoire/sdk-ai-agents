@@ -136,4 +136,28 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-회귀 테스트 스위트, 동작 단언(assertion), 실행 비교, 배포 전 영향 분석도 쓸 수 있습니다. [SDK API](../reference/sdk-api)를 보세요.
+실행은 이벤트가 뜻하는 바(종류, 순서, 도구, 매개변수, 결과)로 비교되며, 실행마다 새로 생기는 이벤트 id로는 절대 비교되지 않습니다. 시각과 토큰 수도 비교에서 빠집니다. 같은 일을 다시 하는 실행은 통과하고, 다른 인수로 호출된 도구는 호출이 일어난 자리에서 보고됩니다.
+
+### CI에서의 회귀 테스트 스위트 {#regression-suites-in-ci}
+
+골든 트레이스를 한 번 스위트로 묶은 다음, CI에서 실행하세요.
+
+```ts
+// Once, after recording the good runs
+await sdk.createRegressionTestSuite('support-agent', {
+  name: 'refunds',
+  goldenTraces: [{ goldenTraceId: golden.id, name: 'refund flow' }],
+});
+
+// In CI: the same agent, created again
+sdk.createAgent({ name: 'support-agent', model: 'gpt-4o', tools });
+const { results, exitCode } = await sdk.runRegressionTestsForCI('support-agent', {
+  detection: { tolerance: { ignoreEventTypes: ['intention.generated'], ignoreDataFields: ['output'] } },
+});
+await sdk.exportTestResults(results, 'junit', { outputPath: 'regressions.xml' });
+process.exitCode = exitCode;
+```
+
+에이전트 id는 프로세스마다 새로 생기므로, 스위트는 에이전트를 **이름**으로 알아봅니다. 에이전트의 모든 스위트가 오래된 것부터 실행되며, 각 테스트는 기준 실행의 입력을 에이전트에 보내고 새 실행을 골든 트레이스와 비교합니다. 종료 코드는 모든 테스트가 통과하면 0, 회귀를 찾은 테스트가 있으면 1, 실행할 수 없었던 테스트가 있으면 2입니다. 실제 모델은 실행할 때마다 답변을 다르게 표현합니다. 위의 `detection`은 모델의 텍스트와 최종 답변을 비교에서 빼면서도, 모든 도구 호출과 그 인수는 계속 검사합니다.
+
+실행 이벤트에 대한 단언, 두 실행의 비교, 에이전트 새 버전의 영향, 모든 실행에 걸친 쿼리는 [SDK API](../reference/sdk-api#assertions)에 있습니다.

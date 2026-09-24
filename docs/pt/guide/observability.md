@@ -136,4 +136,28 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-Suítes de regressão, asserções de comportamento, comparação de execuções e análise de impacto antes da implantação também estão disponíveis — veja a [API do SDK](../reference/sdk-api).
+As execuções são comparadas pelo que os seus eventos significam — tipo, ordem, ferramenta, parâmetros, resultados —, nunca pelos ids dos eventos, que são novos em cada execução; os horários e as contagens de tokens também ficam de fora. Uma execução que volta a fazer a mesma coisa passa; uma ferramenta chamada com outros argumentos é apontada onde a chamada aconteceu.
+
+### Suítes de regressão na CI {#regression-suites-in-ci}
+
+Agrupe uma vez os golden traces numa suíte e depois execute-a na CI:
+
+```ts
+// Once, after recording the good runs
+await sdk.createRegressionTestSuite('support-agent', {
+  name: 'refunds',
+  goldenTraces: [{ goldenTraceId: golden.id, name: 'refund flow' }],
+});
+
+// In CI: the same agent, created again
+sdk.createAgent({ name: 'support-agent', model: 'gpt-4o', tools });
+const { results, exitCode } = await sdk.runRegressionTestsForCI('support-agent', {
+  detection: { tolerance: { ignoreEventTypes: ['intention.generated'], ignoreDataFields: ['output'] } },
+});
+await sdk.exportTestResults(results, 'junit', { outputPath: 'regressions.xml' });
+process.exitCode = exitCode;
+```
+
+Uma suíte conhece o seu agente pelo **nome**, já que os ids dos agentes são novos em cada processo. Todas as suítes do agente rodam, a mais antiga primeiro: cada teste envia ao agente a entrada da execução de referência e compara a nova execução com o golden trace. O código de saída é 0 quando todos os testes passaram, 1 quando um encontrou uma regressão e 2 quando um não conseguiu rodar. Um modelo real formula as suas respostas de outro jeito de uma execução para outra: a `detection` acima deixa de fora o texto do modelo e a resposta final, e continua verificando cada chamada de ferramenta com os seus argumentos.
+
+As asserções sobre os eventos de uma execução, a comparação de duas execuções, o impacto de uma nova versão de um agente e as consultas em todas as execuções estão na [API do SDK](../reference/sdk-api#assertions).

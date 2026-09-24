@@ -73,7 +73,7 @@ const analyst = sdk.createAgent({
 
 | Метод | Возвращает | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | Управляемый агент: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. Он может запускать только собственные инструменты (`tools`, `capabilities`), даже если модель называет другой инструмент, зарегистрированный в SDK; `signal` отменяет запуск; `onText` получает текст, который пишет модель, по мере его написания, а `onTextRestart` — часть, которую нужно отбросить, когда неудавшийся вызов модели пробуют снова (см. [Потоковая передача ответа](../guide/governed-agents#_7-streaming-the-answer)) |
+| `createAgent(config)` | `AgentImpl` | Управляемый агент: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`, `version`, `configHash`. Он может запускать только собственные инструменты (`tools`, `capabilities`), даже если модель называет другой инструмент, зарегистрированный в SDK; `signal` отменяет запуск; `onText` получает текст, который пишет модель, по мере его написания, а `onTextRestart` — часть, которую нужно отбросить, когда неудавшийся вызов модели пробуют снова (см. [Потоковая передача ответа](../guide/governed-agents#_7-streaming-the-answer)) |
 | `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()`. Его мысли структурированы и не передаются потоком |
 | `defineTool(definition)` | `Tool` | Регистрирует инструмент; обработчик типизируется по его схеме Zod |
 | `defineCapability(definition)` | `Capability` | Группирует инструменты |
@@ -199,7 +199,83 @@ interface ModelCostLine {
 | `getTrace(runId)`, `exportTrace(runId, 'json' \| 'text')`, `getEvents(runId, filters?)` | Чтение запусков |
 | `replay(runId, modifications?, { onEvent? })` | Повторное выполнение без LLM |
 | `getReasoningGraph`, `exportReasoningGraph`, `getAlternatives`, `getDecisionPatterns`, `getTraceVisualization` | Понимание решений |
-| `createGoldenTrace`, `getGoldenTraces`, `validateAgainstGoldenTrace`, `replayAndValidate`, `detectRegressions` | Тестирование агентов как кода |
+
+### Эталонные трассы {#golden-traces}
+
+| Метод | Возвращает | |
+| --- | --- | --- |
+| `createGoldenTrace(runId, { name, description?, metadata? })` | `Promise<GoldenTrace>` | Сохраняет запуск как эталон вместе с именем управляемого агента, который его выполнил (`agentName`) |
+| `getGoldenTraces(agent?)`, `getGoldenTrace(id)`, `deleteGoldenTrace(id)`, `exportGoldenTrace(id, 'json' \| 'yaml')` | | `agent`: id или имя агента |
+| `validateAgainstGoldenTrace(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | `pass`, `fail` или `partial` с каждым различием (`event_added`, `event_removed`, `event_modified`, `event_order_changed`) и его позицией |
+| `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | Те же различия в виде регрессий, у каждой — серьёзность и влияние: `no_regression` или `regressions_detected` |
+| `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | Воспроизводит запуск, затем проверяет воспроизведение. Воспроизведение не вызывает модель: сравнивайте его с `validateAspects: ['tools', 'policies']` |
+
+Запуски сравниваются **по смыслу их событий**, а не по id событий (у каждого запуска они новые). События сопоставляются по порядку, по типу и предмету — инструменту, политике, операции, ответу, — затем сравниваются их данные. Никогда не сравниваются: id событий, время, метаданные и поля данных `agentId`, `approvalId`, `delayMs`, `duration`, `durationMs`, `elapsedMs`, `eventId`, `observedAt`, `recordedAt`, `replayOf`, `sourceEventId` и `usage`. Запуск, который снова делает то же самое, проходит; инструмент, вызванный с другими аргументами, отмечается там, где произошёл вызов (`parameters.metric: "churn" → "revenue"`); `action.executed`, ставший `action.failed`, — это одно изменение, а не пропажа плюс добавление.
+
+| Параметр | Для | |
+| --- | --- | --- |
+| `ignoreEventTypes`, `validateAspects` (`intentions`, `actions`, `tools`, `policies`) | Проверка | Сравнивать меньше событий |
+| `tolerance.dataFields` | Проверка | Дополнительные поля данных, исключаемые на любой глубине |
+| `tolerance.timestampMs`, `ignoreTimestampDiff` | Проверка | Время сравнивается, относительно начала каждого запуска, только при `timestampMs` |
+| `compareStructureOnly` | Проверка | Различия в данных дают `partial`, а не `fail` |
+| `tolerance.ignoreEventTypes`, `tolerance.ignoreDataFields` | Регрессии | Сравнивать меньше событий, исключать поля данных |
+| `tolerance.criticalEventTypes` | Регрессии | Типы, появление, пропажа или изменение которых критичны (по умолчанию: `run.failed`, `action.failed`, `tool.failed`, `policy.violated`) |
+| `tolerance.maxEventCountDiff` | Регрессии | До стольких добавленных или удалённых служебных событий (проверки политик, повторы, одобрения) допускается; изменение результата — никогда |
+| `tolerance.maxDurationDiff`, `severityThresholds` | Регрессии | Длительность проверяется только с одним из них: запуск, ставший медленнее более чем на `maxDurationDiff` мс, — регрессия с серьёзностью наивысшего достигнутого порога; более быстрый запуск регрессией не бывает |
+
+### Наборы регрессионных тестов {#regression-suites}
+
+| Метод | Возвращает | |
+| --- | --- | --- |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Сохраняется в `regressionTestSuitesDir`. `agent`: id или имя агента этого SDK. Каждая эталонная трасса должна существовать; `input` по умолчанию — вход, который получил эталонный запуск |
+| `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | Сначала самые новые |
+| `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | Все наборы агента, начиная с самого старого: каждый тест отправляет свой вход агенту и сравнивает запуск со своей эталонной трассой; в `suites` — по одному результату на набор |
+| `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | Один набор |
+| `runRegressionTestsForCI(agent, options?)` | `Promise<{ results, exitCode }>` | `exitCode`: 0 — все тесты прошли, 1 — тест нашёл регрессию, 2 — тест не смог выполниться (ошибка или тайм-аут); `exitCode: false` в параметрах даёт 0 |
+| `exportTestResults(results, 'junit' \| 'json' \| 'json-summary', { outputPath?, includeDetails? })` | `Promise<string>` | JUnit XML: по одному `<testsuite>` на набор, тайм-аут считается ошибкой |
+
+Id агентов новые в каждом процессе, поэтому набор записывает и **имя** своего агента, а другой процесс запускает его со своим агентом с этим именем (сначала по id агента из набора, если такой агент есть в SDK). Если у двух агентов одного SDK одинаковое имя, укажите id. Наборы, сохранённые прежними версиями, не содержат имени: они запускаются только в создавшем их процессе. Параметры: `parallel` (тесты набора одновременно), `stopOnFirstFailure` (только при последовательном запуске), `filterTags`, `excludeTags`, `timeout` (мс на тест, по умолчанию 60 000; после него запуск отменяется, а тест получает `timeout`) и `detection` (параметры регрессий выше).
+
+### Проверки {#assertions}
+
+| Метод | Возвращает | |
+| --- | --- | --- |
+| `defineAssertion(name, condition, { description?, severity?, tags?, agentId?, agentName? })` | `Promise<Assertion>` | Для всех запусков или для запусков одного агента; для агента этого SDK, заданного через `agentId`, записывается и его имя. Условие, которое нельзя было бы вычислить, отклоняется с `ValidationError` |
+| `getAssertions(agent?, tags?)` | `Promise<Assertion[]>` | Сначала самые новые |
+| `evaluateAssertions(runId, assertionIds?)` | `Promise<AssertionEvaluationReport>` | Указанные проверки (неизвестный id вызывает ошибку), иначе проверки для всех запусков плюс проверки агента этого запуска |
+| `deleteAssertion(assertionId)` | `Promise<void>` | |
+
+| `condition.type` | Нужно | Проходит, когда |
+| --- | --- | --- |
+| `event_present`, `event_absent` | `eventType` или `eventTypes` | Встречается один из типов / не встречается ни один |
+| `event_count` | `eventType` или `eventTypes`, затем `count` либо `minCount` и `maxCount` | Число таких событий подходит |
+| `event_order` | `beforeEventType`, `afterEventType` | Первое событие одного типа идёт раньше первого события другого |
+| `event_value` | `eventType`, `valuePath`, `valueMatcher` (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `contains`, `regex`) | Каждое событие этого типа подходит |
+| `custom` | `customEvaluator(events) => boolean` | Функция возвращает `true` |
+
+Проверка `custom` содержит функцию, а функцию нельзя записать в файл: такая проверка **не сохраняется** и живёт, пока живёт экземпляр SDK, который её определил, — определяйте её заново при запуске. Остальные типы сохраняются в `assertionsDir`.
+
+### Сравнения и влияние {#comparisons-and-impact}
+
+| Метод | Возвращает | |
+| --- | --- | --- |
+| `compareRuns(runId1, runId2, { ignoreEventTypes?, focusAspects?, compareStructureOnly?, includeMetadata? })` | `Promise<RunComparison>` | Различия, сопоставленные по смыслу, как выше: `event_added`, `event_removed`, `event_modified` (сменился тип), `data_changed`, `sequence_changed` |
+| `getComparisonReport(comparison, 'text' \| 'json' \| 'html')` | `Promise<string>` | |
+| `analyzeImpact(beforeRunIds, afterRunIds, { metrics?, includeRecommendations? })` | `Promise<ImpactAnalysis>` | Средние до и после для `duration` (мс), `cost` (USD вызовов модели, у которых есть цена, как в `getRunCost`), `quality` (доля событий, которые не являются неудавшимися действиями) и `success_rate`, с изменениями поведения; сохраняется в `impactAnalysesDir` |
+| `getImpactAnalysis(analysisId)` | `Promise<ImpactAnalysis>` | |
+| `compareVersions(agent, version1, version2, options?)` | `Promise<ImpactAnalysis>` | `analyzeImpact` по запускам управляемого агента (его имя или id агента этого SDK), записанным с каждой версией: его `version` или его `configHash`. Воспроизведения не учитываются; неизвестная версия вызывает ошибку со списком записанных |
+
+События жизненного цикла запусков управляемого агента (`run.started`, `run.completed`…) записывают его `agentName`, `agentVersion` и `configHash`: два агента с одним именем — это один агент в двух версиях или в двух процессах. Запуски, записанные прежними версиями, содержат только id и версию.
+
+### Запросы по всем запускам {#queries-across-runs}
+
+| Метод | Возвращает |
+| --- | --- |
+| `queryEventsAdvanced(filter)` | `Promise<{ events, total, filtered, filters, executionTime }>`: подходящие события в порядке времени (не больше `limit`), число событий в области, число подходящих |
+| `countEventsAdvanced(filter)` | `Promise<number>` |
+| `getEventStatistics(filter)` | `Promise<{ total, byType, byAgent }>` |
+
+У фильтра есть **область** — `runId` (без него — все запуски), `since`, `until` — и **условия** — `type`, `agentId`, `userId`, `sessionId`, `dataFilters` (`{ path, operator, value?, regex? }`) и `metadataFilters` (`{ field, operator, value? }`). Условия объединяются через `logic` (`and` по умолчанию; `or` — хотя бы одно), затем инвертируются через `not`; область не инвертируется никогда. Отвечает любое встроенное хранилище: файловое читает каждый запуск, SQL-хранилища обращаются к базе данных, которая сама фильтрует по типу и id, когда должны выполняться все условия.
 
 ## События в реальном времени {#live-events}
 

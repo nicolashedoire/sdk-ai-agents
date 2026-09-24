@@ -136,4 +136,28 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-रिग्रेशन सूट, व्यवहार संबंधी assertions, runs की तुलना और डिप्लॉयमेंट से पहले असर का विश्लेषण भी उपलब्ध हैं — देखें [SDK API](../reference/sdk-api)।
+runs की तुलना उनके इवेंट्स के अर्थ से होती है — प्रकार, क्रम, टूल, पैरामीटर, नतीजे — इवेंट id से कभी नहीं, जो हर run में नए होते हैं; समय और tokens की गिनती भी छोड़ दी जाती है। वही काम दोबारा करने वाला run पास होता है; दूसरे arguments के साथ कॉल किया गया टूल वहीं बताया जाता है जहाँ कॉल हुई।
+
+### CI में रिग्रेशन सूट {#regression-suites-in-ci}
+
+गोल्डन ट्रेस को एक बार किसी सूट में जमा करें, फिर उसे CI में चलाएँ:
+
+```ts
+// Once, after recording the good runs
+await sdk.createRegressionTestSuite('support-agent', {
+  name: 'refunds',
+  goldenTraces: [{ goldenTraceId: golden.id, name: 'refund flow' }],
+});
+
+// In CI: the same agent, created again
+sdk.createAgent({ name: 'support-agent', model: 'gpt-4o', tools });
+const { results, exitCode } = await sdk.runRegressionTestsForCI('support-agent', {
+  detection: { tolerance: { ignoreEventTypes: ['intention.generated'], ignoreDataFields: ['output'] } },
+});
+await sdk.exportTestResults(results, 'junit', { outputPath: 'regressions.xml' });
+process.exitCode = exitCode;
+```
+
+सूट अपने एजेंट को उसके **नाम** से पहचानता है, क्योंकि एजेंट के id हर प्रोसेस में नए होते हैं। एजेंट के सभी सूट चलते हैं, सबसे पुराना पहले: हर टेस्ट संदर्भ run का इनपुट एजेंट को भेजता है और नए run की तुलना गोल्डन ट्रेस से करता है। सभी टेस्ट पास होने पर exit code 0 होता है, किसी टेस्ट को रिग्रेशन मिलने पर 1, और कोई टेस्ट न चल पाने पर 2। असली मॉडल हर run में अपने जवाब अलग शब्दों में देता है: ऊपर का `detection` मॉडल के टेक्स्ट और आखिरी जवाब को छोड़ देता है, और फिर भी हर टूल कॉल को उसके arguments के साथ जाँचता है।
+
+किसी run के इवेंट्स पर assertions, दो runs की तुलना, किसी एजेंट के नए version का असर और सभी runs पर क्वेरी [SDK API](../reference/sdk-api#assertions) में हैं।

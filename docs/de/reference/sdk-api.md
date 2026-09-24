@@ -73,7 +73,7 @@ Ihr eigener Anbieter implementiert `generateCompletion(request)`, `supportsModel
 
 | Methode | Rückgabe | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | Kontrollierter Agent: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. Er kann nur seine eigenen Tools ausführen (`tools`, `capabilities`), selbst wenn das Modell ein anderes im SDK registriertes Tool nennt; `signal` bricht den Lauf ab; `onText` erhält den Text, den das Modell schreibt, während es ihn schreibt, und `onTextRestart` den zu verwerfenden Teil, wenn ein fehlgeschlagener Modellaufruf erneut versucht wird (siehe [Die Antwort streamen](../guide/governed-agents#_7-streaming-the-answer)) |
+| `createAgent(config)` | `AgentImpl` | Kontrollierter Agent: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`, `version`, `configHash`. Er kann nur seine eigenen Tools ausführen (`tools`, `capabilities`), selbst wenn das Modell ein anderes im SDK registriertes Tool nennt; `signal` bricht den Lauf ab; `onText` erhält den Text, den das Modell schreibt, während es ihn schreibt, und `onTextRestart` den zu verwerfenden Teil, wenn ein fehlgeschlagener Modellaufruf erneut versucht wird (siehe [Die Antwort streamen](../guide/governed-agents#_7-streaming-the-answer)) |
 | `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()`. Seine Gedanken sind strukturiert und werden nicht gestreamt |
 | `defineTool(definition)` | `Tool` | Registriert ein Tool; der Handler wird aus seinem Zod-Schema typisiert |
 | `defineCapability(definition)` | `Capability` | Gruppiert Tools |
@@ -199,7 +199,83 @@ interface ModelCostLine {
 | `getTrace(runId)`, `exportTrace(runId, 'json' \| 'text')`, `getEvents(runId, filters?)` | Läufe lesen |
 | `replay(runId, modifications?, { onEvent? })` | Ohne das LLM erneut ausführen |
 | `getReasoningGraph`, `exportReasoningGraph`, `getAlternatives`, `getDecisionPatterns`, `getTraceVisualization` | Entscheidungen verstehen |
-| `createGoldenTrace`, `getGoldenTraces`, `validateAgainstGoldenTrace`, `replayAndValidate`, `detectRegressions` | Agenten wie Code testen |
+
+### Golden Traces {#golden-traces}
+
+| Methode | Rückgabe | |
+| --- | --- | --- |
+| `createGoldenTrace(runId, { name, description?, metadata? })` | `Promise<GoldenTrace>` | Behält einen Lauf als Referenz, mit dem Namen des kontrollierten Agenten, der ihn ausgeführt hat (`agentName`) |
+| `getGoldenTraces(agent?)`, `getGoldenTrace(id)`, `deleteGoldenTrace(id)`, `exportGoldenTrace(id, 'json' \| 'yaml')` | | `agent`: die ID oder der Name eines Agenten |
+| `validateAgainstGoldenTrace(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | `pass`, `fail` oder `partial`, mit jedem Unterschied (`event_added`, `event_removed`, `event_modified`, `event_order_changed`) und seiner Position |
+| `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | Dieselben Unterschiede als Regressionen, jede mit einem Schweregrad und einer Auswirkung: `no_regression` oder `regressions_detected` |
+| `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | Spielt den Lauf erneut ab und validiert dann das Replay. Ein Replay ruft kein Modell auf: vergleichen Sie es mit `validateAspects: ['tools', 'policies']` |
+
+Läufe werden **nach der Bedeutung ihrer Ereignisse** verglichen, nie nach Ereignis-IDs (jeder Lauf hat neue). Die Ereignisse werden der Reihe nach über ihren Typ und ihren Gegenstand – das Tool, die Richtlinie, die Operation, die Antwort – einander zugeordnet, dann werden ihre Daten verglichen. Nie verglichen werden: Ereignis-IDs, Zeitpunkte, Metadaten sowie die Datenfelder `agentId`, `approvalId`, `delayMs`, `duration`, `durationMs`, `elapsedMs`, `eventId`, `observedAt`, `recordedAt`, `replayOf`, `sourceEventId` und `usage`. Ein Lauf, der dasselbe noch einmal tut, besteht; ein Tool, das mit anderen Argumenten aufgerufen wird, wird dort gemeldet, wo der Aufruf stattfand (`parameters.metric: "churn" → "revenue"`); ein `action.executed`, das zu `action.failed` wurde, ist eine einzige Änderung, kein Verlust plus eine Ergänzung.
+
+| Option | Für | |
+| --- | --- | --- |
+| `ignoreEventTypes`, `validateAspects` (`intentions`, `actions`, `tools`, `policies`) | Validierung | Weniger Ereignisse vergleichen |
+| `tolerance.dataFields` | Validierung | Weitere Datenfelder auslassen, in jeder Tiefe |
+| `tolerance.timestampMs`, `ignoreTimestampDiff` | Validierung | Zeitpunkte werden nur mit `timestampMs` verglichen, relativ zum Beginn jedes Laufs |
+| `compareStructureOnly` | Validierung | Datenunterschiede ergeben `partial`, nicht `fail` |
+| `tolerance.ignoreEventTypes`, `tolerance.ignoreDataFields` | Regressionen | Weniger Ereignisse vergleichen, Datenfelder auslassen |
+| `tolerance.criticalEventTypes` | Regressionen | Typen, deren Auftreten, Wegfall oder Änderung kritisch ist (Standard: `run.failed`, `action.failed`, `tool.failed`, `policy.violated`) |
+| `tolerance.maxEventCountDiff` | Regressionen | Bis zu so viele hinzugekommene oder weggefallene Ablaufereignisse (Richtlinienprüfungen, Wiederholungen, Freigaben) werden toleriert; eine Änderung des Ergebnisses nie |
+| `tolerance.maxDurationDiff`, `severityThresholds` | Regressionen | Die Dauer wird nur mit einer der beiden Optionen geprüft: Ein Lauf, der um mehr als `maxDurationDiff` ms langsamer ist, ist eine Regression, mit dem Schweregrad der höchsten erreichten Schwelle; ein schnellerer Lauf nie |
+
+### Regressionssuiten {#regression-suites}
+
+| Methode | Rückgabe | |
+| --- | --- | --- |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Gespeichert in `regressionTestSuitesDir`. `agent`: die ID oder der Name eines Agenten dieses SDK. Jeder Golden Trace muss existieren; `input` ist standardmäßig die Eingabe, die der Referenzlauf erhalten hat |
+| `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | Die neuesten zuerst |
+| `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | Alle Suiten des Agenten, die älteste zuerst: Jeder Test schickt seine Eingabe an den Agenten und vergleicht den Lauf mit seinem Golden Trace; `suites` enthält ein Ergebnis pro Suite |
+| `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | Eine einzelne Suite |
+| `runRegressionTestsForCI(agent, options?)` | `Promise<{ results, exitCode }>` | `exitCode`: 0 alle Tests bestanden, 1 ein Test hat eine Regression gefunden, 2 ein Test konnte nicht laufen (Fehler oder Zeitüberschreitung); `exitCode: false` in den Optionen ergibt 0 |
+| `exportTestResults(results, 'junit' \| 'json' \| 'json-summary', { outputPath?, includeDetails? })` | `Promise<string>` | JUnit-XML: ein `<testsuite>` pro Suite, eine Zeitüberschreitung zählt als Fehler |
+
+Agenten-IDs sind in jedem Prozess neu: Eine Suite speichert auch den **Namen** ihres Agenten, und ein anderer Prozess führt sie mit seinem Agenten dieses Namens aus (zuerst mit der Agenten-ID der Suite, wenn dieser Agent im SDK ist). Wenn sich zwei Agenten eines SDK den Namen teilen, geben Sie die ID an. Von früheren Versionen gespeicherte Suiten haben keinen Namen: Sie laufen nur in dem Prozess, der sie erstellt hat. Optionen: `parallel` (die Tests einer Suite gleichzeitig), `stopOnFirstFailure` (nur bei sequenziellen Läufen), `filterTags`, `excludeTags`, `timeout` (ms pro Test, standardmäßig 60 000; danach wird der Lauf abgebrochen und der Test ist `timeout`) und `detection` (die Regressionsoptionen oben).
+
+### Assertions {#assertions}
+
+| Methode | Rückgabe | |
+| --- | --- | --- |
+| `defineAssertion(name, condition, { description?, severity?, tags?, agentId?, agentName? })` | `Promise<Assertion>` | Für alle Läufe oder für die Läufe eines Agenten; ein Agent dieses SDK, der über `agentId` angegeben wird, speichert auch seinen Namen. Eine Bedingung, die sich nicht auswerten ließe, wird mit einem `ValidationError` abgelehnt |
+| `getAssertions(agent?, tags?)` | `Promise<Assertion[]>` | Die neuesten zuerst |
+| `evaluateAssertions(runId, assertionIds?)` | `Promise<AssertionEvaluationReport>` | Die angegebenen Assertions (eine unbekannte ID wirft einen Fehler), sonst die für alle Läufe plus die des Agenten des Laufs |
+| `deleteAssertion(assertionId)` | `Promise<void>` | |
+
+| `condition.type` | Braucht | Besteht, wenn |
+| --- | --- | --- |
+| `event_present`, `event_absent` | `eventType` oder `eventTypes` | Einer der Typen vorkommt / keiner vorkommt |
+| `event_count` | `eventType` oder `eventTypes`, dann `count` oder `minCount` und `maxCount` | Die Anzahl dieser Ereignisse passt |
+| `event_order` | `beforeEventType`, `afterEventType` | Das erste des einen vor dem ersten des anderen kommt |
+| `event_value` | `eventType`, `valuePath`, `valueMatcher` (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `contains`, `regex`) | Jedes Ereignis des Typs passt |
+| `custom` | `customEvaluator(events) => boolean` | Die Funktion `true` zurückgibt |
+
+Eine `custom`-Assertion enthält eine Funktion, die sich nicht in eine Datei schreiben lässt: Sie wird **nicht gespeichert** und lebt so lange wie die SDK-Instanz, die sie definiert hat; definieren Sie sie beim Start erneut. Die anderen Typen werden in `assertionsDir` gespeichert.
+
+### Vergleiche und Auswirkungen {#comparisons-and-impact}
+
+| Methode | Rückgabe | |
+| --- | --- | --- |
+| `compareRuns(runId1, runId2, { ignoreEventTypes?, focusAspects?, compareStructureOnly?, includeMetadata? })` | `Promise<RunComparison>` | Die Unterschiede, nach Bedeutung ausgerichtet wie oben: `event_added`, `event_removed`, `event_modified` (Typ geändert), `data_changed`, `sequence_changed` |
+| `getComparisonReport(comparison, 'text' \| 'json' \| 'html')` | `Promise<string>` | |
+| `analyzeImpact(beforeRunIds, afterRunIds, { metrics?, includeRecommendations? })` | `Promise<ImpactAnalysis>` | Durchschnitte vorher und nachher von `duration` (ms), `cost` (USD der Modellaufrufe mit Preis, wie bei `getRunCost`), `quality` (Anteil der Ereignisse, die keine fehlgeschlagenen Aktionen sind) und `success_rate`, mit den Verhaltensänderungen; gespeichert in `impactAnalysesDir` |
+| `getImpactAnalysis(analysisId)` | `Promise<ImpactAnalysis>` | |
+| `compareVersions(agent, version1, version2, options?)` | `Promise<ImpactAnalysis>` | `analyzeImpact` auf den Läufen eines kontrollierten Agenten (sein Name oder die ID eines Agenten dieses SDK), die mit jeder Version aufgezeichnet wurden: seiner `version` oder seinem `configHash`. Replays bleiben außen vor; eine unbekannte Version wirft einen Fehler, der die aufgezeichneten auflistet |
+
+Die Lebenszyklusereignisse der Läufe eines kontrollierten Agenten (`run.started`, `run.completed` …) zeichnen seinen `agentName`, seine `agentVersion` und seinen `configHash` auf: Zwei Agenten mit demselben Namen sind ein Agent in zwei Versionen oder in zwei Prozessen. Läufe, die von früheren Versionen aufgezeichnet wurden, haben nur die ID und die Version.
+
+### Abfragen über alle Läufe {#queries-across-runs}
+
+| Methode | Rückgabe |
+| --- | --- |
+| `queryEventsAdvanced(filter)` | `Promise<{ events, total, filtered, filters, executionTime }>`: die passenden Ereignisse in zeitlicher Reihenfolge (höchstens `limit`), die Ereignisse im Umfang, die passenden |
+| `countEventsAdvanced(filter)` | `Promise<number>` |
+| `getEventStatistics(filter)` | `Promise<{ total, byType, byAgent }>` |
+
+Ein Filter hat einen **Umfang** – `runId` (ohne ihn alle Läufe), `since`, `until` – und **Bedingungen** – `type`, `agentId`, `userId`, `sessionId`, `dataFilters` (`{ path, operator, value?, regex? }`) und `metadataFilters` (`{ field, operator, value? }`). Die Bedingungen werden mit `logic` verknüpft (standardmäßig `and`; `or`: mindestens eine) und dann durch `not` verneint; der Umfang nie. Jeder mitgelieferte Speicher antwortet: Der Dateispeicher liest jeden Lauf, die SQL-Speicher fragen die Datenbank ab, die selbst nach Typ und IDs filtert, wenn alle Bedingungen gelten müssen.
 
 ## Live-Ereignisse {#live-events}
 

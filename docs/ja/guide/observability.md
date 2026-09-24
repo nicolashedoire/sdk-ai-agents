@@ -136,4 +136,28 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-リグレッションスイート、振る舞いのアサーション、実行同士の比較、デプロイ前の影響分析も利用できます。[SDK API](../reference/sdk-api) を参照してください。
+実行はイベントの意味（種類、順序、ツール、パラメーター、結果）で比較され、実行ごとに新しくなるイベントの id では決して比較されません。時刻とトークン数も比較から外されます。同じことをもう一度行う実行は合格し、別の引数で呼ばれたツールは、呼び出しが起きた位置で報告されます。
+
+### CI でのリグレッションスイート {#regression-suites-in-ci}
+
+ゴールデントレースを一度スイートにまとめておき、CI で実行します。
+
+```ts
+// Once, after recording the good runs
+await sdk.createRegressionTestSuite('support-agent', {
+  name: 'refunds',
+  goldenTraces: [{ goldenTraceId: golden.id, name: 'refund flow' }],
+});
+
+// In CI: the same agent, created again
+sdk.createAgent({ name: 'support-agent', model: 'gpt-4o', tools });
+const { results, exitCode } = await sdk.runRegressionTestsForCI('support-agent', {
+  detection: { tolerance: { ignoreEventTypes: ['intention.generated'], ignoreDataFields: ['output'] } },
+});
+await sdk.exportTestResults(results, 'junit', { outputPath: 'regressions.xml' });
+process.exitCode = exitCode;
+```
+
+エージェントの id はプロセスごとに新しくなるため、スイートはエージェントを **名前** で覚えています。エージェントのすべてのスイートが古い順に実行され、各テストは基準の実行の入力をエージェントに送り、新しい実行をゴールデントレースと比較します。終了コードは、すべてのテストが合格すれば 0、リグレッションを見つけたテストがあれば 1、実行できなかったテストがあれば 2 です。実際のモデルは、実行のたびに回答を違う言い方で返します。上の `detection` はモデルのテキストと最終的な回答を比較から外し、それでもツール呼び出しとその引数はすべてチェックします。
+
+実行のイベントに対するアサーション、2 つの実行の比較、エージェントの新しいバージョンの影響、すべての実行にまたがるクエリは [SDK API](../reference/sdk-api#assertions) にあります。

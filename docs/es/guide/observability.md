@@ -136,4 +136,28 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-También están disponibles las baterías de regresión, las aserciones de comportamiento, la comparación de ejecuciones y el análisis de impacto antes del despliegue — consulta la [API del SDK](../reference/sdk-api).
+Las ejecuciones se comparan por lo que significan sus eventos —tipo, orden, herramienta, parámetros, resultados—, nunca por los ids de los eventos, que son nuevos en cada ejecución; las horas y los recuentos de tokens también se dejan fuera. Una ejecución que vuelve a hacer lo mismo pasa; una herramienta llamada con otros argumentos se señala allí donde ocurrió.
+
+### Baterías de regresión en CI {#regression-suites-in-ci}
+
+Agrupa una vez las trazas de referencia en una batería y después ejecútala en CI:
+
+```ts
+// Once, after recording the good runs
+await sdk.createRegressionTestSuite('support-agent', {
+  name: 'refunds',
+  goldenTraces: [{ goldenTraceId: golden.id, name: 'refund flow' }],
+});
+
+// In CI: the same agent, created again
+sdk.createAgent({ name: 'support-agent', model: 'gpt-4o', tools });
+const { results, exitCode } = await sdk.runRegressionTestsForCI('support-agent', {
+  detection: { tolerance: { ignoreEventTypes: ['intention.generated'], ignoreDataFields: ['output'] } },
+});
+await sdk.exportTestResults(results, 'junit', { outputPath: 'regressions.xml' });
+process.exitCode = exitCode;
+```
+
+Una batería conoce a su agente por su **nombre**, ya que los ids de los agentes son nuevos en cada proceso. Se ejecutan todas las baterías del agente, la más antigua primero: cada prueba envía al agente la entrada de la ejecución de referencia y compara la nueva ejecución con la traza de referencia. El código de salida es 0 cuando todas las pruebas pasaron, 1 cuando una encontró una regresión y 2 cuando una no pudo ejecutarse. Un modelo real formula sus respuestas de otra manera de una ejecución a otra: la `detection` de arriba deja fuera el texto del modelo y la respuesta final, y sigue comprobando cada llamada a herramienta con sus argumentos.
+
+Las aserciones sobre los eventos de una ejecución, la comparación de dos ejecuciones, el impacto de una nueva versión de un agente y las consultas sobre todas las ejecuciones están en la [API del SDK](../reference/sdk-api#assertions).
