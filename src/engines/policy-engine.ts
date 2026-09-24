@@ -45,6 +45,13 @@ export class PolicyEngine {
     this.budgetTracker = tracker;
   }
 
+  /** Counts tokens a model call used for an agent, for token budgets per agent and period. */
+  async recordTokenUsage(agentId: string, tokens: number): Promise<void> {
+    if (tokens > 0) {
+      await this.budgetTracker?.recordUsage(agentId, tokens);
+    }
+  }
+
   applyGlobalPolicy(policy: Policy): void {
     if (!policy.enabled) return;
     this.globalPolicies.set(policy.id, policy);
@@ -106,6 +113,8 @@ export class PolicyEngine {
   async validate(intention: Intention, context: PolicyContext): Promise<PolicyValidationResult> {
     const policies = this.getActivePolicies(context.agentId);
     const violatedPolicies: string[] = [];
+    // What each violated policy says went wrong, e.g. "Max steps (10) exceeded".
+    const reasons = new Map<string, string>();
     const approvalRequiredPolicies: Array<{ policyId: string; rule: PolicyRule }> = [];
 
     for (const policy of policies) {
@@ -123,6 +132,7 @@ export class PolicyEngine {
       const result = await this.validatePolicy(policy, intention, context);
       if (!result.allowed) {
         violatedPolicies.push(policy.id);
+        if (result.reason) reasons.set(policy.id, result.reason);
       }
 
       // Check if any rule requires approval
@@ -150,7 +160,7 @@ export class PolicyEngine {
       return { allowed: true };
     }
 
-    return this.createViolationResult(intention, policies, violatedPolicies);
+    return this.createViolationResult(intention, policies, violatedPolicies, reasons);
   }
 
   /**
@@ -324,10 +334,15 @@ export class PolicyEngine {
   private createViolationResult(
     intention: Intention,
     policies: Policy[],
-    violatedPolicies: string[]
+    violatedPolicies: string[],
+    reasons: ReadonlyMap<string, string>
   ): PolicyValidationResult {
-    const firstPolicy = policies.find((p) => p.id === violatedPolicies[0]);
-    const reason = this.getViolationReason(intention, firstPolicy, violatedPolicies);
+    const firstId = violatedPolicies[0];
+    const firstPolicy = policies.find((p) => p.id === firstId);
+    // The policy's own reason says what was exceeded; the generic one only names policies.
+    const reason =
+      (firstId !== undefined ? reasons.get(firstId) : undefined) ??
+      this.getViolationReason(intention, firstPolicy, violatedPolicies);
 
     return {
       allowed: false,
@@ -479,8 +494,9 @@ export class PolicyEngine {
       return null; // This limit doesn't apply to this tool
     }
 
-    // Calculate additional usage for this action
-    const additionalTokens = context.tokensUsed || 0;
+    // A tool call consumes no tokens: model tokens are recorded as they are used
+    // (recordTokenUsage), so adding the run's total here would count them twice.
+    const additionalTokens = 0;
     const additionalToolCalls = context.intention?.toolName ? 1 : 0;
 
     const checkResult = await this.budgetTracker.checkBudget(

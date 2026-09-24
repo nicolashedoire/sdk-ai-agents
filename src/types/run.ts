@@ -49,6 +49,11 @@ export interface Intention {
 export interface ActionContext {
   runId: string;
   agentId: string;
+  /**
+   * Progress of the calling run, checked by budget policies (`maxSteps`, `maxTokens`,
+   * `maxDuration`). Absent for a call outside a run, such as a tool called by an MCP client.
+   */
+  run?: { step: number; tokensUsed: number; startedAt: number };
   mode?: 'normal' | 'replay';
   /**
    * Replay only: the original run got a human approval for this very call (same tool, same

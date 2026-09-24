@@ -28,6 +28,13 @@ export interface ReasoningContext {
   abortSignal?: AbortSignal;
 }
 
+/** One model call of a run: what the model intends, and what the call cost. */
+export interface ReasoningStep {
+  intention: Intention;
+  /** Tokens the call used, when the provider reports them. */
+  usage?: LLMResponse['usage'];
+}
+
 export class ReasoningEngine {
   private provider: LLMProvider;
   private model: string;
@@ -61,6 +68,15 @@ export class ReasoningEngine {
     eventStore: IEventStore,
     signal?: AbortSignal
   ): Promise<Intention> {
+    return (await this.generateStep(context, eventStore, signal)).intention;
+  }
+
+  /** Calls the model once and returns its intention with the tokens the call used. */
+  async generateStep(
+    context: ReasoningContext,
+    eventStore: IEventStore,
+    signal?: AbortSignal
+  ): Promise<ReasoningStep> {
     // Either way of passing the signal cancels the call.
     const abortSignal = signal ?? context.abortSignal;
     if (abortSignal?.aborted) {
@@ -148,7 +164,7 @@ export class ReasoningEngine {
         answeredBy
       );
 
-      return this.parseIntention(response);
+      return { intention: this.parseIntention(response), usage: response.usage };
     } catch (error) {
       if (abortSignal?.aborted) {
         throw new Error('Run cancelled');

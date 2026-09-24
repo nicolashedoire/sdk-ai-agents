@@ -1,6 +1,6 @@
 import type { ActionEngine } from './engines/action-engine.js';
 import type { PolicyEngine } from './engines/policy-engine.js';
-import type { ReasoningEngine } from './engines/reasoning-engine.js';
+import type { ReasoningEngine, ReasoningStep } from './engines/reasoning-engine.js';
 import type { IEventStore } from './stores/event-store.js';
 import type { Event } from './types/events.js';
 import type { Agent, ProviderSettings } from './types/agent.js';
@@ -14,6 +14,8 @@ interface RunState {
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
   currentInput: string;
   step: number;
+  /** Tokens the run's model calls used so far. */
+  tokensUsed: number;
   maxSteps: number;
   timeout: number;
   startTime: number;
@@ -107,6 +109,7 @@ export class AgentImpl {
       conversationHistory: [],
       currentInput: input.message,
       step: 0,
+      tokensUsed: 0,
       maxSteps: this.agent.config.maxSteps || DEFAULT_MAX_STEPS,
       timeout: this.agent.config.timeout || DEFAULT_TIMEOUT_MS,
       startTime: Date.now(),
@@ -121,7 +124,8 @@ export class AgentImpl {
       this.checkTimeout(state);
 
       try {
-        const intention = await this.generateIntention(runId, state);
+        const { intention, usage } = await this.generateStep(runId, state);
+        await this.recordTokens(state, usage);
 
         this.checkCancellation(runId, state);
 
@@ -160,7 +164,15 @@ export class AgentImpl {
     }
   }
 
-  private async generateIntention(runId: string, state: RunState): Promise<Intention> {
+  /** Adds a model call's tokens to the run and to the agent's token budgets. */
+  private async recordTokens(state: RunState, usage: ReasoningStep['usage']): Promise<void> {
+    const tokens =
+      usage?.totalTokens ?? (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0);
+    state.tokensUsed += tokens;
+    await this.policyEngine.recordTokenUsage(this.agent.id, tokens);
+  }
+
+  private async generateStep(runId: string, state: RunState): Promise<ReasoningStep> {
     // Merge agent and run providerSettings
     // Priority: run settings > agent settings
     const providerSettings = this.mergeProviderSettings(
@@ -168,7 +180,7 @@ export class AgentImpl {
       state.providerSettings
     );
 
-    return await this.reasoningEngine.generateIntention(
+    return await this.reasoningEngine.generateStep(
       {
         runId,
         agentId: this.agent.id,
@@ -233,6 +245,8 @@ export class AgentImpl {
     const result = await this.actionEngine.executeIntention(intention, {
       runId,
       agentId: this.agent.id,
+      // What budget policies check: the run's step, tokens and start time.
+      run: { step: state.step, tokensUsed: state.tokensUsed, startedAt: state.startTime },
       abortSignal: state.abortController?.signal,
       // Only this agent's tools, even if the model names another tool registered in the SDK.
       allowedTools: this.agent.tools.map((tool) => tool.name),
