@@ -1,5 +1,5 @@
 import type { SQLConnection, SQLEventStoreConfig } from './sql-event-store.js';
-import type { Event, EventFilters, EventAggregation } from '../types/events.js';
+import type { Event, EventFilters, EventAggregation, EventQueryResult } from '../types/events.js';
 import type { BackupData } from './event-store.js';
 import { SQLEventStore } from './sql-event-store.js';
 
@@ -172,27 +172,48 @@ export class PostgreSQLEventStore extends SQLEventStore {
       paramIndex++;
     }
 
-    const rows = await this.connection.query<{
-      id: string;
-      run_id: string;
-      type: string;
-      timestamp: number;
-      data: string | Record<string, unknown>;
-      metadata: string | Record<string, unknown> | null;
-    }>(sql, params);
+    const rows = await this.connection.query<PostgreSQLEventRow>(sql, params);
+    return rows.map(toEvent);
+  }
 
-    return rows.map((row) => ({
-      id: row.id,
-      runId: row.run_id,
-      type: row.type as Event['type'],
-      timestamp: row.timestamp,
-      data: typeof row.data === 'string' ? JSON.parse(row.data) : row.data,
-      metadata: row.metadata
-        ? typeof row.metadata === 'string'
-          ? JSON.parse(row.metadata)
-          : row.metadata
-        : undefined,
-    }));
+  /**
+   * Queries events across all runs, in time order. The base class writes `?` placeholders and
+   * parses JSON text; PostgreSQL numbers its placeholders and returns JSONB already parsed.
+   */
+  async queryEvents(
+    filters?: EventFilters,
+    aggregation?: EventAggregation
+  ): Promise<EventQueryResult> {
+    const params: unknown[] = [];
+    const { sql: filtered, paramIndex } = this.applyFiltersToSQLPostgreSQL(
+      `SELECT * FROM ${this.tableName} WHERE 1=1`,
+      params,
+      filters
+    );
+    let sql = `${filtered} ORDER BY timestamp ASC`;
+    if (filters?.limit !== undefined) {
+      sql += ` LIMIT $${paramIndex}`;
+      params.push(filters.limit);
+    }
+
+    const rows = await this.connection.query<PostgreSQLEventRow>(sql, params);
+    const events = rows.map(toEvent);
+    return {
+      events,
+      aggregation: aggregation ? await this.applyAggregation(events, aggregation) : undefined,
+    };
+  }
+
+  /** Counts events matching filters (PostgreSQL returns COUNT(*) as a string). */
+  async countEvents(filters?: EventFilters): Promise<number> {
+    const params: unknown[] = [];
+    const { sql } = this.applyFiltersToSQLPostgreSQL(
+      `SELECT COUNT(*) as count FROM ${this.tableName} WHERE 1=1`,
+      params,
+      filters
+    );
+    const rows = await this.connection.query<{ count: number | string }>(sql, params);
+    return Number(rows[0]?.count ?? 0);
   }
 
   /**
@@ -385,4 +406,29 @@ export class PostgreSQLEventStore extends SQLEventStore {
       }
     }
   }
+}
+
+/** A row as node-postgres returns it: JSONB columns parsed, BIGINT columns as strings. */
+interface PostgreSQLEventRow {
+  id: string;
+  run_id: string;
+  type: string;
+  timestamp: number | string;
+  data: string | Record<string, unknown>;
+  metadata: string | Record<string, unknown> | null;
+}
+
+function toEvent(row: PostgreSQLEventRow): Event {
+  return {
+    id: row.id,
+    runId: row.run_id,
+    type: row.type as Event['type'],
+    timestamp: Number(row.timestamp),
+    data: typeof row.data === 'string' ? JSON.parse(row.data) : row.data,
+    metadata: row.metadata
+      ? typeof row.metadata === 'string'
+        ? JSON.parse(row.metadata)
+        : row.metadata
+      : undefined,
+  };
 }

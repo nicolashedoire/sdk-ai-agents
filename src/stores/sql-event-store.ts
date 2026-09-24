@@ -557,7 +557,7 @@ export class SQLEventStore implements IEventStore {
   /**
    * Applies aggregation to events (in-memory for complex aggregations).
    */
-  private async applyAggregation(
+  protected async applyAggregation(
     events: Event[],
     aggregation: EventAggregation
   ): Promise<EventQueryResult['aggregation']> {

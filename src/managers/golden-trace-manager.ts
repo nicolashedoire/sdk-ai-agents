@@ -35,12 +35,16 @@ export class GoldenTraceManager {
   ): Promise<GoldenTrace> {
     await this.ensureGoldenTracesDir();
 
+    // The agent's id is new in every process; its name, recorded by governed runs, is not.
+    const agentName = trace.events.find((event) => typeof event.metadata?.agentName === 'string')
+      ?.metadata?.agentName;
     const goldenTrace: GoldenTrace = {
       id: uuidv4(),
       name: config.name,
       description: config.description,
       runId,
       agentId: trace.agentId,
+      ...(agentName !== undefined ? { agentName } : {}),
       createdAt: Date.now(),
       trace,
       metadata: config.metadata,

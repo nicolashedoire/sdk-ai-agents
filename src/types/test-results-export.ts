@@ -24,9 +24,12 @@ export interface JUnitTestSuite {
   }>;
 }
 
+/** One suite in the `json` export (`runRegressionTests` results hold one per suite in `suites`). */
 export interface TestResultsJSON {
   suiteId: string;
+  suiteName?: string;
   agentId: string;
+  agentName?: string;
   executedAt: number;
   summary: {
     totalTests: number;
@@ -40,6 +43,7 @@ export interface TestResultsJSON {
   };
   results: Array<{
     goldenTraceId: string;
+    name?: string;
     runId: string;
     status: 'pass' | 'fail' | 'error' | 'timeout';
     duration: number;

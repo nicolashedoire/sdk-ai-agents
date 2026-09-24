@@ -5,7 +5,22 @@ import type {
   ValidationResult,
   ValidationDifference,
 } from '../types/validation.js';
+import { alignEvents, eventSubject } from './event-alignment.js';
 
+/** What a comparison found, before it is turned into a verdict. */
+export interface TraceComparison {
+  differences: ValidationDifference[];
+  /** Compared events of each run (after `ignoreEventTypes` and `validateAspects`). */
+  expectedCount: number;
+  actualCount: number;
+  /** Golden events found unchanged, at their place. */
+  unchanged: number;
+}
+
+/**
+ * Compares a run with a golden trace by what the events mean (see `alignEvents`): event ids,
+ * new in every run, are never compared, nor are clock readings and token counts.
+ */
 export class TraceValidator {
   static validate(
     actualTrace: Trace,
@@ -13,55 +28,7 @@ export class TraceValidator {
     goldenTraceId: string,
     options: ValidationOptions = {}
   ): ValidationResult {
-    const differences: ValidationDifference[] = [];
-
-    const expectedEvents = TraceValidator.filterEvents(expectedTrace.events, options);
-    const actualEvents = TraceValidator.filterEvents(actualTrace.events, options);
-
-    const eventMap = new Map<string, Event>();
-    expectedEvents.forEach((event) => {
-      eventMap.set(event.id, event);
-    });
-
-    const actualMap = new Map<string, Event>();
-    actualEvents.forEach((event) => {
-      actualMap.set(event.id, event);
-    });
-
-    for (const expectedEvent of expectedEvents) {
-      const actualEvent = actualMap.get(expectedEvent.id);
-      if (!actualEvent) {
-        differences.push({
-          type: 'event_removed',
-          eventId: expectedEvent.id,
-          eventType: expectedEvent.type,
-          expected: expectedEvent,
-          details: `Event ${expectedEvent.id} (${expectedEvent.type}) was expected but not found in actual trace`,
-        });
-      } else {
-        const diff = TraceValidator.compareEvents(expectedEvent, actualEvent, options);
-        if (diff) {
-          differences.push(diff);
-        }
-        actualMap.delete(expectedEvent.id);
-      }
-    }
-
-    for (const actualEvent of actualMap.values()) {
-      differences.push({
-        type: 'event_added',
-        eventId: actualEvent.id,
-        eventType: actualEvent.type,
-        actual: actualEvent,
-        details: `Event ${actualEvent.id} (${actualEvent.type}) was found in actual trace but not expected`,
-      });
-    }
-
-    const orderDiff = TraceValidator.checkEventOrder(expectedEvents, actualEvents, options);
-    if (orderDiff) {
-      differences.push(orderDiff);
-    }
-
+    const { differences } = TraceValidator.compare(actualTrace, expectedTrace, options);
     const metrics = TraceValidator.calculateMetrics(expectedTrace, actualTrace);
     const status = TraceValidator.determineStatus(differences, options);
     const summary = TraceValidator.generateSummary(status, differences, metrics);
@@ -73,6 +40,122 @@ export class TraceValidator {
       differences,
       metrics,
       summary,
+    };
+  }
+
+  static compare(
+    actualTrace: Trace,
+    expectedTrace: Trace,
+    options: ValidationOptions = {}
+  ): TraceComparison {
+    const expectedEvents = TraceValidator.filterEvents(expectedTrace.events, options);
+    const actualEvents = TraceValidator.filterEvents(actualTrace.events, options);
+    const aligned = alignEvents(expectedEvents, actualEvents, {
+      ignoredFields: options.tolerance?.dataFields ?? [],
+    });
+    const timing = TraceValidator.timing(expectedTrace, actualTrace, options);
+    const differences: ValidationDifference[] = [];
+    let unchanged = 0;
+
+    for (const step of aligned) {
+      switch (step.kind) {
+        case 'removed':
+          differences.push({
+            type: 'event_removed',
+            eventId: step.expected.id,
+            eventType: step.expected.type,
+            expected: step.expected,
+            expectedIndex: step.expectedIndex,
+            details: `${describeEvent(step.expected)} was expected at position ${step.expectedIndex} but is missing`,
+          });
+          break;
+        case 'added':
+          differences.push({
+            type: 'event_added',
+            eventId: step.actual.id,
+            eventType: step.actual.type,
+            actual: step.actual,
+            actualIndex: step.actualIndex,
+            details: `${describeEvent(step.actual)} was added at position ${step.actualIndex}`,
+          });
+          break;
+        case 'moved':
+          differences.push({
+            type: 'event_order_changed',
+            eventId: step.expected.id,
+            eventType: step.expected.type,
+            expected: step.expected,
+            actual: step.actual,
+            expectedIndex: step.expectedIndex,
+            actualIndex: step.actualIndex,
+            details: `${describeEvent(step.expected)} moved from position ${step.expectedIndex} to ${step.actualIndex}`,
+          });
+          break;
+        case 'changed':
+          differences.push({
+            type: 'event_modified',
+            eventId: step.expected.id,
+            eventType: step.expected.type,
+            expected: step.expected,
+            actual: step.actual,
+            expectedIndex: step.expectedIndex,
+            actualIndex: step.actualIndex,
+            details: step.typeChanged
+              ? `Event type changed at position ${step.expectedIndex}: ${step.detail}`
+              : options.compareStructureOnly
+                ? `${describeEvent(step.expected)} data differs (structure-only comparison): ${step.detail}`
+                : `${describeEvent(step.expected)} data differs: ${step.detail}`,
+          });
+          break;
+        case 'same': {
+          const late = timing?.(step.expected, step.actual);
+          if (late) {
+            differences.push({
+              type: 'event_modified',
+              eventId: step.expected.id,
+              eventType: step.expected.type,
+              expected: step.expected,
+              actual: step.actual,
+              expectedIndex: step.expectedIndex,
+              actualIndex: step.actualIndex,
+              details: `${describeEvent(step.expected)} ${late}`,
+            });
+          } else {
+            unchanged++;
+          }
+          break;
+        }
+      }
+    }
+
+    return {
+      differences,
+      expectedCount: expectedEvents.length,
+      actualCount: actualEvents.length,
+      unchanged,
+    };
+  }
+
+  /**
+   * With `tolerance.timestampMs`, compares when two events happened relative to the start of
+   * their runs (absolute times always differ between runs). Returns what is wrong, if anything.
+   */
+  private static timing(
+    expectedTrace: Trace,
+    actualTrace: Trace,
+    options: ValidationOptions
+  ): ((expected: Event, actual: Event) => string | undefined) | undefined {
+    const tolerance = options.tolerance?.timestampMs;
+    if (options.ignoreTimestampDiff || tolerance === undefined) return undefined;
+    const expectedStart = expectedTrace.events[0]?.timestamp ?? 0;
+    const actualStart = actualTrace.events[0]?.timestamp ?? 0;
+    return (expected, actual) => {
+      const expectedOffset = expected.timestamp - expectedStart;
+      const actualOffset = actual.timestamp - actualStart;
+      const gap = Math.abs(actualOffset - expectedOffset);
+      return gap > tolerance
+        ? `happened ${actualOffset} ms after the start instead of ${expectedOffset} ms (tolerance: ${tolerance} ms)`
+        : undefined;
     };
   }
 
@@ -102,144 +185,6 @@ export class TraceValidator {
     }
 
     return filtered;
-  }
-
-  private static compareEvents(
-    expected: Event,
-    actual: Event,
-    options: ValidationOptions
-  ): ValidationDifference | null {
-    if (expected.type !== actual.type) {
-      return {
-        type: 'event_modified',
-        eventId: expected.id,
-        eventType: expected.type,
-        expected,
-        actual,
-        details: `Event type mismatch: expected ${expected.type}, got ${actual.type}`,
-      };
-    }
-
-    if (!options.ignoreTimestampDiff) {
-      const tolerance = options.tolerance?.timestampMs || 0;
-      const timeDiff = Math.abs(expected.timestamp - actual.timestamp);
-      if (timeDiff > tolerance) {
-        return {
-          type: 'event_modified',
-          eventId: expected.id,
-          eventType: expected.type,
-          expected,
-          actual,
-          details: `Timestamp difference: ${timeDiff}ms (tolerance: ${tolerance}ms)`,
-        };
-      }
-    }
-
-    // In structure-only mode, value differences are still reported (and yield a `partial`
-    // status) so that a run whose values changed never passes as identical.
-    const dataDiff = TraceValidator.compareData(expected.data, actual.data, options);
-    if (dataDiff) {
-      return {
-        type: 'event_modified',
-        eventId: expected.id,
-        eventType: expected.type,
-        expected,
-        actual,
-        details: options.compareStructureOnly
-          ? `Data differs (structure-only comparison): ${dataDiff}`
-          : `Data mismatch: ${dataDiff}`,
-      };
-    }
-
-    return null;
-  }
-
-  private static compareData(
-    expected: unknown,
-    actual: unknown,
-    options: ValidationOptions
-  ): string | null {
-    if (expected === actual) {
-      return null;
-    }
-
-    if (typeof expected !== typeof actual) {
-      return `Type mismatch: expected ${typeof expected}, got ${typeof actual}`;
-    }
-
-    if (
-      expected === null ||
-      actual === null ||
-      typeof expected !== 'object' ||
-      typeof actual !== 'object'
-    ) {
-      return expected !== actual ? 'Value mismatch' : null;
-    }
-
-    if (Array.isArray(expected) !== Array.isArray(actual)) {
-      return 'Array/Object type mismatch';
-    }
-
-    if (Array.isArray(expected) && Array.isArray(actual)) {
-      if (expected.length !== actual.length) {
-        return `Array length mismatch: expected ${expected.length}, got ${actual.length}`;
-      }
-      for (let i = 0; i < expected.length; i++) {
-        const diff = TraceValidator.compareData(expected[i], actual[i], options);
-        if (diff) {
-          return `Array[${i}]: ${diff}`;
-        }
-      }
-      return null;
-    }
-
-    const expectedObj = expected as Record<string, unknown>;
-    const actualObj = actual as Record<string, unknown>;
-    const ignoredFields = options.tolerance?.dataFields || [];
-
-    const expectedKeys = Object.keys(expectedObj).filter((k) => !ignoredFields.includes(k));
-    const actualKeys = Object.keys(actualObj).filter((k) => !ignoredFields.includes(k));
-
-    if (expectedKeys.length !== actualKeys.length) {
-      return `Object key count mismatch: expected ${expectedKeys.length}, got ${actualKeys.length}`;
-    }
-
-    for (const key of expectedKeys) {
-      if (!(key in actualObj)) {
-        return `Missing key: ${key}`;
-      }
-      const diff = TraceValidator.compareData(expectedObj[key], actualObj[key], options);
-      if (diff) {
-        return `${key}: ${diff}`;
-      }
-    }
-
-    return null;
-  }
-
-  private static checkEventOrder(
-    expected: Event[],
-    actual: Event[],
-    _options: ValidationOptions
-  ): ValidationDifference | null {
-    if (expected.length !== actual.length) {
-      return null;
-    }
-
-    for (let i = 0; i < expected.length; i++) {
-      if (expected[i].id !== actual[i].id) {
-        return {
-          type: 'event_order_changed',
-          eventId: expected[i].id,
-          eventType: expected[i].type,
-          expected: expected[i],
-          actual: actual[i],
-          details: `Event order mismatch at position ${i}: expected ${expected[i].id} (${expected[i].type}), got ${actual[i].id} (${actual[i].type})`,
-        };
-      }
-    }
-
-    return null;
   }
 
   private static calculateMetrics(expectedTrace: Trace, actualTrace: Trace) {
@@ -334,4 +279,11 @@ export class TraceValidator {
 
     return parts.join('. ');
   }
+}
+
+/** `tool.called (lookup_metric)`: the type and, when it has one, what the event is about. */
+export function describeEvent(event: Event): string {
+  const subject = eventSubject(event);
+  const about = subject.replace(/^\|/, '').replace(/\|$/, '').replace('|', ', ');
+  return about ? `${event.type} (${about})` : event.type;
 }

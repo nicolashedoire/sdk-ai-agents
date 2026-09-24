@@ -132,7 +132,10 @@ describe('RegressionTestRunner', () => {
 
     expect(result).toMatchObject({
       suiteId: 'suite-1',
-      agentId: 'test-agent',
+      suiteName: 'Test Suite',
+      // The agent that ran the tests (a suite saved by another process names another id).
+      agentId: agent.id,
+      agentName: 'Test Agent',
       totalTests: 2,
       passedTests: 2,
       failedTests: 0,

@@ -60,6 +60,19 @@ export class AgentImpl {
     return this.agent.name;
   }
 
+  /** `version` of the configuration (`1.0.0` when none is given). */
+  get version(): string {
+    return this.agent.version;
+  }
+
+  /**
+   * Hash of the configuration (name, model, system prompt, limits, tools and their versions,
+   * policies, capabilities, version): two agents with the same hash are configured alike.
+   */
+  get configHash(): string | undefined {
+    return this.agent.configHash;
+  }
+
   async run(input: RunInput): Promise<RunResult> {
     const runId = generateRunId();
     // Watched before anything is recorded, so the listener gets every event of the run.
@@ -369,6 +382,9 @@ export class AgentImpl {
       metadata: {
         agentId: this.agent.id,
         agentVersion: this.agent.version,
+        // The id is new in every process: the name and the configuration say which agent ran.
+        agentName: this.agent.name,
+        ...(this.agent.configHash ? { configHash: this.agent.configHash } : {}),
       },
     });
   }

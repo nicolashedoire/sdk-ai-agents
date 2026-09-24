@@ -1,5 +1,11 @@
 export interface ImpactAnalysisOptions {
+  /** @deprecated Has no effect. */
   groupBy?: 'version' | 'configuration' | 'time' | 'user' | 'session';
+  /**
+   * Metrics to compute (default: all). `duration` (ms per run), `cost` (USD of the priced model
+   * calls, as `getRunCost`), `quality` (share of a run's events that are not failed actions),
+   * `success_rate` (share of completed runs).
+   */
   metrics?: ('duration' | 'cost' | 'quality' | 'success_rate')[];
   includeRecommendations?: boolean;
 }

@@ -22,7 +22,24 @@ export interface AssertionCondition {
     operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'regex';
     value: unknown;
   };
+  /**
+   * `custom` only: receives the run's events. A function cannot be written to a file: a
+   * custom assertion is kept by the SDK instance that defined it, not in `assertionsDir`.
+   */
   customEvaluator?: (events: Event[]) => boolean;
+}
+
+export interface AssertionOptions {
+  description?: string;
+  severity?: 'error' | 'warning';
+  tags?: string[];
+  /**
+   * The assertion applies to this agent's runs only. An agent of this SDK also gives its name,
+   * so the assertion keeps applying to the agent of that name in another process.
+   */
+  agentId?: string;
+  /** The assertion applies to the runs of the governed agents with this name. */
+  agentName?: string;
 }
 
 export interface Assertion {
@@ -32,7 +49,9 @@ export interface Assertion {
   condition: AssertionCondition;
   severity?: 'error' | 'warning';
   tags?: string[];
+  /** With `agentName`: the agent whose runs it applies to. Neither: every run. */
   agentId?: string;
+  agentName?: string;
   createdAt: number;
 }
 

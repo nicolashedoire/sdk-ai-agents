@@ -11,6 +11,11 @@ export interface TestSDK {
   sdk: SDK;
   store: FileEventStore;
   provider: ScriptedLLMProvider;
+  /** Folders of the testing artifacts: another SDK given them shares them, like a second process. */
+  folders: Pick<
+    SDKConfig,
+    'goldenTracesDir' | 'regressionTestSuitesDir' | 'assertionsDir' | 'impactAnalysesDir'
+  >;
   dispose(): Promise<void>;
 }
 
@@ -21,19 +26,28 @@ export function createTestSDK(
 ): TestSDK {
   const directory = mkdtempSync(join(tmpdir(), 'sdk-ai-agents-'));
   const store = new FileEventStore(join(directory, 'events'));
-  const sdk = createSDK({
-    llmProvider: provider,
-    eventStore: store,
+  const folders = {
     goldenTracesDir: join(directory, 'golden'),
     regressionTestSuitesDir: join(directory, 'suites'),
     assertionsDir: join(directory, 'assertions'),
     impactAnalysesDir: join(directory, 'impact'),
+  };
+  const sdk = createSDK({
+    llmProvider: provider,
+    eventStore: store,
+    ...folders,
     ...overrides,
   });
   return {
     sdk,
     store,
     provider,
+    folders: {
+      goldenTracesDir: overrides.goldenTracesDir ?? folders.goldenTracesDir,
+      regressionTestSuitesDir: overrides.regressionTestSuitesDir ?? folders.regressionTestSuitesDir,
+      assertionsDir: overrides.assertionsDir ?? folders.assertionsDir,
+      impactAnalysesDir: overrides.impactAnalysesDir ?? folders.impactAnalysesDir,
+    },
     dispose: async () => {
       await store.destroy();
       rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });

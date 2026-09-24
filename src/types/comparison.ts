@@ -1,10 +1,15 @@
 import type { Event, EventType } from './events.js';
 
 export interface ComparisonOptions {
+  /** Event types left out of the comparison. */
   ignoreEventTypes?: EventType[];
+  /** Only events added, removed, moved or whose type changed: data changes are not reported. */
   compareStructureOnly?: boolean;
+  /** Compares only these kinds of events. */
   focusAspects?: ('intentions' | 'actions' | 'tools' | 'policies')[];
+  /** Also compares event metadata (ids and other volatile fields excepted). */
   includeMetadata?: boolean;
+  /** @deprecated Has no effect. */
   groupSimilarEvents?: boolean;
 }
 

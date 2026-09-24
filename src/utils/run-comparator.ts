@@ -5,6 +5,8 @@ import type {
   RunComparison,
   ComparisonDifference,
 } from '../types/comparison.js';
+import { alignEvents, firstDifference, VOLATILE_EVENT_FIELDS } from './event-alignment.js';
+import { describeEvent } from './trace-validator.js';
 
 export class RunComparator {
   static compare(trace1: Trace, trace2: Trace, options: ComparisonOptions = {}): RunComparison {
@@ -82,146 +84,95 @@ export class RunComparator {
     };
   }
 
+  /** Aligns the two runs by what their events mean (see `alignEvents`), never by event id. */
   private static findDifferences(
     events1: Event[],
     events2: Event[],
     options: ComparisonOptions
   ): ComparisonDifference[] {
     const differences: ComparisonDifference[] = [];
+    const ignored = new Set(VOLATILE_EVENT_FIELDS);
 
-    const eventMap1 = new Map<string, Event>();
-    events1.forEach((e) => eventMap1.set(e.id, e));
-
-    const eventMap2 = new Map<string, Event>();
-    events2.forEach((e) => eventMap2.set(e.id, e));
-
-    for (const event1 of events1) {
-      const event2 = eventMap2.get(event1.id);
-      if (!event2) {
-        differences.push({
-          type: 'event_removed',
-          eventId: event1.id,
-          eventType: event1.type,
-          run1: event1,
-          details: `Event ${event1.id} (${event1.type}) present in run1 but not in run2`,
-          severity: RunComparator.determineSeverity(event1.type, 'removed'),
-        });
-      } else {
-        const diff = RunComparator.compareEventData(event1, event2, options);
-        if (diff) {
-          differences.push(diff);
+    for (const step of alignEvents(events1, events2)) {
+      switch (step.kind) {
+        case 'removed':
+          differences.push({
+            type: 'event_removed',
+            eventId: step.expected.id,
+            eventType: step.expected.type,
+            run1: step.expected,
+            details: `${describeEvent(step.expected)} present in run1 (position ${step.expectedIndex}) but not in run2`,
+            severity: RunComparator.determineSeverity(step.expected.type, 'removed'),
+          });
+          break;
+        case 'added':
+          differences.push({
+            type: 'event_added',
+            eventId: step.actual.id,
+            eventType: step.actual.type,
+            run2: step.actual,
+            details: `${describeEvent(step.actual)} present in run2 (position ${step.actualIndex}) but not in run1`,
+            severity: RunComparator.determineSeverity(step.actual.type, 'added'),
+          });
+          break;
+        case 'moved':
+          differences.push({
+            type: 'sequence_changed',
+            eventId: step.expected.id,
+            eventType: step.expected.type,
+            run1: step.expected,
+            run2: step.actual,
+            details: `${describeEvent(step.expected)} moved from position ${step.expectedIndex} to ${step.actualIndex}`,
+            severity: 'medium',
+          });
+          break;
+        case 'changed':
+          if (step.typeChanged) {
+            differences.push({
+              type: 'event_modified',
+              eventId: step.expected.id,
+              eventType: step.expected.type,
+              run1: step.expected,
+              run2: step.actual,
+              details: `Event type changed at position ${step.expectedIndex}: ${step.detail}`,
+              severity: 'high',
+            });
+          } else if (!options.compareStructureOnly) {
+            differences.push({
+              type: 'data_changed',
+              eventId: step.expected.id,
+              eventType: step.expected.type,
+              run1: step.expected,
+              run2: step.actual,
+              details: `${describeEvent(step.expected)} data differs: ${step.detail}`,
+              severity: RunComparator.determineSeverity(step.expected.type, 'modified'),
+            });
+          }
+          break;
+        case 'same': {
+          const metadataDiff = options.includeMetadata
+            ? firstDifference(
+                withoutVolatile(step.expected.metadata, ignored),
+                withoutVolatile(step.actual.metadata, ignored)
+              )
+            : null;
+          if (metadataDiff) {
+            differences.push({
+              type: 'data_changed',
+              eventId: step.expected.id,
+              eventType: step.expected.type,
+              run1: step.expected,
+              run2: step.actual,
+              details: `${describeEvent(step.expected)} metadata differs: ${metadataDiff}`,
+              severity: 'low',
+            });
+          }
+          break;
         }
-        eventMap2.delete(event1.id);
       }
-    }
-
-    for (const event2 of eventMap2.values()) {
-      differences.push({
-        type: 'event_added',
-        eventId: event2.id,
-        eventType: event2.type,
-        run2: event2,
-        details: `Event ${event2.id} (${event2.type}) present in run2 but not in run1`,
-        severity: RunComparator.determineSeverity(event2.type, 'added'),
-      });
-    }
-
-    const sequenceDiff = RunComparator.checkSequence(events1, events2);
-    if (sequenceDiff) {
-      differences.push(sequenceDiff);
     }
 
     return differences;
-  }
-
-  private static compareEventData(
-    event1: Event,
-    event2: Event,
-    options: ComparisonOptions
-  ): ComparisonDifference | null {
-    if (options.compareStructureOnly) {
-      if (event1.type !== event2.type) {
-        return {
-          type: 'event_modified',
-          eventId: event1.id,
-          eventType: event1.type,
-          run1: event1,
-          run2: event2,
-          details: `Event ${event1.id} type changed from ${event1.type} to ${event2.type}`,
-          severity: 'high',
-        };
-      }
-      return null;
-    }
-
-    const dataDiff = RunComparator.compareData(event1.data, event2.data);
-    if (dataDiff) {
-      return {
-        type: 'data_changed',
-        eventId: event1.id,
-        eventType: event1.type,
-        run1: event1,
-        run2: event2,
-        details: `Event ${event1.id} data differs: ${dataDiff}`,
-        severity: RunComparator.determineSeverity(event1.type, 'modified'),
-      };
-    }
-
-    if (options.includeMetadata) {
-      const metadataDiff = RunComparator.compareData(event1.metadata, event2.metadata);
-      if (metadataDiff) {
-        return {
-          type: 'data_changed',
-          eventId: event1.id,
-          eventType: event1.type,
-          run1: event1,
-          run2: event2,
-          details: `Event ${event1.id} metadata differs: ${metadataDiff}`,
-          severity: 'low',
-        };
-      }
-    }
-
-    return null;
-  }
-
-  private static compareData(data1: unknown, data2: unknown): string | null {
-    if (data1 === data2) return null;
-    if (data1 === null || data2 === null) {
-      return `null vs ${data2 === null ? 'null' : 'value'}`;
-    }
-    if (typeof data1 !== typeof data2) {
-      return `type mismatch: ${typeof data1} vs ${typeof data2}`;
-    }
-    if (typeof data1 === 'object') {
-      const str1 = JSON.stringify(data1);
-      const str2 = JSON.stringify(data2);
-      if (str1 !== str2) {
-        return 'object content differs';
-      }
-    }
-    return null;
-  }
-
-  private static checkSequence(events1: Event[], events2: Event[]): ComparisonDifference | null {
-    const order1 = events1.map((e) => e.id);
-    const order2 = events2.map((e) => e.id);
-
-    const commonIds = order1.filter((id) => order2.includes(id));
-    if (commonIds.length === 0) return null;
-
-    const order1Filtered = order1.filter((id) => commonIds.includes(id));
-    const order2Filtered = order2.filter((id) => commonIds.includes(id));
-
-    if (JSON.stringify(order1Filtered) !== JSON.stringify(order2Filtered)) {
-      return {
-        type: 'sequence_changed',
-        details: 'Event sequence differs between runs',
-        severity: 'medium',
-      };
-    }
-
-    return null;
   }
 
   private static determineSeverity(
@@ -264,4 +215,12 @@ export class RunComparator {
       mainDifferences,
     };
   }
+}
+
+/** Metadata without its volatile fields (the agent id is new in every process). */
+function withoutVolatile(
+  metadata: Event['metadata'],
+  ignored: ReadonlySet<string>
+): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(metadata ?? {}).filter(([key]) => !ignored.has(key)));
 }

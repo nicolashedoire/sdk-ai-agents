@@ -5,58 +5,65 @@ import type {
   MetadataFilter,
 } from '../types/advanced-event-filter.js';
 
+/**
+ * Evaluates an `AdvancedEventFilter` on one event: the event must be in the scope (`runId`,
+ * `since`, `until`) and match the conditions (`type`, `agentId`, `userId`, `sessionId`, each
+ * data filter, each metadata filter), combined with `logic` and negated by `not`.
+ */
 export class AdvancedEventFilterEvaluator {
   static evaluate(event: Event, filter: AdvancedEventFilter): boolean {
-    let result = true;
+    return (
+      AdvancedEventFilterEvaluator.inScope(event, filter) &&
+      AdvancedEventFilterEvaluator.matchesConditions(event, filter)
+    );
+  }
+
+  /** The scope: never negated by `not`, never combined with `or`. */
+  static inScope(event: Event, filter: AdvancedEventFilter): boolean {
+    return (
+      (filter.runId === undefined || event.runId === filter.runId) &&
+      (filter.since === undefined || event.timestamp >= filter.since) &&
+      (filter.until === undefined || event.timestamp <= filter.until)
+    );
+  }
+
+  static matchesConditions(event: Event, filter: AdvancedEventFilter): boolean {
+    const results: boolean[] = [];
 
     if (filter.type) {
       const types = Array.isArray(filter.type) ? filter.type : [filter.type];
-      result = result && types.includes(event.type);
+      results.push(types.includes(event.type));
     }
-
-    if (filter.since !== undefined) {
-      result = result && event.timestamp >= filter.since;
-    }
-
-    if (filter.until !== undefined) {
-      result = result && event.timestamp <= filter.until;
-    }
-
     if (filter.agentId !== undefined) {
-      result = result && event.metadata?.agentId === filter.agentId;
+      results.push(event.metadata?.agentId === filter.agentId);
     }
-
     if (filter.userId !== undefined) {
-      result = result && event.metadata?.userId === filter.userId;
+      results.push(event.metadata?.userId === filter.userId);
     }
-
     if (filter.sessionId !== undefined) {
-      result = result && event.metadata?.sessionId === filter.sessionId;
+      results.push(event.metadata?.sessionId === filter.sessionId);
     }
-
-    if (filter.runId !== undefined) {
-      result = result && event.runId === filter.runId;
+    for (const dataFilter of filter.dataFilters ?? []) {
+      results.push(AdvancedEventFilterEvaluator.evaluateDataFilter(event.data, dataFilter));
     }
-
-    if (filter.dataFilters && filter.dataFilters.length > 0) {
-      const dataResults = filter.dataFilters.map((df) =>
-        AdvancedEventFilterEvaluator.evaluateDataFilter(event.data, df)
+    for (const metadataFilter of filter.metadataFilters ?? []) {
+      results.push(
+        AdvancedEventFilterEvaluator.evaluateMetadataFilter(event.metadata, metadataFilter)
       );
-      result = AdvancedEventFilterEvaluator.combineResults(result, dataResults, filter.logic);
     }
 
-    if (filter.metadataFilters && filter.metadataFilters.length > 0) {
-      const metadataResults = filter.metadataFilters.map((mf) =>
-        AdvancedEventFilterEvaluator.evaluateMetadataFilter(event.metadata, mf)
-      );
-      result = AdvancedEventFilterEvaluator.combineResults(result, metadataResults, filter.logic);
-    }
+    const matches =
+      results.length === 0 ||
+      (filter.logic === 'or' ? results.some((result) => result) : results.every((r) => r));
+    return filter.not ? !matches : matches;
+  }
 
-    if (filter.not) {
-      result = !result;
-    }
-
-    return result;
+  /**
+   * Whether an event store may apply the filter's `type`, `agentId`, `userId` and `sessionId`
+   * itself before the other conditions are checked: only when every condition must hold.
+   */
+  static canNarrowInStore(filter: AdvancedEventFilter): boolean {
+    return filter.logic !== 'or' && !filter.not;
   }
 
   private static evaluateDataFilter(data: unknown, filter: DataFilter): boolean {
@@ -165,20 +172,6 @@ export class AdvancedEventFilterEvaluator {
       default:
         return false;
     }
-  }
-
-  private static combineResults(
-    baseResult: boolean,
-    results: boolean[],
-    logic?: 'and' | 'or'
-  ): boolean {
-    if (results.length === 0) return baseResult;
-
-    if (logic === 'or') {
-      return baseResult && results.some((r) => r);
-    }
-
-    return baseResult && results.every((r) => r);
   }
 
   private static getNestedValue(obj: unknown, path: string): unknown {

@@ -74,7 +74,7 @@ import type { ValidationOptions, ValidationResult } from './types/validation.js'
 import { RegressionDetector } from './utils/regression-detector.js';
 import type { RegressionDetectionOptions, RegressionReport } from './types/regression.js';
 import { RegressionTestManager } from './managers/regression-test-manager.js';
-import { RegressionTestRunner } from './utils/regression-test-runner.js';
+import { isRunInput, RegressionTestRunner } from './utils/regression-test-runner.js';
 import { TestResultsExporter } from './utils/test-results-exporter.js';
 import { AssertionManager } from './managers/assertion-manager.js';
 import { AssertionEvaluator } from './utils/assertion-evaluator.js';
@@ -85,7 +85,9 @@ import { ImpactAnalysisManager } from './managers/impact-analysis-manager.js';
 import { AdvancedEventFilterEvaluator } from './utils/advanced-event-filter.js';
 import type {
   RegressionTestSuite,
+  RegressionTestSuiteConfig,
   RegressionTestOptions,
+  RegressionTestRunResult,
   RegressionTestSuiteResult,
 } from './types/regression-test.js';
 import type { TestResultsExportOptions } from './types/test-results-export.js';
@@ -93,6 +95,7 @@ import type {
   Assertion,
   AssertionCondition,
   AssertionEvaluationReport,
+  AssertionOptions,
 } from './types/assertion.js';
 import type { ComparisonOptions, RunComparison } from './types/comparison.js';
 import type { ImpactAnalysisOptions, ImpactAnalysis } from './types/impact-analysis.js';
@@ -187,26 +190,152 @@ export interface SDK {
     minFrequency?: number;
   }): Promise<DecisionPatternAnalysis>;
   getTraceVisualization(runId: string): Promise<TraceVisualization>;
+  /** Keeps a run as a reference, with the name of the governed agent that ran it. */
   createGoldenTrace(runId: string, config: GoldenTraceConfig): Promise<GoldenTrace>;
-  getGoldenTraces(agentId?: string): Promise<GoldenTrace[]>;
+  /** Golden traces, newest first; with `agent` (id or name), only that agent's. */
+  getGoldenTraces(agent?: string): Promise<GoldenTrace[]>;
   getGoldenTrace(goldenTraceId: string): Promise<GoldenTrace>;
   deleteGoldenTrace(goldenTraceId: string): Promise<void>;
   exportGoldenTrace(goldenTraceId: string, format?: 'json' | 'yaml'): Promise<string>;
+  /**
+   * Compares a run with a golden trace, event by event, by what the events mean: type, order,
+   * tool, parameters, results. Event ids, clock readings and token counts are never compared.
+   */
   validateAgainstGoldenTrace(
     runId: string,
     goldenTraceId: string,
     options?: ValidationOptions
   ): Promise<ValidationResult>;
+  /**
+   * Replays a run, then validates the replay. A replay calls no model, so it records no
+   * `intention.generated`: compare it with `validateAspects: ['tools', 'policies']`.
+   */
   replayAndValidate(
     runId: string,
     goldenTraceId: string,
     options?: ValidationOptions
   ): Promise<ValidationResult>;
+  /** `validateAgainstGoldenTrace`, with each difference classified by severity and impact. */
   detectRegressions(
     newRunId: string,
     goldenTraceId: string,
     options?: import('./types/regression.js').RegressionDetectionOptions
   ): Promise<import('./types/regression.js').RegressionReport>;
+
+  // Regression suites. An agent is given by its id or its name: ids are new in every process,
+  // so a suite also records the agent's name and runs, elsewhere, with the agent of that name.
+
+  /**
+   * Saves a suite of golden traces whose inputs run again with `agent` (an agent of this SDK,
+   * by id or by name). Each golden trace must exist; a test's `input` defaults to the one the
+   * golden run received. Throws a `ValidationError` for an unknown or ambiguous agent or a
+   * bad test.
+   */
+  createRegressionTestSuite(
+    agent: string,
+    config: RegressionTestSuiteConfig
+  ): Promise<RegressionTestSuite>;
+  /** Saved suites, newest first; with `agent` (id or name), only that agent's. */
+  getRegressionTestSuites(agent?: string): Promise<RegressionTestSuite[]>;
+  /**
+   * Runs every suite of `agent` (an agent of this SDK, by id or name), oldest first, with that
+   * agent: each test runs the golden trace's input and compares the run with the trace
+   * (`detectRegressions`). Throws when the agent has no suite.
+   */
+  runRegressionTests(
+    agent: string,
+    options?: RegressionTestOptions
+  ): Promise<RegressionTestRunResult>;
+  /** Runs one suite with its agent: the one with the suite's agent id here, else its name. */
+  runRegressionTestSuite(
+    suiteId: string,
+    options?: RegressionTestOptions
+  ): Promise<RegressionTestSuiteResult>;
+  /**
+   * Formats results as JUnit XML (one `<testsuite>` per suite; timeouts count as errors),
+   * JSON or a JSON summary; `outputPath` also writes the text to that file.
+   */
+  exportTestResults(
+    results: RegressionTestSuiteResult | RegressionTestRunResult,
+    format: 'junit' | 'json' | 'json-summary',
+    options?: Omit<TestResultsExportOptions, 'format'>
+  ): Promise<string>;
+  /**
+   * `runRegressionTests` and the process exit code for CI: 0 every test passed, 1 a test
+   * found a regression, 2 a test could not run (error or timeout). `exitCode: false` gives 0.
+   */
+  runRegressionTestsForCI(
+    agent: string,
+    options?: RegressionTestOptions & { exitCode?: boolean }
+  ): Promise<{ results: RegressionTestRunResult; exitCode: number }>;
+
+  // Assertions: checks on a run's events.
+
+  /**
+   * Defines an assertion, for every run or for one agent's runs (`agentId`, `agentName`).
+   * Saved in `assertionsDir`, except `custom` ones: their function cannot be written to a
+   * file, so they last as long as this SDK instance. A condition that could not be evaluated
+   * is refused with a `ValidationError`.
+   */
+  defineAssertion(
+    name: string,
+    condition: AssertionCondition,
+    options?: AssertionOptions
+  ): Promise<Assertion>;
+  /**
+   * Assertions, newest first; with `agent` (id or name), only that agent's; with `tags`, those
+   * with at least one of them.
+   */
+  getAssertions(agent?: string, tags?: string[]): Promise<Assertion[]>;
+  /**
+   * Evaluates the assertions given by id (unknown ids throw), or else the assertions for every
+   * run plus those of the run's agent (by id, or by name from another process).
+   */
+  evaluateAssertions(runId: string, assertionIds?: string[]): Promise<AssertionEvaluationReport>;
+  deleteAssertion(assertionId: string): Promise<void>;
+
+  // Comparisons across runs.
+
+  /** What differs between two runs, event by event, aligned by meaning (never by event id). */
+  compareRuns(runId1: string, runId2: string, options?: ComparisonOptions): Promise<RunComparison>;
+  /** A comparison as text, JSON or an HTML page. */
+  getComparisonReport(
+    comparison: RunComparison,
+    format?: 'json' | 'html' | 'text'
+  ): Promise<string>;
+  /**
+   * Compares two groups of runs (before and after a change): duration, cost in USD, quality,
+   * success rate and behavior changes. Saved in `impactAnalysesDir`.
+   */
+  analyzeImpact(
+    beforeRunIds: string[],
+    afterRunIds: string[],
+    options?: ImpactAnalysisOptions
+  ): Promise<ImpactAnalysis>;
+  getImpactAnalysis(analysisId: string): Promise<ImpactAnalysis>;
+  /**
+   * `analyzeImpact` on the runs of a governed agent (by name, or by the id of an agent of
+   * this SDK) recorded with each version: a `version` of its configuration or a
+   * `configHash`. Replays are left out.
+   */
+  compareVersions(
+    agent: string,
+    version1: string,
+    version2: string,
+    options?: ImpactAnalysisOptions
+  ): Promise<ImpactAnalysis>;
+
+  // Queries across runs, on any event store.
+
+  /**
+   * Events of one run (`runId`) or of every run, in time order, that match the conditions
+   * (see `AdvancedEventFilter`). Without `runId`, the file store reads every run.
+   */
+  queryEventsAdvanced(filter: AdvancedEventFilter): Promise<AdvancedEventQueryResult>;
+  /** Number of matching events (`limit` does not apply). */
+  countEventsAdvanced(filter: AdvancedEventFilter): Promise<number>;
+  /** Matching events counted by type and by agent id. */
+  getEventStatistics(filter: AdvancedEventFilter): Promise<EventStatistics>;
   /** Creates an agent that reasons explicitly (hypotheses, simulation, critique) before answering. */
   createCognitiveAgent(config: CognitiveAgentConfig): CognitiveAgent;
   /** Rebuilds the mental state of a cognitive run from its events. */
@@ -819,8 +948,11 @@ export class SDKImpl implements SDK {
     return this.goldenTraceManager.createGoldenTrace(runId, trace, config);
   }
 
-  async getGoldenTraces(agentId?: string): Promise<GoldenTrace[]> {
-    return this.goldenTraceManager.getGoldenTraces(agentId);
+  async getGoldenTraces(agent?: string): Promise<GoldenTrace[]> {
+    const traces = await this.goldenTraceManager.getGoldenTraces();
+    if (agent === undefined) return traces;
+    const ref = this.agentRef(agent);
+    return traces.filter((trace) => refersTo(trace, ref));
   }
 
   async getGoldenTrace(goldenTraceId: string): Promise<GoldenTrace> {
@@ -877,65 +1009,129 @@ export class SDKImpl implements SDK {
   }
 
   async createRegressionTestSuite(
-    agentId: string,
-    config: {
-      name: string;
-      goldenTraces: Array<{
-        goldenTraceId: string;
-        name: string;
-        input: unknown;
-        tags?: string[];
-      }>;
-    }
+    agent: string,
+    config: RegressionTestSuiteConfig
   ): Promise<RegressionTestSuite> {
-    return this.regressionTestManager.createTestSuite(agentId, config);
+    const target = this.resolveAgent(agent);
+    if (typeof config?.name !== 'string' || config.name.trim() === '') {
+      throw new ValidationError('name', 'must be a non-empty string');
+    }
+    if (!Array.isArray(config.goldenTraces) || config.goldenTraces.length === 0) {
+      throw new ValidationError('goldenTraces', 'list at least one golden trace');
+    }
+
+    const goldenTraces: RegressionTestSuite['goldenTraces'] = [];
+    for (const [index, test] of config.goldenTraces.entries()) {
+      const field = `goldenTraces[${index}]`;
+      const golden = await this.goldenTraceManager.getGoldenTrace(String(test?.goldenTraceId));
+      if (!golden) {
+        throw new ValidationError(
+          `${field}.goldenTraceId`,
+          `no golden trace "${String(test?.goldenTraceId).slice(0, 80)}"`
+        );
+      }
+      if (typeof test.name !== 'string' || test.name.trim() === '') {
+        throw new ValidationError(`${field}.name`, 'must be a non-empty string');
+      }
+      const input =
+        test.input ?? golden.trace.events.find((event) => event.type === 'run.started')?.data.input;
+      if (!isRunInput(input)) {
+        throw new ValidationError(
+          `${field}.input`,
+          test.input === undefined
+            ? 'the golden trace records no run input: give one ({ message })'
+            : 'must be a run input with a string `message`'
+        );
+      }
+      goldenTraces.push({
+        goldenTraceId: golden.id,
+        name: test.name,
+        input,
+        ...(test.tags ? { tags: test.tags } : {}),
+      });
+    }
+
+    return this.regressionTestManager.createTestSuite(
+      { id: target.id, name: target.name },
+      { name: config.name, goldenTraces }
+    );
   }
 
-  async getRegressionTestSuites(agentId?: string): Promise<RegressionTestSuite[]> {
-    return this.regressionTestManager.getTestSuites(agentId);
+  async getRegressionTestSuites(agent?: string): Promise<RegressionTestSuite[]> {
+    if (agent === undefined) return this.regressionTestManager.getTestSuites();
+    const ref = this.agentRef(agent);
+    return this.regressionTestManager.getTestSuites((suite) => refersTo(suite, ref));
   }
 
   async runRegressionTests(
-    agentId: string,
-    options?: RegressionTestOptions
-  ): Promise<RegressionTestSuiteResult> {
-    const suites = await this.getRegressionTestSuites(agentId);
+    agent: string,
+    options: RegressionTestOptions = {}
+  ): Promise<RegressionTestRunResult> {
+    checkRegressionTestOptions(options);
+    const target = this.resolveAgent(agent);
+    const ref = { id: target.id, name: target.name };
+    const suites = (
+      await this.regressionTestManager.getTestSuites((suite) => refersTo(suite, ref))
+    ).sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
     if (suites.length === 0) {
-      throw new Error(`No regression test suites found for agent ${agentId}`);
+      throw new Error(`No regression test suites found for agent ${agent}`);
     }
 
-    const agent = this.activeAgentInstances.get(agentId);
-    if (!agent) {
-      throw new Error(`Agent ${agentId} not found`);
+    const startTime = Date.now();
+    const results: RegressionTestSuiteResult[] = [];
+    for (const suite of suites) {
+      const result = await this.runSuiteWith(suite, target, options);
+      results.push(result);
+      if (options.stopOnFirstFailure && !options.parallel && result.failedTests > 0) break;
     }
-
-    const suite = suites[0];
-    return this.runRegressionTestSuite(suite.id, options);
+    return RegressionTestRunner.combine(ref, results, startTime);
   }
 
   async runRegressionTestSuite(
     suiteId: string,
-    options?: RegressionTestOptions
+    options: RegressionTestOptions = {}
   ): Promise<RegressionTestSuiteResult> {
+    checkRegressionTestOptions(options);
     const suite = await this.regressionTestManager.getTestSuite(suiteId);
     if (!suite) {
       throw new Error(`Regression test suite ${suiteId} not found`);
     }
+    return this.runSuiteWith(suite, this.agentOfSuite(suite), options);
+  }
 
-    const agent = this.activeAgentInstances.get(suite.agentId);
-    if (!agent) {
-      throw new Error(`Agent ${suite.agentId} not found`);
+  private runSuiteWith(
+    suite: RegressionTestSuite,
+    agent: AgentImpl,
+    options: RegressionTestOptions
+  ): Promise<RegressionTestSuiteResult> {
+    return RegressionTestRunner.runTestSuite(
+      suite,
+      agent,
+      (runId, goldenTraceId) => this.detectRegressions(runId, goldenTraceId, options.detection),
+      options
+    );
+  }
+
+  /** The agent a suite runs with: the one with its id in this SDK, else the one with its name. */
+  private agentOfSuite(suite: RegressionTestSuite): AgentImpl {
+    const byId = this.activeAgentInstances.get(suite.agentId);
+    if (byId) return byId;
+    if (suite.agentName === undefined) {
+      throw new Error(
+        `Agent ${suite.agentId} of suite "${suite.name}" is not in this SDK, and the suite records no agent name (saved by an older version): create the suite again`
+      );
     }
-
-    const detectRegressions = async (runId: string, goldenTraceId: string) => {
-      return this.detectRegressions(runId, goldenTraceId);
-    };
-
-    return RegressionTestRunner.runTestSuite(suite, agent, detectRegressions, options || {});
+    const named = this.agentsNamed(suite.agentName);
+    if (named.length === 1 && named[0]) return named[0];
+    throw new Error(
+      named.length === 0
+        ? `No agent named "${suite.agentName}" in this SDK: create it before running suite "${suite.name}"`
+        : `${named.length} agents are named "${suite.agentName}" in this SDK: run the suite with runRegressionTests(<agent id>)`
+    );
   }
 
   async exportTestResults(
-    results: RegressionTestSuiteResult,
+    results: RegressionTestSuiteResult | RegressionTestRunResult,
     format: 'junit' | 'json' | 'json-summary',
     options?: Omit<TestResultsExportOptions, 'format'>
   ): Promise<string> {
@@ -943,10 +1139,10 @@ export class SDKImpl implements SDK {
   }
 
   async runRegressionTestsForCI(
-    agentId: string,
+    agent: string,
     options?: RegressionTestOptions & { exitCode?: boolean }
-  ): Promise<{ results: RegressionTestSuiteResult; exitCode: number }> {
-    const results = await this.runRegressionTests(agentId, options);
+  ): Promise<{ results: RegressionTestRunResult; exitCode: number }> {
+    const results = await this.runRegressionTests(agent, options);
     const exitCode = TestResultsExporter.calculateExitCode(results);
 
     return {
@@ -958,37 +1154,61 @@ export class SDKImpl implements SDK {
   async defineAssertion(
     name: string,
     condition: AssertionCondition,
-    options?: {
-      description?: string;
-      severity?: 'error' | 'warning';
-      tags?: string[];
-      agentId?: string;
-    }
+    options: AssertionOptions = {}
   ): Promise<Assertion> {
-    return this.assertionManager.createAssertion(name, condition, options || {});
+    if (typeof name !== 'string' || name.trim() === '') {
+      throw new ValidationError('name', 'must be a non-empty string');
+    }
+    const problem = AssertionEvaluator.problemWith(condition);
+    if (problem) {
+      throw new ValidationError('condition', problem);
+    }
+    // An agent of this SDK also gives its name: the assertion then applies in other processes.
+    const agentName =
+      options.agentName ??
+      (options.agentId ? this.activeAgentInstances.get(options.agentId)?.name : undefined);
+    return this.assertionManager.createAssertion(name, condition, {
+      ...options,
+      ...(agentName !== undefined ? { agentName } : {}),
+    });
   }
 
-  async getAssertions(agentId?: string, tags?: string[]): Promise<Assertion[]> {
-    return this.assertionManager.getAssertions(agentId, tags);
+  async getAssertions(agent?: string, tags?: string[]): Promise<Assertion[]> {
+    const ref = agent === undefined ? undefined : this.agentRef(agent);
+    return this.assertionManager.getAssertions(
+      ref ? (assertion) => refersTo(assertion, ref) : undefined,
+      tags
+    );
   }
 
   async evaluateAssertions(
     runId: string,
     assertionIds?: string[]
   ): Promise<AssertionEvaluationReport> {
-    const events = await this.getEvents(runId);
-    let assertions: Assertion[];
-
+    let assertions: Assertion[] | undefined;
     if (assertionIds && assertionIds.length > 0) {
-      assertions = [];
-      for (const id of assertionIds) {
-        const assertion = await this.assertionManager.getAssertion(id);
-        if (assertion) {
-          assertions.push(assertion);
-        }
+      const found = await Promise.all(
+        assertionIds.map((id) => this.assertionManager.getAssertion(id))
+      );
+      const unknown = assertionIds.filter((_, index) => !found[index]);
+      if (unknown.length > 0) {
+        throw new ValidationError('assertionIds', `Unknown assertion id(s): ${unknown.join(', ')}`);
       }
-    } else {
-      assertions = await this.getAssertions();
+      assertions = found.filter((assertion): assertion is Assertion => assertion !== null);
+    }
+
+    const events = await this.getEvents(runId);
+    if (events.length === 0) {
+      throw new Error(`No events found for runId: ${runId}`);
+    }
+    if (!assertions) {
+      // The assertions for every run, and those of the run's agent.
+      const runAgent = agentOfRun(events);
+      assertions = await this.assertionManager.getAssertions(
+        (assertion) =>
+          (assertion.agentId === undefined && assertion.agentName === undefined) ||
+          (runAgent !== undefined && refersTo(assertion, runAgent))
+      );
     }
 
     const results = assertions.map((assertion) => AssertionEvaluator.evaluate(assertion, events));
@@ -1037,12 +1257,20 @@ export class SDKImpl implements SDK {
     afterRunIds: string[],
     options?: ImpactAnalysisOptions
   ): Promise<ImpactAnalysis> {
+    for (const [field, runIds] of [
+      ['beforeRunIds', beforeRunIds],
+      ['afterRunIds', afterRunIds],
+    ] as const) {
+      if (!Array.isArray(runIds) || runIds.length === 0) {
+        throw new ValidationError(field, 'give at least one run id');
+      }
+    }
     const [beforeTraces, afterTraces] = await Promise.all([
       Promise.all(beforeRunIds.map((id) => this.getTrace(id))),
       Promise.all(afterRunIds.map((id) => this.getTrace(id))),
     ]);
 
-    const analysis = ImpactAnalyzer.analyze(beforeTraces, afterTraces, options || {});
+    const analysis = ImpactAnalyzer.analyze(beforeTraces, afterTraces, options || {}, this.pricing);
     await this.impactAnalysisManager.saveAnalysis(analysis);
 
     return analysis;
@@ -1057,82 +1285,129 @@ export class SDKImpl implements SDK {
   }
 
   async compareVersions(
-    agentId: string,
+    agent: string,
     version1: string,
     version2: string,
     options?: ImpactAnalysisOptions
   ): Promise<ImpactAnalysis> {
-    if (!this.eventStore.queryEvents) {
-      throw new Error('queryEvents is not supported by this event store');
+    const ref = this.agentRef(agent);
+    const { events } = await this.queryEventsAdvanced({ type: 'run.started' });
+    // The agent's runs; a replay re-executes a run's tools without its model: left out.
+    const starts = events.filter(
+      (event) =>
+        event.data.replayOf === undefined &&
+        refersTo({ agentId: event.metadata?.agentId, agentName: event.metadata?.agentName }, ref)
+    );
+    const runsOf = (version: string) => [
+      ...new Set(
+        starts
+          .filter(
+            (event) =>
+              event.metadata?.agentVersion === version || event.metadata?.configHash === version
+          )
+          .map((event) => event.runId)
+      ),
+    ];
+
+    const before = runsOf(version1);
+    const after = runsOf(version2);
+    for (const [field, version, runIds] of [
+      ['version1', version1, before],
+      ['version2', version2, after],
+    ] as const) {
+      if (runIds.length === 0) {
+        const recorded = [
+          ...new Set(
+            starts.map((event) =>
+              event.metadata?.configHash
+                ? `${event.metadata.agentVersion} (config ${event.metadata.configHash})`
+                : String(event.metadata?.agentVersion)
+            )
+          ),
+        ];
+        throw new ValidationError(
+          field,
+          `no run of agent "${agent}" has version or config hash "${version}" (recorded: ${recorded.join(', ') || 'none'})`
+        );
+      }
     }
 
-    const queryResult = await this.eventStore.queryEvents({
-      agentId,
-    });
-
-    if (!queryResult || !queryResult.events) {
-      throw new Error(`No events found for agent ${agentId}`);
-    }
-
-    const allEvents = queryResult.events;
-
-    const beforeRunIds = Array.from(
-      new Set(
-        allEvents
-          .filter((e: Event) => e.metadata?.agentVersion === version1)
-          .map((e: Event) => e.runId as string)
-      )
-    ) as string[];
-
-    const afterRunIds = Array.from(
-      new Set(
-        allEvents
-          .filter((e: Event) => e.metadata?.agentVersion === version2)
-          .map((e: Event) => e.runId as string)
-      )
-    ) as string[];
-
-    if (beforeRunIds.length === 0 || afterRunIds.length === 0) {
-      throw new Error(`No traces found for version ${version1} or ${version2}`);
-    }
-
-    return this.analyzeImpact(beforeRunIds, afterRunIds, options);
+    return this.analyzeImpact(before, after, options);
   }
 
   async queryEventsAdvanced(filter: AdvancedEventFilter): Promise<AdvancedEventQueryResult> {
-    const startTime = Date.now();
-
-    let allEvents: Event[] = [];
-
-    if (filter.runId) {
-      allEvents = await this.getEvents(filter.runId);
-    } else if (this.eventStore.queryEvents) {
-      const queryResult = await this.eventStore.queryEvents({
-        type: filter.type,
-        since: filter.since,
-        until: filter.until,
-        agentId: filter.agentId,
-        userId: filter.userId,
-        sessionId: filter.sessionId,
-      });
-      allEvents = queryResult?.events || [];
-    } else {
-      throw new Error('Advanced event filtering requires queryEvents support in event store');
+    const limit = filter.limit;
+    if (limit !== undefined && (!Number.isInteger(limit) || limit < 0)) {
+      throw new ValidationError('limit', 'must be a whole number >= 0');
     }
-
-    const filteredEvents = allEvents.filter((e) =>
-      AdvancedEventFilterEvaluator.evaluate(e, filter)
+    const startTime = Date.now();
+    const { candidates, total } = await this.eventsInScope(filter);
+    const matching = candidates.filter((event) =>
+      AdvancedEventFilterEvaluator.matchesConditions(event, filter)
     );
 
-    const limitedEvents = filter.limit ? filteredEvents.slice(0, filter.limit) : filteredEvents;
-
     return {
-      events: limitedEvents,
-      total: allEvents.length,
-      filtered: filteredEvents.length,
+      events: limit === undefined ? matching : matching.slice(0, limit),
+      total,
+      filtered: matching.length,
       filters: filter,
       executionTime: Date.now() - startTime,
     };
+  }
+
+  /**
+   * The events in the filter's scope (`runId`, `since`, `until`), in time order: one run, or
+   * every run through the store's `queryEvents`, or by reading each run (file store, any store
+   * without `queryEvents`). A store may narrow them by type and ids itself only when every
+   * condition must hold; `total` is then counted separately.
+   */
+  private async eventsInScope(
+    filter: AdvancedEventFilter
+  ): Promise<{ candidates: Event[]; total: number }> {
+    const inScope = (event: Event) => AdvancedEventFilterEvaluator.inScope(event, filter);
+    const store = this.eventStore;
+    if (filter.runId !== undefined) {
+      const events = (await store.getEvents(filter.runId)).filter(inScope);
+      return { candidates: events, total: events.length };
+    }
+
+    const scope: EventFilters = {
+      ...(filter.since !== undefined ? { since: filter.since } : {}),
+      ...(filter.until !== undefined ? { until: filter.until } : {}),
+    };
+    if (store.queryEvents) {
+      const narrowed: EventFilters = {
+        ...scope,
+        ...(filter.type !== undefined && [filter.type].flat().length > 0
+          ? { type: filter.type }
+          : {}),
+        ...(filter.agentId ? { agentId: filter.agentId } : {}),
+        ...(filter.userId ? { userId: filter.userId } : {}),
+        ...(filter.sessionId ? { sessionId: filter.sessionId } : {}),
+      };
+      const narrows = Object.keys(narrowed).length > Object.keys(scope).length;
+      if (narrows && store.countEvents && AdvancedEventFilterEvaluator.canNarrowInStore(filter)) {
+        const [result, total] = await Promise.all([
+          store.queryEvents(narrowed),
+          store.countEvents(scope),
+        ]);
+        return { candidates: result.events.filter(inScope), total };
+      }
+      const events = (await store.queryEvents(scope)).events.filter(inScope);
+      return { candidates: events, total: events.length };
+    }
+
+    const found: Array<{ event: Event; runId: string; index: number }> = [];
+    for (const runId of await store.getRunIds()) {
+      (await store.getEvents(runId)).forEach((event, index) => {
+        if (inScope(event)) found.push({ event, runId, index });
+      });
+    }
+    found.sort(
+      (a, b) =>
+        a.event.timestamp - b.event.timestamp || a.runId.localeCompare(b.runId) || a.index - b.index
+    );
+    return { candidates: found.map(({ event }) => event), total: found.length };
   }
 
   async countEventsAdvanced(filter: AdvancedEventFilter): Promise<number> {
@@ -1160,6 +1435,34 @@ export class SDKImpl implements SDK {
       byType,
       byAgent,
     };
+  }
+
+  /** The governed agent of this SDK with this id, or the only one with this name. */
+  private resolveAgent(agent: string): AgentImpl {
+    const byId = this.activeAgentInstances.get(agent);
+    if (byId) return byId;
+    const named = this.agentsNamed(agent);
+    if (named.length === 1 && named[0]) return named[0];
+    throw new ValidationError(
+      'agent',
+      named.length === 0
+        ? `no agent of this SDK has the id or name "${String(agent).slice(0, 80)}": create it with createAgent first`
+        : `${named.length} agents are named "${agent}" in this SDK: give the id of the one to use`
+    );
+  }
+
+  private agentsNamed(name: string): AgentImpl[] {
+    return [...this.activeAgentInstances.values()].filter((agent) => agent.name === name);
+  }
+
+  /**
+   * Whom `agent` designates among saved suites, assertions, golden traces and recorded runs:
+   * an agent of this SDK by id also brings its name (the same agent in another process);
+   * anything else is taken as an id or a name.
+   */
+  private agentRef(agent: string): AgentRef {
+    const active = this.activeAgentInstances.get(agent);
+    return active ? { id: active.id, name: active.name } : { id: agent, name: agent };
   }
 
   defineGlobalPolicy(policy: Policy): void {
@@ -1363,6 +1666,39 @@ export class SDKImpl implements SDK {
 
 export function createSDK(config: SDKConfig): SDK {
   return new SDKImpl(config);
+}
+
+/** An agent as saved artifacts and recorded runs name it: its id in one process, its name in all. */
+interface AgentRef {
+  id?: string;
+  name?: string;
+}
+
+/** Whether something saved or recorded for `stored` belongs to the agent `ref`. */
+function refersTo(stored: { agentId?: string; agentName?: string }, ref: AgentRef): boolean {
+  return (
+    (stored.agentId !== undefined && stored.agentId === ref.id) ||
+    (stored.agentName !== undefined && stored.agentName === ref.name)
+  );
+}
+
+function checkRegressionTestOptions(options: RegressionTestOptions): void {
+  const timeout = options.timeout;
+  if (timeout !== undefined && !(Number.isFinite(timeout) && timeout > 0)) {
+    throw new ValidationError('timeout', 'must be a positive number of milliseconds');
+  }
+}
+
+/** The agent that ran a run, as its events record it (its `run.started` first). */
+function agentOfRun(events: Event[]): AgentRef | undefined {
+  const recorded =
+    events.find((event) => event.type === 'run.started' && event.metadata?.agentId) ??
+    events.find((event) => event.metadata?.agentId);
+  if (!recorded?.metadata?.agentId) return undefined;
+  return {
+    id: recorded.metadata.agentId,
+    ...(recorded.metadata.agentName ? { name: recorded.metadata.agentName } : {}),
+  };
 }
 
 /**
