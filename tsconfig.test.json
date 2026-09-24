@@ -54,6 +54,7 @@
     "src/__tests__/run-budget-policies.test.ts",
     "src/__tests__/native-tool-messages.test.ts",
     "src/__tests__/file-ids.test.ts",
+    "src/__tests__/sql-event-store-schema.test.ts",
     "examples/cognitive-agent.ts",
     "examples/mcp-server.ts",
     "examples/mcp-openapi.ts",
