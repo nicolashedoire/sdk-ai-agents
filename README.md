@@ -212,4 +212,4 @@ Tests use no module mocks, and a guard test refuses them: ports are implemented 
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
