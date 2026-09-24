@@ -227,7 +227,7 @@ Les exécutions sont comparées **d'après ce que signifient leurs événements*
 
 | Méthode | Renvoie | |
 | --- | --- | --- |
-| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Enregistrée dans `regressionTestSuitesDir`. `agent` : l'id ou le nom d'un agent de ce SDK. Chaque trace de référence doit exister ; `input` vaut par défaut l'entrée qu'a reçue l'exécution de référence |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Enregistrée dans `regressionTestSuitesDir`. `agent` : l'id ou le nom d'un agent de ce SDK. Chaque trace de référence doit exister ; `input` vaut par défaut l'entrée qu'a reçue l'exécution de référence ; une suite ne conserve ni le `signal` ni les callbacks (`onEvent`, `onText`, `onTextRestart`) d'une entrée |
 | `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | Les plus récentes d'abord |
 | `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | Toutes les suites de l'agent, la plus ancienne d'abord : chaque test envoie son entrée à l'agent et compare l'exécution à sa trace de référence ; `suites` contient un résultat par suite |
 | `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | Une seule suite |

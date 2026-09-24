@@ -227,7 +227,7 @@ Runs are compared **by what their events mean**, never by event id (every run ha
 
 | Method | Returns | |
 | --- | --- | --- |
-| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Saved in `regressionTestSuitesDir`. `agent`: the id or the name of an agent of this SDK. Each golden trace must exist; `input` defaults to the one the golden run received |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Saved in `regressionTestSuitesDir`. `agent`: the id or the name of an agent of this SDK. Each golden trace must exist; `input` defaults to the one the golden run received; a suite does not keep the `signal` or the callbacks (`onEvent`, `onText`, `onTextRestart`) of an input |
 | `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | Newest first |
 | `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | Every suite of the agent, oldest first: each test sends its input to the agent and compares the run with its golden trace; `suites` holds one result per suite |
 | `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | One suite |

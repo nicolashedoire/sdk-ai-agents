@@ -227,7 +227,7 @@ Läufe werden **nach der Bedeutung ihrer Ereignisse** verglichen, nie nach Ereig
 
 | Methode | Rückgabe | |
 | --- | --- | --- |
-| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Gespeichert in `regressionTestSuitesDir`. `agent`: die ID oder der Name eines Agenten dieses SDK. Jeder Golden Trace muss existieren; `input` ist standardmäßig die Eingabe, die der Referenzlauf erhalten hat |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Gespeichert in `regressionTestSuitesDir`. `agent`: die ID oder der Name eines Agenten dieses SDK. Jeder Golden Trace muss existieren; `input` ist standardmäßig die Eingabe, die der Referenzlauf erhalten hat; eine Suite speichert weder `signal` noch die Callbacks (`onEvent`, `onText`, `onTextRestart`) einer Eingabe |
 | `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | Die neuesten zuerst |
 | `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | Alle Suiten des Agenten, die älteste zuerst: Jeder Test schickt seine Eingabe an den Agenten und vergleicht den Lauf mit seinem Golden Trace; `suites` enthält ein Ergebnis pro Suite |
 | `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | Eine einzelne Suite |

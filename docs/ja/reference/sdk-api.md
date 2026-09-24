@@ -227,7 +227,7 @@ interface ModelCostLine {
 
 | メソッド | 戻り値 | |
 | --- | --- | --- |
-| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | `regressionTestSuitesDir` に保存される。`agent`：この SDK のエージェントの id または名前。各ゴールデントレースは存在している必要がある。`input` のデフォルトは、基準の実行が受け取った入力 |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | `regressionTestSuitesDir` に保存される。`agent`：この SDK のエージェントの id または名前。各ゴールデントレースは存在している必要がある。`input` のデフォルトは、基準の実行が受け取った入力。スイートは入力の `signal` とコールバック（`onEvent`、`onText`、`onTextRestart`）を保存しない |
 | `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | 新しいものから順に |
 | `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | エージェントのすべてのスイートを古い順に実行する。各テストは入力をエージェントに送り、その実行をゴールデントレースと比較する。`suites` にはスイートごとに 1 つの結果が入る |
 | `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | 1 つのスイートだけ |

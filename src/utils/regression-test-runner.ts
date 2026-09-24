@@ -1,5 +1,6 @@
 import type { AgentImpl } from '../agent.js';
 import type {
+  RegressionTestInput,
   RegressionTestSuite,
   RegressionTestOptions,
   RegressionTestResult,
@@ -7,7 +8,6 @@ import type {
   RegressionTestSuiteResult,
 } from '../types/regression-test.js';
 import type { RegressionReport } from '../types/regression.js';
-import type { RunInput } from '../types/run.js';
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 /** How long a timed-out run has, once cancelled, to record its cancellation. */
@@ -196,7 +196,7 @@ function settleAfter(ms: number): { promise: Promise<'elapsed'>; cancel(): void 
 }
 
 /** A run input as `agent.run` needs it; a suite file edited by hand may hold anything. */
-export function isRunInput(value: unknown): value is Omit<RunInput, 'signal'> {
+export function isRunInput(value: unknown): value is RegressionTestInput {
   return (
     typeof value === 'object' &&
     value !== null &&

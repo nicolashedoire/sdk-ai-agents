@@ -55,7 +55,7 @@ import type {
   LiveSubscriptionOptions,
 } from './types/events.js';
 import type { Policy } from './types/policy.js';
-import type { ReplayModifications, ReplayOptions, RunResult } from './types/run.js';
+import type { ReplayModifications, ReplayOptions, RunInput, RunResult } from './types/run.js';
 import type { SDKConfig, Trace } from './types/sdk.js';
 import type { Capability, Tool, ToolDefinition } from './types/tool.js';
 import type { ResourceContent } from './types/resource.js';
@@ -233,8 +233,9 @@ export interface SDK {
   /**
    * Saves a suite of golden traces whose inputs run again with `agent` (an agent of this SDK,
    * by id or by name). Each golden trace must exist; a test's `input` defaults to the one the
-   * golden run received. Throws a `ValidationError` for an unknown or ambiguous agent or a
-   * bad test.
+   * golden run received. A suite keeps data only: an input's `signal` and callbacks (`onEvent`,
+   * `onText`, `onTextRestart`) are dropped. Throws a `ValidationError` for an unknown or
+   * ambiguous agent or a bad test.
    */
   createRegressionTestSuite(
     agent: string,
@@ -1052,10 +1053,19 @@ export class SDKImpl implements SDK {
             : 'must be a run input with a string `message`'
         );
       }
+      // The suite's file cannot hold the signal and the callbacks: the suite in memory does not
+      // keep them either, so its tests run as they would in another process.
+      const {
+        signal: _signal,
+        onEvent: _onEvent,
+        onText: _onText,
+        onTextRestart: _onTextRestart,
+        ...stored
+      } = input as RunInput;
       goldenTraces.push({
         goldenTraceId: golden.id,
         name: test.name,
-        input,
+        input: stored,
         ...(test.tags ? { tags: test.tags } : {}),
       });
     }

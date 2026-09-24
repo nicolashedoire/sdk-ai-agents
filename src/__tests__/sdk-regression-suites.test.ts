@@ -5,6 +5,7 @@ import { InMemoryKnowledgeStore } from '../cognition/knowledge-store.js';
 import type { Incident, IncidentNotifier } from '../incidents/incident.js';
 import { defineTool } from '../sdk.js';
 import type { RegressionTestSuiteConfig } from '../types/regression-test.js';
+import type { RunInput } from '../types/run.js';
 import {
   InclinedPlaneBench,
   OBSERVATIONS,
@@ -288,6 +289,29 @@ describe('regression suites', () => {
       /goldenTraces\[0\]\.input/
     );
     expect(await env.sdk.getRegressionTestSuites()).toEqual([]);
+  });
+
+  it("keeps the input's data, not the callbacks of the run it was written for", async () => {
+    const goldenTraceId = await goldenRun('churn');
+    const watched: string[] = [];
+    const input: RunInput = {
+      message: 'What is our churn?',
+      onEvent: (event) => watched.push(event.type),
+      onText: (delta) => watched.push(delta),
+    };
+    const suite = await env.sdk.createRegressionTestSuite(analyst.id, {
+      name: 'metrics',
+      goldenTraces: [{ goldenTraceId, name: 'churn', input }],
+    });
+    scriptRun(env.provider);
+
+    const results = await env.sdk.runRegressionTestSuite(suite.id);
+
+    // Before, the suite kept the callbacks in memory (not in its file) and every test run
+    // called them.
+    expect(Object.keys(suite.goldenTraces[0]?.input ?? {})).toEqual(['message']);
+    expect(results).toMatchObject({ totalTests: 1, passedTests: 1 });
+    expect(watched).toEqual([]);
   });
 
   it('cancels a test that runs past its timeout and fails CI with an error code', async () => {

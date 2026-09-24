@@ -227,7 +227,7 @@ As execuções são comparadas **pelo que os seus eventos significam**, nunca pe
 
 | Método | Devolve | |
 | --- | --- | --- |
-| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Salva em `regressionTestSuitesDir`. `agent`: o id ou o nome de um agente deste SDK. Cada golden trace precisa existir; `input` é, por padrão, a entrada que a execução de referência recebeu |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Salva em `regressionTestSuitesDir`. `agent`: o id ou o nome de um agente deste SDK. Cada golden trace precisa existir; `input` é, por padrão, a entrada que a execução de referência recebeu; uma suíte não guarda o `signal` nem os callbacks (`onEvent`, `onText`, `onTextRestart`) de uma entrada |
 | `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | As mais recentes primeiro |
 | `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | Todas as suítes do agente, a mais antiga primeiro: cada teste envia a sua entrada ao agente e compara a execução com o seu golden trace; `suites` tem um resultado por suíte |
 | `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | Uma única suíte |

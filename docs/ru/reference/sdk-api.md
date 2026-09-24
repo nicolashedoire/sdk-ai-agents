@@ -227,7 +227,7 @@ interface ModelCostLine {
 
 | Метод | Возвращает | |
 | --- | --- | --- |
-| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Сохраняется в `regressionTestSuitesDir`. `agent`: id или имя агента этого SDK. Каждая эталонная трасса должна существовать; `input` по умолчанию — вход, который получил эталонный запуск |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Сохраняется в `regressionTestSuitesDir`. `agent`: id или имя агента этого SDK. Каждая эталонная трасса должна существовать; `input` по умолчанию — вход, который получил эталонный запуск; набор не сохраняет `signal` и колбэки (`onEvent`, `onText`, `onTextRestart`) входа |
 | `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | Сначала самые новые |
 | `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | Все наборы агента, начиная с самого старого: каждый тест отправляет свой вход агенту и сравнивает запуск со своей эталонной трассой; в `suites` — по одному результату на набор |
 | `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | Один набор |

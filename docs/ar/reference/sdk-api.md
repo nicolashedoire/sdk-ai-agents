@@ -227,7 +227,7 @@ interface ModelCostLine {
 
 | الدالة | تعيد | |
 | --- | --- | --- |
-| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | تُحفَظ في `regressionTestSuitesDir`. `agent`: معرّف وكيل من هذه الحزمة أو اسمه. يجب أن يوجد كل أثر مرجعي؛ وقيمة `input` الافتراضية هي المُدخل الذي تلقّاه التشغيل المرجعي |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | تُحفَظ في `regressionTestSuitesDir`. `agent`: معرّف وكيل من هذه الحزمة أو اسمه. يجب أن يوجد كل أثر مرجعي؛ وقيمة `input` الافتراضية هي المُدخل الذي تلقّاه التشغيل المرجعي؛ ولا تحتفظ المجموعة بـ`signal` المُدخل ولا بدوال الاستدعاء فيه (`onEvent`، `onText`، `onTextRestart`) |
 | `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | الأحدث أولًا |
 | `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | كل مجموعات الوكيل، الأقدم أولًا: يرسل كل اختبار مُدخله إلى الوكيل ويقارن التشغيل بأثره المرجعي؛ وفي `suites` نتيجة واحدة لكل مجموعة |
 | `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | مجموعة واحدة |

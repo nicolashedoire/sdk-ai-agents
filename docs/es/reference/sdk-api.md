@@ -227,7 +227,7 @@ Las ejecuciones se comparan **por lo que significan sus eventos**, nunca por el 
 
 | Método | Devuelve | |
 | --- | --- | --- |
-| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Se guarda en `regressionTestSuitesDir`. `agent`: el id o el nombre de un agente de este SDK. Cada traza de referencia debe existir; `input` es por defecto la entrada que recibió la ejecución de referencia |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Se guarda en `regressionTestSuitesDir`. `agent`: el id o el nombre de un agente de este SDK. Cada traza de referencia debe existir; `input` es por defecto la entrada que recibió la ejecución de referencia; una suite no guarda el `signal` ni los callbacks (`onEvent`, `onText`, `onTextRestart`) de una entrada |
 | `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | Las más recientes primero |
 | `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | Todas las baterías del agente, la más antigua primero: cada prueba envía su entrada al agente y compara la ejecución con su traza de referencia; `suites` tiene un resultado por batería |
 | `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | Una sola batería |

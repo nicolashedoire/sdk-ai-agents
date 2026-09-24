@@ -227,7 +227,7 @@ runs की तुलना **उनके इवेंट्स के अर�
 
 | Method | लौटाता है | |
 | --- | --- | --- |
-| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | `regressionTestSuitesDir` में सहेजा जाता है। `agent`: इस SDK के किसी एजेंट का id या नाम। हर गोल्डन ट्रेस मौजूद होना चाहिए; `input` डिफ़ॉल्ट रूप से वह इनपुट है जो संदर्भ run को मिला था |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | `regressionTestSuitesDir` में सहेजा जाता है। `agent`: इस SDK के किसी एजेंट का id या नाम। हर गोल्डन ट्रेस मौजूद होना चाहिए; `input` डिफ़ॉल्ट रूप से वह इनपुट है जो संदर्भ run को मिला था; सूट किसी इनपुट का `signal` और callbacks (`onEvent`, `onText`, `onTextRestart`) नहीं रखता |
 | `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | सबसे नए पहले |
 | `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | एजेंट के सभी सूट, सबसे पुराना पहले: हर टेस्ट अपना इनपुट एजेंट को भेजता है और run की तुलना अपने गोल्डन ट्रेस से करता है; `suites` में हर सूट का एक नतीजा होता है |
 | `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | एक सूट |

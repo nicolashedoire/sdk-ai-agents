@@ -227,7 +227,7 @@ interface ModelCostLine {
 
 | 메서드 | 반환값 | |
 | --- | --- | --- |
-| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | `regressionTestSuitesDir`에 저장됩니다. `agent`: 이 SDK에 있는 에이전트의 id 또는 이름. 각 골든 트레이스는 존재해야 하며, `input`의 기본값은 기준 실행이 받은 입력입니다 |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | `regressionTestSuitesDir`에 저장됩니다. `agent`: 이 SDK에 있는 에이전트의 id 또는 이름. 각 골든 트레이스는 존재해야 하며, `input`의 기본값은 기준 실행이 받은 입력입니다. 스위트는 입력의 `signal`과 콜백(`onEvent`, `onText`, `onTextRestart`)을 저장하지 않습니다 |
 | `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | 최신순 |
 | `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | 에이전트의 모든 스위트를 오래된 것부터 실행합니다. 각 테스트는 입력을 에이전트에 보내고 그 실행을 골든 트레이스와 비교합니다. `suites`에는 스위트마다 결과가 하나씩 있습니다 |
 | `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | 스위트 하나만 |

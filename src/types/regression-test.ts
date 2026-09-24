@@ -1,8 +1,11 @@
 import type { RegressionDetectionOptions, RegressionReport } from './regression.js';
 import type { RunInput } from './run.js';
 
-/** What a regression test sends to the agent: a run input, without its abort signal. */
-export type RegressionTestInput = Omit<RunInput, 'signal'>;
+/**
+ * What a regression test sends to the agent: a run input without its abort signal and its
+ * callbacks (`onEvent`, `onText`, `onTextRestart`), which a suite saved as JSON cannot hold.
+ */
+export type RegressionTestInput = Omit<RunInput, 'signal' | 'onEvent' | 'onText' | 'onTextRestart'>;
 
 export interface RegressionTestSuiteConfig {
   name: string;

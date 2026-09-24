@@ -227,7 +227,7 @@ interface ModelCostLine {
 
 | 方法 | 返回值 | |
 | --- | --- | --- |
-| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | 保存在 `regressionTestSuitesDir` 中。`agent`：本 SDK 中某个智能体的 id 或名称。每条黄金追踪记录都必须存在；`input` 默认为参照运行收到的输入 |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | 保存在 `regressionTestSuitesDir` 中。`agent`：本 SDK 中某个智能体的 id 或名称。每条黄金追踪记录都必须存在；`input` 默认为参照运行收到的输入；套件不保存输入的 `signal` 和回调（`onEvent`、`onText`、`onTextRestart`） |
 | `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | 最新的在前 |
 | `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | 按从旧到新的顺序运行该智能体的所有套件：每个测试把输入发给智能体，并把这次运行与其黄金追踪记录比较；`suites` 中每个套件对应一个结果 |
 | `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | 只运行一个套件 |
