@@ -11,9 +11,9 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Key of the primary provider (not needed with `llmProvider`). Without any key, tools and MCP servers work and calls that need a model fail with a clear error |
 | `provider` | `'openai' \| 'anthropic'` | Primary provider, default `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | Settings of each vendor: `apiKey`, `defaultModel` and `baseURL` (a compatible endpoint, such as the Azure OpenAI v1 API or a local model server, or a proxy). Used by the primary provider and by fallbacks of the same vendor |
-| `fallbackProviders` | `Array<{ provider, config? }>` | Tried in order when the primary fails; a `config` overrides its vendor's `providerConfig`. A fallback of another vendor needs its own `apiKey` |
-| `llmProvider` | `LLMProvider` | Your own provider (local model, gateway, test double) |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` and `baseURL` of each vendor (`baseURL`: a compatible endpoint, such as the Azure OpenAI v1 API or a local model server, or a proxy). The primary uses its vendor's entry, and a fallback of another vendor uses its own vendor's entry |
+| `fallbackProviders` | `Array<{ provider, config? }>` | Tried in order when the primary fails; a `config` overrides `providerConfig`. A fallback of the primary's vendor inherits none of the primary's settings (only the SDK-wide `apiKey`); one of another vendor needs its own key |
+| `llmProvider` | `LLMProvider` | Your own provider (local model, gateway, test double). It gets tool calls and results in the native format (`LLMMessage`) if it declares `nativeToolMessages`, as plain text otherwise |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM retry policy, per provider, before fallback |
 | `jev` | `JevClientConfig` | Enables TypeSafe Jev for typed decisions — directly, or through [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) with `baseUrl` and `model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | Any typed-decision backend (takes precedence over `jev`) |

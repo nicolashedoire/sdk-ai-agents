@@ -232,6 +232,8 @@ const agent = sdk.createAgent({
 });
 ```
 
+Les limites de budget et de durée sont vérifiées avant chaque appel d'outil d'une exécution d'agent gouverné, d'après sa progression : `maxSteps` compte les étapes déjà effectuées (le premier appel est à l'étape 0), `maxTokens` les tokens consommés par ses appels au modèle, `maxDuration` le temps écoulé depuis le début de l'exécution. Une limite refuse l'appel d'outil, ce qui fait échouer l'exécution ; elle n'interrompt jamais un appel au modèle. Les budgets de tokens par période (`budgetLimit` avec `maxTokens`) comptent les tokens des appels au modèle des agents gouvernés, et un rejeu applique les limites comme l'exécution d'origine. Les agents cognitifs ont leurs propres limites (`maxSteps`, `maxToolCalls`, `timeoutMs`).
+
 ### 4. Traces {#_4-traces}
 
 Chaque exécution génère une trace complète et rejouable.

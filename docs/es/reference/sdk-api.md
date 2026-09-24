@@ -11,9 +11,9 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Clave del proveedor principal (no hace falta con `llmProvider`). Sin ninguna clave, las herramientas y los servidores MCP funcionan, y las llamadas que necesitan un modelo fallan con un error claro |
 | `provider` | `'openai' \| 'anthropic'` | Proveedor principal, `openai` por defecto |
-| `providerConfig` | `{ openai?, anthropic? }` | Ajustes de cada proveedor: `apiKey`, `defaultModel` y `baseURL` (un endpoint compatible, como la API v1 de Azure OpenAI o un servidor de modelos local, o un proxy). Los usan el proveedor principal y los de respaldo del mismo proveedor |
-| `fallbackProviders` | `Array<{ provider, config? }>` | Se prueban en orden cuando falla el principal; un `config` prevalece sobre el `providerConfig` de su proveedor. Uno de otro proveedor necesita su propia `apiKey` |
-| `llmProvider` | `LLMProvider` | Tu propio proveedor (modelo local, pasarela, doble de prueba) |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` y `baseURL` de cada fabricante (`baseURL`: un endpoint compatible, como la API v1 de Azure OpenAI o un servidor de modelos local, o un proxy). El principal usa la entrada de su fabricante, y uno de respaldo de otro fabricante la del suyo |
+| `fallbackProviders` | `Array<{ provider, config? }>` | Se prueban en orden cuando falla el principal; un `config` prevalece sobre `providerConfig`. Uno de respaldo del mismo fabricante que el principal no hereda ninguno de sus ajustes (solo la `apiKey` global); uno de otro fabricante necesita su propia clave |
+| `llmProvider` | `LLMProvider` | Tu propio proveedor (modelo local, pasarela, doble de prueba). Recibe las llamadas a herramientas y sus resultados en el formato nativo (`LLMMessage`) si declara `nativeToolMessages`, y como texto si no |
 | `retry` | `Partial<RetryPolicy> \| false` | Política de reintentos del LLM, por proveedor, antes de la conmutación |
 | `jev` | `JevClientConfig` | Activa TypeSafe Jev para las decisiones tipadas — directamente, o a través de [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) con `baseUrl` y `model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | Cualquier backend de decisiones tipadas (tiene prioridad sobre `jev`) |
