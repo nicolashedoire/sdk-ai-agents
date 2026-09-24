@@ -27,7 +27,6 @@ interface Event {
 | Type | Données |
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` — ou `intention` pour une réponse finale cognitive |
-| `intention.rejected` | `reason` |
 | `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools` quand un appelant a utilisé un outil qui ne lui avait pas été donné ; l'identifiant de la politique de budget quand son budget d'appels est épuisé) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval` quand c'est le `metadata.requiresApproval` de l'outil lui-même qui l'a demandée), `reason?` (`cancelled before a decision` quand l'appelant a abandonné ou que l'exécution s'est arrêtée, `no decision within N ms` après `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` — `action.failed` enregistre aussi un appel refusé pour arguments invalides (avant toute politique) ou parce que son appelant est parti après une approbation |
@@ -37,7 +36,7 @@ interface Event {
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` du contenu servi (le contenu lui-même n'est pas stocké) |
 
-`tool.failed` fait partie du type `EventType` mais n'est jamais enregistré : un appel d'outil en échec est un événement `action.failed`.
+`tool.failed`, `intention.rejected` et `error.occurred` font partie du type `EventType`, mais le SDK ne les enregistre jamais : un appel d'outil en échec est un événement `action.failed`, et un appel refusé un événement `policy.violated` ou `approval.rejected`.
 
 ## Cognition {#cognition}
 
@@ -58,6 +57,5 @@ interface Event {
 | Type | Données |
 | --- | --- |
 | `incident.reported` | `incident`, `deliveries`, `suppressed?` (`throttled`, `below minimum severity`) |
-| `error.occurred` | `error` |
 
 L'état mental d'une exécution cognitive est le résultat de l'application successive de ses patchs `cognition.thought` dans l'ordre des `step`, en partant de l'objectif et des observations de `cognition.started`. Les observations produites pendant l'exécution sont portées par les patchs de pensée, avec un `sourceEventId` qui pointe vers l'événement `action.executed` ou `cognition.evaluated` contenant les données complètes. Les exécutions sans `schemaVersion` sont reconstruites avec les règles selon lesquelles elles ont été enregistrées.

@@ -27,7 +27,6 @@ interface Event {
 | Typ | Daten |
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` – oder `intention` für eine kognitive endgültige Antwort |
-| `intention.rejected` | `reason` |
 | `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools`, wenn ein Aufrufer ein Tool verwendet hat, das ihm nicht gegeben wurde; die Kennung der Budgetrichtlinie, wenn ihr Aufrufbudget aufgebraucht ist) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval`, wenn das eigene `metadata.requiresApproval` des Tools sie verlangt hat), `reason?` (`cancelled before a decision`, wenn der Aufrufer aufgegeben hat oder der Lauf angehalten wurde, `no decision within N ms` nach `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` – `action.failed` zeichnet auch einen Aufruf auf, der wegen ungültiger Argumente (vor jeder Richtlinie) abgelehnt wurde oder weil sein Aufrufer nach einer Freigabe gegangen war |
@@ -37,7 +36,7 @@ interface Event {
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` des ausgelieferten Inhalts (der Inhalt selbst wird nicht gespeichert) |
 
-`tool.failed` gehört zum Typ `EventType`, wird aber nie aufgezeichnet: Ein fehlgeschlagener Tool-Aufruf ist ein Ereignis `action.failed`.
+`tool.failed`, `intention.rejected` und `error.occurred` gehören zum Typ `EventType`, werden vom SDK aber nie aufgezeichnet: Ein fehlgeschlagener Tool-Aufruf ist ein Ereignis `action.failed`, ein abgelehnter ein Ereignis `policy.violated` oder `approval.rejected`.
 
 ## Kognition {#cognition}
 
@@ -58,6 +57,5 @@ interface Event {
 | Typ | Daten |
 | --- | --- |
 | `incident.reported` | `incident`, `deliveries`, `suppressed?` (`throttled`, `below minimum severity`) |
-| `error.occurred` | `error` |
 
 Der mentale Zustand eines kognitiven Laufs ist die Faltung seiner `cognition.thought`-Patches in der Reihenfolge von `step`, ausgehend vom Ziel und den Beobachtungen aus `cognition.started`. Beobachtungen, die während des Laufs entstehen, werden von den Gedanken-Patches getragen, wobei `sourceEventId` auf das Ereignis `action.executed` oder `cognition.evaluated` verweist, das die vollständigen Nutzdaten enthält. Läufe ohne `schemaVersion` werden mit den Regeln rekonstruiert, mit denen sie aufgezeichnet wurden.

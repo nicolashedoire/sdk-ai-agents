@@ -27,7 +27,6 @@ interface Event {
 | Tipo | Datos |
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` — o `intention` para una respuesta final cognitiva |
-| `intention.rejected` | `reason` |
 | `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools` cuando quien llama usó una herramienta que no se le dio; el identificador de la política de presupuesto cuando se ha agotado su presupuesto de llamadas) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval` cuando la pidió el propio `metadata.requiresApproval` de la herramienta), `reason?` (`cancelled before a decision` cuando quien llama se rindió o la ejecución se detuvo, `no decision within N ms` tras `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` — `action.failed` también registra una llamada rechazada por argumentos no válidos (antes de cualquier política) o porque quien llamaba se fue tras una aprobación |
@@ -37,7 +36,7 @@ interface Event {
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` del contenido servido (el propio contenido no se guarda) |
 
-`tool.failed` forma parte del tipo `EventType`, pero nunca se registra: una llamada a herramienta fallida es un evento `action.failed`.
+`tool.failed`, `intention.rejected` y `error.occurred` forman parte del tipo `EventType`, pero el SDK nunca los registra: una llamada a herramienta que falla es un evento `action.failed`, y una rechazada, un evento `policy.violated` o `approval.rejected`.
 
 ## Cognición {#cognition}
 
@@ -58,6 +57,5 @@ interface Event {
 | Tipo | Datos |
 | --- | --- |
 | `incident.reported` | `incident`, `deliveries`, `suppressed?` (`throttled`, `below minimum severity`) |
-| `error.occurred` | `error` |
 
 El estado mental de una ejecución cognitiva es el resultado de aplicar sus parches `cognition.thought` en el orden de `step`, partiendo del objetivo y las observaciones de `cognition.started`. Las observaciones producidas durante la ejecución las llevan los parches de pensamiento, con `sourceEventId` apuntando al evento `action.executed` o `cognition.evaluated` que contiene el contenido completo. Las ejecuciones sin `schemaVersion` se reconstruyen con las reglas con las que se registraron.

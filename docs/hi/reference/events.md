@@ -27,7 +27,6 @@ interface Event {
 | टाइप | डेटा |
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` — या संज्ञानात्मक अंतिम उत्तर के लिए `intention` |
-| `intention.rejected` | `reason` |
 | `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools` जब कॉल करने वाले ने ऐसा टूल इस्तेमाल किया जो उसे नहीं दिया गया था; बजट नीति का id जब उसका कॉल-बजट खत्म हो चुका हो) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval` जब टूल के अपने `metadata.requiresApproval` ने इसकी माँग की), `reason?` (`cancelled before a decision` जब कॉल करने वाला हार मान गया या run रुक गया, `no decision within N ms` `approvalTimeoutMs` के बाद) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` — `action.failed` उस कॉल को भी दर्ज करता है जो अमान्य arguments के कारण (किसी भी नीति से पहले) ठुकराई गई, या इसलिए कि कॉल करने वाला मंज़ूरी के बाद चला गया |
@@ -37,7 +36,7 @@ interface Event {
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, सर्व की गई सामग्री का `sha256` (सामग्री खुद सहेजी नहीं जाती) |
 
-`tool.failed` टाइप `EventType` का हिस्सा है, लेकिन यह कभी दर्ज नहीं होता: विफल टूल कॉल एक `action.failed` इवेंट होती है।
+`tool.failed`, `intention.rejected` और `error.occurred` टाइप `EventType` का हिस्सा हैं, लेकिन SDK इन्हें कभी दर्ज नहीं करता: विफल टूल कॉल एक `action.failed` इवेंट होती है, और ठुकराई गई टूल कॉल एक `policy.violated` या `approval.rejected` इवेंट।
 
 ## संज्ञान (Cognition) {#cognition}
 
@@ -58,6 +57,5 @@ interface Event {
 | टाइप | डेटा |
 | --- | --- |
 | `incident.reported` | `incident`, `deliveries`, `suppressed?` (`throttled`, `below minimum severity`) |
-| `error.occurred` | `error` |
 
 किसी संज्ञानात्मक run की मानसिक स्थिति उसके `cognition.thought` पैचों को `step` के क्रम में लागू करने का नतीजा है, `cognition.started` के लक्ष्य और अवलोकनों से शुरू करके। run के दौरान बने अवलोकन विचार-पैचों में रहते हैं, और उनका `sourceEventId` उस `action.executed` या `cognition.evaluated` इवेंट की ओर इशारा करता है जिसमें पूरा payload है। बिना `schemaVersion` वाले runs उन्हीं नियमों से दोबारा बनाए जाते हैं जिनके साथ वे दर्ज हुए थे।

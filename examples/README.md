@@ -8,7 +8,7 @@ Run the quick start example:
 OPENAI_API_KEY=your-key npm run example:quick-start
 ```
 
-The examples import the SDK from `src/` and are not compiled into `dist/`: run any of them with `tsx`, as the scripts do:
+The examples import the SDK from `src/` and are not compiled into `dist/`: run any of them with `tsx` from the repository root, as the scripts do:
 
 ```bash
 OPENAI_API_KEY=your-key npx tsx examples/quick-start.ts
@@ -18,6 +18,7 @@ OPENAI_API_KEY=your-key npx tsx examples/quick-start.ts
 
 | Script | What it shows |
 | --- | --- |
+| `npm run example:complete` | The main features in one script: tools, capabilities, policies, tracing, replay, stopping a run and exporting its trace (`OPENAI_API_KEY`) |
 | `npm run example:cognitive` | A cognitive agent with a governed tool, costs and incident alerts; typed decisions with `TYPESAFE_API_KEY`, or Jev through Vercel AI Gateway with `AI_GATEWAY_API_KEY` |
 | `npm run example:rules` | The evidence loop: a rule induced from measurements, predictions tested on a simulated bench, a refuted rule revised (`MODEL=gpt-4o` to try a stronger model) |
 | `npm run example:mcp` | A function exposed as an MCP server over stdio (no model key needed) |
@@ -29,7 +30,7 @@ OPENAI_API_KEY=your-key npx tsx examples/quick-start.ts
 | `npm run example:mcp-http -- /path/to/folder` | An MCP server over Streamable HTTP with a bearer token (`MCP_TOKEN`) |
 | `npm run example:mcp-approvals` | An MCP server whose write tool waits for a human, with a small admin endpoint to see and decide the pending approvals (`ADMIN_SECRET`) |
 
-The MCP examples are started by an MCP client, not by hand: see [Your first MCP server](https://nicolashedoire.github.io/sdk-ai-agents/guide/mcp-first-server) to test them with the MCP Inspector or connect them to Claude Desktop and Claude Code. They write their event log to `examples/events/`.
+The MCP examples are started by an MCP client, not by hand — except `example:mcp-http`, which you start yourself and clients reach at `http://127.0.0.1:3000/mcp`: see [Your first MCP server](https://nicolashedoire.github.io/sdk-ai-agents/guide/mcp-first-server) to test them with the MCP Inspector or connect them to Claude Desktop and Claude Code. They write their event log to `examples/events/`.
 
 ## What the Example Does
 

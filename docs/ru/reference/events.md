@@ -27,7 +27,6 @@ interface Event {
 | Тип | Данные |
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` — или `intention` для итогового когнитивного ответа |
-| `intention.rejected` | `reason` |
 | `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools`, когда вызывающая сторона использовала инструмент, который ей не дали; идентификатор политики бюджета, когда её бюджет вызовов исчерпан) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval`, когда одобрения потребовал собственный `metadata.requiresApproval` инструмента), `reason?` (`cancelled before a decision`, когда вызывающая сторона сдалась или запуск остановился, `no decision within N ms` по истечении `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` — `action.failed` также записывает вызов, отклонённый из-за некорректных аргументов (до любой политики) или потому, что вызывающая сторона ушла после одобрения |
@@ -37,7 +36,7 @@ interface Event {
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` отданного содержимого (само содержимое не хранится) |
 
-`tool.failed` входит в тип `EventType`, но никогда не записывается: неудачный вызов инструмента — это событие `action.failed`.
+`tool.failed`, `intention.rejected` и `error.occurred` входят в тип `EventType`, но SDK никогда их не записывает: неудачный вызов инструмента — это событие `action.failed`, а отклонённый — событие `policy.violated` или `approval.rejected`.
 
 ## Когнитивные события {#cognition}
 
@@ -58,6 +57,5 @@ interface Event {
 | Тип | Данные |
 | --- | --- |
 | `incident.reported` | `incident`, `deliveries`, `suppressed?` (`throttled`, `below minimum severity`) |
-| `error.occurred` | `error` |
 
 Ментальное состояние когнитивного запуска — это свёртка его патчей `cognition.thought` в порядке `step`, начиная с цели и наблюдений из `cognition.started`. Наблюдения, полученные во время запуска, переносятся патчами мыслей, а `sourceEventId` указывает на событие `action.executed` или `cognition.evaluated`, в котором хранятся полные данные. Запуски без `schemaVersion` восстанавливаются по тем правилам, с которыми они были записаны.
