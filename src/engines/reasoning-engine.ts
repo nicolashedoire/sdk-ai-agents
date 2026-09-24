@@ -37,10 +37,10 @@ export interface ReasoningStep {
   /** Tokens the call used, when the provider reports them. */
   usage?: LLMResponse['usage'];
   /**
-   * For a tool call: the model's turn to add to the conversation before the tool's result,
-   * with the call's id (the result refers to it).
+   * Set exactly when the model called a tool: the call's id and name (the tool's result refers
+   * to the id), and the model's turn to add to the conversation before that result.
    */
-  assistantTurn?: Extract<LLMMessage, { role: 'assistant' }>;
+  toolCall?: { id: string; name: string; turn: Extract<LLMMessage, { role: 'assistant' }> };
 }
 
 export class ReasoningEngine {
@@ -174,17 +174,18 @@ export class ReasoningEngine {
 
       const intention = this.parseIntention(response);
       const call = response.toolCalls?.[0];
-      const assistantTurn =
-        intention.type === 'tool_call' && call
-          ? {
-              role: 'assistant' as const,
-              content: response.content ?? '',
-              // Only the call the SDK runs: each call of a turn needs its result.
-              toolCalls: [{ ...call, id: call.id ?? `call_${randomUUID().replaceAll('-', '')}` }],
-              ...(response.vendorContent ? { vendorContent: response.vendorContent } : {}),
-            }
-          : undefined;
-      return { intention, usage: response.usage, ...(assistantTurn ? { assistantTurn } : {}) };
+      if (intention.type !== 'tool_call' || !call) {
+        return { intention, usage: response.usage };
+      }
+      const id = call.id ?? `call_${randomUUID().replaceAll('-', '')}`;
+      const turn = {
+        role: 'assistant' as const,
+        content: response.content ?? '',
+        // Only the call the SDK runs: each call of a turn needs its result.
+        toolCalls: [{ ...call, id }],
+        ...(response.vendorContent ? { vendorContent: response.vendorContent } : {}),
+      };
+      return { intention, usage: response.usage, toolCall: { id, name: call.function.name, turn } };
     } catch (error) {
       if (abortSignal?.aborted) {
         throw new Error('Run cancelled');

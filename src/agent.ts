@@ -126,7 +126,7 @@ export class AgentImpl {
       this.checkTimeout(state);
 
       try {
-        const { intention, usage, assistantTurn } = await this.generateStep(runId, state);
+        const { intention, usage, toolCall } = await this.generateStep(runId, state);
         await this.recordTokens(state, usage);
 
         this.checkCancellation(runId, state);
@@ -135,8 +135,8 @@ export class AgentImpl {
           return await this.completeRun(runId, intention.reasoning);
         }
 
-        if (intention.type === 'tool_call') {
-          await this.handleToolCall(runId, state, intention, assistantTurn);
+        if (toolCall) {
+          await this.handleToolCall(runId, state, intention, toolCall);
           this.checkCancellation(runId, state);
         }
 
@@ -239,7 +239,7 @@ export class AgentImpl {
     runId: string,
     state: RunState,
     intention: Intention,
-    assistantTurn: ReasoningStep['assistantTurn']
+    toolCall: NonNullable<ReasoningStep['toolCall']>
   ): Promise<void> {
     if (state.abortController?.signal.aborted) {
       throw new Error('Run cancelled');
@@ -257,27 +257,13 @@ export class AgentImpl {
 
     // The turn so far: the user's message, the model's call, then the tool's result, which
     // refers to the call by its id. The next step continues from there, with no new input.
-    const toolName = intention.toolName ?? '';
-    const call = assistantTurn?.toolCalls?.[0];
     if (state.currentInput) {
       state.conversationHistory.push({ role: 'user', content: state.currentInput });
     }
-    state.conversationHistory.push(
-      assistantTurn ?? {
-        role: 'assistant',
-        content: '',
-        toolCalls: [
-          {
-            id: `call_${state.step}`,
-            function: { name: toolName, arguments: JSON.stringify(intention.parameters ?? {}) },
-          },
-        ],
-      }
-    );
-    state.conversationHistory.push({
+    state.conversationHistory.push(toolCall.turn, {
       role: 'tool',
-      toolCallId: call?.id ?? `call_${state.step}`,
-      toolName,
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
       content: JSON.stringify(result.result) ?? 'null',
     });
     state.currentInput = '';
