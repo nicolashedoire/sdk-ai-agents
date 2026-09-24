@@ -59,6 +59,22 @@ export interface Event {
   metadata?: EventMetadata;
 }
 
+/**
+ * Receives live events (`RunInput.onEvent`, `ThinkInput.onEvent`, `sdk.subscribe`), one at a
+ * time: when it returns a promise, its next event waits until that promise settles.
+ */
+export type LiveEventListener = (event: Event) => void | Promise<void>;
+
+/** Which live events a subscriber gets. Every field given must match; none means every event. */
+export interface LiveEventFilter {
+  /** Events recorded for this run. */
+  runId?: string;
+  /** Events whose `metadata.agentId` is this agent, as with `EventFilters.agentId`. */
+  agentId?: string;
+  /** Events of these types. */
+  types?: EventType[];
+}
+
 export interface EventFilters {
   type?: EventType | EventType[];
   since?: number;

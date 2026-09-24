@@ -2,6 +2,8 @@ export * from './types/index.js';
 export * from './errors/index.js';
 export * from './stores/event-store.js';
 export * from './stores/file-event-store.js';
+export { LiveSubscription, ObservedEventStore } from './stores/observed-event-store.js';
+export type { ObservedEventStoreOptions } from './stores/observed-event-store.js';
 export * from './stores/sql-event-store.js';
 export * from './stores/sqlite-event-store.js';
 export * from './stores/postgresql-event-store.js';

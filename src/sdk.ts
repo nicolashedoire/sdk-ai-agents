@@ -40,10 +40,11 @@ import { CapabilityRegistry } from './registry/capability-registry.js';
 import { ToolRegistry } from './registry/tool-registry.js';
 import type { IEventStore } from './stores/event-store.js';
 import { FileEventStore } from './stores/file-event-store.js';
+import { ObservedEventStore, watchRun } from './stores/observed-event-store.js';
 import type { Agent, AgentConfig } from './types/agent.js';
-import type { Event, EventFilters } from './types/events.js';
+import type { Event, EventFilters, LiveEventFilter, LiveEventListener } from './types/events.js';
 import type { Policy } from './types/policy.js';
-import type { ReplayModifications, RunResult } from './types/run.js';
+import type { ReplayModifications, ReplayOptions, RunResult } from './types/run.js';
 import type { SDKConfig, Trace } from './types/sdk.js';
 import type { Capability, Tool, ToolDefinition } from './types/tool.js';
 import type { ResourceContent } from './types/resource.js';
@@ -101,9 +102,23 @@ export interface SDK {
     version?: string;
     metadata?: Record<string, unknown>;
   }): Capability;
-  replay(runId: string, modifications?: ReplayModifications): Promise<RunResult>;
+  /** Re-executes a run's recorded intentions without the LLM; `options.onEvent` watches it live. */
+  replay(
+    runId: string,
+    modifications?: ReplayModifications,
+    options?: ReplayOptions
+  ): Promise<RunResult>;
   getTrace(runId: string): Promise<Trace>;
   getEvents(runId: string, filters?: EventFilters): Promise<Event[]>;
+  /**
+   * Live events of every run (agents, cognitive runs, MCP calls, typed decisions, replays):
+   * `listener` gets each event matching `filter` once the event store has accepted it, in the
+   * order of each run, one event at a time (a promise it returns is awaited before its next
+   * event). Runs never wait for it; its errors are reported on standard error, or to the
+   * `onListenerError` of an `ObservedEventStore` given as `eventStore`. Returns the function that
+   * unsubscribes: from then on the listener is not called, not even for events already queued.
+   */
+  subscribe(listener: LiveEventListener, filter?: LiveEventFilter): () => void;
   exportTrace(runId: string, format?: 'json' | 'text'): Promise<string>;
   defineGlobalPolicy(policy: Policy): void;
   stopRun(runId: string): Promise<void>;
@@ -231,10 +246,18 @@ export interface ExecuteToolOptions {
   signal?: AbortSignal;
   /** Longest wait for a human approval; past it the approval is cancelled and the call refused. */
   approvalTimeoutMs?: number;
+  /**
+   * Called with every event of the call's run (of the run given as `runId`, while the call
+   * lasts), and of the runs the tool starts for it (agent tools), one at a time and in order.
+   * The call resolves or rejects once it has settled on every event.
+   */
+  onEvent?: LiveEventListener;
 }
 
 export class SDKImpl implements SDK {
   private eventStore: IEventStore;
+  /** Delivers live events; `eventStore` wraps it when incidents are on. */
+  private liveEvents: ObservedEventStore;
   private toolRegistry: ToolRegistry;
   private capabilityRegistry: CapabilityRegistry;
   private policyEngine: PolicyEngine;
@@ -259,9 +282,12 @@ export class SDKImpl implements SDK {
     // Before the event store (a FileEventStore creates its folder and a flush timer).
     for (const policy of config.defaultPolicies ?? []) assertCheckableLimits(policy);
     const baseStore = config.eventStore || new FileEventStore();
+    // Every append goes through it, `incident.reported` events included (the monitor is outside).
+    this.liveEvents =
+      baseStore instanceof ObservedEventStore ? baseStore : new ObservedEventStore(baseStore);
     this.eventStore = config.incidents
-      ? new MonitoredEventStore(baseStore, config.incidents)
-      : baseStore;
+      ? new MonitoredEventStore(this.liveEvents, config.incidents)
+      : this.liveEvents;
     this.pricing = { ...DEFAULT_PRICING, ...config.pricing };
     this.toolRegistry = new ToolRegistry();
     this.capabilityRegistry = new CapabilityRegistry();
@@ -406,6 +432,22 @@ export class SDKImpl implements SDK {
     options: ExecuteToolOptions = {}
   ): Promise<unknown> {
     const runId = options.runId ?? `tool_${uuidv4()}`;
+    // Watched before anything is recorded; the runs the tool starts are forwarded to it.
+    const watch = watchRun(this.liveEvents, runId, options.onEvent);
+    try {
+      return await this.executeToolAs(runId, name, parameters, options, watch?.forward.bind(watch));
+    } finally {
+      await watch?.close();
+    }
+  }
+
+  private async executeToolAs(
+    runId: string,
+    name: string,
+    parameters: Record<string, unknown>,
+    options: ExecuteToolOptions,
+    forward: ((event: Event) => void) | undefined
+  ): Promise<unknown> {
     const agentId = options.agentId ?? 'external';
     const log = (type: Event['type'], data: Record<string, unknown>) =>
       this.eventStore.append(runId, {
@@ -434,6 +476,7 @@ export class SDKImpl implements SDK {
           ...(options.approvalTimeoutMs !== undefined
             ? { approvalTimeoutMs: options.approvalTimeoutMs }
             : {}),
+          ...(forward ? { onEvent: forward } : {}),
         }
       );
       if (!options.runId) {
@@ -600,8 +643,17 @@ export class SDKImpl implements SDK {
     });
   }
 
-  async replay(runId: string, modifications?: ReplayModifications): Promise<RunResult> {
-    return await this.replayEngine.replay(runId, modifications);
+  async replay(
+    runId: string,
+    modifications?: ReplayModifications,
+    options?: ReplayOptions
+  ): Promise<RunResult> {
+    return await this.replayEngine.replay(runId, modifications, options);
+  }
+
+  subscribe(listener: LiveEventListener, filter?: LiveEventFilter): () => void {
+    const subscription = this.liveEvents.subscribe(listener, filter);
+    return () => subscription.unsubscribe();
   }
 
   async getTrace(runId: string): Promise<Trace> {

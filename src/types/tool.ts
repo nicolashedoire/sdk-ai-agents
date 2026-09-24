@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import type { LiveEventListener } from './events.js';
 
 export interface ToolMetadata {
   category?: string;
@@ -21,6 +22,13 @@ export interface ToolCallContext {
   agentId: string;
   /** Aborted when the caller gives up: run stopped, MCP request cancelled or timed out. */
   signal?: AbortSignal;
+  /**
+   * Set when the caller watches the call live (an MCP client that asked for progress,
+   * `executeTool` with `onEvent`). A tool that starts runs of its own passes it as their
+   * `onEvent`, so the caller sees them progress too; `governedAgentTool` and
+   * `cognitiveAgentTool` do.
+   */
+  onEvent?: LiveEventListener;
 }
 
 /** Retries for idempotent tools. Only tool errors are retried, never policy decisions. */

@@ -4,7 +4,20 @@ import type {
   EventLog,
   EventAggregation,
   EventQueryResult,
+  LiveEventFilter,
+  LiveEventListener,
 } from '../types/events.js';
+
+/** A listener's subscription to live events (see `ObservedEventStore`). */
+export interface EventSubscription {
+  /** Stops at once: the listener is not called again, events not yet delivered are dropped. */
+  unsubscribe(): void;
+  /**
+   * Takes no new events, and resolves once the listener has settled on every event it already
+   * took. Never rejects: listener errors are reported, not thrown.
+   */
+  close(): Promise<void>;
+}
 
 export interface IEventStore {
   append(runId: string, event: Event): Promise<void>;
@@ -32,6 +45,12 @@ export interface IEventStore {
   // Backup and restore methods (optional - may not be supported by all implementations)
   backup?(): Promise<BackupData>;
   restore?(backupData: BackupData): Promise<void>;
+  /**
+   * Live events: `listener` gets each matching event after it was appended. Present on an
+   * `ObservedEventStore` and on the stores wrapping one (the SDK's store always is); needed
+   * by the `onEvent` option of runs.
+   */
+  subscribe?(listener: LiveEventListener, filter?: LiveEventFilter): EventSubscription;
 }
 
 export interface BackupData {

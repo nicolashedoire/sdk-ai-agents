@@ -1,6 +1,7 @@
 import { ValidationError } from '../errors/index.js';
 import type { IEventStore } from '../stores/event-store.js';
-import type { RunStatus } from '../types/events.js';
+import { watchRun } from '../stores/observed-event-store.js';
+import type { LiveEventListener, RunStatus } from '../types/events.js';
 import type { Tool } from '../types/tool.js';
 import { generateRunId } from '../utils/id.js';
 import type { CognitiveController } from './cognitive-controller.js';
@@ -60,6 +61,13 @@ export interface ThinkInput {
   metadata?: Record<string, unknown>;
   /** Cancels the run when aborted (e.g. the MCP client that asked gave up). Not recorded. */
   signal?: AbortSignal;
+  /**
+   * Called with every event recorded for this run, in order, once the event store has accepted
+   * it; a promise it returns is awaited before its next event. The run never waits for it, and
+   * `think()` resolves once it has settled on every event. Its errors are reported, never
+   * thrown into the run. Not recorded.
+   */
+  onEvent?: LiveEventListener;
 }
 
 export interface CognitiveRunResult {
@@ -136,6 +144,9 @@ export class CognitiveAgent {
       throw new ValidationError('problem', 'a problem to think about is required');
     }
     const observations = this.initialObservations(input.observations ?? []);
+    const runId = generateRunId();
+    // Watched before anything is recorded, so the listener gets every event of the run.
+    const watch = watchRun(this.deps.eventStore, runId, input.onEvent);
     const recalled = this.knowledge ? await this.knowledge.recall(problem) : undefined;
 
     const { limits } = this.deps;
@@ -146,7 +157,7 @@ export class CognitiveAgent {
       () => profile
     );
     const run: RunContext = {
-      runId: generateRunId(),
+      runId,
       abortController: new AbortController(),
       timedOut: false,
       toolCalls: 0,
@@ -272,6 +283,7 @@ export class CognitiveAgent {
       this.activeRuns.delete(run.runId);
       // Tests stay valid whatever the run's outcome: a failed or stopped run still learned them.
       await this.rememberFindings(run, state);
+      await watch?.close();
     }
   }
 

@@ -40,6 +40,8 @@ export class MonitoredEventStore implements IEventStore {
   readonly groupEventsBy?: IEventStore['groupEventsBy'];
   readonly backup?: IEventStore['backup'];
   readonly restore?: IEventStore['restore'];
+  /** The wrapped store's live events: `incident.reported` events reach them too. */
+  readonly subscribe?: IEventStore['subscribe'];
 
   private readonly rules: IncidentRule[];
   private readonly lastSent = new Map<string, number>();
@@ -60,6 +62,7 @@ export class MonitoredEventStore implements IEventStore {
     this.groupEventsBy = inner.groupEventsBy?.bind(inner);
     this.backup = inner.backup?.bind(inner);
     this.restore = inner.restore?.bind(inner);
+    this.subscribe = inner.subscribe?.bind(inner);
   }
 
   async append(runId: string, event: Event): Promise<void> {
