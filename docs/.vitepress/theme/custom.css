@@ -32,6 +32,14 @@
   font-size: 26px;
 }
 
+/* The default theme sets this gap in a top-level `:deep(.logo)` rule. postcss-rtlcss
+   (config.mts) runs before Vue's scoped-CSS pass, so the margin half of that rule becomes
+   `:where([dir][data-v-…]) .logo`, which never matches (its height still applies).
+   margin-inline-end puts the gap after the logo in both reading directions. */
+.VPNavBarTitle .logo {
+  margin-inline-end: 8px;
+}
+
 .illustration {
   display: block;
   margin: 24px auto;

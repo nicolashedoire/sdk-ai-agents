@@ -1,3 +1,4 @@
+import postcssRTLCSS from 'postcss-rtlcss';
 import { defineConfig, type DefaultTheme, type LocaleSpecificConfig } from 'vitepress';
 import { withMermaid } from 'vitepress-plugin-mermaid';
 import { text as ar } from './i18n/ar';
@@ -119,6 +120,19 @@ export default withMermaid(
               { translations: searchTranslations(TRANSLATIONS[language.code]) },
             ]),
           ]),
+        },
+      },
+    },
+    // The default theme places the sidebar, content and outline with left/right values. For a
+    // right-to-left language (Arabic), this plugin adds mirrored rules under [dir="rtl"] and
+    // moves the left-to-right ones under [dir="ltr"] (VitePress always sets <html dir>); the
+    // :where() prefixes add no specificity, as the VitePress guide on RTL support asks.
+    // After a VitePress upgrade, grep the built CSS for `dir=(ltr|rtl)\][data-v`: such a
+    // selector never matches (see the logo rule in theme/custom.css).
+    vite: {
+      css: {
+        postcss: {
+          plugins: [postcssRTLCSS({ ltrPrefix: ':where([dir="ltr"])', rtlPrefix: ':where([dir="rtl"])' })],
         },
       },
     },
