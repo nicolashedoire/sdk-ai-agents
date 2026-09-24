@@ -27,6 +27,7 @@ import { OperationSelector, type CognitiveLimits } from './operation-selector.js
 import { PredictionTester, type OutcomeEvaluator } from './outcome-evaluator.js';
 import { assembleThought } from './patch-admission.js';
 import { learnFromRun } from './profile-learning.js';
+import { RunKnowledge, type KnowledgeSettings } from './run-knowledge.js';
 import {
   defineThinkerProfile,
   type ReasoningFeedback,
@@ -46,6 +47,8 @@ export interface CognitiveAgentDependencies {
   evaluator?: OutcomeEvaluator;
   seeker: InformationSeeker;
   eventStore: IEventStore;
+  /** Memory across runs: recalls what earlier tests established, records what this run's did. */
+  knowledge?: KnowledgeSettings;
 }
 
 export interface ThinkInput {
@@ -96,9 +99,11 @@ export class CognitiveAgent {
   private readonly selector: OperationSelector;
   private readonly recorder: CognitiveRunRecorder;
   private readonly activeRuns = new Map<string, RunContext>();
+  private readonly knowledge: RunKnowledge | undefined;
 
   constructor(private readonly deps: CognitiveAgentDependencies) {
     this.profile = deps.profile;
+    this.knowledge = deps.knowledge ? new RunKnowledge(deps.knowledge) : undefined;
     this.selector = new OperationSelector(
       deps.controller,
       deps.limits,
@@ -129,6 +134,7 @@ export class CognitiveAgent {
       throw new ValidationError('problem', 'a problem to think about is required');
     }
     const observations = this.initialObservations(input.observations ?? []);
+    const recalled = this.knowledge ? await this.knowledge.recall(problem) : undefined;
 
     const { limits } = this.deps;
     const profile = this.profile;
@@ -167,7 +173,11 @@ export class CognitiveAgent {
       preferenceWeight: limits.preferenceWeight,
       minProposalSupport: limits.minProposalSupport,
     };
-    let state = createMentalState(problem, input.context, { observations, commitRules });
+    let state = createMentalState(problem, input.context, {
+      observations,
+      commitRules,
+      ...(recalled ? { knowledge: recalled.items } : {}),
+    });
     try {
       await run.recorder.record(run.runId, 'run.started', {
         input: { message: problem, context: input.context, metadata: input.metadata },
@@ -179,6 +189,7 @@ export class CognitiveAgent {
         ...(input.context ? { context: input.context } : {}),
         observations,
         commitRules,
+        ...(recalled ? { knowledge: recalled } : {}),
         profile: { id: profile.id, name: profile.name, version: profile.version },
         controller: this.deps.controller.name,
         assessor: this.deps.assessor?.name ?? 'llm',
@@ -251,6 +262,15 @@ export class CognitiveAgent {
     } finally {
       clearTimeout(timer);
       this.activeRuns.delete(run.runId);
+      // Tests stay valid whatever the run's outcome: a failed or stopped run still learned them.
+      await this.rememberFindings(run, state);
+    }
+  }
+
+  private async rememberFindings(run: RunContext, state: MentalState): Promise<void> {
+    const recorded = await this.knowledge?.remember(state, run.runId);
+    if (recorded) {
+      await run.recorder.record(run.runId, 'cognition.knowledge_recorded', recorded);
     }
   }
 

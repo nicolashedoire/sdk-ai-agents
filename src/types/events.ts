@@ -30,6 +30,7 @@ export type EventType =
   | 'cognition.concluded'
   | 'cognition.evaluated'
   | 'cognition.feedback'
+  | 'cognition.knowledge_recorded'
   | 'decision.evaluated';
 
 export interface EventMetadata {

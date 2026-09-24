@@ -8,6 +8,7 @@ import type {
   InferenceKind,
   ObservationRecord,
   OutcomeVerdict,
+  RecalledKnowledgeRecord,
   ResolutionAction,
 } from './thought-patch.js';
 
@@ -176,6 +177,11 @@ export interface Contradiction {
   step: number;
 }
 
+/** Knowledge recalled from earlier runs (`M1`…): what real tests confirmed or refuted. */
+export interface RememberedKnowledge extends RecalledKnowledgeRecord {
+  id: string;
+}
+
 export interface Failure {
   id: string;
   operation: string;
@@ -239,6 +245,8 @@ export interface MentalState {
   predictions: Prediction[];
   contradictions: Contradiction[];
   failures: Failure[];
+  /** What earlier runs established with real tests, recalled when the run started. */
+  knowledge: RememberedKnowledge[];
   /** Confidence in the current best answer, in [0, 1]. */
   confidence: number;
   /** Increments whenever the evidence changes; older assessments become stale. */
@@ -259,6 +267,8 @@ export interface MentalStateOptions {
   /** Observations given with the problem. */
   observations?: ObservationRecord[];
   commitRules?: Partial<CommitRules>;
+  /** Knowledge recalled from earlier runs, in the order it is shown (ids `M1`…). */
+  knowledge?: RecalledKnowledgeRecord[];
 }
 
 export function createMentalState(
@@ -281,6 +291,7 @@ export function createMentalState(
     predictions: [],
     contradictions: [],
     failures: [],
+    knowledge: (options.knowledge ?? []).map((item, index) => ({ ...item, id: `M${index + 1}` })),
     confidence: 0,
     evidenceRevision: 0,
     observationsCompared: 0,
@@ -321,7 +332,8 @@ export function sameStatement(left: string, right: string): boolean {
   return normalizeStatement(left) === normalizeStatement(right);
 }
 
-function normalizeStatement(text: string): string {
+/** Lower-case words only: two wordings that differ by case or punctuation are the same statement. */
+export function normalizeStatement(text: string): string {
   return text
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
@@ -377,5 +389,6 @@ export function knownReferences(state: MentalState): Set<string> {
     ...state.hypotheses.map((item) => item.id),
     ...state.comparisons.map((item) => item.id),
     ...state.predictions.map((item) => item.id),
+    ...state.knowledge.map((item) => item.id),
   ]);
 }

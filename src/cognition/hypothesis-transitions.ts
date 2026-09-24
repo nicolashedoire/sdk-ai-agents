@@ -34,6 +34,11 @@ export function applyHypothesisProposals(
       issues.push(`${id} cites unknown premise ${ref}`);
       return false;
     });
+    // A restatement of what earlier runs verified rests on those tests, cited or not.
+    const remembered = rememberedMatch(state, proposal);
+    if (remembered && remembered.status !== 'refuted' && !premiseRefs.includes(remembered.id)) {
+      premiseRefs.push(remembered.id);
+    }
     let parentId = proposal.parentId;
     if (parentId && !state.hypotheses.some((hypothesis) => hypothesis.id === parentId)) {
       issues.push(`${id} revises unknown hypothesis ${parentId}`);
@@ -242,6 +247,10 @@ export function proposalRefusal(
       ? `"${proposal.statement}" restates rejected hypothesis ${restated.id}; propose a variant instead`
       : `"${proposal.statement}" restates ${restated.id}, which is already in play`;
   }
+  const remembered = rememberedMatch(state, proposal);
+  if (remembered?.status === 'refuted') {
+    return `"${proposal.statement}" restates ${remembered.id}, refuted in earlier runs; propose a variant that explains the refutation`;
+  }
   const parent = proposal.parentId;
   if (
     parent &&
@@ -251,6 +260,16 @@ export function proposalRefusal(
     return `variant of ${parent} refused: it must state what changed ("difference")`;
   }
   return undefined;
+}
+
+/** Knowledge from earlier runs with the same statement and scope as a proposal, if any. */
+function rememberedMatch(state: MentalState, proposal: HypothesisProposal) {
+  return state.knowledge.find(
+    (item) =>
+      item.kind === proposal.kind &&
+      sameStatement(item.statement, proposal.statement) &&
+      sameStatement(item.scope ?? '', proposal.scope ?? '')
+  );
 }
 
 function findLiveHypothesis(

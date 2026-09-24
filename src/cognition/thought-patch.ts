@@ -56,6 +56,24 @@ export const observationRecordSchema = z.object({
   originGroup: requiredText,
 });
 
+/**
+ * Knowledge an earlier run established with real tests, as recalled at the start of a run.
+ * Recorded in `cognition.started`, so a rebuild never reads the knowledge store again.
+ */
+export const recalledKnowledgeSchema = z.object({
+  /** Stable id of the item in the knowledge store. */
+  itemId: requiredText,
+  statement: requiredText,
+  kind: z.enum(['rule', 'explanation']),
+  scope: z.string().optional(),
+  /** `contested` when earlier tests both confirmed and refuted it. */
+  status: z.enum(['verified', 'refuted', 'contested']),
+  confirmations: z.number().int().min(0),
+  refutations: z.number().int().min(0),
+  /** Short lines: what was expected and what was observed in the latest tests. */
+  evidence: z.array(z.string()).default([]),
+});
+
 export const evaluationRecordSchema = z.object({
   predictionId: requiredText,
   verdict: outcomeVerdictSchema,
@@ -243,6 +261,7 @@ export type OutcomeVerdict = z.infer<typeof outcomeVerdictSchema>;
 export type ObservationSourceKind = z.infer<typeof observationSourceKindSchema>;
 export type ObservationRecord = z.output<typeof observationRecordSchema>;
 export type EvaluationRecord = z.output<typeof evaluationRecordSchema>;
+export type RecalledKnowledgeRecord = z.output<typeof recalledKnowledgeSchema>;
 
 /** Patch fields only the engine may write. */
 export const ENGINE_FIELDS = [

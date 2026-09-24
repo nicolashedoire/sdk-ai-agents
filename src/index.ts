@@ -73,10 +73,11 @@ export type {
   ObservationComparison,
   Prediction,
   PredictionEvaluation,
+  RememberedKnowledge,
   SchemaVersion,
 } from './cognition/mental-state.js';
 export { describeMentalState } from './cognition/mental-state-view.js';
-export { thoughtPatchSchema } from './cognition/thought-patch.js';
+export { recalledKnowledgeSchema, thoughtPatchSchema } from './cognition/thought-patch.js';
 export type {
   Decision,
   DecisionStatus,
@@ -84,9 +85,29 @@ export type {
   InferenceKind,
   ObservationRecord,
   OutcomeVerdict,
+  RecalledKnowledgeRecord,
   ThoughtPatch,
   ThoughtPatchInput,
 } from './cognition/thought-patch.js';
+export {
+  knowledgeEntrySchema,
+  knowledgeFindingSchema,
+  knowledgeItemId,
+  projectKnowledge,
+  rankKnowledge,
+  toRecalledKnowledge,
+} from './cognition/knowledge-records.js';
+export type {
+  KnowledgeEntry,
+  KnowledgeEvidence,
+  KnowledgeFinding,
+  KnowledgeItem,
+  KnowledgeStatus,
+} from './cognition/knowledge-records.js';
+export { knowledgeFindings } from './cognition/knowledge-findings.js';
+export { InMemoryKnowledgeStore } from './cognition/knowledge-store.js';
+export type { KnowledgeStore } from './cognition/knowledge-store.js';
+export { FileKnowledgeStore } from './cognition/file-knowledge-store.js';
 export {
   abstention,
   assessReadiness,

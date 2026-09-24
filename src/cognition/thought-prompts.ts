@@ -121,12 +121,25 @@ export function buildSystemPrompt(profile: ThinkerProfile, extraInstructions?: s
     '',
     'Output rules:',
     '- Reply with exactly one JSON object. No prose before or after it, no Markdown fences.',
-    '- Refer to existing items by their ids (O1, F1, A1, K1, U1, H1, P1, R1, C1). Never invent ids for new items: the engine assigns them.',
+    '- Refer to existing items by their ids (O1, F1, A1, K1, U1, H1, P1, R1, C1, M1). Never invent ids for new items: the engine assigns them.',
     '- Keep every statement short, concrete and checkable. Do not repeat items that already exist.',
     '- Probabilities, supports and confidences are numbers between 0 and 1.',
     ...(extraInstructions ? ['', extraInstructions] : []),
   ].join('\n');
 }
+
+const KNOWLEDGE_RULES =
+  'Knowledge: `knowledge` lists what earlier runs established with real tests (ids M1…). Reuse a verified rule within its scope and cite it in premiseRefs; never propose a refuted one again as it was, only a variant that explains the refutation; a contested one holds only in some conditions. Outside its tested scope, a remembered rule is a hypothesis to test again, not a fact.';
+
+const KNOWLEDGE_OPERATIONS: ReadonlySet<GeneratedOperation> = new Set([
+  'represent',
+  'hypothesize',
+  'simulate',
+  'revise',
+  'critique',
+  'compare',
+  'decide',
+]);
 
 export function buildOperationPrompt(input: {
   operation: GeneratedOperation;
@@ -145,6 +158,7 @@ export function buildOperationPrompt(input: {
   return [
     `Operation: ${operation} — ${description}`,
     `Instructions: ${operationInstructions(operation, state, input.maxNewHypotheses, observation)}`,
+    ...(state.knowledge.length > 0 && KNOWLEDGE_OPERATIONS.has(operation) ? [KNOWLEDGE_RULES] : []),
     '',
     'Mental state:',
     JSON.stringify(describeMentalState(state), null, 2),

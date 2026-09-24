@@ -78,6 +78,20 @@ export function describeMentalState(state: MentalState): Record<string, unknown>
       ...(comparison.hypothesisId ? { hypothesis: comparison.hypothesisId } : {}),
     }))
   );
+  // What earlier runs established with real tests: reusable within its scope.
+  add(
+    'knowledge',
+    state.knowledge.map((item) => ({
+      id: item.id,
+      kind: item.kind,
+      statement: item.statement,
+      ...(item.scope ? { scope: item.scope } : {}),
+      status: item.status,
+      confirmedTimes: item.confirmations,
+      refutedTimes: item.refutations,
+      ...(item.evidence.length > 0 ? { latestTests: item.evidence } : {}),
+    }))
+  );
   add(
     'hypotheses',
     state.hypotheses.map((hypothesis) => describeHypothesis(state, hypothesis))

@@ -11,6 +11,7 @@ import { CognitiveAgent } from './cognitive-agent.js';
 import { HeuristicController, type CognitiveController } from './cognitive-controller.js';
 import { TypedHypothesisAssessor, type HypothesisAssessor } from './hypothesis-assessor.js';
 import { InformationSeeker } from './information-seeker.js';
+import { parseKnowledgeScope, type KnowledgeStore } from './knowledge-store.js';
 import { LLMThoughtGenerator, type ThoughtGenerator } from './llm-thought-generator.js';
 import {
   DEFAULT_COGNITIVE_LIMITS,
@@ -18,6 +19,7 @@ import {
   type CognitiveLimits,
 } from './operation-selector.js';
 import type { OutcomeEvaluator } from './outcome-evaluator.js';
+import type { KnowledgeSettings } from './run-knowledge.js';
 import {
   DEFAULT_THINKER_PROFILE,
   defineThinkerProfile,
@@ -64,6 +66,19 @@ export interface CognitiveAgentConfig {
    * the `test_prediction` operation; without it, predictions are recorded but stay untested.
    */
   evaluator?: OutcomeEvaluator;
+  /**
+   * Memory across runs. At the start of a run, recalls what earlier runs of the same scope
+   * established with real tests; at the end, records what this run's tests established.
+   */
+  knowledge?: {
+    store: KnowledgeStore;
+    /** What the knowledge is about (letters, digits, ".", "-", "_"), e.g. `inclined-plane`. */
+    scope: string;
+    /** Items recalled at the start of a run, 0 to 50. Defaults to 10. */
+    recallLimit?: number;
+    /** Whether runs record what their tests established. Defaults to true. */
+    record?: boolean;
+  };
   temperature?: number;
   maxTokens?: number;
   providerSettings?: {
@@ -131,6 +146,7 @@ export function assembleCognitiveAgent(
     controller: resolveController(config, environment.decisionClient),
     ...optionalAssessor(config, environment.decisionClient),
     ...(config.evaluator ? { evaluator: config.evaluator } : {}),
+    ...(config.knowledge ? { knowledge: knowledgeSettings(config.knowledge) } : {}),
     seeker: new InformationSeeker({
       agentId: environment.agentId,
       model: config.model,
@@ -144,6 +160,26 @@ export function assembleCognitiveAgent(
     }),
     eventStore: environment.eventStore,
   });
+}
+
+const MAX_RECALL = 50;
+
+function knowledgeSettings(
+  knowledge: NonNullable<CognitiveAgentConfig['knowledge']>
+): KnowledgeSettings {
+  const recallLimit = knowledge.recallLimit ?? 10;
+  if (!Number.isInteger(recallLimit) || recallLimit < 0 || recallLimit > MAX_RECALL) {
+    throw new ValidationError(
+      'knowledge.recallLimit',
+      `must be an integer from 0 to ${MAX_RECALL}`
+    );
+  }
+  return {
+    store: knowledge.store,
+    scope: parseKnowledgeScope(knowledge.scope),
+    recallLimit,
+    record: knowledge.record ?? true,
+  };
 }
 
 function resolveController(

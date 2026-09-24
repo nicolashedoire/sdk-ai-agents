@@ -241,6 +241,18 @@ function relevantFacts(state: MentalState, hypotheses: Hypothesis[]): string[] {
   );
 }
 
+/** Premises from earlier runs, with what their tests showed. */
+function remembered(state: MentalState, hypothesis: Hypothesis): Record<string, string[]> {
+  const items = state.knowledge.filter((item) => hypothesis.premiseRefs.includes(item.id));
+  if (items.length === 0) return {};
+  return {
+    earlierRuns: items.map(
+      (item) =>
+        `${item.id}: ${item.status} in earlier runs (${item.confirmations} confirmed, ${item.refutations} refuted): ${item.statement}`
+    ),
+  };
+}
+
 function describeForAssessment(
   state: MentalState,
   hypothesis: Hypothesis
@@ -264,6 +276,7 @@ function describeForAssessment(
       .map((prediction) => `${prediction.expected} → ${prediction.status}`),
     confirmedBy: observations(hypothesis.evidenceRefs),
     contradictedBy: observations(hypothesis.counterEvidenceRefs),
+    ...remembered(state, hypothesis),
   };
 }
 
