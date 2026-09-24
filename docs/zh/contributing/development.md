@@ -368,6 +368,8 @@ Source map 会在构建时自动生成。它们让你可以直接调试 TypeScri
 
 ## 发布流程 {#release-process}
 
+推送版本标签后，`Release` 工作流会把版本发布到 npm：具体步骤见[发布版本](./releasing)页面。
+
 ### 版本管理 {#versioning}
 
 本项目使用语义化版本（SemVer）：
@@ -386,17 +388,11 @@ Source map 会在构建时自动生成。它们让你可以直接调试 TypeScri
 ### 为发布进行构建 {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# Everything the CI checks, as prepublishOnly does before npm publish
+npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## 资源 {#resources}

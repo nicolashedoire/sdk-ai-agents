@@ -15,7 +15,7 @@
 ## 설치 {#installation}
 
 ```bash
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+npm install @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ## 5분 만에 첫 에이전트 만들기 {#first-agent-in-5-minutes}

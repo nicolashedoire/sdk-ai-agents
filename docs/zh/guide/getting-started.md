@@ -2,28 +2,34 @@
 
 ## 安装 {#install}
 
-这个包尚未发布到 npm。请从 GitHub 安装——它会在安装时自行构建：
+从 npm 安装这个包，并一同安装 zod：
 
 ::: code-group
 
 ```sh [npm]
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+npm install @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ```sh [pnpm]
-pnpm add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+pnpm add @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ```sh [yarn]
-yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+yarn add @sdk-ai-agents/core zod@^3.25.28
 ```
 
 :::
 
-环境要求：**Node.js 20+**、TypeScript 5+，以及 **zod 3.25.28 或 v3 范围内的更高版本**——暂不支持 zod 4 的 schema。MCP 连接器还需要官方的 MCP SDK：
+环境要求：**Node.js 20+**、TypeScript 5+，以及 **zod 3.25.28 或 v3 范围内的更高版本**——暂不支持 zod 4 的 schema。这个包**只支持 ESM**：请用 `import` 加载；CommonJS 代码可以用动态 `import()` 加载。MCP 连接器还需要官方的 MCP SDK：
 
 ```sh
 npm install @modelcontextprotocol/sdk@^1.30.0
+```
+
+如果想试用尚未发布的改动，请改为从 GitHub 安装 `main` 分支——它会在安装时自行构建：
+
+```sh
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ## 1. 创建 SDK {#_1-create-the-sdk}

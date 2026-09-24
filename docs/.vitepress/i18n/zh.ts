@@ -40,6 +40,7 @@ export const text: LocaleText = {
     'contributing/development': '开发指南',
     'contributing/source-tree': '源码结构',
     'contributing/translations': '翻译文档',
+    'contributing/releasing': '发布版本',
   },
   ui: {
     editLink: '在 GitHub 上编辑此页',

@@ -368,6 +368,8 @@ Si falla la compilación:
 
 ## Proceso de publicación {#release-process}
 
+Las versiones se publican en npm con el flujo de trabajo `Release` cuando se sube una etiqueta de versión: los pasos están en la página [Publicar una versión](./releasing).
+
 ### Versionado {#versioning}
 
 El proyecto usa el versionado semántico (SemVer):
@@ -386,17 +388,11 @@ El proyecto usa el versionado semántico (SemVer):
 ### Compilar para publicar {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# Everything the CI checks, as prepublishOnly does before npm publish
+npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## Recursos {#resources}

@@ -368,6 +368,8 @@ describe('MyClass', () => {
 
 ## रिलीज़ प्रक्रिया {#release-process}
 
+वर्ज़न tag push होने पर `Release` workflow वर्ज़न को npm पर प्रकाशित करता है: कदम [रिलीज़ करना](./releasing) पेज पर हैं।
+
 ### वर्ज़निंग {#versioning}
 
 प्रोजेक्ट सिमेंटिक वर्ज़निंग (SemVer) इस्तेमाल करता है:
@@ -386,17 +388,11 @@ describe('MyClass', () => {
 ### रिलीज़ के लिए बिल्ड {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# Everything the CI checks, as prepublishOnly does before npm publish
+npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## संसाधन {#resources}

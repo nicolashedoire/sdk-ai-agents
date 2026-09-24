@@ -2,28 +2,34 @@
 
 ## التثبيت {#install}
 
-الحزمة غير منشورة على npm بعد. ثبّتها من GitHub — فهي تبني نفسها عند التثبيت:
+ثبّت الحزمة من npm مع zod:
 
 ::: code-group
 
 ```sh [npm]
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+npm install @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ```sh [pnpm]
-pnpm add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+pnpm add @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ```sh [yarn]
-yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+yarn add @sdk-ai-agents/core zod@^3.25.28
 ```
 
 :::
 
-المتطلبات: **Node.js 20+**، وTypeScript 5+، و**zod 3.25.28 أو أحدث ضمن الإصدار v3** — مخططات zod 4 غير مدعومة بعد. وتحتاج موصِّلات MCP إضافةً إلى ذلك إلى حزمة MCP SDK الرسمية:
+المتطلبات: **Node.js 20+**، وTypeScript 5+، و**zod 3.25.28 أو أحدث ضمن الإصدار v3** — مخططات zod 4 غير مدعومة بعد. الحزمة **بصيغة ESM فقط**: حمّلها باستخدام `import`؛ ويمكن لشيفرة CommonJS تحميلها باستخدام `import()` الديناميكي. وتحتاج موصِّلات MCP إضافةً إلى ذلك إلى حزمة MCP SDK الرسمية:
 
 ```sh
 npm install @modelcontextprotocol/sdk@^1.30.0
+```
+
+لتجربة تغييرات لم تُصدَر بعد، ثبّت بدلًا من ذلك الفرع `main` من GitHub — فهو يبني نفسه عند التثبيت:
+
+```sh
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ## 1. إنشاء حزمة SDK {#_1-create-the-sdk}

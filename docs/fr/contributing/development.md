@@ -368,6 +368,8 @@ Si la compilation échoue :
 
 ## Processus de publication {#release-process}
 
+Les versions sont publiées sur npm par le workflow `Release` quand un tag de version est poussé : les étapes sont décrites sur la page [Publier une version](./releasing).
+
 ### Versionnage {#versioning}
 
 Le projet utilise le versionnage sémantique (SemVer) :
@@ -386,17 +388,11 @@ Le projet utilise le versionnage sémantique (SemVer) :
 ### Compiler pour une publication {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# Everything the CI checks, as prepublishOnly does before npm publish
+npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## Ressources {#resources}

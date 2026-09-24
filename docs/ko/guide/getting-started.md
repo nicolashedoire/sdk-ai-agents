@@ -2,28 +2,34 @@
 
 ## 설치 {#install}
 
-패키지는 아직 npm에 게시되지 않았습니다. GitHub에서 설치하세요. 설치할 때 스스로 빌드됩니다.
+npm에서 zod와 함께 패키지를 설치하세요.
 
 ::: code-group
 
 ```sh [npm]
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+npm install @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ```sh [pnpm]
-pnpm add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+pnpm add @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ```sh [yarn]
-yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+yarn add @sdk-ai-agents/core zod@^3.25.28
 ```
 
 :::
 
-요구 사항: **Node.js 20+**, TypeScript 5+, 그리고 **v3 안에서 zod 3.25.28 이상**입니다. zod 4 스키마는 아직 지원하지 않습니다. MCP 커넥터를 쓰려면 공식 MCP SDK도 필요합니다.
+요구 사항: **Node.js 20+**, TypeScript 5+, 그리고 **v3 안에서 zod 3.25.28 이상**입니다. zod 4 스키마는 아직 지원하지 않습니다. 패키지는 **ESM 전용**입니다. `import`로 불러오세요. CommonJS 코드에서는 동적 `import()`로 불러올 수 있습니다. MCP 커넥터를 쓰려면 공식 MCP SDK도 필요합니다.
 
 ```sh
 npm install @modelcontextprotocol/sdk@^1.30.0
+```
+
+아직 릴리스되지 않은 변경을 써 보려면 대신 GitHub에서 `main` 브랜치를 설치하세요. 설치할 때 스스로 빌드됩니다.
+
+```sh
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ## 1. SDK 만들기 {#_1-create-the-sdk}

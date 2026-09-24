@@ -368,6 +368,8 @@ TypeScript 오류가 나면:
 
 ## 릴리스 과정 {#release-process}
 
+버전 태그가 푸시되면 `Release` 워크플로가 버전을 npm에 게시합니다. 단계는 [릴리스하기](./releasing) 페이지에 있습니다.
+
 ### 버전 관리 {#versioning}
 
 이 프로젝트는 시맨틱 버저닝(SemVer)을 씁니다.
@@ -386,17 +388,11 @@ TypeScript 오류가 나면:
 ### 릴리스용 빌드 {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# Everything the CI checks, as prepublishOnly does before npm publish
+npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## 자료 {#resources}

@@ -368,6 +368,8 @@ TypeScript のエラーが出る場合は、次の手順を試してください
 
 ## リリースの手順 {#release-process}
 
+バージョンは、バージョンタグがプッシュされると `Release` ワークフローによって npm に公開されます。手順は[リリースの手順](./releasing)のページにあります。
+
 ### バージョニング {#versioning}
 
 このプロジェクトは、セマンティックバージョニング（SemVer）を使います。
@@ -386,17 +388,11 @@ TypeScript のエラーが出る場合は、次の手順を試してください
 ### リリース用のビルド {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# Everything the CI checks, as prepublishOnly does before npm publish
+npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## リソース {#resources}

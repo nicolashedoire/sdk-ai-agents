@@ -368,6 +368,8 @@ describe('MyClass', () => {
 
 ## عملية الإصدار {#release-process}
 
+تُنشر النسخ على npm بواسطة سير العمل `Release` عند دفع وسم نسخة: الخطوات مشروحة في صفحة [إصدار نسخة جديدة](./releasing).
+
 ### الإصدارات {#versioning}
 
 يستخدم المشروع الترقيم الدلالي للإصدارات (SemVer):
@@ -386,17 +388,11 @@ describe('MyClass', () => {
 ### البناء للإصدار {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# Everything the CI checks, as prepublishOnly does before npm publish
+npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## الموارد {#resources}

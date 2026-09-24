@@ -2,28 +2,34 @@
 
 ## インストール {#install}
 
-このパッケージはまだ npm に公開されていません。GitHub からインストールしてください。インストール時に自動でビルドされます。
+npm から、zod と一緒にパッケージをインストールします。
 
 ::: code-group
 
 ```sh [npm]
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+npm install @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ```sh [pnpm]
-pnpm add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+pnpm add @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ```sh [yarn]
-yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+yarn add @sdk-ai-agents/core zod@^3.25.28
 ```
 
 :::
 
-必要な環境：**Node.js 20 以上**、TypeScript 5 以上、**v3 系の zod 3.25.28 以降**。zod 4 のスキーマにはまだ対応していません。MCP コネクターを使うには、さらに公式の MCP SDK が必要です。
+必要な環境：**Node.js 20 以上**、TypeScript 5 以上、**v3 系の zod 3.25.28 以降**。zod 4 のスキーマにはまだ対応していません。このパッケージは **ESM 専用**です。`import` で読み込んでください。CommonJS のコードからは動的な `import()` で読み込めます。MCP コネクターを使うには、さらに公式の MCP SDK が必要です。
 
 ```sh
 npm install @modelcontextprotocol/sdk@^1.30.0
+```
+
+まだリリースされていない変更を試すには、代わりに GitHub から `main` ブランチをインストールします。インストール時に自動でビルドされます。
+
+```sh
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ## 1. SDK を作成する {#_1-create-the-sdk}

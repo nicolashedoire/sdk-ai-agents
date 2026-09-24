@@ -50,7 +50,7 @@ La diferencia aquí es que estas piezas comparten un único registro de eventos 
 ## Lo que otros frameworks hacen mejor {#what-other-frameworks-do-better}
 
 - **Ecosistema.** Cientos de integraciones, grandes comunidades, ejemplos para todo.
-- **Madurez.** Este SDK es joven, tiene un único mantenedor, todavía no está publicado en npm y se ha probado en un número limitado de problemas reales.
+- **Madurez.** Este SDK es joven, tiene un único mantenedor, sigue en versiones 0.x (en las que una versión menor puede romper la API) y se ha probado en un número limitado de problemas reales.
 - **La orquestación multiagente, el streaming y los kits de interfaz** son más completos en otros sitios.
 - **Coste y latencia.** Una respuesta cognitiva requiere unos diez pasos de razonamiento, cada uno con una o dos solicitudes al modelo (con gpt-4o y Jev, unos minutos y alrededor de 0,1 USD por problema en nuestras pruebas), mientras que una respuesta directa requiere una sola llamada y un agente con herramientas, unas pocas.
 - **Dependencia del modelo.** Las reglas se cumplen sea cual sea el modelo, pero la calidad del razonamiento no: los modelos pequeños siguen mal el método, e incluso los potentes suelen terminar en provisional o abstenerse en problemas difíciles.

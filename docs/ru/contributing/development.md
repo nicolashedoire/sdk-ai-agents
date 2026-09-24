@@ -368,6 +368,8 @@ describe('MyClass', () => {
 
 ## Процесс выпуска {#release-process}
 
+Версии публикуются в npm рабочим процессом `Release`, когда отправляется тег версии: шаги описаны на странице [Выпуск версии](./releasing).
+
 ### Версионирование {#versioning}
 
 Проект использует семантическое версионирование (SemVer):
@@ -386,17 +388,11 @@ describe('MyClass', () => {
 ### Сборка для выпуска {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# Everything the CI checks, as prepublishOnly does before npm publish
+npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## Ресурсы {#resources}

@@ -50,7 +50,7 @@ The difference here is that these pieces share one event log with an explicit re
 ## What other frameworks do better
 
 - **Ecosystem.** Hundreds of integrations, large communities, examples for everything.
-- **Maturity.** This SDK is young, has a single maintainer, is not published on npm yet, and has been tried on a limited number of real problems.
+- **Maturity.** This SDK is young, has a single maintainer, is still in its 0.x versions (where a minor version may break the API), and has been tried on a limited number of real problems.
 - **Multi-agent orchestration, streaming and UI kits** are richer elsewhere.
 - **Cost and latency.** A cognitive answer takes about ten reasoning steps, each with one or two model requests (with gpt-4o and Jev, a few minutes and around 0.1 USD per problem in our trials), where a direct answer takes a single call and a tool-using agent a few.
 - **Model dependence.** The rules hold whatever the model, but the quality of the reasoning does not: small models follow the method poorly, and even strong ones often end provisional or abstain on hard problems.

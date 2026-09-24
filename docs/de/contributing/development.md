@@ -368,6 +368,8 @@ Wenn der Build fehlschlägt:
 
 ## Release-Prozess {#release-process}
 
+Versionen werden vom Workflow `Release` auf npm veröffentlicht, sobald ein Versions-Tag gepusht wird: Die Schritte stehen auf der Seite [Ein Release veröffentlichen](./releasing).
+
 ### Versionierung {#versioning}
 
 Das Projekt verwendet semantische Versionierung (SemVer):
@@ -386,17 +388,11 @@ Das Projekt verwendet semantische Versionierung (SemVer):
 ### Build für das Release {#build-for-release}
 
 ```bash
-# Clean
-npm run clean
+# Everything the CI checks, as prepublishOnly does before npm publish
+npm run verify
 
-# Build
-npm run build
-
-# Test
-npm test
-
-# Check
-npm run check
+# The files that would be published
+npm pack --dry-run
 ```
 
 ## Ressourcen {#resources}

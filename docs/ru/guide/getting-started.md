@@ -2,28 +2,34 @@
 
 ## Установка {#install}
 
-Пакет ещё не опубликован в npm. Установите его с GitHub — он собирается сам при установке:
+Установите пакет из npm вместе с zod:
 
 ::: code-group
 
 ```sh [npm]
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+npm install @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ```sh [pnpm]
-pnpm add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+pnpm add @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ```sh [yarn]
-yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+yarn add @sdk-ai-agents/core zod@^3.25.28
 ```
 
 :::
 
-Требования: **Node.js 20+**, TypeScript 5+ и **zod 3.25.28 или новее в пределах v3** — схемы zod 4 пока не поддерживаются. Коннекторам MCP дополнительно нужен официальный MCP SDK:
+Требования: **Node.js 20+**, TypeScript 5+ и **zod 3.25.28 или новее в пределах v3** — схемы zod 4 пока не поддерживаются. Пакет поставляется **только в формате ESM**: загружайте его через `import`; код на CommonJS может загрузить его динамическим `import()`. Коннекторам MCP дополнительно нужен официальный MCP SDK:
 
 ```sh
 npm install @modelcontextprotocol/sdk@^1.30.0
+```
+
+Чтобы попробовать ещё не выпущенные изменения, установите вместо этого ветку `main` с GitHub — она собирается сама при установке:
+
+```sh
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ## 1. Создайте SDK {#_1-create-the-sdk}
