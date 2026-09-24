@@ -35,6 +35,22 @@ console.log(await sdk.getRunCost(runId));   // what it cost, per model
 
 No TypeSafe account? Jev is also served by Vercel AI Gateway with the same API: pass your gateway key with `baseUrl: 'https://ai-gateway.vercel.sh/typesafe'` and `model: 'typesafe-ai/jev'` ([details](https://nicolashedoire.github.io/sdk-ai-agents/guide/typed-decisions#through-vercel-ai-gateway)).
 
+## Why this SDK
+
+Most agent frameworks help a language model **act**. This one makes it **justify what it believes** before it concludes, and can make it **reason the way a given person does**.
+
+| | Out of the box elsewhere | SDK AI Agents |
+| --- | --- | --- |
+| Reasoning | Model output, structured by the graph, prompts or checks you write | Typed mental state; reasoning rules enforced by the SDK |
+| Confidence | Usually not modelled, or the model's own claim | Capped at the evidence support of the chosen option, judged in a separate step |
+| "I don't know" | Asked for in the prompt, or your own output check | `provisional` or `abstain`, enforced by a conclusion guard |
+| Checking a claim | Often another model (LLM-as-judge), or your own code | Your evaluator (measurement, simulator, tests) confirms or refutes predictions stated beforehand |
+| Preferences | Not distinguished from evidence | Can choose an action; in the code, never make a claim more credible |
+| A person's way of thinking | A long system prompt, or stored facts and preferences | A versioned thinker profile, corrected with a percentage of agreement |
+| Audit | Traces, logs, checkpoints | One event log for thoughts and actions; rebuild any mental state |
+
+Other frameworks have a much larger ecosystem, more integrations and more maturity, and a cognitive answer takes about ten reasoning steps, each with one or two model requests, instead of one or a few calls. [Why this SDK](https://nicolashedoire.github.io/sdk-ai-agents/guide/why) gives the full comparison, including what others do better and when to choose something lighter.
+
 ## Agents that think before they act
 
 <img src="docs/public/images/reasoning-loop.svg" alt="The cognitive loop" align="right" width="340" />
@@ -152,6 +168,7 @@ Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet).
 | | |
 | --- | --- |
 | [Introduction](https://nicolashedoire.github.io/sdk-ai-agents/guide/introduction) | Why and what |
+| [Why this SDK](https://nicolashedoire.github.io/sdk-ai-agents/guide/why) | What it does differently, what others do better |
 | [Getting started](https://nicolashedoire.github.io/sdk-ai-agents/guide/getting-started) | First agent in five minutes |
 | [Key terms in plain words](https://nicolashedoire.github.io/sdk-ai-agents/guide/glossary) | Every term explained without jargon |
 | [Cognitive agents](https://nicolashedoire.github.io/sdk-ai-agents/guide/cognitive-agents) | Mental state, operations, controllers |

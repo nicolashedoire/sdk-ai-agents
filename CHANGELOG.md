@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- *Why this SDK*: what it does differently from other agent frameworks, what they also do, what they do better and when to choose it (docs page and README section).
+
 ### Changed
 - The conclusion guard can commit a **choice of action** the thinker clearly prefers (`preferenceFit` ≥ `decisionThreshold`) when its evidence support reaches `limits.minProposalSupport` (0.35): with a real thinker profile, questions such as "would you take this job?" always ended in an abstention because they have little evidence to weigh. Claims about the world (rules, explanations) still need evidence support ≥ `decisionThreshold`. The rule is recorded in `cognition.started` (`commitRules.minProposalSupport`); runs recorded before keep the evidence-only rule.
   - Public types: `CognitiveLimits` has a new field `minProposalSupport`, and `DecisionBlocker` a new variant `low_fit` (an exhaustive `switch` over blocker kinds needs a new case).

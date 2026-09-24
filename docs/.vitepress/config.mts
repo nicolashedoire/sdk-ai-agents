@@ -35,6 +35,7 @@ export default withMermaid(
           text: 'Start here',
           items: [
             { text: 'Introduction', link: '/guide/introduction' },
+            { text: 'Why this SDK', link: '/guide/why' },
             { text: 'Getting started', link: '/guide/getting-started' },
             { text: 'Core concepts', link: '/guide/concepts' },
             { text: 'Key terms in plain words', link: '/guide/glossary' },
