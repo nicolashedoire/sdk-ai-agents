@@ -60,19 +60,6 @@
 
    这会更新 `package.json` 和 `package-lock.json`。同时修改 `docs/.vitepress/config.mts` 中的 `const version`，也就是文档站点菜单里显示的版本。
 
-   **仅限首次发布：** 在同一个提交中，把 `README.md` 的 *Install* 一节替换为下面的文本。npm 会显示已发布版本的 README，其中不能写着“Not on npm yet”。
-
-   ````md
-   ## Install
-
-   ```sh
-   npm install @sdk-ai-agents/core zod@^3.25.28
-   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
-   ```
-
-   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
-   ````
-
 5. **合并。** 提交（`chore(release): 0.3.0`），打开一个拉取请求，等待 CI 通过后合并。
 
 6. **推送标签**，打在合并后的提交上：
@@ -86,7 +73,7 @@
 
 7. **跟踪运行情况**：在仓库的 *Actions* 标签页中查看 *Release* 工作流。
 
-8. **发布之后。** 把 `templates/starter-template/package.json` 中的 `@sdk-ai-agents/core` 改为新版本（`^0.3.0`）。仅在首次发布之后，还要合并 `docs/npm-install` 分支的拉取请求：在包上线 npm 之前，安装说明都是从 GitHub 安装。
+8. **发布之后。** 把 `templates/starter-template/package.json` 中的 `@sdk-ai-agents/core` 改为新版本（`^0.3.0`）。
 
 每次只推送一个标签：一次推送超过三个标签时，GitHub 不会启动任何工作流，而 `git push --tags` 可能会这样做。预发布版本（`npm version 0.4.0-beta.1 --no-git-tag-version`，标签 `v0.4.0-beta.1`）以 dist-tag `next` 发布：用 `@sdk-ai-agents/core@next` 安装，而 `npm install @sdk-ai-agents/core` 仍然给出最新的稳定版本。
 

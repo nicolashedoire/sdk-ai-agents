@@ -60,19 +60,6 @@ These steps are done once, by the owner of the repository.
 
    This updates `package.json` and `package-lock.json`. Also change `const version` in `docs/.vitepress/config.mts`, the version shown in the menu of the documentation site.
 
-   **First release only:** in this same commit, replace the *Install* section of `README.md` with the text below. npm shows the README of the published version, which must not say "Not on npm yet".
-
-   ````md
-   ## Install
-
-   ```sh
-   npm install @sdk-ai-agents/core zod@^3.25.28
-   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
-   ```
-
-   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
-   ````
-
 5. **Merge.** Commit (`chore(release): 0.3.0`), open a pull request, wait for the CI and merge it.
 
 6. **Push the tag** on the merged commit:
@@ -86,7 +73,7 @@ These steps are done once, by the owner of the repository.
 
 7. **Follow the run** in the *Actions* tab of the repository, workflow *Release*.
 
-8. **After the release.** Set `@sdk-ai-agents/core` in `templates/starter-template/package.json` to the new version (`^0.3.0`). After the first release only, also merge the pull request of the `docs/npm-install` branch: until the package is on npm, the installation instructions install it from GitHub.
+8. **After the release.** Set `@sdk-ai-agents/core` in `templates/starter-template/package.json` to the new version (`^0.3.0`).
 
 Push one tag at a time: GitHub starts no workflow when more than three tags are pushed at once, which `git push --tags` can do. A pre-release (`npm version 0.4.0-beta.1 --no-git-tag-version`, tag `v0.4.0-beta.1`) is published under the dist-tag `next`: it is installed with `@sdk-ai-agents/core@next`, and `npm install @sdk-ai-agents/core` keeps giving the latest stable version.
 

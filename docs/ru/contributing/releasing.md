@@ -60,19 +60,6 @@ SDK публикуется в npm под именем `@sdk-ai-agents/core`. Н�
 
    Команда обновляет `package.json` и `package-lock.json`. Измените также `const version` в `docs/.vitepress/config.mts` — версию, которую показывает меню сайта документации.
 
-   **Только при первом выпуске:** в этом же коммите замените раздел *Install* в `README.md` текстом ниже. npm показывает README опубликованной версии, и в нём не должно быть «Not on npm yet».
-
-   ````md
-   ## Install
-
-   ```sh
-   npm install @sdk-ai-agents/core zod@^3.25.28
-   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
-   ```
-
-   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
-   ````
-
 5. **Слить.** Сделайте коммит (`chore(release): 0.3.0`), откройте pull request, дождитесь CI и слейте его.
 
 6. **Отправить тег** на слитый коммит:
@@ -86,7 +73,7 @@ SDK публикуется в npm под именем `@sdk-ai-agents/core`. Н�
 
 7. **Следить за запуском** на вкладке *Actions* репозитория, рабочий процесс *Release*.
 
-8. **После выпуска.** Укажите новую версию `@sdk-ai-agents/core` (`^0.3.0`) в `templates/starter-template/package.json`. Только после первого выпуска слейте также pull request ветки `docs/npm-install`: пока пакета нет в npm, инструкции по установке ставят его с GitHub.
+8. **После выпуска.** Укажите новую версию `@sdk-ai-agents/core` (`^0.3.0`) в `templates/starter-template/package.json`.
 
 Отправляйте теги по одному: GitHub не запускает ни одного рабочего процесса, если за раз отправлено больше трёх тегов, а `git push --tags` может так сделать. Предварительная версия (`npm version 0.4.0-beta.1 --no-git-tag-version`, тег `v0.4.0-beta.1`) публикуется под dist-tag `next`: она устанавливается через `@sdk-ai-agents/core@next`, а `npm install @sdk-ai-agents/core` по-прежнему даёт последнюю стабильную версию.
 

@@ -60,19 +60,6 @@
 
    يحدّث هذا الأمر `package.json` و`package-lock.json`. وغيّر أيضًا `const version` في `docs/.vitepress/config.mts`، وهي النسخة المعروضة في قائمة موقع التوثيق.
 
-   **في الإصدار الأول فقط:** في الإيداع نفسه، استبدل قسم *Install* في `README.md` بالنص أدناه. يعرض npm ملف README الخاص بالنسخة المنشورة، ويجب ألا يقول «Not on npm yet».
-
-   ````md
-   ## Install
-
-   ```sh
-   npm install @sdk-ai-agents/core zod@^3.25.28
-   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
-   ```
-
-   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
-   ````
-
 5. **ادمج.** أنشئ الإيداع (`chore(release): 0.3.0`)، وافتح طلب سحب (pull request)، وانتظر التكامل المستمر، ثم ادمجه.
 
 6. **ادفع الوسم** على الإيداع المدموج:
@@ -86,7 +73,7 @@
 
 7. **تابع التشغيل** في تبويب *Actions* في المستودع، سير العمل *Release*.
 
-8. **بعد الإصدار.** اجعل `@sdk-ai-agents/core` في `templates/starter-template/package.json` على النسخة الجديدة (`^0.3.0`). وبعد الإصدار الأول فقط، ادمج أيضًا طلب السحب الخاص بالفرع `docs/npm-install`: فما دامت الحزمة غير موجودة على npm، تثبّتها تعليمات التثبيت من GitHub.
+8. **بعد الإصدار.** اجعل `@sdk-ai-agents/core` في `templates/starter-template/package.json` على النسخة الجديدة (`^0.3.0`).
 
 ادفع وسمًا واحدًا في كل مرة: لا يشغّل GitHub أي سير عمل عند دفع أكثر من ثلاثة وسوم دفعة واحدة، وهو ما قد يفعله `git push --tags`. تُنشر النسخة التمهيدية (`npm version 0.4.0-beta.1 --no-git-tag-version`، والوسم `v0.4.0-beta.1`) تحت وسم التوزيع `next`: تُثبَّت باستخدام `@sdk-ai-agents/core@next`، ويستمر `npm install @sdk-ai-agents/core` في تثبيت أحدث نسخة مستقرة.
 

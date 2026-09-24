@@ -60,19 +60,6 @@
 
    これで `package.json` と `package-lock.json` が更新されます。ドキュメントサイトのメニューに表示されるバージョン、`docs/.vitepress/config.mts` の `const version` も変更します。
 
-   **最初のリリースだけ：** 同じコミットの中で、`README.md` の *Install* セクションを下のテキストに置き換えます。npm は公開されたバージョンの README を表示するので、そこに「Not on npm yet」と書かれていてはいけません。
-
-   ````md
-   ## Install
-
-   ```sh
-   npm install @sdk-ai-agents/core zod@^3.25.28
-   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
-   ```
-
-   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
-   ````
-
 5. **マージする。** コミット（`chore(release): 0.3.0`）し、プルリクエストを開き、CI を待ってからマージします。
 
 6. **タグをプッシュする。** マージされたコミットにタグを付けます。
@@ -86,7 +73,7 @@
 
 7. **実行を見守る。** リポジトリの *Actions* タブで、*Release* ワークフローを確認します。
 
-8. **リリースの後。** `templates/starter-template/package.json` の `@sdk-ai-agents/core` を新しいバージョン（`^0.3.0`）にします。最初のリリースの後だけは、`docs/npm-install` ブランチのプルリクエストもマージします。パッケージが npm に載るまで、インストール手順は GitHub からインストールする内容になっているからです。
+8. **リリースの後。** `templates/starter-template/package.json` の `@sdk-ai-agents/core` を新しいバージョン（`^0.3.0`）にします。
 
 タグは 1 つずつプッシュしてください。一度に 4 つ以上のタグがプッシュされると GitHub はワークフローを 1 つも起動せず、`git push --tags` ではそうなることがあります。プレリリース（`npm version 0.4.0-beta.1 --no-git-tag-version`、タグ `v0.4.0-beta.1`）は dist-tag `next` で公開されます。`@sdk-ai-agents/core@next` でインストールでき、`npm install @sdk-ai-agents/core` は引き続き最新の安定版を返します。
 

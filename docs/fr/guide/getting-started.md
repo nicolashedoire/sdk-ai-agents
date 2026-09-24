@@ -2,20 +2,20 @@
 
 ## Installation {#install}
 
-Le paquet n'est pas encore publié sur npm. Installez-le depuis GitHub — il se compile lui-même à l'installation :
+Installez le paquet depuis npm, avec zod :
 
 ::: code-group
 
 ```sh [npm]
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+npm install @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ```sh [pnpm]
-pnpm add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+pnpm add @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ```sh [yarn]
-yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+yarn add @sdk-ai-agents/core zod@^3.25.28
 ```
 
 :::
@@ -24,6 +24,12 @@ Prérequis : **Node.js 20+**, TypeScript 5+ et **zod 3.25.28 ou ultérieur dans
 
 ```sh
 npm install @modelcontextprotocol/sdk@^1.30.0
+```
+
+Pour essayer des changements qui ne sont pas encore publiés, installez plutôt la branche `main` depuis GitHub — elle se compile elle-même à l'installation :
+
+```sh
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ## 1. Créer le SDK {#_1-create-the-sdk}

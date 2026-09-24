@@ -15,7 +15,7 @@
 ## インストール {#installation}
 
 ```bash
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+npm install @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ## 5 分で最初のエージェント {#first-agent-in-5-minutes}

@@ -60,19 +60,6 @@
 
    이 명령은 `package.json`과 `package-lock.json`을 갱신합니다. 문서 사이트 메뉴에 표시되는 버전인 `docs/.vitepress/config.mts`의 `const version`도 바꾸세요.
 
-   **첫 릴리스에만:** 같은 커밋에서 `README.md`의 *Install* 섹션을 아래 텍스트로 바꾸세요. npm은 게시된 버전의 README를 보여 주므로, 거기에 "Not on npm yet"이라고 쓰여 있으면 안 됩니다.
-
-   ````md
-   ## Install
-
-   ```sh
-   npm install @sdk-ai-agents/core zod@^3.25.28
-   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
-   ```
-
-   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
-   ````
-
 5. **병합합니다.** 커밋하고(`chore(release): 0.3.0`), 풀 리퀘스트를 연 다음, CI를 기다렸다가 병합하세요.
 
 6. **태그를 푸시합니다.** 병합된 커밋에 태그를 붙입니다.
@@ -86,7 +73,7 @@
 
 7. **실행을 지켜봅니다.** 저장소의 *Actions* 탭에서 *Release* 워크플로를 확인합니다.
 
-8. **릴리스 후.** `templates/starter-template/package.json`의 `@sdk-ai-agents/core`를 새 버전(`^0.3.0`)으로 바꾸세요. 첫 릴리스 후에만 `docs/npm-install` 브랜치의 풀 리퀘스트도 병합하세요. 패키지가 npm에 올라가기 전까지 설치 안내는 GitHub에서 설치하도록 되어 있습니다.
+8. **릴리스 후.** `templates/starter-template/package.json`의 `@sdk-ai-agents/core`를 새 버전(`^0.3.0`)으로 바꾸세요.
 
 태그는 한 번에 하나씩 푸시하세요. 한 번에 세 개가 넘는 태그가 푸시되면 GitHub는 워크플로를 하나도 시작하지 않는데, `git push --tags`가 그렇게 할 수 있습니다. 프리릴리스(`npm version 0.4.0-beta.1 --no-git-tag-version`, 태그 `v0.4.0-beta.1`)는 dist-tag `next`로 게시됩니다. `@sdk-ai-agents/core@next`로 설치하며, `npm install @sdk-ai-agents/core`는 계속 최신 안정 버전을 설치합니다.
 
