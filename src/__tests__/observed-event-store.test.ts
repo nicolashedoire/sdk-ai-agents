@@ -463,6 +463,37 @@ describe('ObservedEventStore', () => {
     ]);
   });
 
+  it('calls a listener no more once the drop report unsubscribed it', async () => {
+    let subscription: ReturnType<ObservedEventStore['subscribe']> | undefined;
+    const observed = new ObservedEventStore(fileStore(), {
+      onListenerError: (error) => {
+        if (error instanceof LiveEventsDroppedError) subscription?.unsubscribe();
+      },
+    });
+    const received: string[] = [];
+    const gates = [deferred(), deferred()];
+    let busy = 0;
+    subscription = observed.subscribe(
+      async (live) => {
+        received.push(live.id);
+        await gates[busy++]?.promise;
+      },
+      { maxQueued: 1 }
+    );
+    const [e1, e2, e3, e4] = [event('run_1'), event('run_1'), event('run_1'), event('run_1')];
+
+    // e1 in the listener's hands, e2 waiting, e3 dropped.
+    for (const appended of [e1, e2, e3]) await observed.append('run_1', appended);
+    gates[0]?.resolve();
+    await settle();
+    // The listener now holds e2 with room in the queue: e4 reports the drop, which unsubscribes.
+    await observed.append('run_1', e4 as Event);
+    gates[1]?.resolve();
+    await settle();
+
+    expect(received).toEqual([e1?.id, e2?.id]);
+  });
+
   it('refuses a queue size that is not a whole number of at least 1', () => {
     const observed = new ObservedEventStore(fileStore());
 

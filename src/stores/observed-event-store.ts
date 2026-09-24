@@ -225,6 +225,8 @@ export class LiveSubscription implements EventSubscription {
     }
     // Room again: the burst of dropped events is over.
     this.reportOverflow();
+    // The report may have unsubscribed the listener: it is not called again.
+    if (!this.open) return;
     this.queue.push(event);
     if (!this.delivering) this.deliver();
   }
