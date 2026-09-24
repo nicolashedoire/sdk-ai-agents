@@ -1,3 +1,4 @@
+import { modelCallsOf } from '../costs/run-cost.js';
 import { PolicyViolationError, ToolExecutionError } from '../errors/index.js';
 import type { IEventStore } from '../stores/event-store.js';
 import { finishWatch, watchRun } from '../stores/observed-event-store.js';
@@ -11,7 +12,6 @@ import type {
   RunResult,
 } from '../types/run.js';
 import { generateEventId, generateRunId } from '../utils/id.js';
-import { modelCallsOf } from '../costs/run-cost.js';
 import { stableJson } from '../utils/stable-json.js';
 import { uniqueById } from '../utils/unique-events.js';
 import { tokensOfUsage } from '../utils/usage-tokens.js';

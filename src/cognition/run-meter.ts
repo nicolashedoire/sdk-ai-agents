@@ -1,4 +1,4 @@
-import { modelCallsOf, UNKNOWN_MODEL } from '../costs/run-cost.js';
+import { UNKNOWN_MODEL, modelCallsOf } from '../costs/run-cost.js';
 import type { LLMResponse } from '../providers/llm-provider.js';
 import type { Event } from '../types/events.js';
 import type { RunProgress } from '../types/run.js';
