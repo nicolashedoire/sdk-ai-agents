@@ -37,6 +37,8 @@ interface Event {
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` of the content served (the content itself is not stored) |
 
+`tool.failed` belongs to the `EventType` type but is never recorded: a failed tool call is an `action.failed` event.
+
 ## Cognition
 
 | Type | Data |

@@ -37,6 +37,8 @@ interface Event {
 | `provider.retry` | `provider`、`model`、`retry`、`delayMs`、`error` |
 | `resource.read` | `uri`、`mimeType?`、`bytes`、所提供内容的 `sha256`（内容本身不会被保存） |
 
+`tool.failed` 属于 `EventType` 类型，但从不会被记录：失败的工具调用记录为 `action.failed` 事件。
+
 ## 认知 {#cognition}
 
 | 类型 | 数据 |

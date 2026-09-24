@@ -8,11 +8,10 @@ Run the quick start example:
 OPENAI_API_KEY=your-key npm run example:quick-start
 ```
 
-Or compile and run manually:
+The examples import the SDK from `src/` and are not compiled into `dist/`: run any of them with `tsx`, as the scripts do:
 
 ```bash
-npm run build
-node dist/examples/quick-start.js
+OPENAI_API_KEY=your-key npx tsx examples/quick-start.ts
 ```
 
 ## More examples
@@ -28,6 +27,7 @@ node dist/examples/quick-start.js
 | `npm run example:mcp-postgres` | A PostgreSQL database, read-only (`DATABASE_URL` of a read-only role) |
 | `npm run example:mcp-agent` | Your reasoning twin: a cognitive agent with a thinker profile as one MCP tool (`OPENAI_API_KEY`, `PROFILE_FILE`) |
 | `npm run example:mcp-http -- /path/to/folder` | An MCP server over Streamable HTTP with a bearer token (`MCP_TOKEN`) |
+| `npm run example:mcp-approvals` | An MCP server whose write tool waits for a human, with a small admin endpoint to see and decide the pending approvals (`ADMIN_SECRET`) |
 
 The MCP examples are started by an MCP client, not by hand: see [Your first MCP server](https://nicolashedoire.github.io/sdk-ai-agents/guide/mcp-first-server) to test them with the MCP Inspector or connect them to Claude Desktop and Claude Code. They write their event log to `examples/events/`.
 

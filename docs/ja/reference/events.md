@@ -37,6 +37,8 @@ interface Event {
 | `provider.retry` | `provider`、`model`、`retry`、`delayMs`、`error` |
 | `resource.read` | `uri`、`mimeType?`、`bytes`、提供した内容の `sha256`（内容そのものは保存されない） |
 
+`tool.failed` は `EventType` 型に含まれますが、記録されることはありません。失敗したツール呼び出しは `action.failed` イベントになります。
+
 ## 認知 {#cognition}
 
 | 種類 | データ |

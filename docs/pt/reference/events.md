@@ -37,6 +37,8 @@ interface Event {
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` do conteúdo servido (o próprio conteúdo não é armazenado) |
 
+`tool.failed` faz parte do tipo `EventType`, mas nunca é registrado: uma chamada de ferramenta que falha é um evento `action.failed`.
+
 ## Cognição {#cognition}
 
 | Tipo | Dados |

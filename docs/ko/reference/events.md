@@ -37,6 +37,8 @@ interface Event {
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, 제공한 내용의 `sha256`(내용 자체는 저장되지 않음) |
 
+`tool.failed`는 `EventType` 타입에 포함되지만 기록되지 않습니다. 실패한 도구 호출은 `action.failed` 이벤트로 기록됩니다.
+
 ## 인지 {#cognition}
 
 | 유형 | 데이터 |

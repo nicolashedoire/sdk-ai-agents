@@ -37,6 +37,8 @@ interface Event {
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, सर्व की गई सामग्री का `sha256` (सामग्री खुद सहेजी नहीं जाती) |
 
+`tool.failed` टाइप `EventType` का हिस्सा है, लेकिन यह कभी दर्ज नहीं होता: विफल टूल कॉल एक `action.failed` इवेंट होती है।
+
 ## संज्ञान (Cognition) {#cognition}
 
 | टाइप | डेटा |

@@ -37,6 +37,8 @@ interface Event {
 | `provider.retry` | `provider`، و`model`، و`retry`، و`delayMs`، و`error` |
 | `resource.read` | `uri`، و`mimeType?`، و`bytes`، و`sha256` للمحتوى المُقدَّم (لا يُخزَّن المحتوى نفسه) |
 
+ينتمي `tool.failed` إلى النوع `EventType` لكنه لا يُسجَّل أبدًا: استدعاء الأداة الفاشل حدثٌ من نوع `action.failed`.
+
 ## الإدراك المعرفي {#cognition}
 
 | النوع | البيانات |

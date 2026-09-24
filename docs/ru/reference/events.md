@@ -37,6 +37,8 @@ interface Event {
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` отданного содержимого (само содержимое не хранится) |
 
+`tool.failed` входит в тип `EventType`, но никогда не записывается: неудачный вызов инструмента — это событие `action.failed`.
+
 ## Когнитивные события {#cognition}
 
 | Тип | Данные |
