@@ -1,0 +1,104 @@
+# Publishes @sdk-ai-agents/core to npm when a version tag (v1.2.3, v1.3.0-beta.1) is pushed.
+# How to release: docs/contributing/releasing.md.
+#
+# Authentication: npm trusted publishing (OIDC, nothing to store) once it is configured on
+# npmjs.com for this workflow file; until then, the NPM_TOKEN secret. The npm CLI tries OIDC
+# first and falls back to the token, so the switch needs no change here.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+# Two pushes of the same tag never publish side by side.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Tag matches package.json
+    runs-on: ubuntu-latest
+    outputs:
+      dist-tag: ${{ steps.check.outputs.dist-tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      # The tag name is read from the environment, never pasted into the script.
+      - id: check
+        name: Check the tag against package.json
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match the version in package.json ($version): expected v$version."
+            exit 1
+          fi
+          # npm refuses to publish a pre-release without a dist-tag; it must not become "latest".
+          case "$version" in
+            *-*) dist_tag=next ;;
+            *) dist_tag=latest ;;
+          esac
+          echo "Publishing $version with the dist-tag $dist_tag."
+          echo "dist-tag=$dist_tag" >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: Verify (Node.js ${{ matrix.node-version }})
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # The versions CI tests (.github/workflows/ci.yml).
+        node-version: [20.x, 22.x, 24.x]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run linter
+        run: npm run lint
+      - name: Run formatter check
+        run: npm run format:check
+      - name: Build
+        run: npm run build
+      - name: Type-check tests
+        run: npm run typecheck:tests
+      - name: Run tests
+        run: npm test
+      - name: Check translations
+        run: npm run docs:check
+
+  publish:
+    name: Publish to npm
+    needs: [version, verify]
+    # A tag pushed to a fork runs the checks but publishes nothing.
+    if: github.repository == 'nicolashedoire/sdk-ai-agents'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # OIDC token: signs the provenance statement, and authenticates with trusted publishing.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      # Node.js 24 ships npm 11.5.1 or later, which trusted publishing needs. No dependency
+      # cache here: what gets published is built from a clean install only.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install dependencies
+        run: npm ci
+      # prepublishOnly rebuilds dist/ from scratch and runs the checks again on this runner.
+      - name: Publish
+        run: npm publish --provenance --access public --tag "$DIST_TAG"
+        env:
+          DIST_TAG: ${{ needs.version.outputs.dist-tag }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
