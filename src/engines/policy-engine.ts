@@ -522,6 +522,20 @@ export class PolicyEngine {
       return null; // This limit doesn't apply to this tool
     }
 
+    // The limit is plain data from the caller: a cost cap that is not an amount cannot be
+    // checked, and refuses like one whose spend is unknown.
+    const maxCost: unknown = budgetLimit.maxCost;
+    if (
+      maxCost !== undefined &&
+      !(typeof maxCost === 'number' && Number.isFinite(maxCost) && maxCost >= 0)
+    ) {
+      return {
+        allowed: false,
+        reason: `Cost budget cannot be checked: maxCost must be an amount in USD, not ${typeof maxCost} ${String(maxCost)}`,
+        violatedPolicies: [policyId],
+      };
+    }
+
     // A tool call consumes no tokens: model tokens are recorded as they are used
     // (recordModelUsage), so adding the run's total here would count them twice.
     const additionalTokens = 0;

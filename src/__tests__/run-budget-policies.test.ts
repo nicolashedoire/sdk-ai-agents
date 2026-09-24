@@ -284,6 +284,37 @@ describe('run budget policies', () => {
       }
       env = createTestSDK();
     });
+
+    it('refuses rather than guess when maxCost is not an amount', async () => {
+      // Policy metadata is plain data: a cap read from a config file may be a string.
+      for (const maxCost of ['0.5', Number.NaN, -1]) {
+        const provider = new ScriptedLLMProvider().always(CHANNEL, toolCall);
+        const [agent] = pricedAgents(provider, ['priced']);
+        env.sdk.defineGlobalPolicy({
+          id: 'cost-cap',
+          type: 'budget',
+          scope: 'global',
+          enabled: true,
+          rules: [
+            {
+              condition: 'budgetLimit',
+              action: 'deny',
+              metadata: { budgetLimit: { period: 'all', maxCost } },
+            },
+          ],
+        });
+
+        const result = await agent?.run({ message: 'Look it up' });
+
+        expect(result?.status).toBe('failed');
+        expect(result?.error?.message).toContain(
+          `Cost budget cannot be checked: maxCost must be an amount in USD, not ${typeof maxCost} ${maxCost}`
+        );
+        expect(lookups).toBe(0);
+        await env.dispose();
+      }
+      env = createTestSDK();
+    });
   });
 
   describe('replay', () => {

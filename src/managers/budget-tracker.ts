@@ -318,7 +318,8 @@ export class BudgetTracker {
     } else if (costUnknown) {
       reason = `Cost budget cannot be checked: ${spend.unmeteredCalls} model call(s) reported no token counts`;
     } else if (wouldExceedCost) {
-      reason = `Cost budget exceeded: $${usd(spend.costUsd)} > $${usd(limit.maxCost ?? 0)}`;
+      const [spent, cap] = usdOverCap(spend.costUsd, limit.maxCost ?? 0);
+      reason = `Cost budget exceeded: $${spent} > $${cap}`;
     }
 
     return {
@@ -347,12 +348,15 @@ export class BudgetTracker {
 /** Rounding noise allowed when comparing sums of float costs with a cap. */
 const COST_TOLERANCE_USD = 1e-9;
 
-/** A dollar amount without float noise or needless zeros ($2.4, $0.000005). */
-function usd(amount: number): string {
-  // Below a millionth of a dollar, two significant digits: a tiny spend over a $0 cap must not
-  // read "$0 > $0".
-  if (amount !== 0 && Math.abs(amount) < 1e-6) return String(Number(amount.toPrecision(2)));
-  return String(Number(amount.toFixed(6)));
+/**
+ * A spend and its cap in dollars, without float noise or needless zeros ($2.4 > $2). When six
+ * decimals would show them equal, nine are used: a refused spend is over its cap by more than
+ * COST_TOLERANCE_USD, so they then differ ($2.5e-7 > $0, $1.0000002 > $1).
+ */
+function usdOverCap(spend: number, cap: number): [string, string] {
+  const shown = (amount: number, digits: number) => String(Number(amount.toFixed(digits)));
+  const short: [string, string] = [shown(spend, 6), shown(cap, 6)];
+  return short[0] === short[1] ? [shown(spend, 9), shown(cap, 9)] : short;
 }
 
 function withoutTool(limit: BudgetLimit): BudgetLimit {
