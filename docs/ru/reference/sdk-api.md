@@ -11,9 +11,9 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Ключ основного провайдера (не нужен при `llmProvider`). Без ключа инструменты и серверы MCP работают, а вызовы, которым нужна модель, завершаются понятной ошибкой |
 | `provider` | `'openai' \| 'anthropic'` | Основной провайдер, по умолчанию `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | Настройки основного провайдера под его именем: `apiKey`, `defaultModel` и `baseURL` (совместимая конечная точка, например API v1 Azure OpenAI или локальный сервер моделей, либо прокси) |
-| `fallbackProviders` | `Array<{ provider, config? }>` | Пробуются по порядку, когда основной провайдер даёт сбой; у каждого `config` свои `apiKey`, `defaultModel` и `baseURL` |
-| `llmProvider` | `LLMProvider` | Ваш собственный провайдер (локальная модель, шлюз, тестовый дублёр) |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` и `baseURL` каждого поставщика (`baseURL`: совместимая конечная точка, например API v1 Azure OpenAI или локальный сервер моделей, либо прокси). Основной провайдер берёт запись своего поставщика, резервный провайдер другого поставщика — запись своего |
+| `fallbackProviders` | `Array<{ provider, config? }>` | Пробуются по порядку, когда основной провайдер даёт сбой; `config` имеет приоритет над `providerConfig`. Резервный провайдер того же поставщика, что и основной, не наследует его настроек (только общий `apiKey`); провайдеру другого поставщика нужен собственный ключ |
+| `llmProvider` | `LLMProvider` | Ваш собственный провайдер (локальная модель, шлюз, тестовый дублёр). Он получает вызовы инструментов и их результаты в нативном формате (`LLMMessage`), если объявляет `nativeToolMessages`, а иначе — текстом |
 | `retry` | `Partial<RetryPolicy> \| false` | Политика повторных попыток LLM, для каждого провайдера, до переключения на резерв |
 | `jev` | `JevClientConfig` | Включает TypeSafe Jev для типизированных решений — напрямую или через [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) с `baseUrl` и `model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | Любой бэкенд типизированных решений (имеет приоритет над `jev`) |

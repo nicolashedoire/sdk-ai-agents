@@ -11,9 +11,9 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | مفتاح المزوّد الأساسي (غير مطلوب مع `llmProvider`). دون أي مفتاح، تعمل الأدوات وخوادم MCP، وتفشل الاستدعاءات التي تحتاج إلى نموذج بخطأ واضح |
 | `provider` | `'openai' \| 'anthropic'` | المزوّد الأساسي، والافتراضي `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | إعدادات المزوّد الأساسي، تحت اسمه: `apiKey` و`defaultModel` و`baseURL` (نقطة نهاية متوافقة، مثل واجهة v1 من Azure OpenAI أو خادم نماذج محلي، أو وكيل proxy) |
-| `fallbackProviders` | `Array<{ provider, config? }>` | تُجرَّب بالترتيب حين يفشل المزوّد الأساسي؛ ولكل `config` قيمه الخاصة من `apiKey` و`defaultModel` و`baseURL` |
-| `llmProvider` | `LLMProvider` | مزوّدك الخاص (نموذج محلي، أو بوابة، أو بديل اختباري) |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey` و`defaultModel` و`baseURL` لكل جهة (`baseURL`: نقطة نهاية متوافقة، مثل واجهة v1 من Azure OpenAI أو خادم نماذج محلي، أو وكيل proxy). يستخدم المزوّد الأساسي مدخل جهته، ويستخدم المزوّد الاحتياطي من جهة أخرى مدخل جهته هو |
+| `fallbackProviders` | `Array<{ provider, config? }>` | تُجرَّب بالترتيب حين يفشل المزوّد الأساسي؛ ويتقدّم `config` على `providerConfig`. لا يرث المزوّد الاحتياطي من جهة المزوّد الأساسي نفسها أيًّا من إعداداته (سوى `apiKey` العام)؛ أما المزوّد من جهة أخرى فيحتاج إلى مفتاحه الخاص |
+| `llmProvider` | `LLMProvider` | مزوّدك الخاص (نموذج محلي، أو بوابة، أو بديل اختباري). يتلقّى استدعاءات الأدوات ونتائجها بالصيغة الأصلية (`LLMMessage`) إن صرّح بـ `nativeToolMessages`، وإلا فنصًّا |
 | `retry` | `Partial<RetryPolicy> \| false` | سياسة إعادة المحاولة للنموذج اللغوي، لكل مزوّد، قبل التحويل إلى البديل |
 | `jev` | `JevClientConfig` | يفعّل TypeSafe Jev للقرارات المُنمَّطة — مباشرةً، أو عبر [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) مع `baseUrl` و`model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | أي واجهة خلفية للقرارات المُنمَّطة (لها الأولوية على `jev`) |

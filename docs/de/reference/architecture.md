@@ -224,6 +224,7 @@ interface LLMProvider {
   generateCompletion(request: LLMRequest): Promise<LLMResponse>
   supportsModel(model: string): boolean
   getProviderName(): string
+  readonly nativeToolMessages?: boolean // tool calls and results in the vendor's format
 }
 ```
 

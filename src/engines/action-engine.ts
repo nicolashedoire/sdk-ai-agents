@@ -224,9 +224,9 @@ export class ActionEngine {
     const policyContext = {
       runId: context.runId,
       agentId: context.agentId,
-      currentStep: 0,
-      tokensUsed: 0,
-      startTime: Date.now(),
+      currentStep: context.run?.step ?? 0,
+      tokensUsed: context.run?.tokensUsed ?? 0,
+      startTime: context.run?.startedAt ?? Date.now(),
       intention: {
         type: intention.type,
         toolName: intention.toolName,

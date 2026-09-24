@@ -139,6 +139,39 @@ describe('Provider Settings Configuration', () => {
       // Run-level OpenAI-specific settings (highest priority).
       expect(sentToOpenAI()).toMatchObject({ temperature: 0.9, max_tokens: 2000 });
     });
+
+    it('should let a run default win over an agent provider-specific setting', async () => {
+      const agent = createOpenAIAgent({
+        default: { temperature: 0.3, maxTokens: 500 },
+        openai: { temperature: 0.5 },
+      });
+
+      const result = await agent.run({
+        message: 'Hello',
+        providerSettings: { default: { temperature: 0.7, maxTokens: 1500 } },
+      });
+
+      expect(result.status).toBe('completed');
+      // Run default (0.7, 1500) > agent OpenAI (0.5) > agent default (0.3, 500).
+      expect(sentToOpenAI()).toMatchObject({ temperature: 0.7, max_tokens: 1500 });
+    });
+
+    it('should resolve each field on its own', async () => {
+      const agent = createOpenAIAgent({
+        default: { temperature: 0.3, maxTokens: 500 },
+        openai: { maxTokens: 1000 },
+      });
+
+      const result = await agent.run({
+        message: 'Hello',
+        providerSettings: { default: { temperature: 0.7 } },
+      });
+
+      expect(result.status).toBe('completed');
+      // Temperature from the run default; max tokens from the agent's OpenAI settings, which
+      // no higher level sets.
+      expect(sentToOpenAI()).toMatchObject({ temperature: 0.7, max_tokens: 1000 });
+    });
   });
 
   describe('Anthropic provider settings', () => {

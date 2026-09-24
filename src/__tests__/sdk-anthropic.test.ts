@@ -16,7 +16,10 @@ import { anthropicError, anthropicMessage } from './support/vendor-api.js';
 /** The part of a Messages API request these tests read, validated from the recorded body. */
 const messagesRequest = z.object({
   model: z.string(),
-  messages: z.array(z.object({ role: z.string(), content: z.string() })),
+  // Text, or content blocks (tool_use, tool_result) around a tool call.
+  messages: z.array(
+    z.object({ role: z.string(), content: z.union([z.string(), z.array(z.unknown())]) })
+  ),
 });
 
 const calculatorSchema = z.object({
@@ -114,7 +117,8 @@ describe('SDK with Anthropic Provider', () => {
       expect(request?.headers['anthropic-version']).toBeDefined();
       expect(server.jsonBody(0)).toMatchObject({
         model: 'claude-opus-4-1-20250805',
-        max_tokens: 4096,
+        // Opus 4.1 thinks within max_tokens; its vendor client caps non-streaming calls at 8 192.
+        max_tokens: 8192,
         temperature: 0.7,
         // Anthropic takes the system prompt apart from the conversation.
         system: 'You are a calculator assistant',
@@ -196,7 +200,27 @@ describe('SDK with Anthropic Provider', () => {
         'assistant',
         'user',
       ]);
-      expect(followUp.messages.at(-1)?.content).toContain('{"result":38}');
+      // Native tool format: Claude's turn goes back exactly as it came (its tool_use block and
+      // id), and the result answers that id in a tool_result block.
+      expect(followUp.messages[1]).toEqual({
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'toolu_1',
+            name: 'calculator',
+            input: { operation: 'add', a: 15, b: 23 },
+          },
+        ],
+      });
+      expect(followUp.messages[2]).toEqual({
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'toolu_1', content: '{"result":38}' }],
+      });
+      // One call per turn: the SDK runs one tool per step, and each call needs its result.
+      expect(server.jsonBody(0)).toMatchObject({
+        tool_choice: { type: 'auto', disable_parallel_tool_use: true },
+      });
     });
   });
 

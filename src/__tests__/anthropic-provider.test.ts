@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LLMProviderError } from '../errors/index.js';
-import { AnthropicProvider } from '../providers/anthropic-provider.js';
+import {
+  AnthropicProvider,
+  DEFAULT_ANTHROPIC_MODEL,
+  acceptsSampling,
+} from '../providers/anthropic-provider.js';
 import { isTransientError } from '../resilience/retry.js';
 import { LocalHttpServer } from './support/local-http-server.js';
 import { anthropicError, anthropicMessage } from './support/vendor-api.js';
 
-const BUILT_IN_DEFAULT_MODEL = 'claude-3-5-sonnet-20241022';
+const BUILT_IN_DEFAULT_MODEL = 'claude-opus-5';
 const REQUESTED_MODEL = 'claude-3-5-haiku-20241022';
 
 /** Settles with the LLMProviderError a call fails with, and fails the test otherwise. */
@@ -104,6 +108,7 @@ describe('AnthropicProvider', () => {
         messages: [{ role: 'user', content: 'Hello' }],
       });
 
+      expect(DEFAULT_ANTHROPIC_MODEL).toBe(BUILT_IN_DEFAULT_MODEL);
       expect(server.jsonBody(0)).toMatchObject({ model: BUILT_IN_DEFAULT_MODEL });
     });
 
@@ -142,6 +147,165 @@ describe('AnthropicProvider', () => {
     });
   });
 
+  describe('tool turns in the Anthropic format', () => {
+    it('rebuilds a tool call it did not produce as a tool_use block', async () => {
+      // After a failover, the call may come from another vendor: there is no raw turn to echo.
+      server.reply(anthropicMessage({ text: ['It is 5.'] }));
+
+      await provider.generateCompletion({
+        model: REQUESTED_MODEL,
+        messages: [
+          { role: 'user', content: 'What is 2 + 3?' },
+          {
+            role: 'assistant',
+            content: 'Let me add.',
+            toolCalls: [{ id: 'call_9', function: { name: 'add', arguments: '{"a":2,"b":3}' } }],
+          },
+          { role: 'tool', toolCallId: 'call_9', toolName: 'add', content: '{"sum":5}' },
+        ],
+      });
+
+      expect(server.jsonBody(0)).toMatchObject({
+        messages: [
+          { role: 'user', content: 'What is 2 + 3?' },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'text', text: 'Let me add.' },
+              { type: 'tool_use', id: 'call_9', name: 'add', input: { a: 2, b: 3 } },
+            ],
+          },
+          {
+            role: 'user',
+            content: [{ type: 'tool_result', tool_use_id: 'call_9', content: '{"sum":5}' }],
+          },
+        ],
+      });
+    });
+
+    it('puts the results of one turn in a single user message', async () => {
+      server.reply(anthropicMessage({ text: ['Done'] }));
+
+      await provider.generateCompletion({
+        model: REQUESTED_MODEL,
+        messages: [
+          { role: 'user', content: 'Two lookups' },
+          {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              { id: 't1', function: { name: 'lookup', arguments: '{"key":"a"}' } },
+              { id: 't2', function: { name: 'lookup', arguments: '{"key":"b"}' } },
+            ],
+          },
+          { role: 'tool', toolCallId: 't1', toolName: 'lookup', content: '"A"' },
+          { role: 'tool', toolCallId: 't2', toolName: 'lookup', content: '"B"' },
+        ],
+      });
+
+      const { messages } = server.jsonBody(0) as { messages: Array<{ role: string }> };
+      expect(messages.map((message) => message.role)).toEqual(['user', 'assistant', 'user']);
+      expect(messages[2]).toEqual({
+        role: 'user',
+        content: [
+          { type: 'tool_result', tool_use_id: 't1', content: '"A"' },
+          { type: 'tool_result', tool_use_id: 't2', content: '"B"' },
+        ],
+      });
+    });
+
+    it('returns the call ids, and the raw turn only when the model called a tool', async () => {
+      server.reply(
+        anthropicMessage({ toolUses: [{ name: 'add', input: { a: 1, b: 1 } }] }),
+        anthropicMessage({ text: ['Two'] })
+      );
+      const ask = () =>
+        provider.generateCompletion({
+          model: REQUESTED_MODEL,
+          messages: [{ role: 'user', content: '1 + 1?' }],
+        });
+
+      const call = await ask();
+      const answer = await ask();
+
+      expect(call.toolCalls?.[0]?.id).toBe('toolu_1');
+      expect(call.vendorContent).toEqual({
+        provider: 'anthropic',
+        content: [{ type: 'tool_use', id: 'toolu_1', name: 'add', input: { a: 1, b: 1 } }],
+      });
+      expect(answer.vendorContent).toBeUndefined();
+    });
+  });
+
+  describe('parameters that depend on the model', () => {
+    const ask = (model: string, extra: { temperature?: number; maxTokens?: number } = {}) =>
+      provider.generateCompletion({ model, messages: [{ role: 'user', content: 'Hi' }], ...extra });
+
+    it('should not send a temperature to models that refuse sampling parameters', async () => {
+      server.reply(anthropicMessage({ text: ['OK'] }));
+
+      await ask('claude-opus-5', { temperature: 0.7 });
+
+      // Opus 5 answers a 400 to a request carrying `temperature`.
+      expect(server.jsonBody(0)).not.toHaveProperty('temperature');
+    });
+
+    it('should still send a temperature to models that take it', async () => {
+      server.reply(anthropicMessage({ text: ['OK'] }));
+
+      await ask('claude-sonnet-4-6', { temperature: 0.7 });
+
+      expect(server.jsonBody(0)).toMatchObject({ temperature: 0.7 });
+    });
+
+    it('should know which models take sampling parameters', () => {
+      const takes = [
+        'claude-3-5-sonnet-20241022',
+        'claude-opus-4-20250514',
+        'claude-opus-4-1-20250805',
+        'claude-opus-4-6',
+        'claude-sonnet-4-5-20250929',
+        'claude-sonnet-4-6',
+        'claude-haiku-4-5',
+        // Platform ids (Vertex, Bedrock) of models that take sampling parameters.
+        'claude-opus-4-5@20251101',
+        'anthropic.claude-3-5-sonnet-20241022-v2:0',
+      ];
+      const refuses = [
+        'claude-opus-4-7',
+        'claude-opus-4-8',
+        'claude-opus-5',
+        'claude-opus-5-5',
+        'claude-sonnet-5',
+        'claude-fable-5-1',
+        'claude-mythos-5-1',
+        // The same models behind a platform prefix or version suffix.
+        'anthropic.claude-opus-4-7-v1:0',
+        'us.anthropic.claude-sonnet-5',
+        'claude-opus-5@20260101',
+      ];
+      expect(takes.filter((model) => !acceptsSampling(model))).toEqual([]);
+      expect(refuses.filter((model) => acceptsSampling(model))).toEqual([]);
+    });
+
+    it('should give recent models room to think when no max_tokens is set', async () => {
+      server.reply(
+        anthropicMessage({ text: ['OK'] }),
+        anthropicMessage({ text: ['OK'] }),
+        anthropicMessage({ text: ['OK'] })
+      );
+
+      await ask('claude-opus-5');
+      await ask('claude-opus-4-1-20250805');
+      await ask('claude-3-5-haiku-20241022');
+
+      expect(server.jsonBody(0)).toMatchObject({ max_tokens: 16000 });
+      // The vendor client refuses more than 8 192 without streaming for Opus 4 and 4.1.
+      expect(server.jsonBody(1)).toMatchObject({ max_tokens: 8192 });
+      expect(server.jsonBody(2)).toMatchObject({ max_tokens: 4096 });
+    });
+  });
+
   describe('generateCompletion', () => {
     it('should convert messages correctly', async () => {
       server.reply(anthropicMessage({ text: ['Hello!'], model: REQUESTED_MODEL }));
@@ -163,6 +327,19 @@ describe('AnthropicProvider', () => {
       expect(result.content).toBe('Hello!');
       expect(result.toolCalls).toBeUndefined();
       expect(result.model).toBe(REQUESTED_MODEL);
+    });
+
+    it('should report the model the API answered with, not the requested one', async () => {
+      // An alias resolves to a dated model; costs are priced from the reported model.
+      server.reply(anthropicMessage({ text: ['Hi'], model: 'claude-served-20260101' }));
+
+      const result = await provider.generateCompletion({
+        model: 'claude-served-latest',
+        messages: [{ role: 'user', content: 'Hello' }],
+      });
+
+      expect(server.jsonBody(0)).toMatchObject({ model: 'claude-served-latest' });
+      expect(result.model).toBe('claude-served-20260101');
     });
 
     it('should join several system messages and keep the conversation order', async () => {
@@ -422,10 +599,12 @@ describe('AnthropicProvider', () => {
           abortSignal: abortController.signal,
         })
       ).rejects.toThrow('Request aborted');
+      // An already cancelled request is never sent, so never billed.
+      expect(server.requests).toHaveLength(0);
     });
 
-    it('should discard the answer of a request aborted while in flight', async () => {
-      server.reply({ ...anthropicMessage({ text: ['too late'] }), delayMs: 100 });
+    it('should cancel a request aborted while in flight, without waiting for the answer', async () => {
+      server.reply({ ...anthropicMessage({ text: ['too late'] }), delayMs: 5_000 });
       const abortController = new AbortController();
 
       const completion = provider.generateCompletion({
@@ -438,11 +617,14 @@ describe('AnthropicProvider', () => {
         (error: unknown) => error
       );
       await until(() => server.requests.length === 1);
+      const abortedAt = Date.now();
       abortController.abort();
 
       const failure = await outcome;
       expect(failure).toBeInstanceOf(Error);
       expect(failure).toHaveProperty('message', 'Request aborted');
+      // The HTTP request is cut: the 5 s answer is not waited for.
+      expect(Date.now() - abortedAt).toBeLessThan(1_000);
     });
   });
 });

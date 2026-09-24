@@ -24,6 +24,8 @@ const sdk = createSDK({
 });
 ```
 
+来自另一厂商的回退提供商需要自己的密钥，写在它的 `config` 或 `providerConfig` 中：主提供商的密钥绝不会发送给其他厂商。只有当它支持智能体的模型时才会收到该模型，否则使用它自己的 `defaultModel`（Anthropic 会拒绝 OpenAI 的模型名，反之亦然）。`intention.generated` 事件会记录实际应答的提供商及其使用的模型。
+
 | 选项 | 默认值 | |
 | --- | --- | --- |
 | `maxRetries` | `2` | 首次尝试之后的重试次数 |

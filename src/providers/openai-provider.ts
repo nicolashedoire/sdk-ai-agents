@@ -1,8 +1,15 @@
 import OpenAI from 'openai';
 import { LLMProviderError } from '../errors/index.js';
-import type { LLMProvider, LLMRequest, LLMResponse, VendorClientOptions } from './llm-provider.js';
+import type {
+  LLMMessage,
+  LLMProvider,
+  LLMRequest,
+  LLMResponse,
+  VendorClientOptions,
+} from './llm-provider.js';
 
 export class OpenAIProvider implements LLMProvider {
+  readonly nativeToolMessages = true;
   private client: OpenAI;
   private defaultModel: string;
 
@@ -19,12 +26,13 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async generateCompletion(request: LLMRequest): Promise<LLMResponse> {
+    if (request.abortSignal?.aborted) {
+      // Never send (nor pay for) a request that is already cancelled.
+      throw new Error('Request aborted');
+    }
     try {
       const model = request.model || this.defaultModel;
-      const messages = request.messages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
+      const messages = request.messages.map(toOpenAIMessage);
 
       const tools = request.tools?.map((tool) => ({
         type: 'function' as const,
@@ -35,22 +43,18 @@ export class OpenAIProvider implements LLMProvider {
         },
       }));
 
-      const callPromise = this.client.chat.completions.create({
-        model,
-        messages,
-        tools: tools && tools.length > 0 ? tools : undefined,
-        tool_choice: tools && tools.length > 0 ? 'auto' : undefined,
-        temperature: request.temperature,
-        max_tokens: request.maxTokens,
-      });
-
-      if (request.abortSignal) {
-        request.abortSignal.addEventListener('abort', () => {
-          callPromise.catch(() => {});
-        });
-      }
-
-      const response = await callPromise;
+      // The signal cancels the HTTP request itself: the answer is not waited for.
+      const response = await this.client.chat.completions.create(
+        {
+          model,
+          messages,
+          tools: tools && tools.length > 0 ? tools : undefined,
+          tool_choice: tools && tools.length > 0 ? 'auto' : undefined,
+          temperature: request.temperature,
+          max_tokens: request.maxTokens,
+        },
+        { signal: request.abortSignal }
+      );
 
       if (request.abortSignal?.aborted) {
         throw new Error('Request aborted');
@@ -65,6 +69,7 @@ export class OpenAIProvider implements LLMProvider {
 
       const content = message.content || null;
       const toolCalls = message.tool_calls?.map((tc) => ({
+        id: tc.id,
         function: {
           name: tc.function.name,
           arguments: tc.function.arguments || '{}',
@@ -92,7 +97,7 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   supportsModel(model: string): boolean {
-    return model.startsWith('gpt-') || model.startsWith('o1-');
+    return /^(ft:)?(gpt-|chatgpt-|o\d)/.test(model);
   }
 
   getProviderName(): string {
@@ -106,5 +111,28 @@ export class OpenAIProvider implements LLMProvider {
       return new LLMProviderError('openai', error, true, { connectionFailure });
     }
     return new LLMProviderError('openai', new Error(String(error)), true);
+  }
+}
+
+/** A message in the OpenAI format: tool calls on the assistant turn, results as `tool` messages. */
+function toOpenAIMessage(message: LLMMessage): OpenAI.ChatCompletionMessageParam {
+  switch (message.role) {
+    case 'system':
+    case 'user':
+      return { role: message.role, content: message.content };
+    case 'assistant':
+      return message.toolCalls && message.toolCalls.length > 0
+        ? {
+            role: 'assistant',
+            content: message.content || null,
+            tool_calls: message.toolCalls.map((call, index) => ({
+              id: call.id ?? `call_${index}`,
+              type: 'function' as const,
+              function: { name: call.function.name, arguments: call.function.arguments },
+            })),
+          }
+        : { role: 'assistant', content: message.content };
+    case 'tool':
+      return { role: 'tool', tool_call_id: message.toolCallId, content: message.content };
   }
 }

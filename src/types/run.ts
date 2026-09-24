@@ -46,9 +46,24 @@ export interface Intention {
   reasoning?: string;
 }
 
+/** How far a run has gone, as budget and timeout policies see it. */
+export interface RunProgress {
+  /** Steps completed before this call (0 for the first). */
+  step: number;
+  /** Tokens the run's model calls used so far. */
+  tokensUsed: number;
+  /** When the run started (ms since the epoch). */
+  startedAt: number;
+}
+
 export interface ActionContext {
   runId: string;
   agentId: string;
+  /**
+   * Progress of the calling run, checked by budget policies (`maxSteps`, `maxTokens`,
+   * `maxDuration`). Absent for a call outside a run, such as a tool called by an MCP client.
+   */
+  run?: RunProgress;
   mode?: 'normal' | 'replay';
   /**
    * Replay only: the original run got a human approval for this very call (same tool, same

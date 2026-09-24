@@ -30,7 +30,15 @@ describe('Provider Settings with FallbackProvider', () => {
       provider: 'openai',
       providerConfig: { openai: { baseURL: `${openaiAddress}/v1` } },
       fallbackProviders: [
-        { provider: 'anthropic', config: { apiKey: 'anthropic-key', baseURL: anthropicAddress } },
+        {
+          provider: 'anthropic',
+          // A model that takes a temperature, so every setting can be checked on the request.
+          config: {
+            apiKey: 'anthropic-key',
+            baseURL: anthropicAddress,
+            defaultModel: 'claude-sonnet-4-6',
+          },
+        },
       ],
       // One attempt per provider: the primary fails over at once, without backoff delays.
       retry: { maxRetries: 0 },
@@ -74,11 +82,18 @@ describe('Provider Settings with FallbackProvider', () => {
 
     expect(result).toMatchObject({ status: 'completed', output: 'Hello from Anthropic' });
     await expectFailoverToAnthropic(result.runId);
-    // Each vendor receives its own settings: OpenAI (0.5, 1000), then Anthropic (0.8, 2000).
-    // The model is not asserted: Anthropic is sent 'gpt-4', a known bug the real API would
-    // refuse (see the `.fails` test in sdk-fallback.test.ts).
-    expect(openai.jsonBody(0)).toMatchObject({ temperature: 0.5, max_tokens: 1000 });
-    expect(anthropic.jsonBody(0)).toMatchObject({ temperature: 0.8, max_tokens: 2000 });
+    // Each vendor receives its own settings and a model it serves: OpenAI (gpt-4, 0.5, 1000),
+    // then Anthropic (its configured Claude model, 0.8, 2000).
+    expect(openai.jsonBody(0)).toMatchObject({
+      model: 'gpt-4',
+      temperature: 0.5,
+      max_tokens: 1000,
+    });
+    expect(anthropic.jsonBody(0)).toMatchObject({
+      model: 'claude-sonnet-4-6',
+      temperature: 0.8,
+      max_tokens: 2000,
+    });
   });
 
   it('should apply default settings when provider-specific not available', async () => {

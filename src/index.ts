@@ -234,7 +234,13 @@ export type { IncidentMonitorOptions } from './incidents/monitored-event-store.j
 export { parseRetryAfter } from './utils/http.js';
 export type { FetchLike, HttpResponseLike } from './utils/http.js';
 export { deriveRunStatus } from './utils/run-status.js';
-export type { LLMProvider, LLMRequest, LLMResponse } from './providers/llm-provider.js';
+export type {
+  LLMMessage,
+  LLMProvider,
+  LLMRequest,
+  LLMResponse,
+  LLMToolCall,
+} from './providers/llm-provider.js';
 
 // Tool sources: a web API, a folder, a database or an agent as tools (and MCP servers)
 export { openApiTools } from './tools/openapi-tools.js';

@@ -232,6 +232,8 @@ const agent = sdk.createAgent({
 });
 ```
 
+预算和时长限制会在受治理智能体一次运行中的每次工具调用之前，根据该运行的进度进行检查：`maxSteps` 统计已完成的步骤（第一次调用位于第 0 步），`maxTokens` 统计其模型调用消耗的令牌数，`maxDuration` 统计自运行开始以来的时间。限制会拒绝该工具调用，从而使运行失败；它从不中断模型调用。按时间段计算的令牌预算（带 `maxTokens` 的 `budgetLimit`）会统计受治理智能体模型调用的令牌，回放也会像原始运行一样应用 `maxSteps`、`maxTokens` 和 `maxDuration`（按时间段计算的预算看到的是当前时间段的用量）。认知智能体有自己的限制（`maxSteps`、`maxToolCalls`、`timeoutMs`）。
+
 ### 4. 追踪记录 {#_4-traces}
 
 每一次执行都会生成一份完整的、可回放的追踪记录。

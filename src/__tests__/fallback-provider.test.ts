@@ -18,7 +18,8 @@ class RecordingProvider implements LLMProvider {
     private readonly name: string,
     private readonly outcome: Outcome,
     private readonly journal: string[],
-    private readonly label = name
+    private readonly label = name,
+    private readonly serves: (model: string) => boolean = () => true
   ) {}
 
   async generateCompletion(request: LLMRequest): Promise<LLMResponse> {
@@ -30,8 +31,8 @@ class RecordingProvider implements LLMProvider {
     return { content: this.outcome.content, model: this.outcome.model };
   }
 
-  supportsModel(): boolean {
-    return true;
+  supportsModel(model: string): boolean {
+    return this.serves(model);
   }
 
   getProviderName(): string {
@@ -198,16 +199,41 @@ describe('FallbackProvider', () => {
       const fallback = failing('anthropic', new Error('Fallback failed'));
       const provider = new FallbackProvider(primary, [fallback]);
 
-      await expect(provider.generateCompletion(request)).rejects.toThrow(
-        'All providers failed (attempted: openai -> anthropic): Fallback failed'
+      const failure = await provider.generateCompletion(request).catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(LLMProviderError);
+      const error = failure as LLMProviderError;
+      expect(error.provider).toBe('openai -> anthropic');
+      // Every attempt keeps its own error; the last vendor error stays reachable as the cause.
+      expect(error.message).toBe(
+        'LLM provider error: openai -> anthropic: All providers failed: openai: Primary failed; anthropic: Fallback failed'
       );
+      expect((error.originalError.cause as Error).message).toBe('Fallback failed');
+    });
+
+    it('should name each attempt with the vendor message, not the wrapper prefix', async () => {
+      const primary = failing('openai', new LLMProviderError('openai', new Error('500 boom')));
+      const fallback = failing(
+        'anthropic',
+        new LLMProviderError('anthropic', new Error('529 busy'))
+      );
+      const provider = new FallbackProvider(primary, [fallback]);
+
+      const failure = (await provider
+        .generateCompletion(request)
+        .catch((error: unknown) => error)) as LLMProviderError;
+
+      expect(failure.originalError.message).toBe(
+        'All providers failed: openai: 500 boom; anthropic: 529 busy'
+      );
+      expect((failure.originalError.cause as Error).message).toBe('529 busy');
     });
 
     it('should report a failure of a primary without fallback', async () => {
       const provider = new FallbackProvider(failing('openai', new Error('Primary failed')));
 
       await expect(provider.generateCompletion(request)).rejects.toThrow(
-        'All providers failed (attempted: openai): Primary failed'
+        'All providers failed: openai: Primary failed'
       );
       expect(journal).toEqual(['openai']);
     });
@@ -216,7 +242,7 @@ describe('FallbackProvider', () => {
       const provider = new FallbackProvider(failing('openai', 'socket hang up'));
 
       await expect(provider.generateCompletion(request)).rejects.toThrow(
-        'All providers failed (attempted: openai): socket hang up'
+        'All providers failed: openai: socket hang up'
       );
     });
 
@@ -256,6 +282,73 @@ describe('FallbackProvider', () => {
   });
 
   describe('generateCompletionWithFallback', () => {
+    it('should stop the chain, without trying a fallback, when the call is cancelled', async () => {
+      const controller = new AbortController();
+      controller.abort();
+      const provider = new FallbackProvider(succeeding('openai', 'never', 'gpt-4'), [
+        succeeding('anthropic', 'never', 'claude-x'),
+      ]);
+
+      await expect(
+        provider.generateCompletion({ ...request, abortSignal: controller.signal })
+      ).rejects.toThrow('Request aborted');
+      expect(journal).toEqual([]);
+    });
+
+    it('should send a fallback its own default model when it does not serve the requested one', async () => {
+      const primary = failing('openai', new Error('Primary failed'));
+      const claudeOnly = (model: string) => model.startsWith('claude-');
+      const fallback = new RecordingProvider(
+        'anthropic',
+        { content: 'Fallback success', model: 'claude-sonnet-x' },
+        journal,
+        'anthropic',
+        claudeOnly
+      );
+      const provider = new FallbackProvider(primary, [fallback]);
+
+      const result = await provider.generateCompletionWithFallback(request);
+
+      expect(primary.requests[0]?.model).toBe('gpt-4');
+      // An empty model lets the provider use its own default.
+      expect(fallback.requests[0]?.model).toBe('');
+      expect(result).toMatchObject({ usedProvider: 'anthropic', wasFallback: true });
+      expect(result).not.toHaveProperty('requestedModel');
+      expect(result.response.model).toBe('claude-sonnet-x');
+    });
+
+    it('should keep the requested model for a fallback that serves it', async () => {
+      const primary = failing('openai', new Error('Primary failed'));
+      const fallback = new RecordingProvider(
+        'openai-backup',
+        { content: 'Fallback success', model: 'gpt-4' },
+        journal,
+        'openai-backup',
+        (model) => model.startsWith('gpt-')
+      );
+
+      const result = await new FallbackProvider(primary, [fallback]).generateCompletionWithFallback(
+        request
+      );
+
+      expect(fallback.requests[0]?.model).toBe('gpt-4');
+      expect(result.requestedModel).toBe('gpt-4');
+    });
+
+    it('should always send the primary the requested model', async () => {
+      const primary = new RecordingProvider(
+        'openai',
+        { content: 'ok', model: 'o3-mini' },
+        journal,
+        'openai',
+        () => false
+      );
+
+      await new FallbackProvider(primary).generateCompletion({ ...request, model: 'o3-mini' });
+
+      expect(primary.requests[0]?.model).toBe('o3-mini');
+    });
+
     it('should return metadata when primary succeeds', async () => {
       const provider = new FallbackProvider(succeeding('openai', 'Success', 'gpt-4'));
 
@@ -266,6 +359,7 @@ describe('FallbackProvider', () => {
         usedProvider: 'openai',
         wasFallback: false,
         attemptedProviders: ['openai'],
+        requestedModel: 'gpt-4',
       });
     });
 
@@ -281,6 +375,7 @@ describe('FallbackProvider', () => {
         usedProvider: 'anthropic',
         wasFallback: true,
         attemptedProviders: ['openai', 'anthropic'],
+        requestedModel: 'gpt-4',
       });
     });
 

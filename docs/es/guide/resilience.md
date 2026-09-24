@@ -24,6 +24,8 @@ const sdk = createSDK({
 });
 ```
 
+Si el proveedor de respaldo es de otro fabricante, necesita su propia clave, en su `config` o en `providerConfig`: la clave del principal nunca se envía a otro fabricante. Recibe el modelo del agente solo si lo sirve; si no, usa su propio `defaultModel` (Anthropic rechaza un nombre de modelo de OpenAI, y viceversa). El evento `intention.generated` indica qué proveedor respondió y con qué modelo.
+
 | Opción | Por defecto | |
 | --- | --- | --- |
 | `maxRetries` | `2` | Reintentos después del primer intento |

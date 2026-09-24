@@ -11,9 +11,9 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | 主提供商的密钥（使用 `llmProvider` 时不需要）。完全没有密钥时，工具和 MCP 服务器照常工作，需要模型的调用会失败并给出清晰的错误 |
 | `provider` | `'openai' \| 'anthropic'` | 主提供商，默认 `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | 主提供商的设置，放在其名称下：`apiKey`、`defaultModel` 和 `baseURL`（兼容的端点，例如 Azure OpenAI 的 v1 API 或本地模型服务器，或代理） |
-| `fallbackProviders` | `Array<{ provider, config? }>` | 主提供商失败时按顺序尝试；每个 `config` 都有自己的 `apiKey`、`defaultModel` 和 `baseURL` |
-| `llmProvider` | `LLMProvider` | 你自己的提供商（本地模型、网关、测试替身） |
+| `providerConfig` | `{ openai?, anthropic? }` | 各厂商的 `apiKey`、`defaultModel` 和 `baseURL`（`baseURL`：兼容的端点，例如 Azure OpenAI 的 v1 API 或本地模型服务器，或代理）。主提供商使用其厂商的条目，其他厂商的回退使用它自己厂商的条目 |
+| `fallbackProviders` | `Array<{ provider, config? }>` | 主提供商失败时按顺序尝试；`config` 优先于 `providerConfig`。与主提供商同一厂商的回退不继承主提供商的任何设置（只继承全局 `apiKey`）；其他厂商的回退需要自己的密钥 |
+| `llmProvider` | `LLMProvider` | 你自己的提供商（本地模型、网关、测试替身）。如果它声明了 `nativeToolMessages`，就以原生格式（`LLMMessage`）接收工具调用及其结果，否则以文本形式接收 |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM 重试策略，按提供商分别应用，在回退之前 |
 | `jev` | `JevClientConfig` | 为类型化决策启用 TypeSafe Jev——直接使用，或者通过 [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) 并设置 `baseUrl` 和 `model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | 任何类型化决策后端（优先于 `jev`） |

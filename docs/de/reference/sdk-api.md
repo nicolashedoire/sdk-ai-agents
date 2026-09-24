@@ -11,9 +11,9 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Schlüssel des primären Anbieters (mit `llmProvider` nicht nötig). Ohne jeden Schlüssel funktionieren Tools und MCP-Server, und Aufrufe, die ein Modell brauchen, schlagen mit einem klaren Fehler fehl |
 | `provider` | `'openai' \| 'anthropic'` | Primärer Anbieter, Standard `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | Einstellungen des primären Anbieters, unter seinem Namen: `apiKey`, `defaultModel` und `baseURL` (ein kompatibler Endpunkt wie die v1-API von Azure OpenAI oder ein lokaler Modellserver, oder ein Proxy) |
-| `fallbackProviders` | `Array<{ provider, config? }>` | Der Reihe nach versucht, wenn der primäre Anbieter ausfällt; jede `config` hat ihre eigenen `apiKey`, `defaultModel` und `baseURL` |
-| `llmProvider` | `LLMProvider` | Ihr eigener Anbieter (lokales Modell, Gateway, Test-Double) |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` und `baseURL` jedes Herstellers (`baseURL`: ein kompatibler Endpunkt wie die v1-API von Azure OpenAI oder ein lokaler Modellserver, oder ein Proxy). Der primäre Anbieter nutzt den Eintrag seines Herstellers, ein Fallback eines anderen Herstellers den seines eigenen |
+| `fallbackProviders` | `Array<{ provider, config? }>` | Der Reihe nach versucht, wenn der primäre Anbieter ausfällt; eine `config` hat Vorrang vor `providerConfig`. Ein Fallback desselben Herstellers wie der primäre erbt keine seiner Einstellungen (nur den globalen `apiKey`); einer eines anderen Herstellers braucht einen eigenen Schlüssel |
+| `llmProvider` | `LLMProvider` | Ihr eigener Anbieter (lokales Modell, Gateway, Test-Double). Er erhält Tool-Aufrufe und ihre Ergebnisse im nativen Format (`LLMMessage`), wenn er `nativeToolMessages` angibt, sonst als Text |
 | `retry` | `Partial<RetryPolicy> \| false` | Wiederholungsrichtlinie für das LLM, pro Anbieter, vor dem Fallback |
 | `jev` | `JevClientConfig` | Aktiviert TypeSafe Jev für typisierte Entscheidungen – direkt oder über [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) mit `baseUrl` und `model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | Jedes beliebige Backend für typisierte Entscheidungen (hat Vorrang vor `jev`) |

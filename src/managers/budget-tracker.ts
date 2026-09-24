@@ -105,8 +105,9 @@ export class BudgetTracker {
     for (const period of periods) {
       const boundaries = this.getPeriodBoundaries(period, timestamp);
 
-      // Record for agent-level usage
+      // Record for agent-level usage, and for limits that name no agent
       this.addUsage(agentId, undefined, period, boundaries, tokensUsed, 0, timestamp);
+      this.addUsage(undefined, undefined, period, boundaries, tokensUsed, 0, timestamp);
 
       // Record for tool-level usage if toolName provided
       if (toolName) {

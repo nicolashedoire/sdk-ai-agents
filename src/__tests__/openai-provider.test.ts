@@ -70,6 +70,14 @@ describe('OpenAIProvider', () => {
       expect(provider.supportsModel('o1-mini')).toBe(true);
     });
 
+    it('should recognize the newer OpenAI model families', () => {
+      // A fallback only receives the requested model if it serves it.
+      for (const model of ['o3', 'o3-mini', 'o4-mini', 'chatgpt-4o-latest', 'ft:gpt-4o:org::id']) {
+        expect(provider.supportsModel(model)).toBe(true);
+      }
+      expect(provider.supportsModel('omni-model')).toBe(false);
+    });
+
     it('should return false for non-GPT models', () => {
       expect(provider.supportsModel('claude-3-opus')).toBe(false);
       expect(provider.supportsModel('unknown')).toBe(false);
@@ -122,6 +130,8 @@ describe('OpenAIProvider', () => {
 
       expect(result.content).toBeNull();
       expect(result.toolCalls).toHaveLength(1);
+      // The id the tool's result will refer to.
+      expect(result.toolCalls?.[0]?.id).toBe('call_1');
       expect(result.toolCalls?.[0]?.function.name).toBe('calculator');
       expect(JSON.parse(result.toolCalls?.[0]?.function.arguments ?? '')).toEqual({
         operation: 'add',
@@ -272,6 +282,33 @@ describe('OpenAIProvider', () => {
           abortSignal: abortController.signal,
         })
       ).rejects.toThrow('Request aborted');
+      // An already cancelled request is never sent, so never billed.
+      expect(server.requests).toHaveLength(0);
+    });
+
+    it('should cancel a request aborted while in flight, without waiting for the answer', async () => {
+      server.reply({ ...openAIChat({ content: 'too late' }), delayMs: 5_000 });
+      const abortController = new AbortController();
+      const outcome = provider
+        .generateCompletion({
+          model: 'gpt-4',
+          messages: [{ role: 'user', content: 'Hello' }],
+          abortSignal: abortController.signal,
+        })
+        .then(
+          () => 'answered',
+          (error: unknown) => error
+        );
+      while (server.requests.length === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      const abortedAt = Date.now();
+      abortController.abort();
+
+      const failure = await outcome;
+      expect(failure).toHaveProperty('message', 'Request aborted');
+      // The HTTP request is cut: the 5 s answer is not waited for.
+      expect(Date.now() - abortedAt).toBeLessThan(1_000);
     });
 
     it('should handle empty response', async () => {

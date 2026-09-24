@@ -256,8 +256,22 @@ describe('AnthropicProvider Integration', () => {
       expect(server.requests).toHaveLength(0);
     });
 
+    it('should honour a signal given in the reasoning context', async () => {
+      server.reply(anthropicMessage({ text: ['too late'] }));
+      const abortController = new AbortController();
+      abortController.abort();
+
+      await expect(
+        reasoningEngine.generateIntention(
+          { ...context(), abortSignal: abortController.signal },
+          eventStore
+        )
+      ).rejects.toThrow('Run cancelled');
+      expect(server.requests).toHaveLength(0);
+    });
+
     it('should cancel a run aborted while Anthropic is answering', async () => {
-      server.reply({ ...anthropicMessage({ text: ['too late'] }), delayMs: 100 });
+      server.reply({ ...anthropicMessage({ text: ['too late'] }), delayMs: 5_000 });
       const abortController = new AbortController();
 
       const outcome = reasoningEngine
@@ -267,11 +281,13 @@ describe('AnthropicProvider Integration', () => {
           (error: unknown) => error
         );
       await until(() => server.requests.length === 1);
+      const abortedAt = Date.now();
       abortController.abort();
 
       const failure = await outcome;
       expect(failure).toBeInstanceOf(Error);
       expect(failure).toHaveProperty('message', 'Run cancelled');
+      expect(Date.now() - abortedAt).toBeLessThan(1_000);
       expect(await eventStore.getEvents(RUN_ID)).toEqual([]);
     });
   });
