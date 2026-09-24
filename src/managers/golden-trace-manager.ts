@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { GoldenTrace, GoldenTraceConfig } from '../types/golden-trace.js';
 import type { Trace } from '../types/sdk.js';
 import { fileInFolder } from '../utils/file-in-folder.js';
+import { ValidationError } from '../errors/index.js';
 
 export class GoldenTraceManager {
   private goldenTracesDir: string;
@@ -66,7 +67,8 @@ export class GoldenTraceManager {
       this.goldenTracesCache.set(goldenTraceId, goldenTrace);
       return goldenTrace;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      // A missing file, or an id that cannot name one: nothing to read or delete.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT' || error instanceof ValidationError) {
         return null;
       }
       this.handleError('Failed to read golden trace', error);
@@ -114,7 +116,8 @@ export class GoldenTraceManager {
       this.goldenTracesCache.delete(goldenTraceId);
       return true;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      // A missing file, or an id that cannot name one: nothing to read or delete.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT' || error instanceof ValidationError) {
         return false;
       }
       this.handleError('Failed to delete golden trace', error);

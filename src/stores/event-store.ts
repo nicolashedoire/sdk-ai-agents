@@ -20,6 +20,11 @@ export interface IEventStore {
     filters?: Omit<EventFilters, 'sessionId'>
   ): Promise<Event[]>;
   countEvents?(filters?: EventFilters): Promise<number>;
+  /**
+   * Throws if the store cannot record events under this run id (e.g. an id that cannot name
+   * a file). Checked before paid work whose result would then be lost.
+   */
+  checkRunId?(runId: string): void;
   groupEventsBy?(
     groupBy: EventAggregation['groupBy'],
     filters?: EventFilters

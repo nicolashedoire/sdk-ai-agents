@@ -10,12 +10,18 @@ const FILE_ID = /^[A-Za-z0-9_-][A-Za-z0-9._-]{0,199}$/;
  * (`../x`, `/etc/x`, `a/b`) or a hidden file is refused instead of being joined to the path.
  */
 export function fileInFolder(folder: string, id: string, extension: string, field: string): string {
-  if (typeof id !== 'string' || !FILE_ID.test(id)) {
-    const shown = String(id).slice(0, 60);
+  if (!isFileId(id)) {
+    // Quoted by JSON: a refused id with line breaks or control characters stays on one line.
+    const shown = JSON.stringify(String(id).slice(0, 60));
     throw new ValidationError(
       field,
-      `"${shown}" cannot name a file: use letters, digits, ".", "_" or "-" (at most 200)`
+      `${shown} cannot name a file: use letters, digits, ".", "_" or "-" (at most 200)`
     );
   }
   return join(folder, `${id}${extension}`);
+}
+
+/** Whether an id may name a file (see fileInFolder). */
+export function isFileId(id: unknown): id is string {
+  return typeof id === 'string' && FILE_ID.test(id);
 }
