@@ -60,19 +60,6 @@ Ces étapes se font une seule fois, par le propriétaire du dépôt.
 
    Cette commande met à jour `package.json` et `package-lock.json`. Changez aussi `const version` dans `docs/.vitepress/config.mts`, la version affichée dans le menu du site de documentation.
 
-   **Première publication seulement :** dans ce même commit, remplacez la section *Install* de `README.md` par le texte ci-dessous. npm affiche le README de la version publiée, qui ne doit pas dire « Not on npm yet ».
-
-   ````md
-   ## Install
-
-   ```sh
-   npm install @sdk-ai-agents/core zod@^3.25.28
-   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
-   ```
-
-   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
-   ````
-
 5. **Fusionner.** Committez (`chore(release): 0.3.0`), ouvrez une pull request, attendez la CI et fusionnez-la.
 
 6. **Pousser le tag** sur le commit fusionné :
@@ -86,7 +73,7 @@ Ces étapes se font une seule fois, par le propriétaire du dépôt.
 
 7. **Suivre l'exécution** dans l'onglet *Actions* du dépôt, workflow *Release*.
 
-8. **Après la publication.** Mettez `@sdk-ai-agents/core` à la nouvelle version (`^0.3.0`) dans `templates/starter-template/package.json`. Après la première publication seulement, fusionnez aussi la pull request de la branche `docs/npm-install` : tant que le paquet n'est pas sur npm, les instructions d'installation l'installent depuis GitHub.
+8. **Après la publication.** Mettez `@sdk-ai-agents/core` à la nouvelle version (`^0.3.0`) dans `templates/starter-template/package.json`.
 
 Poussez un seul tag à la fois : GitHub ne lance aucun workflow quand plus de trois tags sont poussés en même temps, ce que `git push --tags` peut faire. Une préversion (`npm version 0.4.0-beta.1 --no-git-tag-version`, tag `v0.4.0-beta.1`) est publiée sous le dist-tag `next` : elle s'installe avec `@sdk-ai-agents/core@next`, et `npm install @sdk-ai-agents/core` continue de donner la dernière version stable.
 

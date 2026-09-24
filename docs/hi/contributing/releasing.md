@@ -60,19 +60,6 @@ SDK npm पर `@sdk-ai-agents/core` नाम से प्रकाशित �
 
    यह `package.json` और `package-lock.json` अपडेट करता है। `docs/.vitepress/config.mts` में `const version` भी बदलें, जो दस्तावेज़ साइट के मेनू में दिखने वाला वर्ज़न है।
 
-   **सिर्फ़ पहली रिलीज़ में:** इसी commit में `README.md` के *Install* सेक्शन को नीचे दिए टेक्स्ट से बदलें। npm प्रकाशित वर्ज़न का README दिखाता है, जिसमें "Not on npm yet" नहीं लिखा होना चाहिए।
-
-   ````md
-   ## Install
-
-   ```sh
-   npm install @sdk-ai-agents/core zod@^3.25.28
-   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
-   ```
-
-   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
-   ````
-
 5. **merge करें।** commit करें (`chore(release): 0.3.0`), pull request खोलें, CI का इंतज़ार करें और उसे merge करें।
 
 6. **tag push करें**, merge हुए commit पर:
@@ -86,7 +73,7 @@ SDK npm पर `@sdk-ai-agents/core` नाम से प्रकाशित �
 
 7. **run पर नज़र रखें**, repository के *Actions* टैब में, *Release* workflow।
 
-8. **रिलीज़ के बाद।** `templates/starter-template/package.json` में `@sdk-ai-agents/core` को नए वर्ज़न (`^0.3.0`) पर सेट करें। सिर्फ़ पहली रिलीज़ के बाद, `docs/npm-install` branch का pull request भी merge करें: जब तक पैकेज npm पर नहीं है, इंस्टॉल करने के निर्देश उसे GitHub से इंस्टॉल करते हैं।
+8. **रिलीज़ के बाद।** `templates/starter-template/package.json` में `@sdk-ai-agents/core` को नए वर्ज़न (`^0.3.0`) पर सेट करें।
 
 एक बार में एक ही tag push करें: जब एक साथ तीन से ज़्यादा tags push होते हैं, तो GitHub कोई workflow शुरू नहीं करता, और `git push --tags` ऐसा कर सकता है। pre-release (`npm version 0.4.0-beta.1 --no-git-tag-version`, tag `v0.4.0-beta.1`) dist-tag `next` के साथ प्रकाशित होता है: इसे `@sdk-ai-agents/core@next` से इंस्टॉल किया जाता है, और `npm install @sdk-ai-agents/core` पहले की तरह नवीनतम स्थिर वर्ज़न देता रहता है।
 

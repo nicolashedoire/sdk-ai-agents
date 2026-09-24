@@ -6,7 +6,7 @@ Todos os termos usados nesta documentação, explicados sem jargão, com um link
 
 | Termo | Em palavras simples |
 | --- | --- |
-| **SDK** | Uma caixa de ferramentas para desenvolvedores: código que você adiciona à sua própria aplicação em vez de escrever tudo você mesmo. Este é escrito em TypeScript; ainda não está no npm e é instalado a partir do GitHub (veja [Primeiros passos](./getting-started)). |
+| **SDK** | Uma caixa de ferramentas para desenvolvedores: código que você adiciona à sua própria aplicação em vez de escrever tudo você mesmo. Este é escrito em TypeScript e é instalado a partir do npm com o nome `@sdk-ai-agents/core` (veja [Primeiros passos](./getting-started)). |
 | **Modelo de linguagem** (LLM) | A IA que lê e escreve texto (GPT-4o, Claude…). Aqui ela é um componente entre outros: ela propõe, e o SDK verifica e decide o que é permitido. |
 | **Prompt** | As instruções em texto enviadas a um modelo de linguagem a cada requisição. |
 | **Token** | Um pedaço de palavra. Os fornecedores de modelos cobram por token lido e escrito, e é por isso que os [custos](./costs) são contados em tokens. |

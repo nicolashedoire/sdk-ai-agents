@@ -15,7 +15,7 @@ Pour les décisions ouvertes, préférez les [agents cognitifs](./cognitive-agen
 ## Installation {#installation}
 
 ```bash
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+npm install @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ## Un premier agent en 5 minutes {#first-agent-in-5-minutes}

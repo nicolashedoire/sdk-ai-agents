@@ -60,19 +60,6 @@ Estes passos são feitos uma única vez, pelo dono do repositório.
 
    Isso atualiza `package.json` e `package-lock.json`. Mude também `const version` em `docs/.vitepress/config.mts`, a versão mostrada no menu do site de documentação.
 
-   **Somente na primeira publicação:** neste mesmo commit, substitua a seção *Install* do `README.md` pelo texto abaixo. O npm mostra o README da versão publicada, que não deve dizer "Not on npm yet".
-
-   ````md
-   ## Install
-
-   ```sh
-   npm install @sdk-ai-agents/core zod@^3.25.28
-   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
-   ```
-
-   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
-   ````
-
 5. **Fazer o merge.** Faça o commit (`chore(release): 0.3.0`), abra um pull request, espere a CI e faça o merge.
 
 6. **Enviar a tag** no commit do merge:
@@ -86,7 +73,7 @@ Estes passos são feitos uma única vez, pelo dono do repositório.
 
 7. **Acompanhar a execução** na aba *Actions* do repositório, workflow *Release*.
 
-8. **Depois da publicação.** Coloque `@sdk-ai-agents/core` na nova versão (`^0.3.0`) em `templates/starter-template/package.json`. Somente depois da primeira publicação, faça também o merge do pull request do branch `docs/npm-install`: enquanto o pacote não estiver no npm, as instruções de instalação o instalam a partir do GitHub.
+8. **Depois da publicação.** Coloque `@sdk-ai-agents/core` na nova versão (`^0.3.0`) em `templates/starter-template/package.json`.
 
 Envie uma tag de cada vez: o GitHub não inicia nenhum workflow quando mais de três tags são enviadas ao mesmo tempo, o que `git push --tags` pode fazer. Uma versão prévia (`npm version 0.4.0-beta.1 --no-git-tag-version`, tag `v0.4.0-beta.1`) é publicada com a dist-tag `next`: ela é instalada com `@sdk-ai-agents/core@next`, e `npm install @sdk-ai-agents/core` continua trazendo a última versão estável.
 

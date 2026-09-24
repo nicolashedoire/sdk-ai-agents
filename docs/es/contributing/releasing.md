@@ -60,19 +60,6 @@ Estos pasos se hacen una sola vez, y los hace el propietario del repositorio.
 
    Esto actualiza `package.json` y `package-lock.json`. Cambia también `const version` en `docs/.vitepress/config.mts`, la versión que muestra el menú del sitio de documentación.
 
-   **Solo en la primera publicación:** en este mismo commit, sustituye la sección *Install* de `README.md` por el texto de abajo. npm muestra el README de la versión publicada, que no debe decir "Not on npm yet".
-
-   ````md
-   ## Install
-
-   ```sh
-   npm install @sdk-ai-agents/core zod@^3.25.28
-   npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
-   ```
-
-   Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet). The package is ESM only: `import` it (from CommonJS, use a dynamic `import()`). To try the unreleased `main` branch instead, install it from GitHub — it builds itself on install: `npm install github:nicolashedoire/sdk-ai-agents`.
-   ````
-
 5. **Fusionar.** Haz el commit (`chore(release): 0.3.0`), abre una pull request, espera a la CI y fusiónala.
 
 6. **Subir la etiqueta** en el commit fusionado:
@@ -86,7 +73,7 @@ Estos pasos se hacen una sola vez, y los hace el propietario del repositorio.
 
 7. **Seguir la ejecución** en la pestaña *Actions* del repositorio, flujo de trabajo *Release*.
 
-8. **Después de publicar.** Pon `@sdk-ai-agents/core` en la nueva versión (`^0.3.0`) en `templates/starter-template/package.json`. Solo tras la primera publicación, fusiona también la pull request de la rama `docs/npm-install`: mientras el paquete no esté en npm, las instrucciones de instalación lo instalan desde GitHub.
+8. **Después de publicar.** Pon `@sdk-ai-agents/core` en la nueva versión (`^0.3.0`) en `templates/starter-template/package.json`.
 
 Sube una sola etiqueta cada vez: GitHub no inicia ningún flujo de trabajo cuando se suben más de tres etiquetas a la vez, cosa que `git push --tags` puede hacer. Una versión preliminar (`npm version 0.4.0-beta.1 --no-git-tag-version`, etiqueta `v0.4.0-beta.1`) se publica con el dist-tag `next`: se instala con `@sdk-ai-agents/core@next`, y `npm install @sdk-ai-agents/core` sigue dando la última versión estable.
 

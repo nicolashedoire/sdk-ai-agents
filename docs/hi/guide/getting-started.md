@@ -2,20 +2,20 @@
 
 ## इंस्टॉल करें {#install}
 
-पैकेज अभी npm पर प्रकाशित नहीं हुआ है। इसे GitHub से इंस्टॉल करें — इंस्टॉल होते समय यह खुद को बिल्ड कर लेता है:
+पैकेज को npm से, zod के साथ इंस्टॉल करें:
 
 ::: code-group
 
 ```sh [npm]
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+npm install @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ```sh [pnpm]
-pnpm add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+pnpm add @sdk-ai-agents/core zod@^3.25.28
 ```
 
 ```sh [yarn]
-yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
+yarn add @sdk-ai-agents/core zod@^3.25.28
 ```
 
 :::
@@ -24,6 +24,12 @@ yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 
 ```sh
 npm install @modelcontextprotocol/sdk@^1.30.0
+```
+
+जो बदलाव अभी रिलीज़ नहीं हुए हैं उन्हें आज़माने के लिए, इसके बजाय GitHub से `main` branch इंस्टॉल करें — इंस्टॉल होते समय यह खुद को बिल्ड कर लेता है:
+
+```sh
+npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 ```
 
 ## 1. SDK बनाएँ {#_1-create-the-sdk}

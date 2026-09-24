@@ -17,7 +17,7 @@ mkdir my-mcp-server
 cd my-mcp-server
 npm init -y
 npm pkg set type=module
-npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28 @modelcontextprotocol/sdk@^1.30.0
+npm install @sdk-ai-agents/core zod@^3.25.28 @modelcontextprotocol/sdk@^1.30.0
 npm install --save-dev tsx
 ```
 
@@ -27,7 +27,7 @@ npm install --save-dev tsx
 | --- | --- |
 | `npm init -y` | 프로젝트의 의존성을 나열하는 파일인 `package.json`을 만듭니다. |
 | `npm pkg set type=module` | 최신 JavaScript 모듈(`import`)을 사용합니다. SDK가 이를 요구합니다. |
-| `npm install github:nicolashedoire/sdk-ai-agents …` | 이 SDK(아직 npm에 없으므로 GitHub에서 가져오며, 스스로 빌드됩니다), zod(인자를 기술하기 위해), 그리고 공식 MCP SDK 1.x 안의 1.30 이상 버전(이 SDK가 테스트된 버전)을 설치합니다. |
+| `npm install @sdk-ai-agents/core …` | 이 SDK, zod(인자를 기술하기 위해), 그리고 공식 MCP SDK 1.x 안의 1.30 이상 버전(이 SDK가 테스트된 버전)을 설치합니다. |
 | `npm install --save-dev tsx` | 빌드 단계 없이 TypeScript 파일을 바로 실행합니다. |
 
 ## 2. 서버 작성하기 {#_2-write-the-server}
