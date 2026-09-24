@@ -14,7 +14,7 @@ const sdk = createSDK(config);
 | `providerConfig` | `{ openai?, anthropic? }` | 各厂商的 `apiKey`、`defaultModel` 和 `baseURL`（`baseURL`：兼容的端点，例如 Azure OpenAI 的 v1 API 或本地模型服务器，或代理）。主提供商使用其厂商的条目，其他厂商的回退使用它自己厂商的条目 |
 | `fallbackProviders` | `Array<{ provider, config? }>` | 主提供商失败时按顺序尝试；`config` 优先于 `providerConfig`。与主提供商同一厂商的回退不继承主提供商的任何设置（只继承全局 `apiKey`）；其他厂商的回退需要自己的密钥 |
 | `llmProvider` | `LLMProvider` | 你自己的提供商（本地模型、网关、测试替身）。如果它声明了 `nativeToolMessages`，就以原生格式（`LLMMessage`）接收工具调用及其结果，否则以文本形式接收 |
-| `retry` | `Partial<RetryPolicy> \| false` | LLM 重试策略，按提供商分别应用，在回退之前。仅在显式设置时才应用于注入的 `llmProvider`，且从不应用于作为 `llmProvider` 传入的 `FallbackProvider` 及其内部的提供商 |
+| `retry` | `Partial<RetryPolicy> \| false` | LLM 重试策略，按提供商分别应用，在回退之前。它也是 Jev 客户端重试的默认值（`jev.maxRetries` 和 `jev.retryBaseDelayMs` 可覆盖它）。仅在显式设置时才应用于注入的 `llmProvider`，且从不应用于作为 `llmProvider` 传入的 `FallbackProvider` 及其内部的提供商 |
 | `jev` | `JevClientConfig` | 为类型化决策启用 TypeSafe Jev——直接使用，或者通过 [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) 并设置 `baseUrl` 和 `model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | 任何类型化决策后端（优先于 `jev`） |
 | `pricing` | `PricingTable` | 每百万 token 的美元价格，合并到默认值之上 |
