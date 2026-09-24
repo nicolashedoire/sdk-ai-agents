@@ -141,7 +141,7 @@ export class AnthropicProvider implements LLMProvider {
     return {
       content,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-      model,
+      model: response.model || model,
       usage: response.usage
         ? {
             promptTokens: response.usage.input_tokens,

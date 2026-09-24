@@ -165,6 +165,19 @@ describe('AnthropicProvider', () => {
       expect(result.model).toBe(REQUESTED_MODEL);
     });
 
+    it('should report the model the API answered with, not the requested one', async () => {
+      // An alias resolves to a dated model; costs are priced from the reported model.
+      server.reply(anthropicMessage({ text: ['Hi'], model: 'claude-served-20260101' }));
+
+      const result = await provider.generateCompletion({
+        model: 'claude-served-latest',
+        messages: [{ role: 'user', content: 'Hello' }],
+      });
+
+      expect(server.jsonBody(0)).toMatchObject({ model: 'claude-served-latest' });
+      expect(result.model).toBe('claude-served-20260101');
+    });
+
     it('should join several system messages and keep the conversation order', async () => {
       server.reply(anthropicMessage({ text: ['OK'] }));
 

@@ -92,7 +92,7 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   supportsModel(model: string): boolean {
-    return model.startsWith('gpt-') || model.startsWith('o1-');
+    return /^(ft:)?(gpt-|chatgpt-|o\d)/.test(model);
   }
 
   getProviderName(): string {

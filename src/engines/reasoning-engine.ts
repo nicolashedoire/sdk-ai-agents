@@ -72,6 +72,9 @@ export class ReasoningEngine {
 
       // Check if provider is a FallbackProvider
       let response: LLMResponse;
+      // What was actually asked, and of whom: a fallback may use its own default model.
+      let requestedModel: string | undefined = model;
+      let answeredBy = this.provider.getProviderName();
       let fallbackInfo: {
         usedProvider: string;
         wasFallback: boolean;
@@ -102,6 +105,8 @@ export class ReasoningEngine {
           abortSignal,
         });
         response = result.response;
+        requestedModel = result.requestedModel;
+        answeredBy = result.usedProvider;
         fallbackInfo = {
           usedProvider: result.usedProvider,
           wasFallback: result.wasFallback,
@@ -134,7 +139,12 @@ export class ReasoningEngine {
         });
       }
 
-      await this.logIntentionGenerated(context, eventStore, { ...response, requestedModel: model });
+      await this.logIntentionGenerated(
+        context,
+        eventStore,
+        { ...response, requestedModel },
+        answeredBy
+      );
 
       return this.parseIntention(response);
     } catch (error) {
@@ -208,7 +218,8 @@ export class ReasoningEngine {
       model?: string;
       requestedModel?: string;
       usage?: LLMResponse['usage'];
-    }
+    },
+    provider: string
   ): Promise<void> {
     await eventStore.append(context.runId, {
       id: generateEventId(),
@@ -229,7 +240,7 @@ export class ReasoningEngine {
       },
       metadata: {
         agentId: context.agentId,
-        provider: this.provider.getProviderName(),
+        provider,
       },
     });
   }

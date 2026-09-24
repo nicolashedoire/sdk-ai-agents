@@ -70,6 +70,14 @@ describe('OpenAIProvider', () => {
       expect(provider.supportsModel('o1-mini')).toBe(true);
     });
 
+    it('should recognize the newer OpenAI model families', () => {
+      // A fallback only receives the requested model if it serves it.
+      for (const model of ['o3', 'o3-mini', 'o4-mini', 'chatgpt-4o-latest', 'ft:gpt-4o:org::id']) {
+        expect(provider.supportsModel(model)).toBe(true);
+      }
+      expect(provider.supportsModel('omni-model')).toBe(false);
+    });
+
     it('should return false for non-GPT models', () => {
       expect(provider.supportsModel('claude-3-opus')).toBe(false);
       expect(provider.supportsModel('unknown')).toBe(false);

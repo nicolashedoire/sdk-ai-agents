@@ -12,7 +12,7 @@ export interface LLMRequest {
   /** Run the request belongs to, used to trace retries and costs (optional). */
   runId?: string;
 
-  /** Model to use (e.g. "gpt-4", "claude-3-opus") */
+  /** Model to use (e.g. "gpt-4o"). An empty string lets the provider use its default model. */
   model: string;
 
   /** Conversation messages */
