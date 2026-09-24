@@ -193,16 +193,16 @@ interface ModelCostLine {
 
 ## लाइव इवेंट {#live-events}
 
-एक listener `(event: Event) => void | Promise<void>` होता है। उसे एक बार में एक इवेंट मिलता है, हर run के क्रम में, जैसे ही स्टोर उसे स्वीकार कर लेता है; वह जो promise लौटाता है, उसके पूरा होने का इंतज़ार उसके अगले इवेंट से पहले किया जाता है। कोई run कभी उसका इंतज़ार नहीं करता, और उसके errors की सूचना दी जाती है, उन्हें कभी run में नहीं फेंका जाता। देखें [लाइव प्रगति](../guide/observability#live-progress)।
+एक listener `(event: Event) => unknown` होता है। उसे एक बार में एक इवेंट मिलता है, हर run के क्रम में, जैसे ही स्टोर उसे स्वीकार कर लेता है; वह जो promise लौटाता है, उसके पूरा होने का इंतज़ार उसके अगले इवेंट से पहले किया जाता है। कोई run कभी उसका इंतज़ार नहीं करता, और उसके errors की सूचना दी जाती है, उन्हें कभी run में नहीं फेंका जाता। ज़्यादा से ज़्यादा `maxQueued` इवेंट (डिफ़ॉल्ट रूप से 10 000) उसका इंतज़ार करते हैं; उससे आगे, नए इवेंट उसके लिए छोड़ दिए जाते हैं और उनकी सूचना एक `LiveEventsDroppedError` के साथ दी जाती है। देखें [लाइव प्रगति](../guide/observability#live-progress)।
 
 | API | |
 | --- | --- |
-| `RunInput.onEvent`: `agent.run({ message, onEvent })` | run का हर इवेंट; `run()` तभी resolve होता है जब listener उनमें से हर एक को निपटा चुका हो। listener दर्ज नहीं किया जाता |
-| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | संज्ञानात्मक run के लिए भी यही |
-| `replay(runId, modifications?, { onEvent })` | रीप्ले के लिए भी यही |
-| `executeTool(name, params, { onEvent })` | कॉल के इवेंट, और उसके टूल द्वारा शुरू किए गए runs के इवेंट: handler को listener `context.onEvent` के रूप में मिलता है, जिसे `governedAgentTool` और `cognitiveAgentTool` अपने एजेंट को देते हैं |
-| `subscribe(listener, { runId?, agentId?, types? })` | `() => void`: फ़िल्टर से मेल खाने वाले हर run का हर इवेंट (`agentId` का मतलब `metadata.agentId` है), जब तक आप लौटाया गया फ़ंक्शन कॉल नहीं करते, जो अभी तक न पहुँचाए गए इवेंट छोड़ देता है |
-| `new ObservedEventStore(store, { onListenerError? })` | वह परत जो इवेंट पहुँचाती है; SDK अपने स्टोर को ऐसी एक परत में लपेटता है, या वह परत इस्तेमाल करता है जो आप `eventStore` के रूप में देते हैं। इसका `subscribe(listener, filter?)` `{ unsubscribe(), close() }` लौटाता है: `close()` तब तक इंतज़ार करता है जब तक listener उन इवेंट्स को निपटा न ले जो वह पहले ही ले चुका है |
+| `RunInput.onEvent`: `agent.run({ message, onEvent })` | run का हर इवेंट; `run()` तब resolve होता है जब listener उनमें से हर एक को निपटा चुका हो, या उससे पहले, जब run रोका या रद्द किया गया हो या `signal` abort हो (तब listener की सदस्यता खत्म कर दी जाती है)। listener दर्ज नहीं किया जाता |
+| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | संज्ञानात्मक run के लिए भी यही, जिसका `limits.timeoutMs` भी इंतज़ार खत्म करता है |
+| `replay(runId, modifications?, { onEvent })` | रीप्ले के लिए भी यही, जिसे रद्द नहीं किया जा सकता: वह हमेशा इंतज़ार करता है |
+| `executeTool(name, params, { onEvent })` | कॉल के इवेंट, और उसके टूल द्वारा शुरू किए गए runs के इवेंट, सिर्फ़ एक स्तर तक: handler को listener `context.onEvent` के रूप में मिलता है, जिसे `governedAgentTool` और `cognitiveAgentTool` अपने एजेंट को देते हैं (लाइव इवेंट के बिना वाले स्टोर पर हाथ से बनाया गया एजेंट इसके बिना चलता है)। `signal` इंतज़ार खत्म करता है |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: फ़िल्टर से मेल खाने वाले हर run का हर इवेंट (`agentId` का मतलब `metadata.agentId` है), जब तक आप लौटाया गया फ़ंक्शन कॉल नहीं करते, जो अभी तक न पहुँचाए गए इवेंट छोड़ देता है |
+| `new ObservedEventStore(store, { onListenerError? })` | वह परत जो इवेंट पहुँचाती है; SDK अपने स्टोर को ऐसी एक परत में लपेटता है, या वह परत इस्तेमाल करता है जो आप `eventStore` के रूप में देते हैं, `MonitoredEventStore` के अंदर भी (तब उसकी घटना रिपोर्ट भी पहुँचाई जाती हैं)। इसका `subscribe(listener, options?)` `{ unsubscribe(), close() }` लौटाता है: `close()` तब तक इंतज़ार करता है जब तक listener उन इवेंट्स को निपटा न ले जो वह पहले ही ले चुका है। `onListenerError` को listener के errors और इवेंट छोड़े जाने की सूचनाएँ मिलती हैं |
 
 ## टूल: `ToolDefinition` {#tools-tooldefinition}
 

@@ -193,16 +193,16 @@ interface ModelCostLine {
 
 ## 실시간 이벤트 {#live-events}
 
-리스너는 `(event: Event) => void | Promise<void>`입니다. 리스너는 저장소가 받아들인 이벤트를 각 실행의 순서대로, 한 번에 하나씩 받습니다. 리스너가 프로미스를 반환하면 다음 이벤트 전에 그 프로미스를 기다립니다. 실행은 리스너를 절대 기다리지 않으며, 리스너의 오류는 보고될 뿐 실행 안으로 던져지지 않습니다. [실시간 진행 상황](../guide/observability#live-progress)을 보세요.
+리스너는 `(event: Event) => unknown`입니다. 리스너는 저장소가 받아들인 이벤트를 각 실행의 순서대로, 한 번에 하나씩 받습니다. 리스너가 프로미스를 반환하면 다음 이벤트 전에 그 프로미스를 기다립니다. 실행은 리스너를 절대 기다리지 않으며, 리스너의 오류는 보고될 뿐 실행 안으로 던져지지 않습니다. 리스너를 기다릴 수 있는 이벤트는 최대 `maxQueued`개(기본값 10 000)입니다. 이를 넘으면 새 이벤트는 그 리스너에게 전달되지 않고 버려지며, `LiveEventsDroppedError`로 보고됩니다. [실시간 진행 상황](../guide/observability#live-progress)을 보세요.
 
 | API | |
 | --- | --- |
-| `RunInput.onEvent`: `agent.run({ message, onEvent })` | 실행의 모든 이벤트. `run()`은 리스너가 이벤트 하나하나의 처리를 마친 뒤에 완료됩니다. 리스너는 기록되지 않습니다 |
-| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | 인지 실행에 대해 위와 같습니다 |
-| `replay(runId, modifications?, { onEvent })` | 리플레이에 대해 위와 같습니다 |
-| `executeTool(name, params, { onEvent })` | 호출의 이벤트, 그리고 그 도구가 시작하는 실행의 이벤트. 핸들러는 리스너를 `context.onEvent`로 받으며, `governedAgentTool`과 `cognitiveAgentTool`은 이를 자신의 에이전트에 넘깁니다 |
-| `subscribe(listener, { runId?, agentId?, types? })` | `() => void`: 필터에 맞는 모든 실행의 모든 이벤트(`agentId`는 `metadata.agentId`). 반환된 함수를 호출할 때까지 받으며, 그 함수는 아직 전달되지 않은 이벤트를 버립니다 |
-| `new ObservedEventStore(store, { onListenerError? })` | 이벤트를 전달하는 계층. SDK는 자기 저장소를 이것으로 감싸거나, 여러분이 `eventStore`로 넘긴 것을 그대로 씁니다. 그 `subscribe(listener, filter?)`는 `{ unsubscribe(), close() }`를 반환합니다. `close()`는 리스너가 이미 가져간 이벤트의 처리를 마칠 때까지 기다립니다 |
+| `RunInput.onEvent`: `agent.run({ message, onEvent })` | 실행의 모든 이벤트. `run()`은 리스너가 이벤트 하나하나의 처리를 마친 뒤에 완료되며, 실행이 중지되거나 취소되었을 때 또는 `signal`이 중단될 때는 더 일찍 완료됩니다(그러면 리스너는 구독 해제됩니다). 리스너는 기록되지 않습니다 |
+| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | 인지 실행에 대해 위와 같습니다. 인지 실행에서는 `limits.timeoutMs`도 기다림을 끝냅니다 |
+| `replay(runId, modifications?, { onEvent })` | 리플레이에 대해 위와 같습니다. 리플레이는 취소할 수 없으므로 항상 기다립니다 |
+| `executeTool(name, params, { onEvent })` | 호출의 이벤트, 그리고 그 도구가 시작하는 실행의 이벤트(한 단계 깊이까지만). 핸들러는 리스너를 `context.onEvent`로 받으며, `governedAgentTool`과 `cognitiveAgentTool`은 이를 자신의 에이전트에 넘깁니다(실시간 이벤트가 없는 저장소 위에 직접 만든 에이전트는 리스너 없이 실행됩니다). `signal`은 기다림을 끝냅니다 |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: 필터에 맞는 모든 실행의 모든 이벤트(`agentId`는 `metadata.agentId`). 반환된 함수를 호출할 때까지 받으며, 그 함수는 아직 전달되지 않은 이벤트를 버립니다 |
+| `new ObservedEventStore(store, { onListenerError? })` | 이벤트를 전달하는 계층. SDK는 자기 저장소를 이것으로 감싸거나, 여러분이 `eventStore`로 넘긴 것을 그대로 씁니다. `MonitoredEventStore` 안에 넣은 경우도 마찬가지입니다(그러면 그 인시던트 보고도 전달됩니다). 그 `subscribe(listener, options?)`는 `{ unsubscribe(), close() }`를 반환합니다. `close()`는 리스너가 이미 가져간 이벤트의 처리를 마칠 때까지 기다립니다. `onListenerError`는 리스너의 오류와 버려진 이벤트를 받습니다 |
 
 ## 도구: `ToolDefinition` {#tools-tooldefinition}
 

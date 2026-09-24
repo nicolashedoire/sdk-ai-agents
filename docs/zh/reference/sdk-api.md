@@ -193,16 +193,16 @@ interface ModelCostLine {
 
 ## 实时事件 {#live-events}
 
-监听器是一个 `(event: Event) => void | Promise<void>`。它一次收到一个事件，按每次运行内的顺序，在存储接受该事件之后送达；如果它返回一个 promise，它的下一个事件会等到这个 promise 完成之后才送达。运行从不等待它，它的错误会被报告，绝不会被抛进运行中。参见[实时进度](../guide/observability#live-progress)。
+监听器是一个 `(event: Event) => unknown`。它一次收到一个事件，按每次运行内的顺序，在存储接受该事件之后送达；如果它返回一个 promise，它的下一个事件会等到这个 promise 完成之后才送达。运行从不等待它，它的错误会被报告，绝不会被抛进运行中。最多有 `maxQueued` 个事件（默认 10 000 个）排队等待它；超过之后，发给它的新事件会被丢弃，并以一个 `LiveEventsDroppedError` 报告出来。参见[实时进度](../guide/observability#live-progress)。
 
 | API | |
 | --- | --- |
-| `RunInput.onEvent`：`agent.run({ message, onEvent })` | 这次运行的每一个事件；`run()` 会等到监听器处理完其中每一个事件之后才返回结果。监听器本身不会被记录 |
-| `ThinkInput.onEvent`：`agent.think({ problem, onEvent })` | 对认知运行同样如此 |
-| `replay(runId, modifications?, { onEvent })` | 对回放同样如此 |
-| `executeTool(name, params, { onEvent })` | 这次调用的事件，以及它的工具所启动的运行的事件：处理函数以 `context.onEvent` 的形式得到监听器，`governedAgentTool` 和 `cognitiveAgentTool` 会把它传给它们的智能体 |
-| `subscribe(listener, { runId?, agentId?, types? })` | `() => void`：与过滤条件匹配的每一次运行的每一个事件（`agentId` 即 `metadata.agentId`），直到你调用返回的函数为止；调用它时，尚未送达的事件会被丢弃 |
-| `new ObservedEventStore(store, { onListenerError? })` | 负责送达这些事件的那一层；SDK 会用它包装自己的存储，或者使用你作为 `eventStore` 传入的那一个。它的 `subscribe(listener, filter?)` 返回 `{ unsubscribe(), close() }`：`close()` 会等到监听器处理完它已经取走的事件 |
+| `RunInput.onEvent`：`agent.run({ message, onEvent })` | 这次运行的每一个事件；`run()` 会等到监听器处理完其中每一个事件之后才返回结果，而当运行被停止或被取消、或 `signal` 被中止时，会更早返回（此时监听器会被取消订阅）。监听器本身不会被记录 |
+| `ThinkInput.onEvent`：`agent.think({ problem, onEvent })` | 对认知运行同样如此，它的 `limits.timeoutMs` 也会结束这段等待 |
+| `replay(runId, modifications?, { onEvent })` | 对回放同样如此，回放无法被取消：它总是会等待 |
+| `executeTool(name, params, { onEvent })` | 这次调用的事件，以及它的工具所启动的运行的事件，只跟随一层：处理函数以 `context.onEvent` 的形式得到监听器，`governedAgentTool` 和 `cognitiveAgentTool` 会把它传给它们的智能体（在没有实时事件的存储上手动构建的智能体会在没有它的情况下运行）。`signal` 会结束这段等待 |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`：与过滤条件匹配的每一次运行的每一个事件（`agentId` 即 `metadata.agentId`），直到你调用返回的函数为止；调用它时，尚未送达的事件会被丢弃 |
+| `new ObservedEventStore(store, { onListenerError? })` | 负责送达这些事件的那一层；SDK 会用它包装自己的存储，或者使用你作为 `eventStore` 传入的那一个，即使它位于一个 `MonitoredEventStore` 内部也是如此（这时后者的事故报告也会被送达）。它的 `subscribe(listener, options?)` 返回 `{ unsubscribe(), close() }`：`close()` 会等到监听器处理完它已经取走的事件。`onListenerError` 会收到监听器的错误以及事件被丢弃的情况 |
 
 ## 工具：`ToolDefinition` {#tools-tooldefinition}
 

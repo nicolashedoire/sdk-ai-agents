@@ -193,16 +193,16 @@ interface ModelCostLine {
 
 ## Événements en direct {#live-events}
 
-Un écouteur est de la forme `(event: Event) => void | Promise<void>`. Il reçoit un événement à la fois, dans l'ordre de chaque exécution, une fois que le magasin l'a accepté ; une promesse qu'il renvoie est attendue avant son événement suivant. Les exécutions ne l'attendent jamais, et ses erreurs sont signalées, jamais propagées dans l'exécution. Voir [Progression en direct](../guide/observability#live-progress).
+Un écouteur est de la forme `(event: Event) => unknown`. Il reçoit un événement à la fois, dans l'ordre de chaque exécution, une fois que le magasin l'a accepté ; une promesse qu'il renvoie est attendue avant son événement suivant. Les exécutions ne l'attendent jamais, et ses erreurs sont signalées, jamais propagées dans l'exécution. Au plus `maxQueued` événements (10 000 par défaut) l'attendent ; au-delà, les nouveaux sont abandonnés pour lui et signalés par une `LiveEventsDroppedError`. Voir [Progression en direct](../guide/observability#live-progress).
 
 | API | |
 | --- | --- |
-| `RunInput.onEvent` : `agent.run({ message, onEvent })` | Tous les événements de l'exécution ; `run()` se résout une fois que l'écouteur a fini de traiter chacun d'eux. L'écouteur n'est pas enregistré |
-| `ThinkInput.onEvent` : `agent.think({ problem, onEvent })` | De même pour une exécution cognitive |
-| `replay(runId, modifications?, { onEvent })` | De même pour un rejeu |
-| `executeTool(name, params, { onEvent })` | Les événements de l'appel, et ceux des exécutions que lance son outil : le gestionnaire reçoit l'écouteur sous la forme `context.onEvent`, que `governedAgentTool` et `cognitiveAgentTool` transmettent à leur agent |
-| `subscribe(listener, { runId?, agentId?, types? })` | `() => void` : tous les événements de toutes les exécutions qui correspondent au filtre (`agentId` est `metadata.agentId`), jusqu'à ce que vous appeliez la fonction renvoyée, qui abandonne les événements pas encore transmis |
-| `new ObservedEventStore(store, { onListenerError? })` | La couche qui les transmet ; le SDK enveloppe son magasin dans une telle couche, ou utilise celle que vous passez comme `eventStore`. Son `subscribe(listener, filter?)` renvoie `{ unsubscribe(), close() }` : `close()` attend que l'écouteur ait fini de traiter les événements qu'il a déjà pris en charge |
+| `RunInput.onEvent` : `agent.run({ message, onEvent })` | Tous les événements de l'exécution ; `run()` se résout une fois que l'écouteur a fini de traiter chacun d'eux, ou plus tôt quand l'exécution a été arrêtée ou annulée ou que `signal` est interrompu (l'écouteur est alors désabonné). L'écouteur n'est pas enregistré |
+| `ThinkInput.onEvent` : `agent.think({ problem, onEvent })` | De même pour une exécution cognitive, dont le `limits.timeoutMs` met aussi fin à l'attente |
+| `replay(runId, modifications?, { onEvent })` | De même pour un rejeu, qui ne peut pas être annulé : il attend toujours |
+| `executeTool(name, params, { onEvent })` | Les événements de l'appel, et ceux des exécutions que lance son outil, sur un seul niveau : le gestionnaire reçoit l'écouteur sous la forme `context.onEvent`, que `governedAgentTool` et `cognitiveAgentTool` transmettent à leur agent (un agent construit à la main sur un magasin sans événements en direct s'exécute sans lui). `signal` met fin à l'attente |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void` : tous les événements de toutes les exécutions qui correspondent au filtre (`agentId` est `metadata.agentId`), jusqu'à ce que vous appeliez la fonction renvoyée, qui abandonne les événements pas encore transmis |
+| `new ObservedEventStore(store, { onListenerError? })` | La couche qui les transmet ; le SDK enveloppe son magasin dans une telle couche, ou utilise celle que vous passez comme `eventStore`, y compris à l'intérieur d'un `MonitoredEventStore` (dont les rapports d'incident sont alors transmis eux aussi). Son `subscribe(listener, options?)` renvoie `{ unsubscribe(), close() }` : `close()` attend que l'écouteur ait fini de traiter les événements qu'il a déjà pris en charge. `onListenerError` reçoit les erreurs des écouteurs et les abandons |
 
 ## Outils : `ToolDefinition` {#tools-tooldefinition}
 

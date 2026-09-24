@@ -193,16 +193,16 @@ interface ModelCostLine {
 
 ## Live events
 
-A listener is `(event: Event) => void | Promise<void>`. It gets one event at a time, in the order of each run, once the store has accepted it; a promise it returns is awaited before its next event. Runs never wait for it, and its errors are reported, never thrown into the run. See [Live progress](../guide/observability#live-progress).
+A listener is `(event: Event) => unknown`. It gets one event at a time, in the order of each run, once the store has accepted it; a promise it returns is awaited before its next event. Runs never wait for it, and its errors are reported, never thrown into the run. At most `maxQueued` events (10 000 by default) wait for it; past that, new ones are dropped for it and reported with a `LiveEventsDroppedError`. See [Live progress](../guide/observability#live-progress).
 
 | API | |
 | --- | --- |
-| `RunInput.onEvent`: `agent.run({ message, onEvent })` | Every event of the run; `run()` resolves once the listener has settled on each of them. The listener is not recorded |
-| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | The same for a cognitive run |
-| `replay(runId, modifications?, { onEvent })` | The same for a replay |
-| `executeTool(name, params, { onEvent })` | The events of the call, and of the runs its tool starts: the handler gets the listener as `context.onEvent`, which `governedAgentTool` and `cognitiveAgentTool` pass to their agent |
-| `subscribe(listener, { runId?, agentId?, types? })` | `() => void`: every event of every run that matches the filter (`agentId` is `metadata.agentId`), until you call the returned function, which drops the events not yet delivered |
-| `new ObservedEventStore(store, { onListenerError? })` | The layer that delivers them; the SDK wraps its store in one, or uses the one you give as `eventStore`. Its `subscribe(listener, filter?)` returns `{ unsubscribe(), close() }`: `close()` waits until the listener has settled on the events it already took |
+| `RunInput.onEvent`: `agent.run({ message, onEvent })` | Every event of the run; `run()` resolves once the listener has settled on each of them, or earlier when the run was stopped or cancelled or `signal` aborts (the listener is then unsubscribed). The listener is not recorded |
+| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | The same for a cognitive run, whose `limits.timeoutMs` also ends the wait |
+| `replay(runId, modifications?, { onEvent })` | The same for a replay, which cannot be cancelled: it always waits |
+| `executeTool(name, params, { onEvent })` | The events of the call, and of the runs its tool starts, one level deep: the handler gets the listener as `context.onEvent`, which `governedAgentTool` and `cognitiveAgentTool` pass to their agent (an agent built by hand on a store without live events runs without it). `signal` ends the wait |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: every event of every run that matches the filter (`agentId` is `metadata.agentId`), until you call the returned function, which drops the events not yet delivered |
+| `new ObservedEventStore(store, { onListenerError? })` | The layer that delivers them; the SDK wraps its store in one, or uses the one you give as `eventStore`, also inside a `MonitoredEventStore` (whose incident reports are then delivered too). Its `subscribe(listener, options?)` returns `{ unsubscribe(), close() }`: `close()` waits until the listener has settled on the events it already took. `onListenerError` gets listener errors and drops |
 
 ## Tools: `ToolDefinition`
 

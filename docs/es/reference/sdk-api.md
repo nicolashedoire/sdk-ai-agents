@@ -193,16 +193,16 @@ interface ModelCostLine {
 
 ## Eventos en tiempo real {#live-events}
 
-Un listener es `(event: Event) => void | Promise<void>`. Recibe los eventos de uno en uno, en el orden de cada ejecución, una vez que el almacén los ha aceptado; una promesa que devuelva se espera antes de su siguiente evento. Las ejecuciones nunca lo esperan, y sus errores se notifican, nunca se lanzan dentro de la ejecución. Consulta [Progreso en tiempo real](../guide/observability#live-progress).
+Un listener es `(event: Event) => unknown`. Recibe los eventos de uno en uno, en el orden de cada ejecución, una vez que el almacén los ha aceptado; una promesa que devuelva se espera antes de su siguiente evento. Las ejecuciones nunca lo esperan, y sus errores se notifican, nunca se lanzan dentro de la ejecución. Como máximo `maxQueued` eventos (10 000 por defecto) lo esperan; por encima de esa cifra, los nuevos se descartan para él y se notifican con un `LiveEventsDroppedError`. Consulta [Progreso en tiempo real](../guide/observability#live-progress).
 
 | API | |
 | --- | --- |
-| `RunInput.onEvent`: `agent.run({ message, onEvent })` | Todos los eventos de la ejecución; `run()` se resuelve una vez que el listener ha terminado con cada uno de ellos. El listener no se guarda en el registro de eventos |
-| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | Lo mismo para una ejecución cognitiva |
-| `replay(runId, modifications?, { onEvent })` | Lo mismo para una repetición |
-| `executeTool(name, params, { onEvent })` | Los eventos de la llamada, y los de las ejecuciones que inicia su herramienta: el manejador recibe el listener como `context.onEvent`, que `governedAgentTool` y `cognitiveAgentTool` pasan a su agente |
-| `subscribe(listener, { runId?, agentId?, types? })` | `() => void`: todos los eventos de todas las ejecuciones que coinciden con el filtro (`agentId` es `metadata.agentId`), hasta que llamas a la función devuelta, que descarta los eventos aún no entregados |
-| `new ObservedEventStore(store, { onListenerError? })` | La capa que los entrega; el SDK envuelve su almacén en una, o usa la que pases como `eventStore`. Su `subscribe(listener, filter?)` devuelve `{ unsubscribe(), close() }`: `close()` espera a que el listener haya terminado con los eventos que ya tomó |
+| `RunInput.onEvent`: `agent.run({ message, onEvent })` | Todos los eventos de la ejecución; `run()` se resuelve una vez que el listener ha terminado con cada uno de ellos, o antes si la ejecución se detuvo o se canceló o si `signal` se aborta (entonces se cancela la suscripción del listener). El listener no se guarda en el registro de eventos |
+| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | Lo mismo para una ejecución cognitiva, cuyo `limits.timeoutMs` también termina la espera |
+| `replay(runId, modifications?, { onEvent })` | Lo mismo para una repetición, que no se puede cancelar: siempre espera |
+| `executeTool(name, params, { onEvent })` | Los eventos de la llamada, y los de las ejecuciones que inicia su herramienta, a un solo nivel de profundidad: el manejador recibe el listener como `context.onEvent`, que `governedAgentTool` y `cognitiveAgentTool` pasan a su agente (un agente construido a mano sobre un almacén sin eventos en tiempo real se ejecuta sin él). `signal` termina la espera |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: todos los eventos de todas las ejecuciones que coinciden con el filtro (`agentId` es `metadata.agentId`), hasta que llamas a la función devuelta, que descarta los eventos aún no entregados |
+| `new ObservedEventStore(store, { onListenerError? })` | La capa que los entrega; el SDK envuelve su almacén en una, o usa la que pases como `eventStore`, también dentro de un `MonitoredEventStore` (cuyos informes de incidentes se entregan entonces también). Su `subscribe(listener, options?)` devuelve `{ unsubscribe(), close() }`: `close()` espera a que el listener haya terminado con los eventos que ya tomó. `onListenerError` recibe los errores de los listeners y los descartes de eventos |
 
 ## Herramientas: `ToolDefinition` {#tools-tooldefinition}
 

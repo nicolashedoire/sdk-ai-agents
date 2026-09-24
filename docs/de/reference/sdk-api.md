@@ -193,16 +193,16 @@ interface ModelCostLine {
 
 ## Live-Ereignisse {#live-events}
 
-Ein Listener ist `(event: Event) => void | Promise<void>`. Er erhält ein Ereignis nach dem anderen, in der Reihenfolge jedes Laufs, sobald der Speicher es angenommen hat; auf ein Promise, das er zurückgibt, wird vor seinem nächsten Ereignis gewartet. Läufe warten nie auf ihn, und seine Fehler werden gemeldet, nie in den Lauf geworfen. Siehe [Live-Fortschritt](../guide/observability#live-progress).
+Ein Listener ist `(event: Event) => unknown`. Er erhält ein Ereignis nach dem anderen, in der Reihenfolge jedes Laufs, sobald der Speicher es angenommen hat; auf ein Promise, das er zurückgibt, wird vor seinem nächsten Ereignis gewartet. Läufe warten nie auf ihn, und seine Fehler werden gemeldet, nie in den Lauf geworfen. Höchstens `maxQueued` Ereignisse (standardmäßig 10 000) warten auf ihn; darüber hinaus werden neue für ihn verworfen und mit einem `LiveEventsDroppedError` gemeldet. Siehe [Live-Fortschritt](../guide/observability#live-progress).
 
 | API | |
 | --- | --- |
-| `RunInput.onEvent`: `agent.run({ message, onEvent })` | Jedes Ereignis des Laufs; `run()` wird erst aufgelöst, wenn der Listener jedes davon fertig verarbeitet hat. Der Listener wird nicht aufgezeichnet |
-| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | Dasselbe für einen kognitiven Lauf |
-| `replay(runId, modifications?, { onEvent })` | Dasselbe für ein Replay |
-| `executeTool(name, params, { onEvent })` | Die Ereignisse des Aufrufs und der Läufe, die sein Tool startet: Der Handler erhält den Listener als `context.onEvent`, den `governedAgentTool` und `cognitiveAgentTool` an ihren Agenten weitergeben |
-| `subscribe(listener, { runId?, agentId?, types? })` | `() => void`: jedes Ereignis jedes Laufs, der zum Filter passt (`agentId` ist `metadata.agentId`), bis Sie die zurückgegebene Funktion aufrufen, die die noch nicht zugestellten Ereignisse verwirft |
-| `new ObservedEventStore(store, { onListenerError? })` | Die Schicht, die sie zustellt; das SDK wickelt seinen Speicher in eine solche oder verwendet die, die Sie als `eventStore` übergeben. Ihr `subscribe(listener, filter?)` gibt `{ unsubscribe(), close() }` zurück: `close()` wartet, bis der Listener die Ereignisse, die er bereits übernommen hat, fertig verarbeitet hat |
+| `RunInput.onEvent`: `agent.run({ message, onEvent })` | Jedes Ereignis des Laufs; `run()` wird aufgelöst, sobald der Listener jedes davon fertig verarbeitet hat, oder früher, wenn der Lauf angehalten oder abgebrochen wurde oder `signal` abgebrochen wird (der Listener wird dann abgemeldet). Der Listener wird nicht aufgezeichnet |
+| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | Dasselbe für einen kognitiven Lauf, dessen `limits.timeoutMs` das Warten ebenfalls beendet |
+| `replay(runId, modifications?, { onEvent })` | Dasselbe für ein Replay, das nicht abgebrochen werden kann: Es wartet immer |
+| `executeTool(name, params, { onEvent })` | Die Ereignisse des Aufrufs und der Läufe, die sein Tool startet, eine Ebene tief: Der Handler erhält den Listener als `context.onEvent`, den `governedAgentTool` und `cognitiveAgentTool` an ihren Agenten weitergeben (ein von Hand auf einem Speicher ohne Live-Ereignisse gebauter Agent läuft ohne ihn). `signal` beendet das Warten |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: jedes Ereignis jedes Laufs, der zum Filter passt (`agentId` ist `metadata.agentId`), bis Sie die zurückgegebene Funktion aufrufen, die die noch nicht zugestellten Ereignisse verwirft |
+| `new ObservedEventStore(store, { onListenerError? })` | Die Schicht, die sie zustellt; das SDK wickelt seinen Speicher in eine solche oder verwendet die, die Sie als `eventStore` übergeben, auch innerhalb eines `MonitoredEventStore` (dessen Incident-Meldungen dann ebenfalls zugestellt werden). Ihr `subscribe(listener, options?)` gibt `{ unsubscribe(), close() }` zurück: `close()` wartet, bis der Listener die Ereignisse, die er bereits übernommen hat, fertig verarbeitet hat. `onListenerError` erhält die Fehler der Listener und die Meldungen über verworfene Ereignisse |
 
 ## Tools: `ToolDefinition` {#tools-tooldefinition}
 

@@ -193,16 +193,16 @@ interface ModelCostLine {
 
 ## الأحداث المباشرة {#live-events}
 
-المستمِع (listener) هو `(event: Event) => void | Promise<void>`. يتلقّى حدثًا واحدًا في كل مرة، بترتيب كل تشغيل، بمجرّد أن يقبله المخزن؛ ويُنتظَر الوعد الذي يعيده قبل حدثه التالي. لا تنتظره عمليات التشغيل أبدًا، ويُبلَّغ عن أخطائه، ولا تُرمى أبدًا داخل التشغيل. انظر [التقدّم المباشر](../guide/observability#live-progress).
+المستمِع (listener) هو `(event: Event) => unknown`. يتلقّى حدثًا واحدًا في كل مرة، بترتيب كل تشغيل، بمجرّد أن يقبله المخزن؛ ويُنتظَر الوعد الذي يعيده قبل حدثه التالي. لا تنتظره عمليات التشغيل أبدًا، ويُبلَّغ عن أخطائه، ولا تُرمى أبدًا داخل التشغيل. ولا ينتظره إلا `maxQueued` حدثًا على الأكثر (10 000 افتراضيًا)؛ وبعد ذلك تُسقَط الأحداث الجديدة بالنسبة إليه ويُبلَّغ عنها بخطأ `LiveEventsDroppedError`. انظر [التقدّم المباشر](../guide/observability#live-progress).
 
 | الواجهة | |
 | --- | --- |
-| `RunInput.onEvent`: `agent.run({ message, onEvent })` | كل حدث من أحداث التشغيل؛ ولا تعيد `run()` نتيجتها إلا بعد أن يفرغ المستمِع من كل واحد منها. والمستمِع نفسه لا يُسجَّل |
-| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | الشيء نفسه لتشغيل معرفي |
-| `replay(runId, modifications?, { onEvent })` | الشيء نفسه لإعادة تشغيل |
-| `executeTool(name, params, { onEvent })` | أحداث الاستدعاء، وأحداث عمليات التشغيل التي تبدؤها أداته: يتلقّى المعالج المستمِع بوصفه `context.onEvent`، وتمرّره `governedAgentTool` و`cognitiveAgentTool` إلى وكيلهما |
-| `subscribe(listener, { runId?, agentId?, types? })` | `() => void`: كل حدث من كل تشغيل يطابق المرشِّح (`agentId` هو `metadata.agentId`)، إلى أن تستدعي الدالة المُعادة، التي تُسقِط الأحداث التي لم تُسلَّم بعد |
-| `new ObservedEventStore(store, { onListenerError? })` | الطبقة التي تسلّم الأحداث؛ تغلّف حزمة SDK مخزنها بواحدة منها، أو تستخدم تلك التي تعطيها بوصفها `eventStore`. وتعيد `subscribe(listener, filter?)` الخاصة بها `{ unsubscribe(), close() }`: تنتظر `close()` إلى أن يفرغ المستمِع من الأحداث التي أخذها بالفعل |
+| `RunInput.onEvent`: `agent.run({ message, onEvent })` | كل حدث من أحداث التشغيل؛ ولا تعيد `run()` نتيجتها إلا بعد أن يفرغ المستمِع من كل واحد منها، أو قبل ذلك حين يكون التشغيل قد أُوقِف أو أُلغي أو حين يُلغى `signal` (ويُلغى عندئذٍ اشتراك المستمِع). والمستمِع نفسه لا يُسجَّل |
+| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | الشيء نفسه لتشغيل معرفي، تُنهي `limits.timeoutMs` الخاصة به الانتظارَ أيضًا |
+| `replay(runId, modifications?, { onEvent })` | الشيء نفسه لإعادة تشغيل، وهي لا يمكن إلغاؤها: فتنتظر دائمًا |
+| `executeTool(name, params, { onEvent })` | أحداث الاستدعاء، وأحداث عمليات التشغيل التي تبدؤها أداته، على مستوى واحد فقط: يتلقّى المعالج المستمِع بوصفه `context.onEvent`، وتمرّره `governedAgentTool` و`cognitiveAgentTool` إلى وكيلهما (أما الوكيل المبني يدويًا على مخزن دون أحداث مباشرة فيعمل من دونه). ويُنهي `signal` الانتظار |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: كل حدث من كل تشغيل يطابق المرشِّح (`agentId` هو `metadata.agentId`)، إلى أن تستدعي الدالة المُعادة، التي تُسقِط الأحداث التي لم تُسلَّم بعد |
+| `new ObservedEventStore(store, { onListenerError? })` | الطبقة التي تسلّم الأحداث؛ تغلّف حزمة SDK مخزنها بواحدة منها، أو تستخدم تلك التي تعطيها بوصفها `eventStore`، حتى داخل `MonitoredEventStore` (فتُسلَّم عندئذٍ تقارير الحوادث الخاصة به أيضًا). وتعيد `subscribe(listener, options?)` الخاصة بها `{ unsubscribe(), close() }`: تنتظر `close()` إلى أن يفرغ المستمِع من الأحداث التي أخذها بالفعل. ويتلقّى `onListenerError` أخطاء المستمِعات وحالات الإسقاط |
 
 ## الأدوات: `ToolDefinition` {#tools-tooldefinition}
 

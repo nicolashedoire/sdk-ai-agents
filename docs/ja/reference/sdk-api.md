@@ -193,16 +193,16 @@ interface ModelCostLine {
 
 ## リアルタイムのイベント {#live-events}
 
-リスナーは `(event: Event) => void | Promise<void>` です。リスナーはイベントを、ストアが受け付けた後で、1 つずつ、各実行の順番どおりに受け取ります。リスナーが Promise を返すと、次のイベントの前にその Promise が待たれます。実行がリスナーを待つことは決してなく、リスナーのエラーは報告されるだけで、実行の中に投げられることはありません。[リアルタイムの進捗](../guide/observability#live-progress) を参照してください。
+リスナーは `(event: Event) => unknown` です。リスナーはイベントを、ストアが受け付けた後で、1 つずつ、各実行の順番どおりに受け取ります。リスナーが Promise を返すと、次のイベントの前にその Promise が待たれます。実行がリスナーを待つことは決してなく、リスナーのエラーは報告されるだけで、実行の中に投げられることはありません。リスナーを待てるイベントは最大 `maxQueued` 個（デフォルトは 10 000）です。それを超えると、新しいイベントはそのリスナーについては破棄され、`LiveEventsDroppedError` で報告されます。[リアルタイムの進捗](../guide/observability#live-progress) を参照してください。
 
 | API | |
 | --- | --- |
-| `RunInput.onEvent`：`agent.run({ message, onEvent })` | 実行のすべてのイベント。`run()` は、リスナーがそのそれぞれの処理を終えた後に解決される。リスナーは記録されない |
-| `ThinkInput.onEvent`：`agent.think({ problem, onEvent })` | 認知エージェントの実行について同じ |
-| `replay(runId, modifications?, { onEvent })` | リプレイについて同じ |
-| `executeTool(name, params, { onEvent })` | 呼び出しのイベントと、そのツールが開始する実行のイベント。ハンドラーはリスナーを `context.onEvent` として受け取り、`governedAgentTool` と `cognitiveAgentTool` はそれを自分のエージェントに渡す |
-| `subscribe(listener, { runId?, agentId?, types? })` | `() => void`：フィルターに一致するすべての実行のすべてのイベント（`agentId` は `metadata.agentId`）。返された関数を呼び出すまで続き、その関数を呼び出すと、まだ配信されていないイベントは破棄される |
-| `new ObservedEventStore(store, { onListenerError? })` | イベントを配信する層。SDK は自分のストアをこれでラップするか、`eventStore` として渡されたものを使う。その `subscribe(listener, filter?)` は `{ unsubscribe(), close() }` を返す。`close()` は、リスナーがすでに受け取ったイベントの処理を終えるまで待つ |
+| `RunInput.onEvent`：`agent.run({ message, onEvent })` | 実行のすべてのイベント。`run()` は、リスナーがそのそれぞれの処理を終えた後に解決される。ただし、実行が停止またはキャンセルされたとき、または `signal` が中断されたときは、それより早く解決される（そのときリスナーの購読は解除される）。リスナーは記録されない |
+| `ThinkInput.onEvent`：`agent.think({ problem, onEvent })` | 認知エージェントの実行について同じ。その `limits.timeoutMs` でも待機が終わる |
+| `replay(runId, modifications?, { onEvent })` | リプレイについて同じ。リプレイはキャンセルできないので、必ず待つ |
+| `executeTool(name, params, { onEvent })` | 呼び出しのイベントと、そのツールが開始する実行のイベント（1 階層分まで）。ハンドラーはリスナーを `context.onEvent` として受け取り、`governedAgentTool` と `cognitiveAgentTool` はそれを自分のエージェントに渡す（リアルタイムのイベントに対応していないストアの上に手作業で組み立てたエージェントは、リスナーなしで動く）。`signal` で待機が終わる |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`：フィルターに一致するすべての実行のすべてのイベント（`agentId` は `metadata.agentId`）。返された関数を呼び出すまで続き、その関数を呼び出すと、まだ配信されていないイベントは破棄される |
+| `new ObservedEventStore(store, { onListenerError? })` | イベントを配信する層。SDK は自分のストアをこれでラップするか、`eventStore` として渡されたものを使う（`MonitoredEventStore` の中にあるものも含む。その場合、そのインシデント報告も配信される）。その `subscribe(listener, options?)` は `{ unsubscribe(), close() }` を返す。`close()` は、リスナーがすでに受け取ったイベントの処理を終えるまで待つ。`onListenerError` は、リスナーのエラーとイベントの破棄を受け取る |
 
 ## ツール：`ToolDefinition` {#tools-tooldefinition}
 
