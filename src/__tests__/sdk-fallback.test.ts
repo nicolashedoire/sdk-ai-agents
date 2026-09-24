@@ -1,328 +1,252 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createSDK } from '../sdk.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { LLMProviderError } from '../errors/index.js';
+import { createSDK, type SDK } from '../sdk.js';
 import { FileEventStore } from '../stores/file-event-store.js';
-import { z } from 'zod';
+import type { SDKConfig } from '../types/sdk.js';
+import { LocalHttpServer } from './support/local-http-server.js';
+import { anthropicError, anthropicMessage, openAIChat, openAIError } from './support/vendor-api.js';
 
-// Mock OpenAI
-const mockOpenAICreate = vi.fn();
-vi.mock('openai', () => {
-  return {
-    default: class MockOpenAI {
-      chat = {
-        completions: {
-          create: mockOpenAICreate,
-        },
-      };
-    },
-  };
-});
+type FallbackConfig = NonNullable<SDKConfig['fallbackProviders']>[number];
 
-// Mock Anthropic
-const mockAnthropicCreate = vi.fn();
-vi.mock('@anthropic-ai/sdk', () => {
-  return {
-    default: class MockAnthropic {
-      messages = {
-        create: mockAnthropicCreate,
-      };
-    },
-  };
-});
-
+// The real SDK, adapters and vendor clients talk to local servers answering in each vendor's
+// wire format. The SDK's own retry policy is disabled unless a test is about retries.
 describe('SDK with Fallback Providers', () => {
+  let openai: LocalHttpServer;
+  let anthropic: LocalHttpServer;
+  let openaiURL: string;
+  let anthropicURL: string;
+  let directory: string;
   let eventStore: FileEventStore;
 
-  beforeEach(() => {
-    eventStore = new FileEventStore();
-    mockOpenAICreate.mockClear();
-    mockAnthropicCreate.mockClear();
+  beforeEach(async () => {
+    openai = new LocalHttpServer();
+    anthropic = new LocalHttpServer();
+    // The OpenAI client posts to `${baseURL}/chat/completions`, Anthropic to `${baseURL}/v1/messages`.
+    [openaiURL, anthropicURL] = await Promise.all([
+      openai.start().then((address) => `${address}/v1`),
+      anthropic.start(),
+    ]);
+    directory = mkdtempSync(join(tmpdir(), 'sdk-fallback-'));
+    eventStore = new FileEventStore(join(directory, 'events'));
   });
 
+  afterEach(async () => {
+    await Promise.all([openai.stop(), anthropic.stop()]);
+    await eventStore.destroy();
+    rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
+  });
+
+  const anthropicFallback = (): FallbackConfig => ({
+    provider: 'anthropic',
+    config: { apiKey: 'test-anthropic-key', baseURL: anthropicURL },
+  });
+
+  function buildSDK(config: Partial<SDKConfig> = {}): SDK {
+    return createSDK({
+      apiKey: 'test-openai-key',
+      provider: 'openai',
+      providerConfig: { openai: { baseURL: openaiURL } },
+      fallbackProviders: [anthropicFallback()],
+      retry: { maxRetries: 0 },
+      eventStore,
+      ...config,
+    });
+  }
+
+  function runAgent(sdk: SDK) {
+    const agent = sdk.createAgent({ name: 'test-agent', model: 'gpt-4', maxSteps: 1 });
+    return agent.run({ message: 'Hello' });
+  }
+
+  async function eventsOf(sdk: SDK, runId: string, type: string) {
+    return (await sdk.getEvents(runId)).filter((event) => event.type === type);
+  }
+
   describe('createSDK with fallback', () => {
-    it('should create SDK with fallback providers configured', () => {
-      const sdk = createSDK({
-        apiKey: 'test-key',
-        provider: 'openai',
-        fallbackProviders: [
-          {
-            provider: 'anthropic',
-            config: {
-              apiKey: 'anthropic-key',
-            },
-          },
-        ],
-        eventStore,
-      });
+    it('should create SDK with fallback providers configured, without calling any vendor', () => {
+      const sdk = buildSDK();
 
       expect(sdk).toBeDefined();
+      expect(openai.requests).toHaveLength(0);
+      expect(anthropic.requests).toHaveLength(0);
     });
 
     it('should use primary provider when it succeeds', async () => {
-      const mockResponse = {
-        id: 'chatcmpl-123',
-        object: 'chat.completion',
-        created: 1234567890,
+      openai.reply(openAIChat({ content: 'Hello from OpenAI' }));
+      anthropic.reply(anthropicMessage({ text: ['Hello from Anthropic'] }));
+      const sdk = buildSDK();
+
+      const result = await runAgent(sdk);
+
+      expect(result).toMatchObject({ status: 'completed', output: 'Hello from OpenAI' });
+      expect(openai.requests).toHaveLength(1);
+      expect(openai.requests[0]?.url).toBe('/v1/chat/completions');
+      expect(openai.requests[0]?.headers.authorization).toBe('Bearer test-openai-key');
+      expect(openai.jsonBody(0)).toMatchObject({
         model: 'gpt-4',
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: 'assistant' as const,
-              content: 'Hello from OpenAI',
-            },
-            finish_reason: 'stop' as const,
-          },
-        ],
-        usage: {
-          prompt_tokens: 10,
-          completion_tokens: 5,
-          total_tokens: 15,
-        },
-      };
-
-      mockOpenAICreate.mockResolvedValue(mockResponse);
-
-      const sdk = createSDK({
-        apiKey: 'test-key',
-        provider: 'openai',
-        fallbackProviders: [
-          {
-            provider: 'anthropic',
-            config: {
-              apiKey: 'anthropic-key',
-            },
-          },
-        ],
-        eventStore,
+        messages: [{ role: 'user', content: 'Hello' }],
       });
-
-      const agent = sdk.createAgent({
-        name: 'test-agent',
-        model: 'gpt-4',
-        maxSteps: 1,
-      });
-
-      const result = await agent.run({ message: 'Hello' });
-
-      expect(result.status).toBe('completed');
-      expect(mockOpenAICreate).toHaveBeenCalledTimes(1);
-      expect(mockAnthropicCreate).not.toHaveBeenCalled();
+      expect(anthropic.requests).toHaveLength(0);
+      expect(await eventsOf(sdk, result.runId, 'provider.fallback')).toEqual([]);
     });
 
     it('should fallback to secondary provider when primary fails', async () => {
-      // Primary provider fails
-      mockOpenAICreate.mockRejectedValue(new Error('OpenAI API error'));
+      openai.reply(openAIError(500, 'The server had an error'));
+      anthropic.reply(anthropicMessage({ text: ['Hello from Anthropic'] }));
+      const sdk = buildSDK();
 
-      // Fallback provider succeeds
-      const mockAnthropicResponse = {
-        id: 'msg-123',
-        type: 'message' as const,
-        role: 'assistant' as const,
-        content: [
-          {
-            type: 'text' as const,
-            text: 'Hello from Anthropic',
-          },
-        ],
-        model: 'claude-3-opus-20240229',
-        stop_reason: 'end_turn' as const,
-        stop_sequence: null,
-        usage: {
-          input_tokens: 10,
-          output_tokens: 5,
-        },
-      };
+      const result = await runAgent(sdk);
 
-      mockAnthropicCreate.mockResolvedValue(mockAnthropicResponse);
-
-      const sdk = createSDK({
-        apiKey: 'test-key',
-        provider: 'openai',
-        fallbackProviders: [
-          {
-            provider: 'anthropic',
-            config: {
-              apiKey: 'anthropic-key',
-            },
-          },
-        ],
-        eventStore,
+      expect(result).toMatchObject({ status: 'completed', output: 'Hello from Anthropic' });
+      expect(openai.requests).toHaveLength(1);
+      expect(anthropic.requests).toHaveLength(1);
+      expect(anthropic.requests[0]?.url).toBe('/v1/messages');
+      expect(anthropic.requests[0]?.headers['x-api-key']).toBe('test-anthropic-key');
+      // The conversation is translated to the Anthropic format. The model forwarded to the
+      // fallback vendor is deliberately not asserted: FallbackProvider passes the agent's model
+      // through unchanged, which is under review.
+      expect(anthropic.jsonBody(0)).toMatchObject({
+        messages: [{ role: 'user', content: 'Hello' }],
+        max_tokens: 4096,
       });
+    });
 
-      const agent = sdk.createAgent({
-        name: 'test-agent',
-        model: 'gpt-4',
-        maxSteps: 1,
-      });
+    it('should fallback when the primary vendor cannot be reached', async () => {
+      await openai.stop();
+      anthropic.reply(anthropicMessage({ text: ['Hello from Anthropic'] }));
+      const sdk = buildSDK();
 
-      const result = await agent.run({ message: 'Hello' });
+      const result = await runAgent(sdk);
 
-      expect(result.status).toBe('completed');
-      expect(result.output).toContain('Hello from Anthropic');
-      expect(mockOpenAICreate).toHaveBeenCalledTimes(1);
-      expect(mockAnthropicCreate).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({ status: 'completed', output: 'Hello from Anthropic' });
+      expect(openai.requests).toHaveLength(0);
+      expect(anthropic.requests).toHaveLength(1);
     });
 
     it('should log fallback event when fallback is used', async () => {
-      // Primary provider fails
-      mockOpenAICreate.mockRejectedValue(new Error('OpenAI API error'));
+      openai.reply(openAIError(500, 'The server had an error'));
+      anthropic.reply(anthropicMessage({ text: ['Hello from Anthropic'] }));
+      const sdk = buildSDK();
 
-      // Fallback provider succeeds
-      const mockAnthropicResponse = {
-        id: 'msg-123',
-        type: 'message' as const,
-        role: 'assistant' as const,
-        content: [
-          {
-            type: 'text' as const,
-            text: 'Hello from Anthropic',
-          },
-        ],
-        model: 'claude-3-opus-20240229',
-        stop_reason: 'end_turn' as const,
-        stop_sequence: null,
-        usage: {
-          input_tokens: 10,
-          output_tokens: 5,
-        },
-      };
-
-      mockAnthropicCreate.mockResolvedValue(mockAnthropicResponse);
-
-      const sdk = createSDK({
-        apiKey: 'test-key',
-        provider: 'openai',
-        fallbackProviders: [
-          {
-            provider: 'anthropic',
-            config: {
-              apiKey: 'anthropic-key',
-            },
-          },
-        ],
-        eventStore,
-      });
-
-      const agent = sdk.createAgent({
-        name: 'test-agent',
-        model: 'gpt-4',
-        maxSteps: 1,
-      });
-
-      const result = await agent.run({ message: 'Hello' });
+      const result = await runAgent(sdk);
       expect(result.status).toBe('completed');
 
-      // Check that fallback event was logged
-      const events = await sdk.getEvents(result.runId);
-      const fallbackEvents = events.filter((e) => e.type === 'provider.fallback');
-
-      expect(fallbackEvents.length).toBeGreaterThan(0);
-      expect(fallbackEvents[0].data).toMatchObject({
+      const fallbackEvents = await eventsOf(sdk, result.runId, 'provider.fallback');
+      expect(fallbackEvents).toHaveLength(1);
+      expect(fallbackEvents[0]?.data).toEqual({
         primaryProvider: 'openai',
         usedProvider: 'anthropic',
+        attemptedProviders: ['openai', 'anthropic'],
       });
-      expect(fallbackEvents[0].data.attemptedProviders).toContain('openai');
-      expect(fallbackEvents[0].data.attemptedProviders).toContain('anthropic');
     });
 
     it('should try all fallback providers in order', async () => {
-      // Primary fails
-      mockOpenAICreate.mockRejectedValueOnce(new Error('OpenAI API error'));
-
-      // First fallback fails
-      mockAnthropicCreate.mockRejectedValueOnce(new Error('Anthropic API error'));
-
-      // Second fallback succeeds (OpenAI as fallback)
-      const mockResponse = {
-        id: 'chatcmpl-123',
-        object: 'chat.completion',
-        created: 1234567890,
-        model: 'gpt-4',
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: 'assistant' as const,
-              content: 'Hello from OpenAI fallback',
+      // One local gateway serves the three endpoints, so its journal records the global order
+      // of the calls. Replies are consumed in that order, each in its vendor's format.
+      const gateway = new LocalHttpServer();
+      const address = await gateway.start();
+      try {
+        gateway.reply(
+          openAIError(500, 'Primary OpenAI is down'),
+          anthropicError(529, 'Overloaded'),
+          openAIChat({ content: 'Hello from OpenAI fallback' })
+        );
+        const sdk = buildSDK({
+          providerConfig: { openai: { baseURL: `${address}/primary/v1` } },
+          fallbackProviders: [
+            {
+              provider: 'anthropic',
+              config: { apiKey: 'test-anthropic-key', baseURL: `${address}/anthropic` },
             },
-            finish_reason: 'stop' as const,
-          },
-        ],
-        usage: {
-          prompt_tokens: 10,
-          completion_tokens: 5,
-          total_tokens: 15,
-        },
-      };
-
-      // Mock will be called again for the second fallback (OpenAI)
-      mockOpenAICreate.mockResolvedValueOnce(mockResponse);
-
-      const sdk = createSDK({
-        apiKey: 'test-key',
-        provider: 'openai',
-        fallbackProviders: [
-          {
-            provider: 'anthropic',
-            config: {
-              apiKey: 'anthropic-key',
+            {
+              provider: 'openai',
+              config: { apiKey: 'openai-fallback-key', baseURL: `${address}/secondary/v1` },
             },
-          },
-          {
-            provider: 'openai',
-            config: {
-              apiKey: 'openai-fallback-key',
-            },
-          },
-        ],
-        eventStore,
-      });
+          ],
+        });
 
-      const agent = sdk.createAgent({
-        name: 'test-agent',
-        model: 'gpt-4',
-        maxSteps: 1,
-      });
+        const result = await runAgent(sdk);
 
-      const result = await agent.run({ message: 'Hello' });
-
-      expect(result.status).toBe('completed');
-      // Primary called once (failed), second fallback (OpenAI) called once (succeeded)
-      // Note: Since both use the same mock, we can't distinguish, but we know it was called at least twice
-      expect(mockOpenAICreate).toHaveBeenCalledTimes(2); // Primary + second fallback
-      expect(mockAnthropicCreate).toHaveBeenCalledTimes(1); // First fallback
+        expect(result).toMatchObject({ status: 'completed', output: 'Hello from OpenAI fallback' });
+        expect(
+          gateway.requests.map((request) => ({
+            url: request.url,
+            key: request.headers.authorization ?? request.headers['x-api-key'],
+          }))
+        ).toEqual([
+          { url: '/primary/v1/chat/completions', key: 'Bearer test-openai-key' },
+          { url: '/anthropic/v1/messages', key: 'test-anthropic-key' },
+          { url: '/secondary/v1/chat/completions', key: 'Bearer openai-fallback-key' },
+        ]);
+        const [fallbackEvent] = await eventsOf(sdk, result.runId, 'provider.fallback');
+        expect(fallbackEvent?.data).toEqual({
+          primaryProvider: 'openai',
+          usedProvider: 'openai',
+          attemptedProviders: ['openai', 'anthropic', 'openai'],
+        });
+      } finally {
+        await gateway.stop();
+      }
     });
 
-    it('should fail when all providers fail', async () => {
-      mockOpenAICreate.mockRejectedValue(new Error('OpenAI API error'));
-      mockAnthropicCreate.mockRejectedValue(new Error('Anthropic API error'));
+    it('should fail when all providers fail, reporting the chain and the last vendor error', async () => {
+      openai.reply(openAIError(500, 'The server had an error'));
+      anthropic.reply(anthropicError(529, 'Overloaded'));
+      const sdk = buildSDK();
 
-      const sdk = createSDK({
-        apiKey: 'test-key',
-        provider: 'openai',
-        fallbackProviders: [
-          {
-            provider: 'anthropic',
-            config: {
-              apiKey: 'anthropic-key',
-            },
-          },
-        ],
-        eventStore,
-      });
-
-      const agent = sdk.createAgent({
-        name: 'test-agent',
-        model: 'gpt-4',
-        maxSteps: 1,
-      });
-
-      const result = await agent.run({ message: 'Hello' });
+      const result = await runAgent(sdk);
 
       expect(result.status).toBe('failed');
-      expect(mockOpenAICreate).toHaveBeenCalledTimes(1);
-      expect(mockAnthropicCreate).toHaveBeenCalledTimes(1);
+      expect(openai.requests).toHaveLength(1);
+      expect(anthropic.requests).toHaveLength(1);
+      expect(result.error).toBeInstanceOf(LLMProviderError);
+      expect(result.error).toMatchObject({
+        provider: 'openai -> anthropic',
+        retryable: true,
+        message: expect.stringContaining('All providers failed (attempted: openai -> anthropic)'),
+      });
+      expect(result.error?.message).toContain('Overloaded');
+      const [failed] = await eventsOf(sdk, result.runId, 'run.failed');
+      expect(failed?.data.error).toBe(result.error?.message);
+      expect(await eventsOf(sdk, result.runId, 'provider.fallback')).toEqual([]);
+    });
+  });
+
+  describe('retries before failover', () => {
+    it('should retry the primary on a transient error before falling back', async () => {
+      openai.reply(openAIError(503, 'Service unavailable'));
+      anthropic.reply(anthropicMessage({ text: ['Hello from Anthropic'] }));
+      const sdk = buildSDK({
+        retry: { maxRetries: 1, initialDelayMs: 1, maxDelayMs: 1, jitter: false },
+      });
+
+      const result = await runAgent(sdk);
+
+      expect(result).toMatchObject({ status: 'completed', output: 'Hello from Anthropic' });
+      expect(openai.requests).toHaveLength(2);
+      expect(anthropic.requests).toHaveLength(1);
+      const retries = await eventsOf(sdk, result.runId, 'provider.retry');
+      expect(retries).toHaveLength(1);
+      expect(retries[0]?.data).toMatchObject({ provider: 'openai', model: 'gpt-4', retry: 1 });
+      expect(await eventsOf(sdk, result.runId, 'provider.fallback')).toHaveLength(1);
+    });
+
+    it('should fail over at once when the primary rejects the credentials', async () => {
+      openai.reply(openAIError(401, 'Incorrect API key provided'));
+      anthropic.reply(anthropicMessage({ text: ['Hello from Anthropic'] }));
+      const sdk = buildSDK({
+        retry: { maxRetries: 2, initialDelayMs: 1, maxDelayMs: 1, jitter: false },
+      });
+
+      const result = await runAgent(sdk);
+
+      expect(result).toMatchObject({ status: 'completed', output: 'Hello from Anthropic' });
+      expect(openai.requests).toHaveLength(1);
+      expect(anthropic.requests).toHaveLength(1);
+      expect(await eventsOf(sdk, result.runId, 'provider.retry')).toEqual([]);
     });
   });
 });
-

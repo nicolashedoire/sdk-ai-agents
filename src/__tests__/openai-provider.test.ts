@@ -49,7 +49,7 @@ describe('OpenAIProvider', () => {
     it('should send the API key and call the configured address', async () => {
       server.reply(openAIChat({ content: 'OK' }));
 
-      await provider.generateCompletion({ messages: [{ role: 'user', content: 'Hello' }] });
+      await provider.generateCompletion({ model: 'gpt-4', messages: [{ role: 'user', content: 'Hello' }] });
 
       expect(server.requests).toHaveLength(1);
       expect(server.requests[0]?.method).toBe('POST');
@@ -131,6 +131,7 @@ describe('OpenAIProvider', () => {
       server.reply(openAIChat({ content: 'OK' }));
 
       await provider.generateCompletion({
+        model: 'gpt-4',
         messages: [{ role: 'user', content: 'Calculate 1+2' }],
         tools: [calculator],
       });
@@ -153,7 +154,7 @@ describe('OpenAIProvider', () => {
     it('should send neither tools nor tool_choice when there are no tools', async () => {
       server.reply(openAIChat({ content: 'OK' }));
 
-      await provider.generateCompletion({ messages: [{ role: 'user', content: 'Hi' }], tools: [] });
+      await provider.generateCompletion({ model: 'gpt-4', messages: [{ role: 'user', content: 'Hi' }], tools: [] });
 
       const body = server.jsonBody(0) as Record<string, unknown>;
       expect(body).not.toHaveProperty('tools');
@@ -207,7 +208,7 @@ describe('OpenAIProvider', () => {
       const custom = new OpenAIProvider('test-key', 'gpt-3.5-turbo', { baseURL, maxRetries: 0 });
       server.reply(openAIChat({ content: 'OK' }));
 
-      await custom.generateCompletion({ messages: [{ role: 'user', content: 'Hello' }] });
+      await custom.generateCompletion({ model: '', messages: [{ role: 'user', content: 'Hello' }] });
 
       expect(server.jsonBody(0)).toMatchObject({ model: 'gpt-3.5-turbo' });
     });
@@ -231,7 +232,7 @@ describe('OpenAIProvider', () => {
       server.reply(openAIError(401, 'Incorrect API key provided: sk-proj-abcdef123456'));
 
       await expect(
-        provider.generateCompletion({ messages: [{ role: 'user', content: 'Hello' }] })
+        provider.generateCompletion({ model: 'gpt-4', messages: [{ role: 'user', content: 'Hello' }] })
       ).rejects.toThrow('sk-***');
     });
 
@@ -239,7 +240,7 @@ describe('OpenAIProvider', () => {
       await server.stop();
 
       const failure = await provider
-        .generateCompletion({ messages: [{ role: 'user', content: 'Hello' }] })
+        .generateCompletion({ model: 'gpt-4', messages: [{ role: 'user', content: 'Hello' }] })
         .catch((error: unknown) => error);
 
       expect(failure).toBeInstanceOf(LLMProviderError);
@@ -283,6 +284,7 @@ describe('OpenAIProvider', () => {
       server.reply(openAIChat({ content: 'OK' }));
 
       const result = await provider.generateCompletion({
+        model: 'gpt-4',
         messages: [{ role: 'user', content: 'Hello' }],
       });
 

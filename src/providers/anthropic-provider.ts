@@ -151,10 +151,8 @@ export class AnthropicProvider implements LLMProvider {
 
   private wrapError(error: unknown): LLMProviderError {
     if (error instanceof Error) {
-      // Checked with instanceof so it survives minified bundles; guarded for test doubles.
-      const connectionError: unknown = Reflect.get(Anthropic, 'APIConnectionError');
-      const connectionFailure =
-        typeof connectionError === 'function' && error instanceof connectionError;
+      // Checked with instanceof so it survives minified bundles; timeouts are included.
+      const connectionFailure = error instanceof Anthropic.APIConnectionError;
       return new LLMProviderError('anthropic', error, true, { connectionFailure });
     }
     return new LLMProviderError('anthropic', new Error(String(error)), true);
