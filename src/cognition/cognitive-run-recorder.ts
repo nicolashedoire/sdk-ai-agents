@@ -12,8 +12,9 @@ import type { Decision, ThoughtPatch } from './thought-patch.js';
 /**
  * Writes the events of a cognitive run. Keeping the event shapes in one place keeps them
  * aligned with `rebuildMentalState` and `buildControllerDataset`, which read them back.
- * The model calls it records (thoughts, typed decisions) are counted by the run's `meter`:
- * run limits and budgets count what the trace shows and `getRunCost` prices.
+ * Every model call it records (thoughts, typed decisions, operations cut short after billed
+ * attempts, answers a provider discarded) is counted by the run's `meter` as `getRunCost`
+ * reads it, so run limits and budgets count what the run's cost report prices.
  */
 export class CognitiveRunRecorder {
   constructor(
@@ -23,8 +24,12 @@ export class CognitiveRunRecorder {
     private readonly meter?: CognitiveRunMeter
   ) {}
 
-  /** Appends an event and returns its id, so observations can point to their source. */
+  /**
+   * Appends an event and returns its id, so observations can point to their source. The model
+   * calls it records are counted first: a store that fails does not leave them out of budgets.
+   */
   async record(runId: string, type: Event['type'], data: Record<string, unknown>): Promise<string> {
+    await this.meter?.countRecorded({ type, data });
     const profile = this.currentProfile();
     const id = generateEventId();
     await this.eventStore.append(runId, {
@@ -50,14 +55,6 @@ export class CognitiveRunRecorder {
   ): Promise<void> {
     for (const evaluation of evaluations) {
       await this.record(runId, 'decision.evaluated', { step, ...evaluation });
-      // A custom controller or assessor may leave the usage out: the call then has no counts.
-      const { usage } = evaluation as { usage?: DecisionEvaluationRecord['usage'] };
-      await this.meter?.countModelCall({
-        model: evaluation.model,
-        ...(usage
-          ? { usage: { promptTokens: usage.inputTokens, completionTokens: usage.outputTokens } }
-          : {}),
-      });
     }
   }
 
@@ -102,23 +99,6 @@ export class CognitiveRunRecorder {
       ...(outcome.requestedModel ? { requestedModel: outcome.requestedModel } : {}),
       ...(outcome.usage ? { usage: outcome.usage } : {}),
     });
-    // A thought comes from model calls when it reports their usage or the model that answered
-    // (without usage, their token counts are unknown). One with neither made no known call.
-    if (outcome.usage || outcome.model) {
-      await this.meter?.countModelCall({
-        ...(outcome.model ? { model: outcome.model } : {}),
-        ...(outcome.requestedModel ? { requestedModel: outcome.requestedModel } : {}),
-        ...(outcome.usage
-          ? {
-              usage: {
-                promptTokens: outcome.usage.promptTokens,
-                completionTokens: outcome.usage.completionTokens,
-              },
-              calls: outcome.usage.calls,
-            }
-          : {}),
-      });
-    }
   }
 
   async conclusion(runId: string, state: MentalState, decision: Decision): Promise<void> {

@@ -153,7 +153,7 @@ export class AlternativesExtractor {
         const policyData = readPolicyCheck(event.data);
         // A refused tool call is one rejected alternative: the action engine's verdict. The
         // policy engine's event for each policy it checked stands alone only for a step.
-        const verdict = policyData.level === 'verdict' || policyData.intentionType !== 'tool_call';
+        const verdict = policyData.source !== 'policy' || policyData.intentionType !== 'tool_call';
 
         if (policyData.result === 'denied' && verdict) {
           // Policy rejected - this represents a rejected alternative

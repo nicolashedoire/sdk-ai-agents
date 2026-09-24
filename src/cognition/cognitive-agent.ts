@@ -23,7 +23,8 @@ import {
   observationInputSchema,
   type ObservationInput,
 } from './observation-records.js';
-import { toError, truncate, type OperationOutcome } from './operation-outcome.js';
+import { truncate } from '../utils/truncate.js';
+import { toError, type OperationOutcome } from './operation-outcome.js';
 import { OperationPerformer } from './operation-performer.js';
 import { OperationSelector, type CognitiveLimits } from './operation-selector.js';
 import { PredictionTester, type OutcomeEvaluator } from './outcome-evaluator.js';

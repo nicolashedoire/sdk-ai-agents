@@ -102,7 +102,12 @@ export class DecisionService {
       // A store that cannot record it does not replace the client's error.
       const rejected = rejectedDecision(error);
       if (rejected) {
-        await this.record(runId, input, { answers: {}, ...rejected }).catch(() => undefined);
+        await this.record(runId, input, { answers: {}, ...rejected }).catch((failure: unknown) => {
+          console.warn(
+            `The rejected decision of run ${runId} could not be recorded:`,
+            failure instanceof Error ? failure.message : String(failure)
+          );
+        });
       }
       throw error;
     }

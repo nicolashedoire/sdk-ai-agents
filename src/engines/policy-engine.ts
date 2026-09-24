@@ -76,9 +76,7 @@ export class PolicyEngine {
     const input = usage?.promptTokens;
     const output = usage?.completionTokens;
     const tokens = usage?.totalTokens ?? (input ?? 0) + (output ?? 0);
-    // A count a custom component got wrong still counts the call it came with.
-    const calls =
-      call.calls !== undefined && Number.isInteger(call.calls) && call.calls > 0 ? call.calls : 1;
+    const calls = call.calls ?? 1;
     // Without input or output counts (none at all, or a total alone) the cost is unknown.
     if (input === undefined && output === undefined) {
       await this.budgetTracker.recordModelUsage(agentId, { tokens, uncosted: 'no-usage', calls });

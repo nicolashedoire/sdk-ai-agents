@@ -6,7 +6,8 @@ import { HypothesisAssessmentError, type HypothesisAssessor } from './hypothesis
 import type { InformationSeeker } from './information-seeker.js';
 import type { ThoughtGenerator } from './llm-thought-generator.js';
 import type { MentalState } from './mental-state.js';
-import { failureOutcome, toError, truncate, type OperationOutcome } from './operation-outcome.js';
+import { truncate } from '../utils/truncate.js';
+import { failureOutcome, toError, type OperationOutcome } from './operation-outcome.js';
 import type { PredictionTester } from './outcome-evaluator.js';
 import type { CognitiveRunMeter } from './run-meter.js';
 import type { ThinkerProfile } from './thinker-profile.js';

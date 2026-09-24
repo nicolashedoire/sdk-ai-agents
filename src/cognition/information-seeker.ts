@@ -8,7 +8,8 @@ import { nextUnknownToInvestigate } from './cognitive-operations.js';
 import type { ThoughtGenerator } from './llm-thought-generator.js';
 import { activeFacts, type MentalState } from './mental-state.js';
 import { observationFromTool } from './observation-records.js';
-import { failureOutcome, toError, truncate, type OperationOutcome } from './operation-outcome.js';
+import { truncate } from '../utils/truncate.js';
+import { failureOutcome, toError, type OperationOutcome } from './operation-outcome.js';
 import type { CognitiveRunMeter } from './run-meter.js';
 import type { ThinkerProfile } from './thinker-profile.js';
 
@@ -43,7 +44,7 @@ export class InformationSeeker {
     state: MentalState;
     profile: ThinkerProfile;
     signal: AbortSignal;
-    /** The run's progress, and where its tool selection is counted. */
+    /** The run's progress, and where the model calls of its tool selection are counted. */
     meter: CognitiveRunMeter;
   }): Promise<OperationOutcome> {
     const { runId, state, profile, signal, meter } = input;
@@ -52,7 +53,7 @@ export class InformationSeeker {
       return { failure: new Error('no open unknown to investigate') };
     }
 
-    const selection = await this.deps.reasoningEngine.generateStep(
+    const { intention } = await this.deps.reasoningEngine.generateStep(
       {
         runId,
         agentId: this.deps.agentId,
@@ -72,17 +73,14 @@ export class InformationSeeker {
           }`,
         ].join('\n'),
         ...(this.deps.providerSettings ? { providerSettings: this.deps.providerSettings } : {}),
+        // Every answer the vendor billed — this one, as soon as it arrives (also when its tool
+        // arguments are then unreadable), and those a provider discarded — counts in the run's
+        // tokens before the tool call is checked, and in the agent's budgets.
+        onModelUsage: (call) => meter.countModelCall(call),
       },
       this.deps.eventStore,
       signal
     );
-    // A model call of the run: counted before the tool call is checked against the run's tokens.
-    await meter.countModelCall({
-      ...(selection.model ? { model: selection.model } : {}),
-      ...(selection.requestedModel ? { requestedModel: selection.requestedModel } : {}),
-      ...(selection.usage ? { usage: selection.usage } : {}),
-    });
-    const { intention } = selection;
 
     if (intention.type !== 'tool_call' || !intention.toolName) {
       // Asking again with the same tools would get the same answer: the unknown is dropped

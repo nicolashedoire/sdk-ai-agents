@@ -5,10 +5,10 @@ export interface PolicyCheckOutcome {
   result: 'allowed' | 'denied' | 'requires_approval';
   reason?: string;
   /**
-   * `policy` for the policy engine's event about one policy; `verdict` for a check as a whole
-   * (the action engine's event about a tool call, or an event written by your own code).
+   * Who wrote the event: `policy`, the policy engine, about one policy; `call`, the action
+   * engine, its verdict on a tool call (every policy at once); `custom`, your own code.
    */
-  level: 'policy' | 'verdict';
+  source: 'policy' | 'call' | 'custom';
   /** Type of the intention checked, when recorded (`tool_call`, `continue` for a step). */
   intentionType?: string;
 }
@@ -34,7 +34,7 @@ export function readPolicyCheck(data: Record<string, unknown>): PolicyCheckOutco
       rule: flatRule ?? policyId ?? 'unknown',
       result: data.applied ? 'denied' : 'allowed',
       ...(data.applied && reason ? { reason } : {}),
-      level: 'policy',
+      source: 'policy',
       ...intention,
     };
   }
@@ -54,7 +54,7 @@ export function readPolicyCheck(data: Record<string, unknown>): PolicyCheckOutco
             ? 'allowed'
             : 'denied',
       ...(why ? { reason: why } : {}),
-      level: 'verdict',
+      source: 'call',
       ...intention,
     };
   }
@@ -63,7 +63,7 @@ export function readPolicyCheck(data: Record<string, unknown>): PolicyCheckOutco
     rule: flatRule ?? policyId ?? 'unknown',
     result: data.requiresApproval ? 'requires_approval' : data.allowed ? 'allowed' : 'denied',
     ...(reason ? { reason } : {}),
-    level: 'verdict',
+    source: 'custom',
     ...intention,
   };
 }

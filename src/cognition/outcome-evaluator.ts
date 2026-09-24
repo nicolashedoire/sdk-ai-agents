@@ -3,7 +3,8 @@ import { nextPredictionToTest } from './cognitive-operations.js';
 import type { CognitiveRunRecorder } from './cognitive-run-recorder.js';
 import type { Hypothesis, MentalState, Prediction } from './mental-state.js';
 import { observationFromTest } from './observation-records.js';
-import { toError, truncate, type OperationOutcome } from './operation-outcome.js';
+import { truncate } from '../utils/truncate.js';
+import { toError, type OperationOutcome } from './operation-outcome.js';
 import { outcomeVerdictSchema } from './thought-patch.js';
 
 /** What a real test observed about one prediction. */

@@ -5,6 +5,7 @@ import type {
   PatternInsight,
 } from '../types/decision-patterns.js';
 import { AlternativesExtractor } from './alternatives-extractor.js';
+import { readPolicyCheck } from './policy-check.js';
 
 export interface PatternAnalysisOptions {
   agentId?: string;
@@ -164,34 +165,47 @@ export class PatternAnalyzer {
     firstTimestamp: number,
     lastTimestamp: number
   ): void {
-    const policyChecks = events.filter(
-      (e) => e.type === 'policy.checked' || e.type === 'policy.violated'
-    );
-
-    for (const event of policyChecks) {
-      const policyData = event.data as {
-        rule?: string;
-        allowed?: boolean;
-        policyId?: string;
-      };
-
-      if (!policyData.allowed && policyData.rule) {
-        const patternKey = `policy_violation:${policyData.rule}`;
-        PatternAnalyzer.updatePattern(
-          patternMap,
-          patternKey,
-          {
-            type: 'policy_violation',
-            pattern: `Policy violation: ${policyData.rule}`,
-            description: `Policy "${policyData.rule}" is frequently violated`,
-            metadata: { policyId: policyData.policyId || policyData.rule },
-          },
-          runId,
-          firstTimestamp,
-          lastTimestamp
-        );
-      }
+    for (const event of events) {
+      const violated = PatternAnalyzer.violatedPolicy(event);
+      if (!violated) continue;
+      PatternAnalyzer.updatePattern(
+        patternMap,
+        `policy_violation:${violated.rule}`,
+        {
+          type: 'policy_violation',
+          pattern: `Policy violation: ${violated.rule}`,
+          description: `Policy "${violated.rule}" is frequently violated`,
+          metadata: { policyId: violated.policyId },
+        },
+        runId,
+        firstTimestamp,
+        lastTimestamp
+      );
     }
+  }
+
+  /**
+   * The policy an event says refused something, if any. The SDK records one `policy.checked`
+   * per policy it checks (a refusal has `applied`), which is counted; the action engine's
+   * verdict on the same call repeats it and is not. Events your own code writes in the flat
+   * shape (`rule`, `allowed: false`) are read as before.
+   */
+  private static violatedPolicy(event: Event): { rule: string; policyId: string } | undefined {
+    if (event.type === 'policy.checked') {
+      const check = readPolicyCheck(event.data);
+      if (check.result !== 'denied' || check.source === 'call' || check.rule === 'unknown') {
+        return undefined;
+      }
+      const policyId = typeof event.data.policyId === 'string' ? event.data.policyId : check.rule;
+      return { rule: check.rule, policyId };
+    }
+    if (event.type !== 'policy.violated') return undefined;
+    const data = event.data as { rule?: unknown; allowed?: unknown; policyId?: unknown };
+    if (data.allowed || typeof data.rule !== 'string' || !data.rule) return undefined;
+    return {
+      rule: data.rule,
+      policyId: typeof data.policyId === 'string' && data.policyId ? data.policyId : data.rule,
+    };
   }
 
   private static analyzeApprovalRequests(

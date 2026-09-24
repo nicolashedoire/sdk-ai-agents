@@ -6,7 +6,8 @@ import {
 import { abstention, settleDecision } from './decision-readiness.js';
 import { proposalRefusal } from './hypothesis-transitions.js';
 import { activeHypotheses, sameStatement, type MentalState } from './mental-state.js';
-import { truncate, type OperationOutcome, type ProposedThought } from './operation-outcome.js';
+import { truncate } from '../utils/truncate.js';
+import type { OperationOutcome, ProposedThought } from './operation-outcome.js';
 import { ALLOWED_FIELDS } from './thought-fields.js';
 import { thoughtPatchSchema, type ThoughtPatch } from './thought-patch.js';
 

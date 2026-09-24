@@ -4,14 +4,13 @@ import {
   type CognitiveController,
   type DecisionEvaluationRecord,
 } from '../cognition/cognitive-controller.js';
-import { LLMThoughtGenerator, type ThoughtGenerator } from '../cognition/llm-thought-generator.js';
 import type {
   DecisionRequest,
   DecisionResponse,
   TypedDecisionClient,
   TypedQuestions,
 } from '../decisions/typed-decisions.js';
-import { PolicyViolationError } from '../errors/index.js';
+import { DecisionClientError, PolicyViolationError } from '../errors/index.js';
 import { AlternativesExtractor } from '../utils/alternatives-extractor.js';
 import type { SDKConfig } from '../types/sdk.js';
 import type { Event } from '../types/events.js';
@@ -67,7 +66,6 @@ describe('policies of cognitive agents', () => {
       policies?: Policy[];
       limits?: Record<string, number>;
       controller?: CognitiveController;
-      generator?: (provider: ScriptedLLMProvider) => ThoughtGenerator;
     } = {},
     overrides: Partial<SDKConfig> = {},
     provider = new ScriptedLLMProvider()
@@ -88,7 +86,6 @@ describe('policies of cognitive agents', () => {
       ...(config.policies ? { policies: config.policies } : {}),
       ...(config.limits ? { limits: config.limits } : {}),
       ...(config.controller ? { controller: config.controller } : {}),
-      ...(config.generator ? { generator: config.generator(provider) } : {}),
     });
   }
 
@@ -411,6 +408,26 @@ describe('policies of cognitive agents', () => {
       ]);
     });
 
+    it('shows the policies that refused as violation patterns', async () => {
+      const agent = analyst({
+        policies: [
+          policy('budget', { condition: 'maxTokens', action: 'deny', metadata: { value: 500 } }),
+        ],
+      });
+
+      const first = await agent.think({ problem: PROBLEM });
+      const second = await agent.think({ problem: PROBLEM });
+
+      const analysis = await env.sdk.getDecisionPatterns();
+      const violations = analysis.patterns.filter((pattern) => pattern.type === 'policy_violation');
+      // In each run the policy refused the tool call, then the next step: counted once each,
+      // not again for the action engine's verdict on the call.
+      expect(violations).toMatchObject([
+        { metadata: { policyId: 'limit-maxTokens' }, frequency: 4 },
+      ]);
+      expect(violations[0]?.runs.sort()).toEqual([first.runId, second.runId].sort());
+    });
+
     it('never holds a step for an approval: a limit that requires one concerns tool calls', async () => {
       const agent = analyst({
         policies: [
@@ -490,29 +507,6 @@ describe('policies of cognitive agents', () => {
       // counted as a call whose cost is unknown.
       expect(usage.unpricedCalls).toBe(provider.requests.length);
       expect(usage.tokensUsed).toBe(FULL_RUN_TOKENS + 120);
-    });
-
-    it('counts a thought whose usage reports no valid number of calls as one call', async () => {
-      const agent = analyst({
-        generator: (provider) => {
-          const llm = new LLMThoughtGenerator(provider, { model: 'test-model' });
-          return {
-            generate: async (request) => {
-              const thought = await llm.generate(request);
-              return thought.usage
-                ? { ...thought, usage: { ...thought.usage, calls: 0 } }
-                : thought;
-            },
-          };
-        },
-      });
-
-      const result = await agent.think({ problem: PROBLEM });
-
-      expect(result.status).toBe('completed');
-      const usage = await env.sdk.getBudgetUsage({ agentId: agent.id, period: 'all' });
-      expect(usage.unpricedCalls).toBe(env.provider.requests.length);
-      expect(usage.tokensUsed).toBe(FULL_RUN_TOKENS);
     });
 
     it('counts a typed decision that reports no usage as a call without token counts', async () => {
@@ -674,6 +668,20 @@ describe('policies of cognitive agents', () => {
   });
 });
 
+/** A typed-decision backend that bills an answer it then rejects (it does not fit the questions). */
+class RejectingDecisionClient implements TypedDecisionClient {
+  readonly name = 'rejecting';
+
+  async evaluate<Q extends TypedQuestions>(
+    _request: DecisionRequest<Q>
+  ): Promise<DecisionResponse<Q>> {
+    throw new DecisionClientError('rejecting', 'answers do not match the questions', {
+      retryable: false,
+      billed: { model: 'memory-1', usage: { inputTokens: 1_000, outputTokens: 10 } },
+    });
+  }
+}
+
 /** A typed-decision backend that answers without reporting its usage. */
 class UsagelessDecisionClient implements TypedDecisionClient {
   readonly name = 'usageless';
@@ -709,6 +717,22 @@ describe('typed decisions made with sdk.decisions', () => {
       tokensUsed: 0,
       unmeteredCalls: 1,
     });
+  });
+
+  it('count an answer the client rejected, which was billed', async () => {
+    env = createTestSDK({
+      decisionClient: new RejectingDecisionClient(),
+      pricing: { 'memory-*': { inputPerMillion: 1, outputPerMillion: 0 } },
+    });
+
+    const failure = await env.sdk.decisions
+      .check({ context: 'A refund request', question: 'Is it a refund?', agentId: 'support' })
+      .catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(DecisionClientError);
+    const usage = await env.sdk.getBudgetUsage({ agentId: 'support', period: 'all' });
+    expect(usage.tokensUsed).toBe(1_010);
+    expect(usage.costUsd).toBeCloseTo(0.001, 10);
   });
 
   it('are never refused by a budget', async () => {
