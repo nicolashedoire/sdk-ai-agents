@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | مفتاح المزوّد الأساسي (غير مطلوب مع `llmProvider`). دون أي مفتاح، تعمل الأدوات وخوادم MCP، وتفشل الاستدعاءات التي تحتاج إلى نموذج بخطأ واضح |
 | `provider` | `'openai' \| 'anthropic'` | المزوّد الأساسي، والافتراضي `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey` و`defaultModel` و`baseURL` لكل جهة (`baseURL`: نقطة نهاية متوافقة، مثل واجهة v1 من Azure OpenAI أو خادم نماذج محلي، أو وكيل proxy). يستخدم المزوّد الأساسي مدخل جهته، ويستخدم المزوّد الاحتياطي من جهة أخرى مدخل جهته هو |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey` و`defaultModel` و`baseURL` لكل جهة (`baseURL`: نقطة نهاية متوافقة، مثل واجهة v1 من Azure OpenAI أو خادم نماذج محلي، أو وكيل proxy). يستخدم المزوّد الأساسي مدخل جهته، ويستخدم المزوّد الاحتياطي من جهة أخرى مدخل جهته هو. النماذج الافتراضية: `gpt-5.4` و`claude-opus-5`. ويقبل مدخل OpenAI أيضًا `reasoningModels` و`reasoningEffort` و`nativeToolMessages`: انظر [نماذج OpenAI](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | تُجرَّب بالترتيب حين يفشل المزوّد الأساسي؛ ويتقدّم `config` على `providerConfig`. لا يرث المزوّد الاحتياطي من جهة المزوّد الأساسي نفسها أيًّا من إعداداته (سوى `apiKey` العام)؛ أما المزوّد من جهة أخرى فيحتاج إلى مفتاحه الخاص |
 | `llmProvider` | `LLMProvider` | مزوّدك الخاص (نموذج محلي، أو بوابة، أو بديل اختباري). يتلقّى استدعاءات الأدوات ونتائجها بالصيغة الأصلية (`LLMMessage`) إن صرّح بـ `nativeToolMessages`، وإلا فنصًّا |
 | `retry` | `Partial<RetryPolicy> \| false` | سياسة إعادة المحاولة للنموذج اللغوي، لكل مزوّد، قبل التحويل إلى البديل. وقيمتا `maxRetries` و`initialDelayMs` فيها هما أيضًا القيمتان الافتراضيتان لـ `jev.maxRetries` و`jev.retryBaseDelayMs`؛ أمّا حقولها الأخرى فلا تصل إلى عميل Jev، الذي يحتفظ مع `retry: false` بإعادتَي المحاولة و500 ms الخاصة به. لا تُطبَّق على `llmProvider` محقون إلا إذا عُيّنت صراحةً، ولا تُطبَّق أبدًا على `FallbackProvider` مُمرَّر بوصفه `llmProvider` ولا على مزوّداته |
@@ -22,6 +22,38 @@ const sdk = createSDK(config);
 | `eventStore` | `IEventStore` | الافتراضي `FileEventStore('./events')` |
 | `defaultPolicies` | `Policy[]` | السياسات العامة |
 | `goldenTracesDir`، `regressionTestSuitesDir`، `assertionsDir`، `impactAnalysesDir` | `string` | مواضع تخزين مخرجات الاختبار |
+
+### نماذج OpenAI {#openai-models}
+
+نماذج الاستدلال من OpenAI، أي سلسلة o (`o1`، `o3`، `o4-mini`…) وGPT-5 وما بعده (`gpt-5`، `gpt-5.4-mini`، `gpt-6-sol`…)، بما فيها النماذج المؤرَّخة أو المضبوطة بدقة (`ft:o4-mini-…`)، ترفض `temperature` و`max_tokens`. يتعرّف عليها مزوّد OpenAI من اسمها: فيرسل إليها `maxTokens` في صورة `max_completion_tokens`، الذي يحسب رموز استدلالها أيضًا، ومعه مستوى جهد الاستدلال، لكنه لا يرسل درجة الحرارة أبدًا، ولا حتى مع مستوى الجهد `none`. أما النماذج الأخرى فتتلقّى `temperature` و`max_tokens`، اللذين يعرفهما كل خادم متوافق مع OpenAI.
+
+| الخيار | القيمة الافتراضية | |
+| --- | --- | --- |
+| `defaultModel` | `gpt-5.4` | نموذج الطلب الذي لا يسمّي نموذجًا، والمزوّد الاحتياطي الذي لا يخدم نموذج الوكيل |
+| `reasoningModels` | يُستنتج من الاسم | `true` أو `false`: كل نماذج هذا المزوّد نماذج استدلال، أو لا شيء منها. قائمة: هذه الأسماء نماذج استدلال (عمليات نشر Azure، أسماء مستعارة في بوابة)، ويُتعرَّف على غيرها من اسمه |
+| `reasoningEffort` | مستوى النموذج نفسه | `none` أو `minimal` أو `low` أو `medium` أو `high` أو `xhigh` أو `max`، ويُرسَل إلى نماذج الاستدلال وحدها. يقبل كل نموذج بعض هذه القيم، وترفض الواجهة البرمجية الباقي |
+| `nativeToolMessages` | `true` | `false` لخادم متوافق لا يدعم `tool_calls` ولا رسائل `tool`: تُرسَل عندئذٍ استدعاءات الأدوات ونتائجها نصًّا، إلى كل مزوّدي السلسلة حين يكون هذا المزوّد احتياطيًّا |
+
+توضع هذه الخيارات في `providerConfig.openai` أو في `config` الخاص بمزوّد OpenAI احتياطي. يأخذ المزوّد الاحتياطي من جهة أخرى من `providerConfig.openai` كل خيار لا يحدّده `config` الخاص به؛ أما المزوّد الاحتياطي من جهة المزوّد الأساسي نفسها فلا يأخذ أيًّا منها. ويحدّد الوكيل أو التشغيل مستوى الجهد الخاص به في `providerSettings.openai.reasoningEffort`: يتقدّم مستوى التشغيل، ثم مستوى الوكيل، ثم مستوى المزوّد.
+
+```ts
+const sdk = createSDK({
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  providerConfig: {
+    openai: {
+      baseURL: 'https://my-resource.openai.azure.com/openai/v1/',
+      reasoningModels: ['analyst-o4-mini'], // a deployment name says nothing about its model
+      reasoningEffort: 'low',
+    },
+  },
+});
+
+const analyst = sdk.createAgent({
+  name: 'analyst',
+  model: 'analyst-o4-mini',
+  providerSettings: { openai: { reasoningEffort: 'high', maxTokens: 8_000 } },
+});
+```
 
 ## الوكلاء {#agents}
 

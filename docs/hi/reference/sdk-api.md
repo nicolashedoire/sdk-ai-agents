@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | मुख्य प्रदाता की key (`llmProvider` के साथ ज़रूरी नहीं)। बिना किसी key के, टूल और MCP सर्वर काम करते हैं और जिन कॉल को मॉडल चाहिए वे एक साफ़ error के साथ विफल होती हैं |
 | `provider` | `'openai' \| 'anthropic'` | मुख्य प्रदाता, डिफ़ॉल्ट `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | हर vendor की `apiKey`, `defaultModel` और `baseURL` (`baseURL`: कोई संगत endpoint, जैसे Azure OpenAI की v1 API या लोकल मॉडल सर्वर, या कोई proxy)। मुख्य प्रदाता अपने vendor की entry इस्तेमाल करता है, और दूसरे vendor का फ़ॉलबैक अपने vendor की |
+| `providerConfig` | `{ openai?, anthropic? }` | हर vendor की `apiKey`, `defaultModel` और `baseURL` (`baseURL`: कोई संगत endpoint, जैसे Azure OpenAI की v1 API या लोकल मॉडल सर्वर, या कोई proxy)। मुख्य प्रदाता अपने vendor की entry इस्तेमाल करता है, और दूसरे vendor का फ़ॉलबैक अपने vendor की। डिफ़ॉल्ट मॉडल: `gpt-5.4` और `claude-opus-5`। OpenAI की entry `reasoningModels`, `reasoningEffort` और `nativeToolMessages` भी लेती है: देखें [OpenAI मॉडल](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | मुख्य प्रदाता के विफल होने पर क्रम से आज़माए जाते हैं; `config`, `providerConfig` से ऊपर होता है। मुख्य प्रदाता के ही vendor का फ़ॉलबैक उसकी कोई सेटिंग नहीं लेता (सिर्फ़ global `apiKey`); दूसरे vendor के फ़ॉलबैक को अपनी key चाहिए |
 | `llmProvider` | `LLMProvider` | आपका अपना प्रदाता (लोकल मॉडल, gateway, टेस्ट के लिए नकली प्रदाता)। अगर वह `nativeToolMessages` घोषित करे तो टूल कॉल और उनके नतीजे native format (`LLMMessage`) में पाता है, वरना text के रूप में |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM की retry नीति, हर प्रदाता के लिए, फ़ॉलबैक से पहले। इसके `maxRetries` और `initialDelayMs`, `jev.maxRetries` और `jev.retryBaseDelayMs` के डिफ़ॉल्ट भी हैं; इसके बाकी फ़ील्ड Jev क्लाइंट तक नहीं पहुँचते, और `retry: false` होने पर Jev क्लाइंट अपनी 2 retries और 500 ms रखता है। जोड़े गए `llmProvider` पर केवल तब लागू होती है जब इसे स्पष्ट रूप से सेट किया जाए, और `llmProvider` के रूप में दिए गए `FallbackProvider` या उसके प्रदाताओं पर कभी नहीं |
@@ -22,6 +22,38 @@ const sdk = createSDK(config);
 | `eventStore` | `IEventStore` | डिफ़ॉल्ट `FileEventStore('./events')` |
 | `defaultPolicies` | `Policy[]` | ग्लोबल नीतियाँ |
 | `goldenTracesDir`, `regressionTestSuitesDir`, `assertionsDir`, `impactAnalysesDir` | `string` | टेस्टिंग से बनी चीज़ों का भंडारण |
+
+### OpenAI मॉडल {#openai-models}
+
+OpenAI के reasoning मॉडल — o सीरीज़ (`o1`, `o3`, `o4-mini`…) और GPT-5 व उसके बाद के मॉडल (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…), तारीख़ वाले या fine-tuned (`ft:o4-mini-…`) भी — `temperature` और `max_tokens` को ठुकरा देते हैं। OpenAI प्रदाता उन्हें नाम से पहचानता है: वह उन्हें `maxTokens` को `max_completion_tokens` के रूप में भेजता है, जिसमें उनके reasoning tokens भी गिने जाते हैं, और साथ में reasoning effort भी, पर temperature कभी नहीं, effort `none` होने पर भी नहीं। बाकी मॉडलों को `temperature` और `max_tokens` मिलते हैं, जिन्हें हर OpenAI-संगत सर्वर जानता है।
+
+| विकल्प | डिफ़ॉल्ट | |
+| --- | --- | --- |
+| `defaultModel` | `gpt-5.4` | उस request का मॉडल जो कोई मॉडल नहीं बताती, और उस फ़ॉलबैक का जो एजेंट का मॉडल सर्व नहीं करता |
+| `reasoningModels` | नाम से पहचाना जाता है | `true` या `false`: इस प्रदाता के सभी मॉडल reasoning मॉडल हैं, या कोई भी नहीं है। एक सूची: ये नाम reasoning मॉडल हैं (Azure deployments, gateway aliases), बाकी नाम से पहचाने जाते हैं |
+| `reasoningEffort` | मॉडल का अपना | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` या `max`, सिर्फ़ reasoning मॉडलों को भेजा जाता है। हर मॉडल इनमें से कुछ मान स्वीकार करता है, और API बाकी को ठुकरा देती है |
+| `nativeToolMessages` | `true` | ऐसे संगत सर्वर के लिए `false` जो `tool_calls` और `tool` messages सपोर्ट नहीं करता: तब टूल कॉल और उनके नतीजे text के रूप में भेजे जाते हैं, और अगर यह प्रदाता फ़ॉलबैक है तो chain के हर प्रदाता को |
+
+ये विकल्प `providerConfig.openai` में या OpenAI फ़ॉलबैक के `config` में रखे जाते हैं। दूसरे vendor का फ़ॉलबैक हर वह विकल्प `providerConfig.openai` से लेता है जो उसका `config` तय नहीं करता; मुख्य प्रदाता के ही vendor का फ़ॉलबैक कोई विकल्प नहीं लेता। कोई एजेंट या run अपना effort `providerSettings.openai.reasoningEffort` में तय करता है: पहले run का मान चलता है, फिर एजेंट का, फिर प्रदाता का।
+
+```ts
+const sdk = createSDK({
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  providerConfig: {
+    openai: {
+      baseURL: 'https://my-resource.openai.azure.com/openai/v1/',
+      reasoningModels: ['analyst-o4-mini'], // a deployment name says nothing about its model
+      reasoningEffort: 'low',
+    },
+  },
+});
+
+const analyst = sdk.createAgent({
+  name: 'analyst',
+  model: 'analyst-o4-mini',
+  providerSettings: { openai: { reasoningEffort: 'high', maxTokens: 8_000 } },
+});
+```
 
 ## एजेंट {#agents}
 

@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | 主プロバイダーのキー（`llmProvider` を使う場合は不要）。キーがまったくなくてもツールと MCP サーバーは動作し、モデルを必要とする呼び出しは明確なエラーで失敗する |
 | `provider` | `'openai' \| 'anthropic'` | 主プロバイダー。デフォルトは `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | 各ベンダーの `apiKey`、`defaultModel`、`baseURL`（`baseURL`：Azure OpenAI の v1 API やローカルのモデルサーバーなどの互換エンドポイント、またはプロキシ）。主プロバイダーは自分のベンダーの項目を使い、別のベンダーのフォールバックはそのベンダーの項目を使う |
+| `providerConfig` | `{ openai?, anthropic? }` | 各ベンダーの `apiKey`、`defaultModel`、`baseURL`（`baseURL`：Azure OpenAI の v1 API やローカルのモデルサーバーなどの互換エンドポイント、またはプロキシ）。主プロバイダーは自分のベンダーの項目を使い、別のベンダーのフォールバックはそのベンダーの項目を使う。デフォルトのモデルは `gpt-5.4` と `claude-opus-5`。OpenAI の項目では `reasoningModels`、`reasoningEffort`、`nativeToolMessages` も指定できる（[OpenAI のモデル](#openai-models) を参照） |
 | `fallbackProviders` | `Array<{ provider, config? }>` | 主プロバイダーが失敗したときに、順番に試される。`config` は `providerConfig` より優先される。主プロバイダーと同じベンダーのフォールバックは、主プロバイダーの設定を引き継がない（全体の `apiKey` のみ）。別のベンダーのフォールバックには独自のキーが必要 |
 | `llmProvider` | `LLMProvider` | 独自のプロバイダー（ローカルモデル、ゲートウェイ、テストダブル）。`nativeToolMessages` を宣言していれば、ツール呼び出しとその結果をネイティブ形式（`LLMMessage`）で、そうでなければテキストで受け取る |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM のリトライポリシー。プロバイダーごとに、フォールバックの前に適用される。その `maxRetries` と `initialDelayMs` は `jev.maxRetries` と `jev.retryBaseDelayMs` のデフォルトにもなる。ほかのフィールドは Jev クライアントには届かず、`retry: false` の場合、Jev クライアントは独自の 2 回のリトライと 500 ms を使う。注入した `llmProvider` には明示的に設定した場合にのみ適用され、`llmProvider` として渡した `FallbackProvider` とその中のプロバイダーには適用されない |
@@ -22,6 +22,38 @@ const sdk = createSDK(config);
 | `eventStore` | `IEventStore` | デフォルトは `FileEventStore('./events')` |
 | `defaultPolicies` | `Policy[]` | グローバルなポリシー |
 | `goldenTracesDir`、`regressionTestSuitesDir`、`assertionsDir`、`impactAnalysesDir` | `string` | テスト成果物の保存先 |
+
+### OpenAI のモデル {#openai-models}
+
+OpenAI の推論モデル（o シリーズの `o1`、`o3`、`o4-mini`… と、GPT-5 以降の `gpt-5`、`gpt-5.4-mini`、`gpt-6-sol`…。日付付きやファインチューニング済みの `ft:o4-mini-…` なども含む）は、`temperature` と `max_tokens` を拒否します。OpenAI プロバイダーはこれらを名前で判別し、`maxTokens` を `max_completion_tokens`（推論トークンも数えます）として、推論の努力度とともに送ります。温度は、努力度が `none` のときも含めて一切送りません。それ以外のモデルには、OpenAI 互換のどのサーバーも理解する `temperature` と `max_tokens` を送ります。
+
+| オプション | デフォルト | |
+| --- | --- | --- |
+| `defaultModel` | `gpt-5.4` | モデルを指定しないリクエストと、エージェントのモデルに対応していないフォールバックが使うモデル |
+| `reasoningModels` | 名前から判別 | `true` または `false`：このプロバイダーのすべてのモデルを推論モデルとして扱うか、扱わないか。リスト：挙げた名前（Azure のデプロイ、ゲートウェイのエイリアス）は推論モデルで、ほかは名前から判別される |
+| `reasoningEffort` | モデルのデフォルト | `none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max` のいずれか。推論モデルにだけ送られる。各モデルが受け付けるのはこのうち一部の値で、API はそれ以外を拒否する |
+| `nativeToolMessages` | `true` | `tool_calls` と `tool` メッセージに対応していない互換サーバーでは `false`：ツール呼び出しとその結果はテキストで送られる。このプロバイダーがフォールバックなら、チェーンのすべてのプロバイダーに対してそうなる |
+
+これらのオプションは `providerConfig.openai`、または OpenAI のフォールバックの `config` に指定します。別のベンダーのフォールバックは、自身の `config` が指定していないオプションを `providerConfig.openai` から取ります。主プロバイダーと同じベンダーのフォールバックは何も引き継ぎません。エージェントや実行は、`providerSettings.openai.reasoningEffort` で独自の努力度を指定できます。実行の値が最優先で、次にエージェント、最後にプロバイダーの値が使われます。
+
+```ts
+const sdk = createSDK({
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  providerConfig: {
+    openai: {
+      baseURL: 'https://my-resource.openai.azure.com/openai/v1/',
+      reasoningModels: ['analyst-o4-mini'], // a deployment name says nothing about its model
+      reasoningEffort: 'low',
+    },
+  },
+});
+
+const analyst = sdk.createAgent({
+  name: 'analyst',
+  model: 'analyst-o4-mini',
+  providerSettings: { openai: { reasoningEffort: 'high', maxTokens: 8_000 } },
+});
+```
 
 ## エージェント {#agents}
 

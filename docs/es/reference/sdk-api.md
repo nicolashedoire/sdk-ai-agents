@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Clave del proveedor principal (no hace falta con `llmProvider`). Sin ninguna clave, las herramientas y los servidores MCP funcionan, y las llamadas que necesitan un modelo fallan con un error claro |
 | `provider` | `'openai' \| 'anthropic'` | Proveedor principal, `openai` por defecto |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` y `baseURL` de cada fabricante (`baseURL`: un endpoint compatible, como la API v1 de Azure OpenAI o un servidor de modelos local, o un proxy). El principal usa la entrada de su fabricante, y uno de respaldo de otro fabricante la del suyo |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` y `baseURL` de cada fabricante (`baseURL`: un endpoint compatible, como la API v1 de Azure OpenAI o un servidor de modelos local, o un proxy). El principal usa la entrada de su fabricante, y uno de respaldo de otro fabricante la del suyo. Modelos por defecto: `gpt-5.4` y `claude-opus-5`. La entrada de OpenAI también admite `reasoningModels`, `reasoningEffort` y `nativeToolMessages`: ver [Modelos de OpenAI](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | Se prueban en orden cuando falla el principal; un `config` prevalece sobre `providerConfig`. Uno de respaldo del mismo fabricante que el principal no hereda ninguno de sus ajustes (solo la `apiKey` global); uno de otro fabricante necesita su propia clave |
 | `llmProvider` | `LLMProvider` | Tu propio proveedor (modelo local, pasarela, doble de prueba). Recibe las llamadas a herramientas y sus resultados en el formato nativo (`LLMMessage`) si declara `nativeToolMessages`, y como texto si no |
 | `retry` | `Partial<RetryPolicy> \| false` | Política de reintentos del LLM, por proveedor, antes de la conmutación. Sus `maxRetries` e `initialDelayMs` son también los valores por defecto de `jev.maxRetries` y `jev.retryBaseDelayMs`; sus demás campos no llegan al cliente Jev, que conserva sus propios 2 reintentos y 500 ms con `retry: false`. Se aplica a un `llmProvider` inyectado solo si se fija explícitamente, y nunca a un `FallbackProvider` pasado como `llmProvider` ni a sus proveedores |
@@ -22,6 +22,38 @@ const sdk = createSDK(config);
 | `eventStore` | `IEventStore` | `FileEventStore('./events')` por defecto |
 | `defaultPolicies` | `Policy[]` | Políticas globales |
 | `goldenTracesDir`, `regressionTestSuitesDir`, `assertionsDir`, `impactAnalysesDir` | `string` | Almacenamiento de los artefactos de prueba |
+
+### Modelos de OpenAI {#openai-models}
+
+Los modelos de razonamiento de OpenAI (la serie o: `o1`, `o3`, `o4-mini`…; y GPT-5 y posteriores: `gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…; también con fecha o ajustados, como `ft:o4-mini-…`) rechazan `temperature` y `max_tokens`. El proveedor de OpenAI los reconoce por su nombre: les envía `maxTokens` como `max_completion_tokens`, que también cuenta sus tokens de razonamiento, junto con el esfuerzo de razonamiento, pero nunca una temperatura, ni siquiera con el esfuerzo `none`. Los demás modelos reciben `temperature` y `max_tokens`, que todo servidor compatible con OpenAI conoce.
+
+| Opción | Por defecto | |
+| --- | --- | --- |
+| `defaultModel` | `gpt-5.4` | Modelo de una petición que no nombra ninguno, y de un proveedor de respaldo que no sirve el modelo del agente |
+| `reasoningModels` | Deducido del nombre | `true` o `false`: todos los modelos de este proveedor son, o no son, modelos de razonamiento. Una lista: esos nombres lo son (despliegues de Azure, alias de pasarela), y los demás se reconocen por su nombre |
+| `reasoningEffort` | El del modelo | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` o `max`, enviado solo a los modelos de razonamiento. Cada modelo acepta algunos de estos valores, y la API rechaza los demás |
+| `nativeToolMessages` | `true` | `false` para un servidor compatible que no admite `tool_calls` ni los mensajes `tool`: las llamadas a herramientas y sus resultados se envían entonces como texto, a todos los proveedores de la cadena cuando este es uno de respaldo |
+
+Estas opciones van en `providerConfig.openai` o en el `config` de un proveedor de respaldo de OpenAI. Uno de respaldo de otro fabricante toma de `providerConfig.openai` cada opción que su `config` no fija; uno del mismo fabricante que el principal no toma ninguna. Un agente o una ejecución fija su propio esfuerzo en `providerSettings.openai.reasoningEffort`: prevalece el de la ejecución, luego el del agente y luego el del proveedor.
+
+```ts
+const sdk = createSDK({
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  providerConfig: {
+    openai: {
+      baseURL: 'https://my-resource.openai.azure.com/openai/v1/',
+      reasoningModels: ['analyst-o4-mini'], // a deployment name says nothing about its model
+      reasoningEffort: 'low',
+    },
+  },
+});
+
+const analyst = sdk.createAgent({
+  name: 'analyst',
+  model: 'analyst-o4-mini',
+  providerSettings: { openai: { reasoningEffort: 'high', maxTokens: 8_000 } },
+});
+```
 
 ## Agentes {#agents}
 

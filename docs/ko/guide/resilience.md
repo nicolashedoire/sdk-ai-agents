@@ -24,7 +24,7 @@ const sdk = createSDK({
 });
 ```
 
-다른 벤더의 폴백 프로바이더에는 자체 키가 필요하며, 그 `config`나 `providerConfig`에 지정합니다. 기본 프로바이더의 키는 다른 벤더로 절대 전송되지 않습니다. 에이전트의 모델은 해당 프로바이더가 지원할 때만 전달되고, 그렇지 않으면 자체 `defaultModel`을 사용합니다(Anthropic은 OpenAI 모델 이름을 거부하며, 그 반대도 마찬가지입니다). `intention.generated` 이벤트에는 실제로 응답한 프로바이더와 사용된 모델이 기록됩니다.
+다른 벤더의 폴백 프로바이더에는 자체 키가 필요하며, 그 `config`나 `providerConfig`에 지정합니다. 기본 프로바이더의 키는 다른 벤더로 절대 전송되지 않습니다. 에이전트의 모델은 해당 프로바이더가 지원할 때만 전달되고, 그렇지 않으면 자체 `defaultModel`(지정하지 않으면 OpenAI는 `gpt-5.4`, Anthropic은 `claude-opus-5`)을 사용합니다(Anthropic은 OpenAI 모델 이름을 거부하며, 그 반대도 마찬가지입니다). `intention.generated` 이벤트에는 실제로 응답한 프로바이더와 사용된 모델이 기록됩니다.
 
 | 옵션 | 기본값 | |
 | --- | --- | --- |

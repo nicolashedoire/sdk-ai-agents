@@ -24,7 +24,7 @@ const sdk = createSDK({
 });
 ```
 
-Um provedor de fallback de outro fornecedor precisa da própria chave, no seu `config` ou em `providerConfig`: a chave do principal nunca é enviada a outro fornecedor. Ele recebe o modelo do agente somente se o atender e, caso contrário, o seu próprio `defaultModel` (a Anthropic recusa um nome de modelo da OpenAI, e vice-versa). O evento `intention.generated` indica o provedor que respondeu e o modelo usado.
+Um provedor de fallback de outro fornecedor precisa da própria chave, no seu `config` ou em `providerConfig`: a chave do principal nunca é enviada a outro fornecedor. Ele recebe o modelo do agente somente se o atender e, caso contrário, o seu próprio `defaultModel`, que é `gpt-5.4` para a OpenAI e `claude-opus-5` para a Anthropic se não for definido (a Anthropic recusa um nome de modelo da OpenAI, e vice-versa). O evento `intention.generated` indica o provedor que respondeu e o modelo usado.
 
 | Opção | Padrão | |
 | --- | --- | --- |

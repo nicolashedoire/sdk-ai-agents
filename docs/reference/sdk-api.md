@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Key of the primary provider (not needed with `llmProvider`). Without any key, tools and MCP servers work and calls that need a model fail with a clear error |
 | `provider` | `'openai' \| 'anthropic'` | Primary provider, default `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` and `baseURL` of each vendor (`baseURL`: a compatible endpoint, such as the Azure OpenAI v1 API or a local model server, or a proxy). The primary uses its vendor's entry, and a fallback of another vendor uses its own vendor's entry |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` and `baseURL` of each vendor (`baseURL`: a compatible endpoint, such as the Azure OpenAI v1 API or a local model server, or a proxy). The primary uses its vendor's entry, and a fallback of another vendor uses its own vendor's entry. Default models: `gpt-5.4` and `claude-opus-5`. The OpenAI entry also takes `reasoningModels`, `reasoningEffort` and `nativeToolMessages`: see [OpenAI models](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | Tried in order when the primary fails; a `config` overrides `providerConfig`. A fallback of the primary's vendor inherits none of the primary's settings (only the SDK-wide `apiKey`); one of another vendor needs its own key |
 | `llmProvider` | `LLMProvider` | Your own provider (local model, gateway, test double). It gets tool calls and results in the native format (`LLMMessage`) if it declares `nativeToolMessages`, as plain text otherwise |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM retry policy, per provider, before fallback. Its `maxRetries` and `initialDelayMs` are also the defaults of `jev.maxRetries` and `jev.retryBaseDelayMs`; its other fields do not reach the Jev client, which keeps its own 2 retries and 500 ms with `retry: false`. Applied to an injected `llmProvider` only when set explicitly, and never to a `FallbackProvider` given as `llmProvider` or to its providers |
@@ -22,6 +22,38 @@ const sdk = createSDK(config);
 | `eventStore` | `IEventStore` | Defaults to `FileEventStore('./events')` |
 | `defaultPolicies` | `Policy[]` | Global policies |
 | `goldenTracesDir`, `regressionTestSuitesDir`, `assertionsDir`, `impactAnalysesDir` | `string` | Storage of testing artifacts |
+
+### OpenAI models
+
+OpenAI reasoning models — the o-series (`o1`, `o3`, `o4-mini`…) and GPT-5 and later (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…), also dated or fine-tuned (`ft:o4-mini-…`) — refuse `temperature` and `max_tokens`. The OpenAI provider recognizes them by name: it sends them `maxTokens` as `max_completion_tokens`, which also counts their reasoning tokens, and the reasoning effort, but never a temperature, not even with the effort `none`. Other models get `temperature` and `max_tokens`, which every OpenAI-compatible server knows.
+
+| Option | Default | |
+| --- | --- | --- |
+| `defaultModel` | `gpt-5.4` | Model of a request that names none, and of a fallback that does not serve the agent's model |
+| `reasoningModels` | Detected from the name | `true` or `false`: every model of this provider is, or is not, a reasoning model. A list: these names are (Azure deployments, gateway aliases), the others are detected |
+| `reasoningEffort` | The model's | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`, sent to reasoning models only. Each model accepts some of these values, and the API refuses the others |
+| `nativeToolMessages` | `true` | `false` for a compatible server that does not support `tool_calls` and `tool` messages: tool calls and results are then sent as plain text, to every provider of the chain when this one is a fallback |
+
+These options go in `providerConfig.openai` or in the `config` of an OpenAI fallback. A fallback of another vendor takes each option its `config` does not set from `providerConfig.openai`; a fallback of the primary's vendor takes none. An agent or a run sets its own effort in `providerSettings.openai.reasoningEffort`: the run's wins, then the agent's, then the provider's.
+
+```ts
+const sdk = createSDK({
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  providerConfig: {
+    openai: {
+      baseURL: 'https://my-resource.openai.azure.com/openai/v1/',
+      reasoningModels: ['analyst-o4-mini'], // a deployment name says nothing about its model
+      reasoningEffort: 'low',
+    },
+  },
+});
+
+const analyst = sdk.createAgent({
+  name: 'analyst',
+  model: 'analyst-o4-mini',
+  providerSettings: { openai: { reasoningEffort: 'high', maxTokens: 8_000 } },
+});
+```
 
 ## Agents
 
