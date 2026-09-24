@@ -108,6 +108,37 @@ describe('SQLEventStore schema', () => {
     ]);
   });
 
+  it("does not let a callback born during one store's schema skip another store's wait", async () => {
+    // A timer created while store A creates its schema carries A's context; it writes to
+    // store B, whose schema is slower. B's write must still wait for B's table.
+    const slowB = new RecordingConnection({ delayMs: 30 });
+    const storeB = new SQLEventStore({ connection: slowB, tableName: 'b_events' });
+    let write: Promise<void> | undefined;
+    class TimerDuringSchema extends RecordingConnection {
+      override async execute(sql: string): Promise<void> {
+        if (/CREATE TABLE/.test(sql) && !write) {
+          write = new Promise((resolve, reject) => {
+            setTimeout(() => storeB.append('run_1', event).then(resolve, reject), 0);
+          });
+        }
+        await super.execute(sql);
+      }
+    }
+    const storeA = new SQLEventStore({ connection: new TimerDuringSchema() });
+
+    await storeA.append('run_a', event);
+    await write;
+    await storeB.close();
+
+    // Before the fix, B's INSERT ran first, before its table existed.
+    expect(slowB.statements).toEqual([
+      'CREATE TABLE IF',
+      ...Array.from({ length: 5 }, () => 'CREATE INDEX IF'),
+      'INSERT INTO b_events',
+      'CLOSE',
+    ]);
+  });
+
   it('closes only after a schema creation in progress', async () => {
     const connection = new RecordingConnection({ delayMs: 20 });
     const store = new SQLEventStore({ connection });
@@ -149,47 +180,50 @@ describe('SQLEventStore schema', () => {
   });
 
   const nodeSqlite = loadNodeSqlite();
-  describe.skipIf(!nodeSqlite)('with a real SQLite database (node:sqlite)', () => {
-    function indexesOf(
-      db: InstanceType<NonNullable<typeof nodeSqlite>['DatabaseSync']>,
-      schema: string
-    ) {
-      return db
-        .prepare(
-          `SELECT name FROM ${schema}.sqlite_master WHERE type = 'index' AND name LIKE 'idx_%'`
-        )
-        .all()
-        .map((row) => (row as { name: string }).name)
-        .sort();
+  describe.skipIf(!nodeSqlite)(
+    `with a real SQLite database (node:sqlite)${nodeSqlite ? '' : ' — skipped: this Node.js has no node:sqlite'}`,
+    () => {
+      function indexesOf(
+        db: InstanceType<NonNullable<typeof nodeSqlite>['DatabaseSync']>,
+        schema: string
+      ) {
+        return db
+          .prepare(
+            `SELECT name FROM ${schema}.sqlite_master WHERE type = 'index' AND name LIKE 'idx_%'`
+          )
+          .all()
+          .map((row) => (row as { name: string }).name)
+          .sort();
+      }
+
+      it('creates the table and its indexes, then records and reads events', async () => {
+        const db = new (nodeSqlite as NonNullable<typeof nodeSqlite>).DatabaseSync(':memory:');
+        const store = new SQLiteEventStore({ db });
+
+        await store.append('run_1', event);
+
+        expect(await store.getEvents('run_1')).toHaveLength(1);
+        expect(indexesOf(db, 'main')).toHaveLength(5);
+        await store.close();
+      });
+
+      it('creates the indexes of a table in an attached database', async () => {
+        const db = new (nodeSqlite as NonNullable<typeof nodeSqlite>).DatabaseSync(':memory:');
+        db.exec("ATTACH DATABASE ':memory:' AS app");
+        const store = new SQLiteEventStore({ db, tableName: 'app.events' });
+
+        await store.append('run_1', event);
+
+        expect(await store.getEvents('run_1')).toHaveLength(1);
+        expect(indexesOf(db, 'app')).toEqual([
+          'idx_events_run_id',
+          'idx_events_run_timestamp',
+          'idx_events_timestamp',
+          'idx_events_type',
+          'idx_events_type_timestamp',
+        ]);
+        await store.close();
+      });
     }
-
-    it('creates the table and its indexes, then records and reads events', async () => {
-      const db = new (nodeSqlite as NonNullable<typeof nodeSqlite>).DatabaseSync(':memory:');
-      const store = new SQLiteEventStore({ db });
-
-      await store.append('run_1', event);
-
-      expect(await store.getEvents('run_1')).toHaveLength(1);
-      expect(indexesOf(db, 'main')).toHaveLength(5);
-      await store.close();
-    });
-
-    it('creates the indexes of a table in an attached database', async () => {
-      const db = new (nodeSqlite as NonNullable<typeof nodeSqlite>).DatabaseSync(':memory:');
-      db.exec("ATTACH DATABASE ':memory:' AS app");
-      const store = new SQLiteEventStore({ db, tableName: 'app.events' });
-
-      await store.append('run_1', event);
-
-      expect(await store.getEvents('run_1')).toHaveLength(1);
-      expect(indexesOf(db, 'app')).toEqual([
-        'idx_events_run_id',
-        'idx_events_run_timestamp',
-        'idx_events_timestamp',
-        'idx_events_type',
-        'idx_events_type_timestamp',
-      ]);
-      await store.close();
-    });
-  });
+  );
 });

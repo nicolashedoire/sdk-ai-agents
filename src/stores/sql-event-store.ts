@@ -24,8 +24,11 @@ export interface SQLEventStoreConfig {
 /** An SQL identifier, optionally qualified by a schema (`app.events`): it goes into the SQL text. */
 const TABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,62}(\.[A-Za-z_][A-Za-z0-9_]{0,62})?$/;
 
-/** Marks the calls made while the schema is being created: they must not wait for it. */
-const creatingSchema = new AsyncLocalStorage<true>();
+/**
+ * The schema creation attempt a call belongs to, if any. Each attempt has its own token: a
+ * call waits for the schema unless it belongs to this store's attempt still in progress.
+ */
+const schemaAttemptOf = new AsyncLocalStorage<object>();
 
 export class SQLEventStore implements IEventStore {
   /** The connection for every query: each one waits until the schema exists. */
@@ -39,6 +42,8 @@ export class SQLEventStore implements IEventStore {
   protected indexPrefix: string;
   private readonly rawConnection: SQLConnection;
   private schema?: Promise<void>;
+  /** Token of the schema creation in progress (see schemaAttemptOf). */
+  private schemaAttempt?: object;
 
   constructor(config: SQLEventStoreConfig) {
     const tableName = config.tableName || 'events';
@@ -54,7 +59,11 @@ export class SQLEventStore implements IEventStore {
     this.unqualifiedTableName = second ?? tableName;
     this.indexPrefix = `idx_${this.unqualifiedTableName}`;
     this.rawConnection = config.connection;
-    this.connection = afterSchema(config.connection, () => this.ensureSchema());
+    this.connection = afterSchema(
+      config.connection,
+      () => this.ensureSchema(),
+      () => this.schemaAttempt !== undefined && schemaAttemptOf.getStore() === this.schemaAttempt
+    );
     // Created at once, in the background. Queries wait for it, so the first write cannot come
     // before the table exists. A failure (database not reachable yet) is reported by the
     // operations that wait for it, and the next operation tries again.
@@ -63,12 +72,20 @@ export class SQLEventStore implements IEventStore {
 
   /** The schema, created once; after a failure, the next call tries again. */
   private ensureSchema(): Promise<void> {
-    this.schema ??= creatingSchema
-      .run(true, () => this.initializeSchema(this.rawConnection))
-      .catch((error: unknown) => {
-        this.schema = undefined;
-        throw error;
-      });
+    if (!this.schema) {
+      const attempt = {};
+      this.schemaAttempt = attempt;
+      const settled = () => {
+        if (this.schemaAttempt === attempt) this.schemaAttempt = undefined;
+      };
+      this.schema = schemaAttemptOf
+        .run(attempt, () => this.initializeSchema(this.rawConnection))
+        .then(settled, (error: unknown) => {
+          settled();
+          this.schema = undefined;
+          throw error;
+        });
+    }
     return this.schema;
   }
 
@@ -689,12 +706,16 @@ export class SQLEventStore implements IEventStore {
 }
 
 /**
- * A connection whose queries wait for the schema before running, except the ones made while
- * the schema is being created (a subclass creating it through `this.connection`).
+ * A connection whose queries wait for the schema before running, except the ones that belong
+ * to the schema's own creation (a subclass creating it through `this.connection`).
  */
-function afterSchema(connection: SQLConnection, schema: () => Promise<void>): SQLConnection {
+function afterSchema(
+  connection: SQLConnection,
+  schema: () => Promise<void>,
+  creatingSchema: () => boolean
+): SQLConnection {
   const ready = async () => {
-    if (!creatingSchema.getStore()) await schema();
+    if (!creatingSchema()) await schema();
   };
   return {
     query: async <T = unknown>(sql: string, params?: unknown[]): Promise<T[]> => {
