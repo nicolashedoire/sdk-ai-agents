@@ -46,6 +46,7 @@ export default withMermaid(
           items: [
             { text: 'Cognitive agents', link: '/guide/cognitive-agents' },
             { text: 'Evidence & verification', link: '/guide/evidence-and-verification' },
+            { text: 'Memory across runs', link: '/guide/memory' },
             { text: 'Reason like a given person', link: '/guide/thinker-profiles' },
             { text: 'Governed agents', link: '/guide/governed-agents' },
           ],

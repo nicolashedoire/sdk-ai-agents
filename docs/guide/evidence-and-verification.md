@@ -179,7 +179,7 @@ Runs record the version of these rules (`schemaVersion: 2` in `cognition.started
 
 ## Not there yet
 
-- **Memory across runs.** Verified rules are not yet reused by later runs; a `KnowledgeStore` is the next step.
+- **Semantic memory.** [Memory across runs](./memory) recalls what earlier tests established by word matching; related rules worded differently can be missed.
 - **Targeted staleness.** New evidence makes every assessment stale, not only the ones it concerns — conservative, and simple to audit.
 - **Choosing what to explore.** Controllers choose an operation; the target (which unknown, which prediction) is the first eligible one.
 - **Calibration.** There is no calibrated predictive confidence yet: `support` is a judgement, and the track record of predictions is what is measured.

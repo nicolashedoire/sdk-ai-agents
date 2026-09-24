@@ -61,6 +61,8 @@ Every term used in this documentation, explained without jargon, with a link to 
 | **Duplicate** | The same content from the same origin, seen again. It adds no weight. |
 | **Prediction** (`P1`…) | What should be observed if a hypothesis is right, recorded **before** testing it. |
 | **Falsifier** | The observation that would prove the hypothesis wrong. A claim that cannot be proven wrong cannot be tested. |
+| **Knowledge** (`M1`…) | What earlier runs established with real tests, recalled at the start of a run: *verified*, *refuted*, or *contested* when tests disagree. See [Memory across runs](./memory). |
+| **Scope** | The boundary of a memory: runs share what they learned only within the same scope, for example one test bench or one product. |
 | **Outcome evaluator** | Your code that confronts a prediction with the world (a measurement, a simulator, a test suite) and answers *confirmed*, *refuted* or *inconclusive*. The language model never grades its own predictions. See [Predictions](./evidence-and-verification#predictions-and-the-outcome-evaluator). |
 | **Support** | How well the evidence backs a hypothesis, from 0 (refuted) to 1 (established). It is a judgement, not a measured probability. The code never mixes preferences into it; with a language-model judge, that rests on its instructions (see [Evidence is not preference](./evidence-and-verification#evidence-is-not-preference)). |
 | **Preference fit** (`preferenceFit`) | How well a choice of action suits the thinker, from 0 (meets one of their rejection criteria) to 1 (ideal). Only choices of action get one. |

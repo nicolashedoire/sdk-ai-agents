@@ -47,6 +47,7 @@ const sdk = createSDK(config);
 | `controller` | `'auto'` | `'heuristic'`, `'typed'` or a `CognitiveController` |
 | `controllerOptions` | — | `minConfidence` (0.35), `readinessThreshold` (0.8), `fallback`, `model` |
 | `assessment` | `'auto'` | `'llm'`, `'typed'` or your own `HypothesisAssessor` for the `compare` operation |
+| `knowledge` | — | Memory across runs: `{ store, scope, recallLimit? (10), record? (true) }`, see [Memory across runs](../guide/memory) |
 | `evaluator` | — | An `OutcomeEvaluator` that tests predictions; enables `test_prediction` |
 | `generator` | LLM generator on `model` | Your own `ThoughtGenerator` (observation comparisons included); its thoughts still go through the engine's admission rules |
 | `temperature`, `maxTokens` | `0.4`, — | Thought generation settings |

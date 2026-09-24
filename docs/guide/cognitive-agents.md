@@ -45,6 +45,7 @@ The mental state is plain, typed data. Every item gets a stable id the model can
 | `predictions` | `P1…` | What a hypothesis predicts, what would refute it, and the test result |
 | `contradictions` | `C1…` | Conflicts between items, with a category, until resolved with cited evidence |
 | `failures` | `X1…` | What already failed, so it is not retried blindly |
+| `knowledge` | `M1…` | What earlier runs of the same scope established with real tests, recalled when the run started (see [Memory across runs](./memory)) |
 | `confidence`, `evidenceRevision` | | Evidence support of the best answer; a counter that makes older assessments stale |
 | `decision`, `trail` | | The final decision and its status, one line per step |
 
@@ -147,6 +148,7 @@ sdk.createCognitiveAgent({
     minProposalSupport: 0.35,  // evidence support enough for a choice of action the thinker clearly prefers
   },
   evaluator: myBench,          // optional OutcomeEvaluator, enables test_prediction
+  knowledge: { store, scope: 'my-domain' }, // optional memory across runs
 });
 ```
 

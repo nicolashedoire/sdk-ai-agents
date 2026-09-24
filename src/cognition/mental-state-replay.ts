@@ -6,7 +6,11 @@ import { uniqueById } from '../utils/unique-events.js';
 import { applyThought } from './mental-state-reducer.js';
 import { describeMentalState } from './mental-state-view.js';
 import { createMentalState, type MentalState } from './mental-state.js';
-import { observationRecordSchema, thoughtPatchSchema } from './thought-patch.js';
+import {
+  observationRecordSchema,
+  recalledKnowledgeSchema,
+  thoughtPatchSchema,
+} from './thought-patch.js';
 
 /** Runs recorded before `schemaVersion` existed are version 1 and keep their original rules. */
 const startedDataSchema = z.object({
@@ -22,6 +26,14 @@ const startedDataSchema = z.object({
       minProposalSupport: z.number().min(0).max(1),
     })
     .partial()
+    .optional(),
+  /** Knowledge recalled from earlier runs, recorded so a rebuild never reads the store. */
+  knowledge: z
+    .object({
+      scope: z.string(),
+      items: z.array(recalledKnowledgeSchema).default([]),
+      error: z.string().optional(),
+    })
     .optional(),
 });
 
@@ -89,11 +101,12 @@ function rebuildWithHistory(events: Event[]): RebuiltRun {
       return true;
     });
 
-  const { goal, context, schemaVersion, observations, commitRules } = startedData.data;
+  const { goal, context, schemaVersion, observations, commitRules, knowledge } = startedData.data;
   let state = createMentalState(goal, context, {
     schemaVersion,
     observations,
     ...(commitRules ? { commitRules } : {}),
+    ...(knowledge ? { knowledge: knowledge.items } : {}),
   });
   const before = new Map<number, MentalState>();
   for (const thought of thoughts) {

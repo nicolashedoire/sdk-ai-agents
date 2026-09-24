@@ -21,6 +21,8 @@ In a usual agent, the "reasoning" is whatever the model writes: if it says it is
 
 A common pattern is to have one model judge another. Here, the agent states **before** the test what it should observe and what would prove it wrong, and **your code** decides: a measurement, a simulator, a test suite, a query. A refuted rule is rejected, and can only come back as a variant that states its difference. See [Predictions and the outcome evaluator](./evidence-and-verification#predictions-and-the-outcome-evaluator).
 
+What the tests answered is kept for later runs of the same scope: the next run starts with the rules that held and cannot restate, word for word, one that failed. Memory products remember what was said; this [memory across runs](./memory) keeps only what a test answered.
+
 ### 3. Evidence and preferences are kept apart
 
 What the thinker prefers can change **which action is chosen**, and let an action they clearly prefer be committed on plausible evidence; in the code, it never makes a **claim about the world** more credible. With Jev, the evidence question is even sent without the thinker's profile; with a language-model judge, that separation rests on its instructions. See [Evidence is not preference](./evidence-and-verification#evidence-is-not-preference).
@@ -52,7 +54,7 @@ The difference here is that these pieces share one event log with an explicit re
 - **Multi-agent orchestration, streaming and UI kits** are richer elsewhere.
 - **Cost and latency.** A cognitive answer takes about ten reasoning steps, each with one or two model requests (with gpt-4o and Jev, a few minutes and around 0.1 USD per problem in our trials), where a direct answer takes a single call and a tool-using agent a few.
 - **Model dependence.** The rules hold whatever the model, but the quality of the reasoning does not: small models follow the method poorly, and even strong ones often end provisional or abstain on hard problems.
-- **Memory across runs.** A rule verified in one run is not reused by the next one yet.
+- **Memory and retrieval.** Memory products and retrieval pipelines offer semantic search over large collections; [memory across runs](./memory) here recalls tested rules by word matching within a narrow scope.
 
 ## When to choose it
 
