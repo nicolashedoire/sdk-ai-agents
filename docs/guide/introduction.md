@@ -64,4 +64,4 @@ What it imitates is a **way of reasoning**: it does not know what you never wrot
 - **Operations built in** — per-run API costs, retry policies that do not stack, incident alerts by email or webhook.
 - **Native event sourcing** — replay without the LLM, golden traces, regression detection, reasoning graphs.
 
-New to these terms? [Key terms in plain words](./glossary) explains each one. Ready? Head to [Getting started](./getting-started).
+How does it compare with other frameworks? See [Why this SDK](./why). New to these terms? [Key terms in plain words](./glossary) explains each one. Ready? Head to [Getting started](./getting-started).
