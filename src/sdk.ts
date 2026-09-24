@@ -343,9 +343,9 @@ export class SDKImpl implements SDK {
     const ids = runIds ?? (await this.eventStore.getRunIds());
     const examples: ControllerTrainingExample[] = [];
     for (const runId of ids) {
-      const events = await this.eventStore.getEvents(runId);
-      if (!events.some((event) => event.type === 'cognition.started')) continue;
       try {
+        const events = await this.eventStore.getEvents(runId);
+        if (!events.some((event) => event.type === 'cognition.started')) continue;
         examples.push(...buildControllerDataset(runId, events));
       } catch (error) {
         // One damaged run must not block the export of all the others.

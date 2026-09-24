@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import type { GoldenTrace, GoldenTraceConfig } from '../types/golden-trace.js';
 import type { Trace } from '../types/sdk.js';
+import { fileInFolder } from '../utils/file-in-folder.js';
+import { ValidationError } from '../errors/index.js';
 
 export class GoldenTraceManager {
   private goldenTracesDir: string;
@@ -44,7 +46,7 @@ export class GoldenTraceManager {
       metadata: config.metadata,
     };
 
-    const filePath = join(this.goldenTracesDir, `${goldenTrace.id}.json`);
+    const filePath = fileInFolder(this.goldenTracesDir, goldenTrace.id, '.json', 'id');
     await fs.writeFile(filePath, JSON.stringify(goldenTrace, null, 2), 'utf-8');
 
     this.goldenTracesCache.set(goldenTrace.id, goldenTrace);
@@ -59,13 +61,14 @@ export class GoldenTraceManager {
     }
 
     try {
-      const filePath = join(this.goldenTracesDir, `${goldenTraceId}.json`);
+      const filePath = fileInFolder(this.goldenTracesDir, goldenTraceId, '.json', 'id');
       const content = await fs.readFile(filePath, 'utf-8');
       const goldenTrace = JSON.parse(content) as GoldenTrace;
       this.goldenTracesCache.set(goldenTraceId, goldenTrace);
       return goldenTrace;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      // A missing file, or an id that cannot name one: nothing to read or delete.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT' || error instanceof ValidationError) {
         return null;
       }
       this.handleError('Failed to read golden trace', error);
@@ -108,12 +111,13 @@ export class GoldenTraceManager {
     await this.ensureGoldenTracesDir();
 
     try {
-      const filePath = join(this.goldenTracesDir, `${goldenTraceId}.json`);
+      const filePath = fileInFolder(this.goldenTracesDir, goldenTraceId, '.json', 'id');
       await fs.unlink(filePath);
       this.goldenTracesCache.delete(goldenTraceId);
       return true;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      // A missing file, or an id that cannot name one: nothing to read or delete.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT' || error instanceof ValidationError) {
         return false;
       }
       this.handleError('Failed to delete golden trace', error);

@@ -36,6 +36,7 @@ export class MonitoredEventStore implements IEventStore {
   readonly getEventsByUser?: IEventStore['getEventsByUser'];
   readonly getEventsBySession?: IEventStore['getEventsBySession'];
   readonly countEvents?: IEventStore['countEvents'];
+  readonly checkRunId?: IEventStore['checkRunId'];
   readonly groupEventsBy?: IEventStore['groupEventsBy'];
   readonly backup?: IEventStore['backup'];
   readonly restore?: IEventStore['restore'];
@@ -55,6 +56,7 @@ export class MonitoredEventStore implements IEventStore {
     this.getEventsByUser = inner.getEventsByUser?.bind(inner);
     this.getEventsBySession = inner.getEventsBySession?.bind(inner);
     this.countEvents = inner.countEvents?.bind(inner);
+    this.checkRunId = inner.checkRunId?.bind(inner);
     this.groupEventsBy = inner.groupEventsBy?.bind(inner);
     this.backup = inner.backup?.bind(inner);
     this.restore = inner.restore?.bind(inner);

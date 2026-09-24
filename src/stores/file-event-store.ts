@@ -1,8 +1,8 @@
 import { promises as fs } from 'node:fs';
-import { join } from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import type { Event, EventFilters, EventLog } from '../types/events.js';
 import type { IEventStore } from './event-store.js';
+import { fileInFolder, isFileId } from '../utils/file-in-folder.js';
 import { deriveRunStatus } from '../utils/run-status.js';
 
 export class FileEventStore implements IEventStore {
@@ -65,7 +65,14 @@ export class FileEventStore implements IEventStore {
     console.error(`${message}:`, error);
   }
 
+  /** Throws a ValidationError if the store cannot record events under this run id. */
+  checkRunId(runId: string): void {
+    this.getEventFilePath(runId);
+  }
+
   async append(runId: string, event: Event): Promise<void> {
+    // Refused before anything is kept: an id that cannot name a file inside the folder.
+    this.getEventFilePath(runId);
     this.ensureEventId(event);
     this.ensureEventTimestamp(event);
 
@@ -101,9 +108,9 @@ export class FileEventStore implements IEventStore {
   }
 
   async getEvents(runId: string, filters?: EventFilters): Promise<Event[]> {
+    const filePath = this.getEventFilePath(runId);
     await this.flushRun(runId);
 
-    const filePath = this.getEventFilePath(runId);
     try {
       const data = await fs.readFile(filePath, 'utf-8');
       const events: Event[] = JSON.parse(data);
@@ -128,8 +135,10 @@ export class FileEventStore implements IEventStore {
       const runIds: string[] = [];
 
       for (const file of files) {
-        if (file.endsWith('.json')) {
-          const runId = file.replace('.json', '');
+        // A file whose name is not a run id (a copy, an older run id) is not a run of this
+        // store: it is skipped, not allowed to empty the whole listing.
+        const runId = file.endsWith('.json') ? file.slice(0, -'.json'.length) : '';
+        if (isFileId(runId)) {
           const events = await this.getEvents(runId);
 
           if (events.length > 0) {
@@ -249,7 +258,7 @@ export class FileEventStore implements IEventStore {
   }
 
   private getEventFilePath(runId: string): string {
-    return join(this.eventsDir, `${runId}.json`);
+    return fileInFolder(this.eventsDir, runId, '.json', 'runId');
   }
 
   private filterEvents(events: Event[], filters?: EventFilters): Event[] {
