@@ -35,7 +35,7 @@ interface Event {
 | `tool.retry` | `toolName`、`retry`、`delayMs`、`error` |
 | `provider.fallback` | `primaryProvider`、`usedProvider`、`attemptedProviders` |
 | `provider.retry` | `provider`、`model`、`retry`、`delayMs`、`error` |
-| `provider.answer_discarded` | `provider`、`model`、`usage`、`reason`。ベンダーが課金し、使用量を報告したにもかかわらず、プロバイダーが使えなかった応答（選択肢を一つも含まない OpenAI の応答）。コストに数えられ、ガバナンス付きエージェントでは期間ごとの予算にも数えられる |
+| `provider.answer_discarded` | `provider`、`model`、`requestedModel?`、`usage`、`reason`。ベンダーが課金し、使用量を報告したにもかかわらず、プロバイダーが使えなかった応答（選択肢を一つも含まない OpenAI の応答）。コストと期間ごとの予算に数えられる |
 | `resource.read` | `uri`、`mimeType?`、`bytes`、提供した内容の `sha256`（内容そのものは保存されない） |
 
 `tool.failed`、`intention.rejected`、`error.occurred` は `EventType` 型に含まれますが、SDK がこれらを記録することはありません。失敗したツール呼び出しは `action.failed` イベントに、ポリシーに拒否された呼び出しは `policy.violated` イベントに、承認で却下された呼び出しは `approval.rejected` イベントになります。
@@ -46,7 +46,7 @@ interface Event {
 | --- | --- |
 | `cognition.started` | `schemaVersion`（2。古い実行にはない）、`goal`、`context?`、`observations`（問題と一緒に渡されたもの）、`commitRules`、`knowledge?`（`scope`、以前の実行から呼び出された `items`、ストアが失敗した場合は `error?`）、`profile`、`controller`、`assessor`、`evaluator?`、`allowedTools`、`limits` |
 | `cognition.operation_selected` | `step`、`operation`、`controller`、`available`、`stepsRemaining`、`forced?`（エンジンが決定を強制した）、`confidence?`、`probabilities?`、`rationale?`、`fallbackFrom?` |
-| `cognition.thought` | `step`、`operation`、`patch`、`issues`、`failed`、`ignoredFields?`、`model?`、`requestedModel?`、`usage?`（`promptTokens`、`completionTokens`、`calls`、`unmeteredCalls?`。`unmeteredCalls` はトークン数を報告しなかった呼び出しの数） |
+| `cognition.thought` | `step`、`operation`、`patch`、`issues`、`failed`、`ignoredFields?`、`model?`、`requestedModel?`、`usage?`（`promptTokens`、`completionTokens`、`calls`、`unmeteredCalls?`、`totalOnlyTokens?`。`unmeteredCalls` はトークン数を報告しなかった呼び出しの数、`totalOnlyTokens` はそのうち一部が単独で報告した合計） |
 | `cognition.operation_failed` | `step`、`operation`、`error`、`recovery?`。課金された試行の後、停止やタイムアウトで打ち切られたオペレーションでは、さらに `model?`、`requestedModel?`、`usage?` |
 | `cognition.evaluated` | `step`、`predictionId`、`hypothesisId`、`evaluator`（`id`、`version`）、`verdict`、`observed?`、`summary?`、`context?`、`metrics?`、`causeCandidates?`、`reason?`、`durationMs`。予測のテストの完全なレポート |
 | `cognition.concluded` | `decision`、`status`（`committed`、`provisional`、`abstain`）、`confidence`、`steps`、`evidenceRevision`、`hypotheses`、`predictions` |

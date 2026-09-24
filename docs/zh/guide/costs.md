@@ -38,7 +38,7 @@ const sdk = createSDK({
 });
 ```
 
-键可以是精确的模型 id，也可以是以 `*` 结尾的前缀。提供商返回的往往是带版本的 id（`gpt-4o-2024-08-06`），而你请求的是 `gpt-4o`：SDK 会把两者都记录下来，先查找返回的 id，再查找请求的名称——精确键优先于前缀，最长的前缀胜出。使用前缀时要小心：除非存在 `gpt-4o-mini*`，否则 `gpt-4o*` 也会匹配 `gpt-4o-mini`。
+键可以是精确的模型 id，也可以是以 `*` 结尾的前缀。提供商返回的往往是带版本的 id（`gpt-4o-2024-08-06`），而你请求的是 `gpt-4o`：SDK 会把两者都记录下来，先查找返回的 id，再查找请求的名称——精确键优先于前缀，最长的前缀胜出。使用前缀时要小心：除非存在 `gpt-4o-mini*`，否则 `gpt-4o*` 也会匹配 `gpt-4o-mini`。每次调用都按它自己的名称计价，包括提供商丢弃的应答：以另一个名称或不带名称请求的模型的调用，各自单独成一行。
 
 ## 未知的成本 {#unknown-costs}
 
@@ -48,6 +48,8 @@ SDK 从不编造价格，也不编造 token 数。调用的成本在两种情况
 - **它没有报告 token 数**——既没有输入 token 数也没有输出 token 数，例如提供商不返回用量，或者只返回一个总数：它会计入 `unmeteredCalls`（以及它所在行的 `unmeteredCalls`），它的模型列在 `unmeteredModels` 中。它永远不会被当作 0 个 token；如果某一行的调用都没有报告 token 数，这一行同样没有 `costUsd`。
 
 没有 token 数的调用即使模型有价格，也会像预算中那样被算作未计量调用。只要有任何调用的成本未知，报告就会被标记为 `complete: false`，而 `totalUsd` 只累加成本已知的调用：它只是一个下限，而不是这次运行的成本。
+
+一次调用的 token 数是它的输入和输出 token 数，无论厂商是否另外给出总数；如果两者都没有报告，则取它单独报告的总数：这样的总数计为 token（计入该行的 `totalOnlyTokens`、预算和运行的 `maxTokens`），但从不计为成本。
 
 ## 失败的调用 {#failed-calls}
 
@@ -65,8 +67,8 @@ SDK 从不编造价格，也不编造 token 数。调用的成本在两种情况
 | 事件 | 来源 | 字段 |
 | --- | --- | --- |
 | `intention.generated` | 原生推理、工具选择 | `model`、`requestedModel`、`usage.promptTokens`、`usage.completionTokens` |
-| `provider.answer_discarded` | 提供商无法使用的应答 | `provider`、`model`、`usage` |
-| `cognition.thought` | 认知操作，包括修复和失败的尝试 | `model`、`requestedModel`、`usage.calls`、`usage.unmeteredCalls` |
+| `provider.answer_discarded` | 提供商无法使用的应答 | `provider`、`model`、`requestedModel`、`usage` |
+| `cognition.thought` | 认知操作，包括修复和失败的尝试 | `model`、`requestedModel`、`usage.calls`、`usage.unmeteredCalls`、`usage.totalOnlyTokens` |
 | `cognition.operation_failed` | 在已计费的尝试之后被停止或超时打断的操作 | `model`、`requestedModel`、`usage` |
 | `decision.evaluated` | Jev 以及其他类型化决策后端，包括被拒绝的答案 | `model`、`usage.inputTokens`、`usage.outputTokens` |
 

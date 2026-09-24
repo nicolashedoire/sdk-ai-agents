@@ -38,7 +38,7 @@ const sdk = createSDK({
 });
 ```
 
-Schlüssel sind exakte Modellkennungen oder Präfixe, die auf `*` enden. Anbieter antworten oft mit einer versionierten Kennung (`gpt-4o-2024-08-06`), während Sie `gpt-4o` angefragt haben: Das SDK zeichnet beide auf und sucht zuerst nach der zurückgegebenen Kennung, dann nach dem angefragten Namen – exakte Schlüssel vor Präfixen, wobei das längste Präfix gewinnt. Seien Sie vorsichtig mit Präfixen: `gpt-4o*` passt auch auf `gpt-4o-mini`, sofern es kein `gpt-4o-mini*` gibt.
+Schlüssel sind exakte Modellkennungen oder Präfixe, die auf `*` enden. Anbieter antworten oft mit einer versionierten Kennung (`gpt-4o-2024-08-06`), während Sie `gpt-4o` angefragt haben: Das SDK zeichnet beide auf und sucht zuerst nach der zurückgegebenen Kennung, dann nach dem angefragten Namen – exakte Schlüssel vor Präfixen, wobei das längste Präfix gewinnt. Seien Sie vorsichtig mit Präfixen: `gpt-4o*` passt auch auf `gpt-4o-mini`, sofern es kein `gpt-4o-mini*` gibt. Jeder Aufruf wird nach seinen eigenen Namen bepreist, auch eine Antwort, die ein Anbieter verworfen hat: Aufrufe eines Modells, das unter einem anderen Namen oder ohne Namen angefragt wurde, haben eine eigene Zeile.
 
 ## Unbekannte Kosten {#unknown-costs}
 
@@ -48,6 +48,8 @@ Das SDK erfindet nie einen Preis und nie eine Token-Anzahl. Die Kosten eines Auf
 - **er hat keine Token-Anzahl gemeldet** – weder Eingabe- noch Ausgabe-Tokens, etwa bei einem Anbieter, der keinen Verbrauch zurückgibt oder nur eine Summe: Er wird in `unmeteredCalls` gezählt (und im `unmeteredCalls` seiner Zeile), sein Modell in `unmeteredModels`. Er wird nie als null Tokens gewertet, und eine Zeile, von deren Aufrufen keiner sie gemeldet hat, hat ebenfalls kein `costUsd`.
 
 Ein Aufruf ohne Token-Anzahl gilt als ungemessen, auch wenn sein Modell einen Preis hat, so wie Budgets ihn zählen. Sobald die Kosten eines Aufrufs unbekannt sind, wird der Bericht mit `complete: false` markiert, und `totalUsd` addiert nur die Aufrufe mit bekannten Kosten: eine Untergrenze, nicht die Kosten des Laufs.
+
+Die Tokens eines Aufrufs sind seine Eingabe- und Ausgabe-Tokens, gleich welche Summe der Hersteller außerdem angibt, sonst die Summe, die er allein gemeldet hat: Eine solche Summe zählt als Tokens (im `totalOnlyTokens` der Zeile, in den Budgets und im `maxTokens` eines Laufs), nie als Kosten.
 
 ## Fehlgeschlagene Aufrufe {#failed-calls}
 
@@ -65,8 +67,8 @@ Ein Versuch, der ohne Antwort fehlschlug – ein HTTP-Fehler, eine Zeitüberschr
 | Ereignis | Quelle | Felder |
 | --- | --- | --- |
 | `intention.generated` | Natives Reasoning, Tool-Auswahl | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
-| `provider.answer_discarded` | Eine Antwort, die der Anbieter nicht verwenden konnte | `provider`, `model`, `usage` |
-| `cognition.thought` | Kognitive Operationen, einschließlich Reparaturen und fehlgeschlagener Versuche | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls` |
+| `provider.answer_discarded` | Eine Antwort, die der Anbieter nicht verwenden konnte | `provider`, `model`, `requestedModel`, `usage` |
+| `cognition.thought` | Kognitive Operationen, einschließlich Reparaturen und fehlgeschlagener Versuche | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.totalOnlyTokens` |
 | `cognition.operation_failed` | Eine Operation, die ein Stopp oder ein Zeitlimit nach berechneten Versuchen abgebrochen hat | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev und andere Backends für typisierte Entscheidungen, einschließlich abgelehnter Antworten | `model`, `usage.inputTokens`, `usage.outputTokens` |
 

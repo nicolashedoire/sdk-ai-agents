@@ -38,7 +38,7 @@ const sdk = createSDK({
 });
 ```
 
-キーには、モデル ID そのもの、または `*` で終わるプレフィックスを指定します。`gpt-4o` を指定したのに、プロバイダーがバージョン付きの ID（`gpt-4o-2024-08-06`）で応答することはよくあります。SDK はその両方を記録し、まず返された ID で、次に指定した名前で価格を探します。完全一致のキーはプレフィックスより優先され、プレフィックス同士では最も長いものが優先されます。プレフィックスには注意してください。`gpt-4o-mini*` がない限り、`gpt-4o*` は `gpt-4o-mini` にも一致します。
+キーには、モデル ID そのもの、または `*` で終わるプレフィックスを指定します。`gpt-4o` を指定したのに、プロバイダーがバージョン付きの ID（`gpt-4o-2024-08-06`）で応答することはよくあります。SDK はその両方を記録し、まず返された ID で、次に指定した名前で価格を探します。完全一致のキーはプレフィックスより優先され、プレフィックス同士では最も長いものが優先されます。プレフィックスには注意してください。`gpt-4o-mini*` がない限り、`gpt-4o*` は `gpt-4o-mini` にも一致します。各呼び出しは、プロバイダーが破棄した応答も含め、それぞれ自身の名前で価格が決まります。別の名前で、または名前なしで要求されたモデルの呼び出しは、別の行になります。
 
 ## 不明なコスト {#unknown-costs}
 
@@ -48,6 +48,8 @@ SDK が価格やトークン数をでっち上げることは決してありま�
 - **トークン数が報告されなかった**：入力トークン数も出力トークン数もない場合で、使用量を返さないプロバイダーや、合計だけを返すプロバイダーがこれにあたります。その呼び出しは `unmeteredCalls`（とその行の `unmeteredCalls`）に、モデルは `unmeteredModels` に数えられます。トークン数がゼロとみなされることはありません。また、どの呼び出しもトークン数を報告しなかった行には `costUsd` もありません。
 
 トークン数のない呼び出しは、予算での扱いと同じく、モデルに価格があっても計測なし（unmetered）として数えられます。いずれかの呼び出しのコストが不明なとき、レポートには `complete: false` が付き、`totalUsd` はコストのわかっている呼び出しだけを合計します。これは実行のコストではなく、その下限です。
+
+呼び出しのトークン数は、その入力トークン数と出力トークン数です。ベンダーが合計も返す場合でも、その合計は使いません。どちらも報告されなかった場合は、単独で報告された合計を使います。このような合計はトークンとして数えられます（行の `totalOnlyTokens`、予算、実行の `maxTokens`）が、費用としては決して数えられません。
 
 ## 失敗した呼び出し {#failed-calls}
 
@@ -65,8 +67,8 @@ SDK が価格やトークン数をでっち上げることは決してありま�
 | イベント | 発生源 | フィールド |
 | --- | --- | --- |
 | `intention.generated` | ネイティブの推論、ツールの選択 | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
-| `provider.answer_discarded` | プロバイダーが使えなかった応答 | `provider`, `model`, `usage` |
-| `cognition.thought` | 認知オペレーション（修復と失敗した試行も含む） | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls` |
+| `provider.answer_discarded` | プロバイダーが使えなかった応答 | `provider`, `model`, `requestedModel`, `usage` |
+| `cognition.thought` | 認知オペレーション（修復と失敗した試行も含む） | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.totalOnlyTokens` |
 | `cognition.operation_failed` | 課金された試行の後、停止やタイムアウトで打ち切られたオペレーション | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev とその他の型付き決定のバックエンド（拒否された回答も含む） | `model`, `usage.inputTokens`, `usage.outputTokens` |
 

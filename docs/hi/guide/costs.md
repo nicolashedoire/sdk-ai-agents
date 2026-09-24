@@ -38,7 +38,7 @@ const sdk = createSDK({
 });
 ```
 
-Keys सटीक मॉडल ids होते हैं या `*` पर खत्म होने वाले prefixes। प्रदाता अक्सर वर्ज़न वाले id (`gpt-4o-2024-08-06`) के साथ जवाब देते हैं, जबकि आपने `gpt-4o` माँगा था: SDK दोनों दर्ज करता है और पहले लौटाया गया id ढूँढता है, फिर माँगा गया नाम — prefixes से पहले सटीक keys, और सबसे लंबा prefix जीतता है। prefixes के साथ सावधान रहें: `gpt-4o*` `gpt-4o-mini` से भी मेल खाता है, जब तक `gpt-4o-mini*` मौजूद न हो।
+Keys सटीक मॉडल ids होते हैं या `*` पर खत्म होने वाले prefixes। प्रदाता अक्सर वर्ज़न वाले id (`gpt-4o-2024-08-06`) के साथ जवाब देते हैं, जबकि आपने `gpt-4o` माँगा था: SDK दोनों दर्ज करता है और पहले लौटाया गया id ढूँढता है, फिर माँगा गया नाम — prefixes से पहले सटीक keys, और सबसे लंबा prefix जीतता है। prefixes के साथ सावधान रहें: `gpt-4o*` `gpt-4o-mini` से भी मेल खाता है, जब तक `gpt-4o-mini*` मौजूद न हो। हर कॉल की कीमत उसके अपने नामों पर निकाली जाती है, प्रदाता द्वारा छोड़े गए जवाब की भी: किसी दूसरे नाम से, या बिना नाम के, माँगे गए मॉडल की कॉल की अपनी अलग पंक्ति होती है।
 
 ## अज्ञात लागत {#unknown-costs}
 
@@ -48,6 +48,8 @@ SDK कभी कोई कीमत नहीं गढ़ता, और न �
 - **उसने tokens की कोई गिनती नहीं बताई** — न इनपुट tokens की, न आउटपुट tokens की, जैसे कोई प्रदाता जो उपयोग लौटाता ही नहीं, या सिर्फ़ कुल संख्या लौटाता है: वह `unmeteredCalls` में गिनी जाती है (और अपनी पंक्ति के `unmeteredCalls` में), और उसका मॉडल `unmeteredModels` में। उसे कभी शून्य tokens वाली कॉल नहीं माना जाता, और जिस पंक्ति की किसी भी कॉल ने tokens नहीं बताए, उसमें `costUsd` भी नहीं होता।
 
 जिस कॉल ने tokens की गिनती नहीं बताई, वह बिना माप वाली (unmetered) गिनी जाती है, भले ही उसके मॉडल की कीमत हो — ठीक वैसे ही जैसे बजट उसे गिनते हैं। जैसे ही किसी भी कॉल की लागत अज्ञात होती है, रिपोर्ट `complete: false` चिह्नित होती है और `totalUsd` सिर्फ़ उन्हीं कॉल को जोड़ता है जिनकी लागत ज्ञात है: यह एक निचली सीमा है, run की लागत नहीं।
+
+किसी कॉल के tokens उसके इनपुट और आउटपुट tokens होते हैं, vendor साथ में कोई भी कुल संख्या दे; वरना वह कुल संख्या जो उसने अकेले बताई: ऐसी कुल संख्या tokens के रूप में गिनी जाती है (पंक्ति के `totalOnlyTokens` में, बजट में और run के `maxTokens` में), लागत के रूप में कभी नहीं।
 
 ## विफल कॉल {#failed-calls}
 
@@ -65,8 +67,8 @@ SDK कभी कोई कीमत नहीं गढ़ता, और न �
 | इवेंट | स्रोत | फ़ील्ड |
 | --- | --- | --- |
 | `intention.generated` | मूल तर्क, टूल का चुनाव | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
-| `provider.answer_discarded` | ऐसा जवाब जिसे प्रदाता इस्तेमाल नहीं कर सका | `provider`, `model`, `usage` |
-| `cognition.thought` | संज्ञानात्मक ऑपरेशन, सुधार और विफल प्रयासों सहित | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls` |
+| `provider.answer_discarded` | ऐसा जवाब जिसे प्रदाता इस्तेमाल नहीं कर सका | `provider`, `model`, `requestedModel`, `usage` |
+| `cognition.thought` | संज्ञानात्मक ऑपरेशन, सुधार और विफल प्रयासों सहित | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.totalOnlyTokens` |
 | `cognition.operation_failed` | बिल हो चुके प्रयासों के बाद रोक या समय-सीमा से बीच में रुका ऑपरेशन | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev और दूसरे टाइप्ड-निर्णय backends, अस्वीकार किए गए उत्तरों सहित | `model`, `usage.inputTokens`, `usage.outputTokens` |
 

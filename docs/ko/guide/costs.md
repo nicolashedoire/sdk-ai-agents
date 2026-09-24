@@ -38,7 +38,7 @@ const sdk = createSDK({
 });
 ```
 
-키는 정확한 모델 id이거나 `*`로 끝나는 접두사입니다. 여러분이 `gpt-4o`를 요청해도 프로바이더는 흔히 버전이 붙은 id(`gpt-4o-2024-08-06`)로 응답합니다. SDK는 둘 다 기록하고, 반환된 id를 먼저 찾은 다음 요청한 이름을 찾습니다. 정확한 키가 접두사보다 먼저이고, 접두사끼리는 가장 긴 것이 이깁니다. 접두사를 조심하세요. `gpt-4o-mini*`가 없으면 `gpt-4o*`는 `gpt-4o-mini`에도 일치합니다.
+키는 정확한 모델 id이거나 `*`로 끝나는 접두사입니다. 여러분이 `gpt-4o`를 요청해도 프로바이더는 흔히 버전이 붙은 id(`gpt-4o-2024-08-06`)로 응답합니다. SDK는 둘 다 기록하고, 반환된 id를 먼저 찾은 다음 요청한 이름을 찾습니다. 정확한 키가 접두사보다 먼저이고, 접두사끼리는 가장 긴 것이 이깁니다. 접두사를 조심하세요. `gpt-4o-mini*`가 없으면 `gpt-4o*`는 `gpt-4o-mini`에도 일치합니다. 각 호출은 프로바이더가 버린 응답을 포함해 저마다 자신의 이름으로 가격이 매겨집니다. 다른 이름으로, 또는 이름 없이 요청된 모델의 호출은 별도의 줄이 됩니다.
 
 ## 알 수 없는 비용 {#unknown-costs}
 
@@ -48,6 +48,8 @@ SDK는 가격도, 토큰 수도 절대 지어내지 않습니다. 호출의 비�
 - **토큰 수를 보고하지 않은 경우**: 입력 토큰 수도 출력 토큰 수도 없는 경우로, 사용량을 돌려주지 않거나 합계만 돌려주는 프로바이더가 여기에 해당합니다. 그 호출은 `unmeteredCalls`(와 그 줄의 `unmeteredCalls`)에, 모델은 `unmeteredModels`에 집계됩니다. 토큰 0개로 간주되는 일은 절대 없으며, 어떤 호출도 토큰 수를 보고하지 않은 줄에는 `costUsd`도 없습니다.
 
 토큰 수가 없는 호출은 예산에서와 마찬가지로 모델에 가격이 있어도 미계량 호출로 집계됩니다. 어떤 호출이든 비용을 알 수 없으면 보고서는 `complete: false`로 표시되고, `totalUsd`는 비용을 아는 호출만 더합니다. 즉 실행의 비용이 아니라 그 하한입니다.
+
+호출의 토큰 수는 그 입력 토큰과 출력 토큰이며, 벤더가 합계를 함께 주더라도 그 합계는 쓰지 않습니다. 둘 다 보고되지 않았으면 단독으로 보고된 합계를 씁니다. 이런 합계는 토큰으로 집계되지만(그 줄의 `totalOnlyTokens`, 예산, 실행의 `maxTokens`), 비용으로는 절대 집계되지 않습니다.
 
 ## 실패한 호출 {#failed-calls}
 
@@ -65,8 +67,8 @@ SDK는 가격도, 토큰 수도 절대 지어내지 않습니다. 호출의 비�
 | 이벤트 | 출처 | 필드 |
 | --- | --- | --- |
 | `intention.generated` | 네이티브 추론, 도구 선택 | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
-| `provider.answer_discarded` | 프로바이더가 쓸 수 없었던 응답 | `provider`, `model`, `usage` |
-| `cognition.thought` | 인지 연산(수정과 실패한 시도 포함) | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls` |
+| `provider.answer_discarded` | 프로바이더가 쓸 수 없었던 응답 | `provider`, `model`, `requestedModel`, `usage` |
+| `cognition.thought` | 인지 연산(수정과 실패한 시도 포함) | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.totalOnlyTokens` |
 | `cognition.operation_failed` | 청구된 시도 뒤에 중지나 타임아웃으로 중단된 연산 | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev와 그 밖의 타입 지정 결정 백엔드(거부된 답 포함) | `model`, `usage.inputTokens`, `usage.outputTokens` |
 

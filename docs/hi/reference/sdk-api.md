@@ -36,7 +36,7 @@ SDK, OpenAI को Chat Completions के ज़रिए बुलाता �
 | `defaultModel` | `gpt-5.4` | उस request का मॉडल जो कोई मॉडल नहीं बताती, और उस फ़ॉलबैक का जो एजेंट का मॉडल सर्व नहीं करता |
 | `reasoningModels` | नाम से पहचाना जाता है | `true` या `false`: इस प्रदाता के सभी मॉडल reasoning मॉडल हैं, या कोई भी नहीं है। एक सूची: ये नाम reasoning मॉडल हैं (Azure deployments, gateway aliases), बाकी नाम से पहचाने जाते हैं |
 | `reasoningEffort` | मॉडल का अपना | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` या `max`, बिना बदले सिर्फ़ reasoning मॉडलों को भेजा जाता है। हर मॉडल इनमें से कुछ मान स्वीकार करता है, और API बाकी को ठुकरा देती है |
-| `includeStreamUsage` | OpenAI की अपनी API पर | `true`: स्ट्रीम किए गए जवाब से उसका उपयोग माँगा जाता है (`stream_options`), ताकि उसकी लागत गिनी जाए; `false`: नहीं माँगा जाता। डिफ़ॉल्ट रूप से `https://api.openai.com/v1` पर और `https://eu.api.openai.com/v1` जैसे क्षेत्रीय hosts पर चालू (`baseURL` या `OPENAI_BASE_URL` से), क्योंकि कोई संगत सर्वर इस फ़ील्ड को ठुकरा सकता है (तब request इसके बिना दोबारा भेजी जाती है) या अनदेखा कर सकता है, और बिना उपयोग वाली स्ट्रीम की गई कॉल बिना माप वाली (unmetered) गिनी जाती है। लागत बजट के साथ ऐसे संगत सर्वर पर जो उपयोग बताता है (Azure OpenAI की v1 API बताती है), `true` सेट करें |
+| `includeStreamUsage` | OpenAI की अपनी API पर | `true`: स्ट्रीम किए गए जवाब से उसका उपयोग माँगा जाता है (`stream_options`), ताकि उसकी लागत गिनी जाए; `false`: नहीं माँगा जाता। डिफ़ॉल्ट रूप से `https://api.openai.com/v1` पर और `https://eu.api.openai.com/v1` जैसे क्षेत्रीय hosts पर चालू (`baseURL` या `OPENAI_BASE_URL` से), क्योंकि कोई संगत सर्वर इस फ़ील्ड को ठुकरा सकता है (तब request इसके बिना दोबारा भेजी जाती है; OpenAI की अपनी API को सिर्फ़ तब, जब `includeStreamUsage` सेट हो) या अनदेखा कर सकता है, और बिना उपयोग वाली स्ट्रीम की गई कॉल बिना माप वाली (unmetered) गिनी जाती है। लागत बजट के साथ ऐसे संगत सर्वर पर जो उपयोग बताता है (Azure OpenAI की v1 API बताती है), `true` सेट करें |
 | `nativeToolMessages` | `true` | ऐसे संगत सर्वर के लिए `false` जो बातचीत में assistant के `tool_calls` और `tool` messages स्वीकार नहीं करता: तब पिछली टूल कॉल और उनके नतीजे text के रूप में भेजे जाते हैं, जबकि टूल अब भी पेश किए जाते हैं और जवाबों की टूल कॉल अब भी पढ़ी जाती हैं। मुख्य प्रदाता या किसी भी फ़ॉलबैक पर `false` पूरी chain पर लागू होता है |
 
 ये विकल्प `providerConfig.openai` में या OpenAI फ़ॉलबैक के `config` में रखे जाते हैं। दूसरे vendor का फ़ॉलबैक हर वह विकल्प `providerConfig.openai` से लेता है जो उसका `config` तय नहीं करता; मुख्य प्रदाता के ही vendor का फ़ॉलबैक कोई विकल्प नहीं लेता। कोई एजेंट या run अपना effort `providerSettings.openai.reasoningEffort` में तय करता है: पहले run का मान चलता है, फिर एजेंट का, फिर प्रदाता का। संज्ञानात्मक एजेंट इसे सिर्फ़ टूल के चुनाव पर लागू करता है; उसके विचार, जो कोई टूल पेश नहीं करते, उसका `reasoningEffort` विकल्प लेते हैं।
@@ -180,6 +180,7 @@ interface ModelCostLine {
   unmeteredCalls?: number;
   inputTokens: number;
   outputTokens: number;
+  totalOnlyTokens?: number;
   costUsd?: number;
 }
 ```
@@ -190,7 +191,7 @@ interface ModelCostLine {
 | `complete` | `false` जब कुछ कॉल की लागत अज्ञात हो: `unpricedCalls` या `unmeteredCalls` 0 से ज़्यादा |
 | `unpricedModels`, `unpricedCalls` | `pricing` में बिना कीमत वाले मॉडल, और उनकी वे कॉल जिन्होंने अपने tokens बताए |
 | `unmeteredModels`, `unmeteredCalls` | उन कॉल के मॉडल जिन्होंने न इनपुट tokens की गिनती बताई न आउटपुट tokens की, और वे कॉल |
-| `lines` | हर मॉडल और स्रोत के लिए एक: कॉल, उन कॉल के tokens जिन्होंने उन्हें बताया, अगर हों तो `unmeteredCalls`, मॉडल की कीमत हो और पंक्ति की किसी कॉल ने अपने tokens बताए हों तो `costUsd`; जिस कॉल ने कोई मॉडल नाम दर्ज नहीं किया, उसका `model` `(unknown)` होता है |
+| `lines` | हर मॉडल, माँगे गए मॉडल और स्रोत के लिए एक: कॉल, उन कॉल के tokens जिन्होंने उन्हें बताया, अगर हों तो `unmeteredCalls`, उनमें से कुछ द्वारा अकेले बताई गई कुल संख्याओं के लिए `totalOnlyTokens`, मॉडल की कीमत हो और पंक्ति की किसी कॉल ने अपने tokens बताए हों तो `costUsd`; जिस कॉल ने कोई मॉडल नाम दर्ज नहीं किया, उसका `model` `(unknown)` होता है |
 
 ## ट्रेस, रीप्ले और टेस्टिंग {#traces-replay-and-testing}
 

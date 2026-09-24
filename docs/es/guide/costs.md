@@ -38,7 +38,7 @@ const sdk = createSDK({
 });
 ```
 
-Las claves son identificadores exactos de modelo o prefijos que terminan en `*`. Los proveedores suelen responder con un identificador versionado (`gpt-4o-2024-08-06`) cuando pediste `gpt-4o`: el SDK registra ambos y busca primero el identificador devuelto y después el nombre pedido — las claves exactas antes que los prefijos, y gana el prefijo más largo. Cuidado con los prefijos: `gpt-4o*` también coincide con `gpt-4o-mini` salvo que exista `gpt-4o-mini*`.
+Las claves son identificadores exactos de modelo o prefijos que terminan en `*`. Los proveedores suelen responder con un identificador versionado (`gpt-4o-2024-08-06`) cuando pediste `gpt-4o`: el SDK registra ambos y busca primero el identificador devuelto y después el nombre pedido — las claves exactas antes que los prefijos, y gana el prefijo más largo. Cuidado con los prefijos: `gpt-4o*` también coincide con `gpt-4o-mini` salvo que exista `gpt-4o-mini*`. Cada llamada se tarifica con sus propios nombres, incluida una respuesta que un proveedor descartó: las llamadas de un modelo pedido con otro nombre, o sin ninguno, tienen su propia línea.
 
 ## Costes desconocidos {#unknown-costs}
 
@@ -48,6 +48,8 @@ El SDK nunca se inventa un precio, ni un número de tokens. El coste de una llam
 - **no informó de ningún número de tokens** — ni de entrada ni de salida, como con un proveedor que no devuelve el consumo, o solo un total: se cuenta en `unmeteredCalls` (y en el `unmeteredCalls` de su línea), y su modelo en `unmeteredModels`. Nunca se toma como cero tokens, y una línea cuyas llamadas no informaron de ninguno tampoco tiene `costUsd`.
 
 Una llamada sin número de tokens cuenta como no medida aunque su modelo tenga precio, igual que en los presupuestos. En cuanto el coste de alguna llamada es desconocido, el informe se marca con `complete: false` y `totalUsd` solo suma las llamadas cuyo coste se conoce: es un mínimo, no el coste de la ejecución.
+
+Los tokens de una llamada son sus tokens de entrada y de salida, sea cual sea el total que el fabricante dé además; si no, el total que informó por sí solo: ese total cuenta como tokens (en el `totalOnlyTokens` de la línea, en los presupuestos y en el `maxTokens` de una ejecución), nunca como un coste.
 
 ## Llamadas que fallan {#failed-calls}
 
@@ -65,8 +67,8 @@ Un intento que falló sin respuesta — un error HTTP, un tiempo de espera agota
 | Evento | Origen | Campos |
 | --- | --- | --- |
 | `intention.generated` | Razonamiento nativo, selección de herramientas | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
-| `provider.answer_discarded` | Una respuesta que el proveedor no pudo usar | `provider`, `model`, `usage` |
-| `cognition.thought` | Operaciones cognitivas, reparaciones e intentos fallidos incluidos | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls` |
+| `provider.answer_discarded` | Una respuesta que el proveedor no pudo usar | `provider`, `model`, `requestedModel`, `usage` |
+| `cognition.thought` | Operaciones cognitivas, reparaciones e intentos fallidos incluidos | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.totalOnlyTokens` |
 | `cognition.operation_failed` | Una operación interrumpida por una parada o un tiempo límite tras intentos facturados | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev y otros backends de decisiones tipadas, respuestas rechazadas incluidas | `model`, `usage.inputTokens`, `usage.outputTokens` |
 

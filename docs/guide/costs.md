@@ -38,7 +38,7 @@ const sdk = createSDK({
 });
 ```
 
-Keys are exact model ids or prefixes ending with `*`. Providers often answer with a versioned id (`gpt-4o-2024-08-06`) while you asked for `gpt-4o`: the SDK records both and looks up the returned id first, then the requested name — exact keys before prefixes, the longest prefix winning. Be careful with prefixes: `gpt-4o*` also matches `gpt-4o-mini` unless `gpt-4o-mini*` exists.
+Keys are exact model ids or prefixes ending with `*`. Providers often answer with a versioned id (`gpt-4o-2024-08-06`) while you asked for `gpt-4o`: the SDK records both and looks up the returned id first, then the requested name — exact keys before prefixes, the longest prefix winning. Be careful with prefixes: `gpt-4o*` also matches `gpt-4o-mini` unless `gpt-4o-mini*` exists. Each call is priced on its own names, an answer a provider discarded included: calls of a model asked for under another name, or under none, have a line of their own.
 
 ## Unknown costs
 
@@ -48,6 +48,8 @@ The SDK never invents a price, nor a token count. The cost of a call is unknown 
 - **it reported no token counts** — neither input nor output tokens, as with a provider that returns no usage, or only a total: it is counted in `unmeteredCalls` (and in its line's `unmeteredCalls`), and its model in `unmeteredModels`. It is never taken as zero tokens, and a line none of whose calls reported them has no `costUsd` either.
 
 A call without token counts is unmetered even when its model has a price, as budgets count it. When the cost of any call is unknown, the report is marked `complete: false` and `totalUsd` only adds up the calls whose cost is known: a lower bound, not the cost of the run.
+
+The tokens of a call are its input and output tokens, whatever total the vendor also gives, else the total it reported alone: such a total counts as tokens (in the line's `totalOnlyTokens`, in budgets and in a run's `maxTokens`), never as a cost.
 
 ## Failed calls
 
@@ -65,8 +67,8 @@ An attempt that failed without an answer — an HTTP error, a timeout, a lost co
 | Event | Source | Fields |
 | --- | --- | --- |
 | `intention.generated` | Native reasoning, tool selection | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
-| `provider.answer_discarded` | An answer the provider could not use | `provider`, `model`, `usage` |
-| `cognition.thought` | Cognitive operations, repairs and failed attempts included | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls` |
+| `provider.answer_discarded` | An answer the provider could not use | `provider`, `model`, `requestedModel`, `usage` |
+| `cognition.thought` | Cognitive operations, repairs and failed attempts included | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.totalOnlyTokens` |
 | `cognition.operation_failed` | An operation cut short by a stop or a timeout after billed attempts | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev and other typed-decision backends, rejected answers included | `model`, `usage.inputTokens`, `usage.outputTokens` |
 
