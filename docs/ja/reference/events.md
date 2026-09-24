@@ -27,7 +27,6 @@ interface Event {
 | 種類 | データ |
 | --- | --- |
 | `intention.generated` | `message`、`toolCalls`、`model`、`requestedModel`、`usage`。認知エージェントの最終回答では、代わりに `intention` |
-| `intention.rejected` | `reason` |
 | `policy.checked` / `policy.violated` | `intention`、`validation` / `reason`、`violatedPolicies`（呼び出し元が渡されていないツールを使った場合は `allowed-tools`、予算ポリシーの呼び出し予算を使い切った場合はそのポリシーの ID） |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`、`intention`、`policyId`（ツール自身の `metadata.requiresApproval` が承認を求めた場合は `tool-requires-approval`）、`reason?`（呼び出し元が待つのをやめたか、実行が停止した場合は `cancelled before a decision`、`approvalTimeoutMs` を過ぎた場合は `no decision within N ms`） |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`、`parameters`、`result` / `error`、`duration`。`action.failed` は、不正な引数のために（どのポリシーよりも前に）拒否された呼び出しや、承認の後に呼び出し元が去ったために拒否された呼び出しも記録する |
@@ -36,6 +35,8 @@ interface Event {
 | `provider.fallback` | `primaryProvider`、`usedProvider`、`attemptedProviders` |
 | `provider.retry` | `provider`、`model`、`retry`、`delayMs`、`error` |
 | `resource.read` | `uri`、`mimeType?`、`bytes`、提供した内容の `sha256`（内容そのものは保存されない） |
+
+`tool.failed`、`intention.rejected`、`error.occurred` は `EventType` 型に含まれますが、SDK がこれらを記録することはありません。失敗したツール呼び出しは `action.failed` イベントに、ポリシーに拒否された呼び出しは `policy.violated` イベントに、承認で却下された呼び出しは `approval.rejected` イベントになります。
 
 ## 認知 {#cognition}
 
@@ -56,6 +57,5 @@ interface Event {
 | 種類 | データ |
 | --- | --- |
 | `incident.reported` | `incident`、`deliveries`、`suppressed?`（`throttled`、`below minimum severity`） |
-| `error.occurred` | `error` |
 
 認知エージェントの実行の心的状態は、`cognition.started` の目標と観測から始めて、その実行の `cognition.thought` のパッチを `step` の順に畳み込んだものです。実行中に得られた観測は思考パッチによって運ばれ、その `sourceEventId` は、完全なペイロードを保持する `action.executed` または `cognition.evaluated` イベントを指します。`schemaVersion` のない実行は、記録されたときのルールで再構築されます。

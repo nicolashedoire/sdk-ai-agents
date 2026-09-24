@@ -27,7 +27,6 @@ interface Event {
 | النوع | البيانات |
 | --- | --- |
 | `intention.generated` | `message`، و`toolCalls`، و`model`، و`requestedModel`، و`usage` — أو `intention` لإجابة نهائية معرفية |
-| `intention.rejected` | `reason` |
 | `policy.checked` / `policy.violated` | `intention`، و`validation` / `reason`، و`violatedPolicies` (`allowed-tools` حين يستخدم مستدعٍ أداة لم تُعطَ له؛ ومعرّف سياسة الميزانية حين تُستنفَد ميزانية استدعاءاتها) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`، و`intention`، و`policyId` (`tool-requires-approval` حين طلبتها `metadata.requiresApproval` الخاصة بالأداة نفسها)، و`reason?` (`cancelled before a decision` حين تخلّى المستدعي أو توقّف التشغيل، و`no decision within N ms` بعد `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`، و`parameters`، و`result` / `error`، و`duration` — ويسجّل `action.failed` أيضًا الاستدعاء المرفوض بسبب معاملات غير صالحة (قبل أي سياسة) أو لأن مستدعيه غادر بعد موافقة |
@@ -36,6 +35,8 @@ interface Event {
 | `provider.fallback` | `primaryProvider`، و`usedProvider`، و`attemptedProviders` |
 | `provider.retry` | `provider`، و`model`، و`retry`، و`delayMs`، و`error` |
 | `resource.read` | `uri`، و`mimeType?`، و`bytes`، و`sha256` للمحتوى المُقدَّم (لا يُخزَّن المحتوى نفسه) |
+
+تنتمي `tool.failed` و`intention.rejected` و`error.occurred` إلى النوع `EventType`، لكن حزمة SDK لا تسجّلها أبدًا: استدعاء الأداة الفاشل حدثٌ من نوع `action.failed`، والاستدعاء الذي ترفضه سياسةٌ حدثٌ من نوع `policy.violated`، والذي يُرفض عند الموافقة حدثٌ من نوع `approval.rejected`.
 
 ## الإدراك المعرفي {#cognition}
 
@@ -56,6 +57,5 @@ interface Event {
 | النوع | البيانات |
 | --- | --- |
 | `incident.reported` | `incident`، و`deliveries`، و`suppressed?` (`throttled`، `below minimum severity`) |
-| `error.occurred` | `error` |
 
 الحالة الذهنية لتشغيل معرفي هي حصيلة طيّ رقع `cognition.thought` الخاصة به بترتيب `step`، انطلاقًا من الهدف والملاحظات الموجودة في `cognition.started`. تحمل رقعُ التفكير الملاحظاتِ الناتجة أثناء التشغيل، مع `sourceEventId` الذي يشير إلى حدث `action.executed` أو `cognition.evaluated` الذي يحتفظ بالحمولة الكاملة. وعمليات التشغيل التي لا تحتوي على `schemaVersion` يُعاد بناؤها بالقواعد التي سُجِّلت بها.

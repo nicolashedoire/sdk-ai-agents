@@ -67,7 +67,7 @@ npm run example:quick-start
 npm run example:complete
 
 # Test API
-npm run example:test-api
+npm run test:api
 ```
 
 ## Testes {#testing}

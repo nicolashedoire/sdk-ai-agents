@@ -27,7 +27,6 @@ interface Event {
 | Tipo | Dados |
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` — ou `intention` para uma resposta final cognitiva |
-| `intention.rejected` | `reason` |
 | `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools` quando quem chamou usou uma ferramenta que não recebeu; o id da política de orçamento quando o seu orçamento de chamadas se esgotou) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval` quando foi o próprio `metadata.requiresApproval` da ferramenta que a pediu), `reason?` (`cancelled before a decision` quando quem chamou desistiu ou a execução parou, `no decision within N ms` depois de `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` — `action.failed` também registra uma chamada recusada por argumentos inválidos (antes de qualquer política) ou porque quem chamou saiu depois de uma aprovação |
@@ -36,6 +35,8 @@ interface Event {
 | `provider.fallback` | `primaryProvider`, `usedProvider`, `attemptedProviders` |
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` do conteúdo servido (o próprio conteúdo não é armazenado) |
+
+`tool.failed`, `intention.rejected` e `error.occurred` fazem parte do tipo `EventType`, mas o SDK nunca os registra: uma chamada de ferramenta que falha é um evento `action.failed`; uma recusada por uma política, um evento `policy.violated`, e uma rejeitada na aprovação, um evento `approval.rejected`.
 
 ## Cognição {#cognition}
 
@@ -56,6 +57,5 @@ interface Event {
 | Tipo | Dados |
 | --- | --- |
 | `incident.reported` | `incident`, `deliveries`, `suppressed?` (`throttled`, `below minimum severity`) |
-| `error.occurred` | `error` |
 
 O estado mental de uma execução cognitiva é o resultado da aplicação sucessiva dos seus patches `cognition.thought` na ordem de `step`, partindo do objetivo e das observações de `cognition.started`. As observações produzidas durante a execução são trazidas pelos patches de pensamento, com `sourceEventId` apontando para o evento `action.executed` ou `cognition.evaluated` que guarda o conteúdo completo. As execuções sem `schemaVersion` são reconstruídas com as regras com que foram registradas.
