@@ -185,7 +185,10 @@ export class AgentImpl {
   }
 
   /**
-   * Merges agent and run providerSettings with priority: run > agent
+   * Merges agent and run providerSettings. For each field the priority is: run
+   * provider-specific > run default > agent provider-specific > agent default. Each provider's
+   * group is resolved completely here, so a run default wins over an agent's provider-specific
+   * value (it did not when the groups were merged separately).
    */
   private mergeProviderSettings(
     agentSettings?: Agent['config']['providerSettings'],
@@ -201,20 +204,20 @@ export class AgentImpl {
       return undefined;
     }
 
-    // Merge: run settings override agent settings
     return {
-      default: {
-        ...agentSettings?.default,
-        ...runSettings?.default,
-      },
-      openai: {
-        ...agentSettings?.openai,
-        ...runSettings?.openai,
-      },
-      anthropic: {
-        ...agentSettings?.anthropic,
-        ...runSettings?.anthropic,
-      },
+      default: layerSettings(agentSettings?.default, runSettings?.default),
+      openai: layerSettings(
+        agentSettings?.default,
+        agentSettings?.openai,
+        runSettings?.default,
+        runSettings?.openai
+      ),
+      anthropic: layerSettings(
+        agentSettings?.default,
+        agentSettings?.anthropic,
+        runSettings?.default,
+        runSettings?.anthropic
+      ),
     };
   }
 
@@ -307,4 +310,14 @@ export class AgentImpl {
       },
     });
   }
+}
+
+/** Layers settings from lowest to highest priority; an unset field never hides a lower one. */
+function layerSettings(...layers: Array<ProviderSettings | undefined>): ProviderSettings {
+  const result: ProviderSettings = {};
+  for (const layer of layers) {
+    if (layer?.temperature !== undefined) result.temperature = layer.temperature;
+    if (layer?.maxTokens !== undefined) result.maxTokens = layer.maxTokens;
+  }
+  return result;
 }
