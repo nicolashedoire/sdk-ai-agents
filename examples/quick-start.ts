@@ -39,7 +39,7 @@ async function main() {
 
   const agent = sdk.createAgent({
     name: 'math-assistant',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
     tools: [calculatorTool],
     maxSteps: 5,
     timeout: 30000,

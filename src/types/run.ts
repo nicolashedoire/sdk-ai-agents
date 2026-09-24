@@ -1,5 +1,5 @@
 import type { Event, RunStatus } from './events.js';
-import type { ProviderSettings } from './agent.js';
+import type { OpenAIProviderSettings, ProviderSettings } from './agent.js';
 
 export interface RunInput {
   message: string;
@@ -8,7 +8,7 @@ export interface RunInput {
   signal?: AbortSignal;
   metadata?: Record<string, unknown>;
   providerSettings?: {
-    openai?: ProviderSettings;
+    openai?: OpenAIProviderSettings;
     anthropic?: ProviderSettings;
     default?: ProviderSettings; // Default settings for every provider
   };

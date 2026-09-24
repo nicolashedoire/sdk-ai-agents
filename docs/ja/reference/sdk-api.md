@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | 主プロバイダーのキー（`llmProvider` を使う場合は不要）。キーがまったくなくてもツールと MCP サーバーは動作し、モデルを必要とする呼び出しは明確なエラーで失敗する |
 | `provider` | `'openai' \| 'anthropic'` | 主プロバイダー。デフォルトは `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | 各ベンダーの `apiKey`、`defaultModel`、`baseURL`（`baseURL`：Azure OpenAI の v1 API やローカルのモデルサーバーなどの互換エンドポイント、またはプロキシ）。主プロバイダーは自分のベンダーの項目を使い、別のベンダーのフォールバックはそのベンダーの項目を使う |
+| `providerConfig` | `{ openai?, anthropic? }` | 各ベンダーの `apiKey`、`defaultModel`、`baseURL`（`baseURL`：Azure OpenAI の v1 API やローカルのモデルサーバーなどの互換エンドポイント、またはプロキシ）。主プロバイダーは自分のベンダーの項目を使い、別のベンダーのフォールバックはそのベンダーの項目を使う。デフォルトのモデルは `gpt-5.4` と `claude-opus-5`。OpenAI の項目では `reasoningModels`、`reasoningEffort`、`nativeToolMessages` も指定できる（[OpenAI のモデル](#openai-models) を参照） |
 | `fallbackProviders` | `Array<{ provider, config? }>` | 主プロバイダーが失敗したときに、順番に試される。`config` は `providerConfig` より優先される。主プロバイダーと同じベンダーのフォールバックは、主プロバイダーの設定を引き継がない（全体の `apiKey` のみ）。別のベンダーのフォールバックには独自のキーが必要 |
 | `llmProvider` | `LLMProvider` | 独自のプロバイダー（ローカルモデル、ゲートウェイ、テストダブル）。`nativeToolMessages` を宣言していれば、ツール呼び出しとその結果をネイティブ形式（`LLMMessage`）で、そうでなければテキストで受け取る |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM のリトライポリシー。プロバイダーごとに、フォールバックの前に適用される。その `maxRetries` と `initialDelayMs` は `jev.maxRetries` と `jev.retryBaseDelayMs` のデフォルトにもなる。ほかのフィールドは Jev クライアントには届かず、`retry: false` の場合、Jev クライアントは独自の 2 回のリトライと 500 ms を使う。注入した `llmProvider` には明示的に設定した場合にのみ適用され、`llmProvider` として渡した `FallbackProvider` とその中のプロバイダーには適用されない |
@@ -22,6 +22,42 @@ const sdk = createSDK(config);
 | `eventStore` | `IEventStore` | デフォルトは `FileEventStore('./events')` |
 | `defaultPolicies` | `Policy[]` | グローバルなポリシー |
 | `goldenTracesDir`、`regressionTestSuitesDir`、`assertionsDir`、`impactAnalysesDir` | `string` | テスト成果物の保存先 |
+
+### OpenAI のモデル {#openai-models}
+
+OpenAI の推論モデル（o シリーズの `o1`、`o3`、`o4-mini`… と、GPT-5 以降の `gpt-5`、`gpt-5.4-mini`、`gpt-6-sol`…。日付付きやファインチューニング済みの `ft:o4-mini-…` なども含む）は、`max_tokens` を拒否し、推論の努力度が `none` でない限り `temperature` も拒否します。OpenAI プロバイダーは大文字・小文字を問わず名前でこれらを判別し、`maxTokens` を `max_completion_tokens`（推論トークンも数えます）として、推論の努力度とともに送ります。デフォルトの努力度はモデルによって異なるため、温度は一切送りません。エージェントやエンジンの温度は、これらのモデルでは無視されます。それ以外のモデルには、OpenAI 互換のどのサーバーも理解する `temperature` と `max_tokens` を送ります。
+
+::: warning ツールと推論の努力度
+SDK は Chat Completions を通じて OpenAI を呼び出します。Chat Completions では、GPT-5.4 以降のモデルは努力度が `none` のときにしかツールを呼び出しません。デフォルトのモデル `gpt-5.4` は、別の努力度を指定しない限り `none` を使います。GPT-5.5、GPT-5.6、GPT-6 Sol と Luna のデフォルトは `medium` なので、`reasoningEffort: 'none'` を指定しない限り、ツールを持つエージェントはこれらのモデルで失敗します（`Function tools with reasoning_effort are not supported`）。GPT-6 Astra は Chat Completions ではツールをまったく呼び出せません。SDK は指定された努力度をそのまま送ります。
+:::
+
+| オプション | デフォルト | |
+| --- | --- | --- |
+| `defaultModel` | `gpt-5.4` | モデルを指定しないリクエストと、エージェントのモデルに対応していないフォールバックが使うモデル |
+| `reasoningModels` | 名前から判別 | `true` または `false`：このプロバイダーのすべてのモデルを推論モデルとして扱うか、扱わないか。リスト：挙げた名前（Azure のデプロイ、ゲートウェイのエイリアス）は推論モデルで、ほかは名前から判別される |
+| `reasoningEffort` | モデルのデフォルト | `none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max` のいずれか。推論モデルにだけ、そのまま送られる。各モデルが受け付けるのはこのうち一部の値で、API はそれ以外を拒否する |
+| `nativeToolMessages` | `true` | 会話の中でアシスタントの `tool_calls` と `tool` メッセージを受け付けない互換サーバーでは `false`：それまでのツール呼び出しとその結果はテキストで送られる。ツールは引き続き提示され、応答に含まれるツール呼び出しも引き続き読み取られる。主プロバイダーまたはいずれかのフォールバックで `false` にすると、チェーン全体に適用される |
+
+これらのオプションは `providerConfig.openai`、または OpenAI のフォールバックの `config` に指定します。別のベンダーのフォールバックは、自身の `config` が指定していないオプションを `providerConfig.openai` から取ります。主プロバイダーと同じベンダーのフォールバックは何も引き継ぎません。エージェントや実行は、`providerSettings.openai.reasoningEffort` で独自の努力度を指定できます。実行の値が最優先で、次にエージェント、最後にプロバイダーの値が使われます。認知エージェントはこれをツール選択にだけ適用し、ツールを提示しない思考には、エージェントの `reasoningEffort` オプションが使われます。
+
+```ts
+const sdk = createSDK({
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  providerConfig: {
+    openai: {
+      baseURL: 'https://my-resource.openai.azure.com/openai/v1/',
+      reasoningModels: ['analyst-o4-mini'], // a deployment name says nothing about its model
+      reasoningEffort: 'low',
+    },
+  },
+});
+
+const analyst = sdk.createAgent({
+  name: 'analyst',
+  model: 'analyst-o4-mini',
+  providerSettings: { openai: { reasoningEffort: 'high', maxTokens: 8_000 } },
+});
+```
 
 ## エージェント {#agents}
 
@@ -51,8 +87,8 @@ const sdk = createSDK(config);
 | `knowledge` | — | 実行をまたぐ記憶：`{ store, scope, recallLimit? (10), record? (true) }`。[実行をまたぐ記憶](../guide/memory) を参照 |
 | `evaluator` | — | 予測をテストする `OutcomeEvaluator`。`test_prediction` を有効にする |
 | `generator` | `model` を使う LLM ジェネレーター | 独自の `ThoughtGenerator`（観測の比較も含む）。その思考も、エンジンの受け入れ規則を通る |
-| `temperature`、`maxTokens` | `0.4`、— | 思考の生成の設定 |
-| `providerSettings` | — | ツール選択の設定（ネイティブの推論エンジン） |
+| `temperature`、`maxTokens`、`reasoningEffort` | `0.4`、—、— | 思考の生成の設定（`reasoningEffort`：OpenAI の推論モデルのみ） |
+| `providerSettings` | — | ツール選択の設定（ネイティブの推論エンジン）。`openai.reasoningEffort` を含む |
 
 ### `CognitiveRunResult` {#cognitiverunresult}
 

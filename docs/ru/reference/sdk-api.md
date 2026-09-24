@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Ключ основного провайдера (не нужен при `llmProvider`). Без ключа инструменты и серверы MCP работают, а вызовы, которым нужна модель, завершаются понятной ошибкой |
 | `provider` | `'openai' \| 'anthropic'` | Основной провайдер, по умолчанию `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` и `baseURL` каждого поставщика (`baseURL`: совместимая конечная точка, например API v1 Azure OpenAI или локальный сервер моделей, либо прокси). Основной провайдер берёт запись своего поставщика, резервный провайдер другого поставщика — запись своего |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` и `baseURL` каждого поставщика (`baseURL`: совместимая конечная точка, например API v1 Azure OpenAI или локальный сервер моделей, либо прокси). Основной провайдер берёт запись своего поставщика, резервный провайдер другого поставщика — запись своего. Модели по умолчанию: `gpt-5.4` и `claude-opus-5`. Запись OpenAI также принимает `reasoningModels`, `reasoningEffort` и `nativeToolMessages`: см. [Модели OpenAI](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | Пробуются по порядку, когда основной провайдер даёт сбой; `config` имеет приоритет над `providerConfig`. Резервный провайдер того же поставщика, что и основной, не наследует его настроек (только общий `apiKey`); провайдеру другого поставщика нужен собственный ключ |
 | `llmProvider` | `LLMProvider` | Ваш собственный провайдер (локальная модель, шлюз, тестовый дублёр). Он получает вызовы инструментов и их результаты в нативном формате (`LLMMessage`), если объявляет `nativeToolMessages`, а иначе — текстом |
 | `retry` | `Partial<RetryPolicy> \| false` | Политика повторных попыток LLM, для каждого провайдера, до переключения на резерв. Её `maxRetries` и `initialDelayMs` также служат значениями по умолчанию для `jev.maxRetries` и `jev.retryBaseDelayMs`; остальные её поля до клиента Jev не доходят, и при `retry: false` он сохраняет свои 2 повторные попытки и 500 ms. К внедрённому `llmProvider` применяется, только если задана явно, и никогда — к `FallbackProvider`, переданному как `llmProvider`, и к его провайдерам |
@@ -22,6 +22,42 @@ const sdk = createSDK(config);
 | `eventStore` | `IEventStore` | По умолчанию `FileEventStore('./events')` |
 | `defaultPolicies` | `Policy[]` | Глобальные политики |
 | `goldenTracesDir`, `regressionTestSuitesDir`, `assertionsDir`, `impactAnalysesDir` | `string` | Хранилище артефактов тестирования |
+
+### Модели OpenAI {#openai-models}
+
+Модели рассуждения OpenAI — серия o (`o1`, `o3`, `o4-mini`…) и GPT-5 и более поздние (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…), в том числе с датой в имени или дообученные (`ft:o4-mini-…`), — отклоняют `max_tokens`, а `temperature` — если их уровень рассуждения не `none`. Провайдер OpenAI распознаёт их по имени без учёта регистра: он передаёт им `maxTokens` как `max_completion_tokens`, куда входят и их токены рассуждения, и уровень рассуждения. Поскольку уровень по умолчанию у моделей разный, он никогда не передаёт им температуру: температура агента или движка для них игнорируется. Остальные модели получают `temperature` и `max_tokens`, которые знает любой OpenAI-совместимый сервер.
+
+::: warning Инструменты и уровень рассуждения
+SDK обращается к OpenAI через Chat Completions, где модели начиная с GPT-5.4 вызывают инструменты только при уровне `none`. Модель по умолчанию, `gpt-5.4`, использует `none`, пока вы не зададите другой уровень. У GPT-5.5, GPT-5.6 и GPT-6 Sol и Luna по умолчанию `medium`: агент с инструментами на них завершается ошибкой (`Function tools with reasoning_effort are not supported`), если не задать `reasoningEffort: 'none'`. GPT-6 Astra вообще не может вызывать инструменты через Chat Completions. SDK передаёт заданный вами уровень без изменений.
+:::
+
+| Параметр | По умолчанию | |
+| --- | --- | --- |
+| `defaultModel` | `gpt-5.4` | Модель запроса, в котором модель не указана, и резервного провайдера, который не обслуживает модель агента |
+| `reasoningModels` | Определяется по имени | `true` или `false`: все модели этого провайдера являются (или не являются) моделями рассуждения. Список: перечисленные имена ими являются (развёртывания Azure, псевдонимы шлюза), остальные определяются по имени |
+| `reasoningEffort` | Уровень самой модели | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` или `max`; передаётся без изменений и только моделям рассуждения. Каждая модель принимает лишь часть этих значений, остальные API отклоняет |
+| `nativeToolMessages` | `true` | `false` для совместимого сервера, который не принимает в диалоге `tool_calls` ассистента и сообщения `tool`: прежние вызовы инструментов и их результаты тогда передаются текстом, а инструменты по-прежнему предлагаются и вызовы инструментов в ответах по-прежнему читаются. `false` у основного провайдера или у любого резервного действует на всю цепочку |
+
+Эти параметры задаются в `providerConfig.openai` или в `config` резервного провайдера OpenAI. Резервный провайдер другого поставщика берёт из `providerConfig.openai` каждый параметр, который не задан в его `config`; резервный провайдер того же поставщика, что и основной, не берёт ни одного. Агент или запуск задаёт собственный уровень в `providerSettings.openai.reasoningEffort`: приоритет у запуска, затем у агента, затем у провайдера. Когнитивный агент применяет его только к выбору инструмента; его мысли, которые не предлагают инструментов, берут его параметр `reasoningEffort`.
+
+```ts
+const sdk = createSDK({
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  providerConfig: {
+    openai: {
+      baseURL: 'https://my-resource.openai.azure.com/openai/v1/',
+      reasoningModels: ['analyst-o4-mini'], // a deployment name says nothing about its model
+      reasoningEffort: 'low',
+    },
+  },
+});
+
+const analyst = sdk.createAgent({
+  name: 'analyst',
+  model: 'analyst-o4-mini',
+  providerSettings: { openai: { reasoningEffort: 'high', maxTokens: 8_000 } },
+});
+```
 
 ## Агенты {#agents}
 
@@ -51,8 +87,8 @@ const sdk = createSDK(config);
 | `knowledge` | — | Память между запусками: `{ store, scope, recallLimit? (10), record? (true) }`, см. [Память между запусками](../guide/memory) |
 | `evaluator` | — | `OutcomeEvaluator`, который проверяет предсказания; включает `test_prediction` |
 | `generator` | генератор LLM на `model` | Ваш собственный `ThoughtGenerator` (включая сравнения наблюдений); его мысли всё равно проходят через правила допуска движка |
-| `temperature`, `maxTokens` | `0.4`, — | Параметры генерации мыслей |
-| `providerSettings` | — | Параметры выбора инструмента (встроенный движок рассуждения) |
+| `temperature`, `maxTokens`, `reasoningEffort` | `0.4`, —, — | Параметры генерации мыслей (`reasoningEffort`: только модели рассуждения OpenAI) |
+| `providerSettings` | — | Параметры выбора инструмента (встроенный движок рассуждения), включая `openai.reasoningEffort` |
 
 ### `CognitiveRunResult` {#cognitiverunresult}
 

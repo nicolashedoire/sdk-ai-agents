@@ -62,7 +62,7 @@ const calculatorTool = sdk.defineTool({
 ```typescript
 const agent = sdk.createAgent({
   name: 'math-assistant',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
   tools: [calculatorTool],
 });
 ```
@@ -104,7 +104,7 @@ const calc = sdk.defineTool({
   schema: z.object({ op: z.enum(['add', 'multiply']), a: z.number(), b: z.number() }),
   handler: async ({ op, a, b }) => op === 'add' ? a + b : a * b
 });
-const agent = sdk.createAgent({ name: 'assistant', model: 'gpt-4', tools: [calc] });
+const agent = sdk.createAgent({ name: 'assistant', model: 'gpt-5.4', tools: [calc] });
 const result = await agent.run({ message: 'What is 15 * 23?' });
 console.log(await sdk.getTrace(result.runId));
 ```
@@ -183,7 +183,7 @@ const mathCapability = sdk.defineCapability({
 // Usage in an agent
 const agent = sdk.createAgent({
   name: 'assistant',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
   capabilities: ['math'],
 });
 ```
@@ -216,7 +216,7 @@ sdk.defineGlobalPolicy({
 // Per-agent policy
 const agent = sdk.createAgent({
   name: 'assistant',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
   tools: [calculatorTool],
   policies: [{
     id: 'timeout',

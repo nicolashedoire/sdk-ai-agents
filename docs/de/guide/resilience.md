@@ -24,7 +24,7 @@ const sdk = createSDK({
 });
 ```
 
-Ein Fallback-Anbieter eines anderen Herstellers braucht einen eigenen Schlüssel, in seiner `config` oder in `providerConfig`: Der Schlüssel des primären Anbieters wird nie an einen anderen Hersteller gesendet. Er erhält das Modell des Agenten nur, wenn er es anbietet, sonst sein eigenes `defaultModel` (Anthropic lehnt einen OpenAI-Modellnamen ab und umgekehrt). Das Event `intention.generated` nennt den Anbieter, der geantwortet hat, und das verwendete Modell.
+Ein Fallback-Anbieter eines anderen Herstellers braucht einen eigenen Schlüssel, in seiner `config` oder in `providerConfig`: Der Schlüssel des primären Anbieters wird nie an einen anderen Hersteller gesendet. Er erhält das Modell des Agenten nur, wenn er es anbietet, sonst sein eigenes `defaultModel`, ohne eigene Einstellung `gpt-5.4` für OpenAI und `claude-opus-5` für Anthropic (Anthropic lehnt einen OpenAI-Modellnamen ab und umgekehrt). Das Event `intention.generated` nennt den Anbieter, der geantwortet hat, und das verwendete Modell.
 
 | Option | Standard | |
 | --- | --- | --- |

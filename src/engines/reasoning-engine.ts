@@ -1,9 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import { LLMProviderError } from '../errors/index.js';
-import type { LLMMessage, LLMProvider, LLMResponse } from '../providers/llm-provider.js';
+import type {
+  LLMMessage,
+  LLMProvider,
+  LLMResponse,
+  OpenAIReasoningEffort,
+} from '../providers/llm-provider.js';
 import { FallbackProvider } from '../providers/fallback-provider.js';
-import type { ProviderSettings } from '../types/agent.js';
+import type { OpenAIProviderSettings, ProviderSettings } from '../types/agent.js';
 import type { IEventStore } from '../stores/event-store.js';
 import type { Intention } from '../types/run.js';
 import type { Tool } from '../types/tool.js';
@@ -24,7 +29,7 @@ export interface ReasoningContext {
   temperature?: number; // Deprecated: use providerSettings instead
   maxTokens?: number; // Deprecated: use providerSettings instead
   providerSettings?: {
-    openai?: ProviderSettings;
+    openai?: OpenAIProviderSettings;
     anthropic?: ProviderSettings;
     default?: ProviderSettings;
   };
@@ -56,7 +61,8 @@ export class ReasoningEngine {
   private provider: LLMProvider;
   private model: string;
 
-  constructor(provider: LLMProvider, model = 'gpt-4') {
+  /** `model` is used when a step names none; empty, the provider's own default model. */
+  constructor(provider: LLMProvider, model = '') {
     this.provider = provider;
     this.model = model;
   }
@@ -170,6 +176,9 @@ export class ReasoningEngine {
           tools,
           temperature,
           maxTokens,
+          ...(resolvedSettings.reasoningEffort !== undefined
+            ? { reasoningEffort: resolvedSettings.reasoningEffort }
+            : {}),
           abortSignal,
         });
       }
@@ -234,7 +243,7 @@ export class ReasoningEngine {
   private resolveProviderSettings(
     providerName: string,
     providerSettings?: ReasoningContext['providerSettings']
-  ): { temperature?: number; maxTokens?: number } {
+  ): { temperature?: number; maxTokens?: number; reasoningEffort?: OpenAIReasoningEffort } {
     if (!providerSettings) {
       return {};
     }
@@ -250,6 +259,10 @@ export class ReasoningEngine {
     return {
       temperature: providerSpecificSettings?.temperature ?? defaultSettings.temperature,
       maxTokens: providerSpecificSettings?.maxTokens ?? defaultSettings.maxTokens,
+      // OpenAI only: the reasoning effort has no default group.
+      ...(providerName === 'openai' && providerSettings.openai?.reasoningEffort !== undefined
+        ? { reasoningEffort: providerSettings.openai.reasoningEffort }
+        : {}),
     };
   }
 

@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Clé du fournisseur principal (inutile avec `llmProvider`). Sans aucune clé, les outils et les serveurs MCP fonctionnent, et les appels qui ont besoin d'un modèle échouent avec une erreur explicite |
 | `provider` | `'openai' \| 'anthropic'` | Fournisseur principal, `openai` par défaut |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` et `baseURL` de chaque éditeur (`baseURL` : un endpoint compatible, comme l'API v1 d'Azure OpenAI ou un serveur de modèles local, ou un proxy). Le fournisseur principal utilise l'entrée de son éditeur, et un repli d'un autre éditeur celle du sien |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` et `baseURL` de chaque éditeur (`baseURL` : un endpoint compatible, comme l'API v1 d'Azure OpenAI ou un serveur de modèles local, ou un proxy). Le fournisseur principal utilise l'entrée de son éditeur, et un repli d'un autre éditeur celle du sien. Modèles par défaut : `gpt-5.4` et `claude-opus-5`. L'entrée OpenAI accepte aussi `reasoningModels`, `reasoningEffort` et `nativeToolMessages` : voir [Modèles OpenAI](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | Essayés dans l'ordre quand le fournisseur principal échoue ; un `config` l'emporte sur `providerConfig`. Un repli du même éditeur que le principal n'hérite d'aucun de ses réglages (seulement de l'`apiKey` globale) ; un repli d'un autre éditeur a besoin de sa propre clé |
 | `llmProvider` | `LLMProvider` | Votre propre fournisseur (modèle local, passerelle, doublure de test). Il reçoit les appels d'outils et leurs résultats au format natif (`LLMMessage`) s'il déclare `nativeToolMessages`, en texte sinon |
 | `retry` | `Partial<RetryPolicy> \| false` | Politique de nouvelles tentatives pour le LLM, par fournisseur, avant le repli. Ses `maxRetries` et `initialDelayMs` sont aussi les valeurs par défaut de `jev.maxRetries` et `jev.retryBaseDelayMs` ; ses autres champs n'atteignent pas le client Jev, qui garde ses propres 2 nouvelles tentatives et 500 ms avec `retry: false`. Appliquée à un `llmProvider` injecté seulement si elle est définie explicitement, et jamais à un `FallbackProvider` passé comme `llmProvider` ni à ses fournisseurs |
@@ -22,6 +22,42 @@ const sdk = createSDK(config);
 | `eventStore` | `IEventStore` | `FileEventStore('./events')` par défaut |
 | `defaultPolicies` | `Policy[]` | Politiques globales |
 | `goldenTracesDir`, `regressionTestSuitesDir`, `assertionsDir`, `impactAnalysesDir` | `string` | Stockage des artefacts de test |
+
+### Modèles OpenAI {#openai-models}
+
+Les modèles de raisonnement d'OpenAI — la série o (`o1`, `o3`, `o4-mini`…) et GPT-5 et les suivants (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…), y compris datés ou affinés (`ft:o4-mini-…`) — refusent `max_tokens`, et `temperature` sauf quand leur effort de raisonnement est `none`. Le fournisseur OpenAI les reconnaît à leur nom, quelle que soit la casse : il leur envoie `maxTokens` sous la forme de `max_completion_tokens`, qui compte aussi leurs tokens de raisonnement, ainsi que l'effort de raisonnement. Comme l'effort par défaut varie d'un modèle à l'autre, il ne leur envoie jamais de température : celle de l'agent ou du moteur est ignorée pour eux. Les autres modèles reçoivent `temperature` et `max_tokens`, que tout serveur compatible avec OpenAI connaît.
+
+::: warning Outils et effort de raisonnement
+Le SDK appelle OpenAI par Chat Completions, où les modèles GPT-5.4 et suivants n'appellent des outils qu'avec l'effort `none`. Le modèle par défaut, `gpt-5.4`, utilise `none` tant que vous ne fixez pas un autre effort. GPT-5.5, GPT-5.6 et GPT-6 Sol et Luna ont `medium` par défaut : un agent doté d'outils échoue sur eux (`Function tools with reasoning_effort are not supported`) à moins de fixer `reasoningEffort: 'none'`. GPT-6 Astra ne peut pas du tout appeler d'outils par Chat Completions. Le SDK envoie l'effort que vous fixez tel quel.
+:::
+
+| Option | Valeur par défaut | |
+| --- | --- | --- |
+| `defaultModel` | `gpt-5.4` | Modèle d'une requête qui n'en nomme aucun, et d'un repli qui ne sert pas le modèle de l'agent |
+| `reasoningModels` | Déduit du nom | `true` ou `false` : tous les modèles de ce fournisseur sont, ou ne sont pas, des modèles de raisonnement. Une liste : ces noms en sont (déploiements Azure, alias de passerelle), les autres sont reconnus à leur nom |
+| `reasoningEffort` | Celui du modèle | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` ou `max`, envoyé tel quel aux seuls modèles de raisonnement. Chaque modèle accepte certaines de ces valeurs, et l'API refuse les autres |
+| `nativeToolMessages` | `true` | `false` pour un serveur compatible qui n'accepte pas, dans la conversation, les `tool_calls` de l'assistant ni les messages `tool` : les appels d'outils précédents et leurs résultats sont alors envoyés en texte, tandis que les outils restent proposés et que les appels d'outils des réponses sont toujours lus. `false` sur le fournisseur principal ou sur n'importe quel repli s'applique à toute la chaîne |
+
+Ces options se placent dans `providerConfig.openai` ou dans le `config` d'un repli OpenAI. Un repli d'un autre éditeur prend dans `providerConfig.openai` chaque option que son `config` ne fixe pas ; un repli du même éditeur que le principal n'en prend aucune. Un agent ou une exécution fixe son propre effort dans `providerSettings.openai.reasoningEffort` : celui de l'exécution l'emporte, puis celui de l'agent, puis celui du fournisseur. Un agent cognitif ne l'applique qu'à la sélection d'outil ; ses pensées, qui ne proposent pas d'outils, prennent son option `reasoningEffort`.
+
+```ts
+const sdk = createSDK({
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  providerConfig: {
+    openai: {
+      baseURL: 'https://my-resource.openai.azure.com/openai/v1/',
+      reasoningModels: ['analyst-o4-mini'], // a deployment name says nothing about its model
+      reasoningEffort: 'low',
+    },
+  },
+});
+
+const analyst = sdk.createAgent({
+  name: 'analyst',
+  model: 'analyst-o4-mini',
+  providerSettings: { openai: { reasoningEffort: 'high', maxTokens: 8_000 } },
+});
+```
 
 ## Agents {#agents}
 
@@ -51,8 +87,8 @@ const sdk = createSDK(config);
 | `knowledge` | — | Mémoire entre exécutions : `{ store, scope, recallLimit? (10), record? (true) }`, voir [Mémoire entre exécutions](../guide/memory) |
 | `evaluator` | — | Un `OutcomeEvaluator` qui teste les prédictions ; active `test_prediction` |
 | `generator` | générateur LLM sur `model` | Votre propre `ThoughtGenerator` (comparaisons d'observations comprises) ; ses pensées passent tout de même par les règles d'admission du moteur |
-| `temperature`, `maxTokens` | `0.4`, — | Réglages de la génération des pensées |
-| `providerSettings` | — | Réglages de la sélection d'outil (moteur de raisonnement natif) |
+| `temperature`, `maxTokens`, `reasoningEffort` | `0.4`, —, — | Réglages de la génération des pensées (`reasoningEffort` : modèles de raisonnement d'OpenAI uniquement) |
+| `providerSettings` | — | Réglages de la sélection d'outil (moteur de raisonnement natif), `openai.reasoningEffort` compris |
 
 ### `CognitiveRunResult` {#cognitiverunresult}
 

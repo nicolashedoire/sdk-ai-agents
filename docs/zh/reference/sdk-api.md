@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | 主提供商的密钥（使用 `llmProvider` 时不需要）。完全没有密钥时，工具和 MCP 服务器照常工作，需要模型的调用会失败并给出清晰的错误 |
 | `provider` | `'openai' \| 'anthropic'` | 主提供商，默认 `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | 各厂商的 `apiKey`、`defaultModel` 和 `baseURL`（`baseURL`：兼容的端点，例如 Azure OpenAI 的 v1 API 或本地模型服务器，或代理）。主提供商使用其厂商的条目，其他厂商的回退使用它自己厂商的条目 |
+| `providerConfig` | `{ openai?, anthropic? }` | 各厂商的 `apiKey`、`defaultModel` 和 `baseURL`（`baseURL`：兼容的端点，例如 Azure OpenAI 的 v1 API 或本地模型服务器，或代理）。主提供商使用其厂商的条目，其他厂商的回退使用它自己厂商的条目。默认模型：`gpt-5.4` 和 `claude-opus-5`。OpenAI 条目还接受 `reasoningModels`、`reasoningEffort` 和 `nativeToolMessages`，参见 [OpenAI 模型](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | 主提供商失败时按顺序尝试；`config` 优先于 `providerConfig`。与主提供商同一厂商的回退不继承主提供商的任何设置（只继承全局 `apiKey`）；其他厂商的回退需要自己的密钥 |
 | `llmProvider` | `LLMProvider` | 你自己的提供商（本地模型、网关、测试替身）。如果它声明了 `nativeToolMessages`，就以原生格式（`LLMMessage`）接收工具调用及其结果，否则以文本形式接收 |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM 重试策略，按提供商分别应用，在回退之前。其 `maxRetries` 和 `initialDelayMs` 也是 `jev.maxRetries` 和 `jev.retryBaseDelayMs` 的默认值；其他字段不会传给 Jev 客户端，设为 `retry: false` 时，Jev 客户端保留自己的 2 次重试和 500 ms。仅在显式设置时才应用于注入的 `llmProvider`，且从不应用于作为 `llmProvider` 传入的 `FallbackProvider` 及其内部的提供商 |
@@ -22,6 +22,42 @@ const sdk = createSDK(config);
 | `eventStore` | `IEventStore` | 默认为 `FileEventStore('./events')` |
 | `defaultPolicies` | `Policy[]` | 全局策略 |
 | `goldenTracesDir`、`regressionTestSuitesDir`、`assertionsDir`、`impactAnalysesDir` | `string` | 测试产物的存储位置 |
+
+### OpenAI 模型 {#openai-models}
+
+OpenAI 的推理模型——o 系列（`o1`、`o3`、`o4-mini`…）以及 GPT-5 及之后的模型（`gpt-5`、`gpt-5.4-mini`、`gpt-6-sol`…），包括带日期或经过微调的版本（`ft:o4-mini-…`）——会拒绝 `max_tokens`，并且除非推理强度为 `none`，也会拒绝 `temperature`。OpenAI 提供商按名称识别它们，不区分大小写：把 `maxTokens` 作为 `max_completion_tokens` 发送（其中也计入推理 token），并发送推理强度。由于默认推理强度因模型而异，它从不向这些模型发送温度：智能体或引擎的温度对它们无效。其他模型收到的是 `temperature` 和 `max_tokens`，所有兼容 OpenAI 的服务器都认识它们。
+
+::: warning 工具与推理强度
+SDK 通过 Chat Completions 调用 OpenAI，而在 Chat Completions 中，GPT-5.4 及之后的模型只有在推理强度为 `none` 时才会调用工具。默认模型 `gpt-5.4` 在你不设置其他推理强度时使用 `none`。GPT-5.5、GPT-5.6 以及 GPT-6 Sol 和 Luna 默认为 `medium`：除非设置 `reasoningEffort: 'none'`，带工具的智能体在这些模型上会失败（`Function tools with reasoning_effort are not supported`）。GPT-6 Astra 完全无法通过 Chat Completions 调用工具。SDK 会原样发送你设置的推理强度。
+:::
+
+| 选项 | 默认值 | |
+| --- | --- | --- |
+| `defaultModel` | `gpt-5.4` | 未指定模型的请求所用的模型，以及不支持智能体模型的回退所用的模型 |
+| `reasoningModels` | 按名称识别 | `true` 或 `false`：此提供商的所有模型都是（或都不是）推理模型。列表：列出的名称是推理模型（Azure 部署、网关别名），其他名称按名称识别 |
+| `reasoningEffort` | 模型自身的默认值 | `none`、`minimal`、`low`、`medium`、`high`、`xhigh` 或 `max`，只原样发送给推理模型。每个模型只接受其中部分值，API 会拒绝其余的值 |
+| `nativeToolMessages` | `true` | 对于不接受对话中的助手 `tool_calls` 和 `tool` 消息的兼容服务器，设为 `false`：之前的工具调用及其结果将以文本形式发送，而工具仍会提供，回复中的工具调用也仍会读取。在主提供商或任一回退上设为 `false`，都会作用于整条链 |
+
+这些选项写在 `providerConfig.openai` 中，或写在 OpenAI 回退的 `config` 中。其他厂商的回退会从 `providerConfig.openai` 获取其 `config` 未设置的每个选项；与主提供商同一厂商的回退则一个也不获取。智能体或运行可以在 `providerSettings.openai.reasoningEffort` 中设置自己的推理强度：运行的设置优先，其次是智能体的，最后是提供商的。认知智能体只把它用于工具选择；它的思维不提供工具，使用它的 `reasoningEffort` 选项。
+
+```ts
+const sdk = createSDK({
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  providerConfig: {
+    openai: {
+      baseURL: 'https://my-resource.openai.azure.com/openai/v1/',
+      reasoningModels: ['analyst-o4-mini'], // a deployment name says nothing about its model
+      reasoningEffort: 'low',
+    },
+  },
+});
+
+const analyst = sdk.createAgent({
+  name: 'analyst',
+  model: 'analyst-o4-mini',
+  providerSettings: { openai: { reasoningEffort: 'high', maxTokens: 8_000 } },
+});
+```
 
 ## 智能体 {#agents}
 
@@ -51,8 +87,8 @@ const sdk = createSDK(config);
 | `knowledge` | — | 跨运行记忆：`{ store, scope, recallLimit? (10), record? (true) }`，参见[跨运行记忆](../guide/memory) |
 | `evaluator` | — | 一个检验预测的 `OutcomeEvaluator`；启用 `test_prediction` |
 | `generator` | 基于 `model` 的 LLM 生成器 | 你自己的 `ThoughtGenerator`（包括观测比较）；它的思维仍然要经过引擎的准入规则 |
-| `temperature`、`maxTokens` | `0.4`、— | 思维生成的设置 |
-| `providerSettings` | — | 工具选择（原生推理引擎）的设置 |
+| `temperature`、`maxTokens`、`reasoningEffort` | `0.4`、—、— | 思维生成的设置（`reasoningEffort`：仅限 OpenAI 推理模型） |
+| `providerSettings` | — | 工具选择（原生推理引擎）的设置，包括 `openai.reasoningEffort` |
 
 ### `CognitiveRunResult` {#cognitiverunresult}
 

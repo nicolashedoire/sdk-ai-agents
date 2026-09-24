@@ -42,6 +42,22 @@ export type LLMMessage =
     };
 
 /**
+ * How much an OpenAI reasoning model thinks before it answers (`reasoning_effort`). Not every
+ * model accepts every value, and the API refuses the others: `minimal` exists only for the
+ * first GPT-5 models, `none` from GPT-5.1 on (not for GPT-6 Astra), `xhigh` from GPT-5.4 on,
+ * and `max` is documented only for GPT-5.6 and GPT-6 on the Responses API, which the SDK does
+ * not use.
+ */
+export type OpenAIReasoningEffort =
+  | 'none'
+  | 'minimal'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'max';
+
+/**
  * Normalized request to generate an LLM completion
  */
 export interface LLMRequest {
@@ -70,9 +86,15 @@ export interface LLMRequest {
   /** Maximum number of tokens to generate (optional) */
   maxTokens?: number;
 
+  /**
+   * Reasoning effort of an OpenAI reasoning model (optional). The OpenAI provider sends it to
+   * reasoning models only; other providers ignore it.
+   */
+  reasoningEffort?: OpenAIReasoningEffort;
+
   /** Per-provider settings (for FallbackProvider); take precedence over temperature/maxTokens when set */
   providerSettings?: {
-    openai?: { temperature?: number; maxTokens?: number };
+    openai?: { temperature?: number; maxTokens?: number; reasoningEffort?: OpenAIReasoningEffort };
     anthropic?: { temperature?: number; maxTokens?: number };
     default?: { temperature?: number; maxTokens?: number };
   };
@@ -138,7 +160,7 @@ export interface LLMProvider {
   /**
    * Checks whether the provider supports a model
    *
-   * @param model - Model name (e.g. "gpt-4", "claude-3-opus")
+   * @param model - Model name (e.g. "gpt-5.4", "claude-opus-5")
    * @returns true when the model is supported, false otherwise
    */
   supportsModel(model: string): boolean;

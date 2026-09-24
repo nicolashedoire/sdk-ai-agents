@@ -51,7 +51,7 @@ async function test() {
   console.log('3️⃣  Creating an agent...');
   const agent = sdk.createAgent({
     name: 'test-agent',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
     tools: [calculatorTool],
     maxSteps: 3,
     timeout: 30000,

@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Chave do provedor principal (desnecessária com `llmProvider`). Sem nenhuma chave, as ferramentas e os servidores MCP funcionam, e as chamadas que precisam de um modelo falham com um erro claro |
 | `provider` | `'openai' \| 'anthropic'` | Provedor principal, `openai` por padrão |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` e `baseURL` de cada fornecedor (`baseURL`: um endpoint compatível, como a API v1 do Azure OpenAI ou um servidor de modelos local, ou um proxy). O principal usa a entrada do seu fornecedor, e um fallback de outro fornecedor a do seu |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` e `baseURL` de cada fornecedor (`baseURL`: um endpoint compatível, como a API v1 do Azure OpenAI ou um servidor de modelos local, ou um proxy). O principal usa a entrada do seu fornecedor, e um fallback de outro fornecedor a do seu. Modelos padrão: `gpt-5.4` e `claude-opus-5`. A entrada da OpenAI também aceita `reasoningModels`, `reasoningEffort` e `nativeToolMessages`: veja [Modelos da OpenAI](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | Tentados em ordem quando o principal falha; um `config` prevalece sobre `providerConfig`. Um fallback do mesmo fornecedor que o principal não herda nenhuma das suas configurações (só a `apiKey` global); um de outro fornecedor precisa da própria chave |
 | `llmProvider` | `LLMProvider` | O seu próprio provedor (modelo local, gateway, dublê de teste). Recebe as chamadas de ferramenta e os resultados no formato nativo (`LLMMessage`) se declarar `nativeToolMessages`, e como texto caso contrário |
 | `retry` | `Partial<RetryPolicy> \| false` | Política de novas tentativas do LLM, por provedor, antes do fallback. Os `maxRetries` e `initialDelayMs` dela também são os padrões de `jev.maxRetries` e `jev.retryBaseDelayMs`; os outros campos dela não chegam ao cliente Jev, que mantém as próprias 2 novas tentativas e 500 ms com `retry: false`. Aplicada a um `llmProvider` injetado só quando definida explicitamente, e nunca a um `FallbackProvider` passado como `llmProvider` nem aos provedores dele |
@@ -22,6 +22,42 @@ const sdk = createSDK(config);
 | `eventStore` | `IEventStore` | Por padrão, `FileEventStore('./events')` |
 | `defaultPolicies` | `Policy[]` | Políticas globais |
 | `goldenTracesDir`, `regressionTestSuitesDir`, `assertionsDir`, `impactAnalysesDir` | `string` | Armazenamento dos artefatos de teste |
+
+### Modelos da OpenAI {#openai-models}
+
+Os modelos de raciocínio da OpenAI — a série o (`o1`, `o3`, `o4-mini`…) e o GPT-5 e posteriores (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…), também datados ou com fine-tuning (`ft:o4-mini-…`) — recusam `max_tokens`, e `temperature` a não ser que o seu esforço de raciocínio seja `none`. O provedor da OpenAI os reconhece pelo nome, sem diferenciar maiúsculas e minúsculas: envia a eles `maxTokens` como `max_completion_tokens`, que também conta os seus tokens de raciocínio, e o esforço de raciocínio. Como o esforço padrão varia de um modelo para outro, nunca envia a eles uma temperatura: a do agente ou a do motor é ignorada para eles. Os outros modelos recebem `temperature` e `max_tokens`, que todo servidor compatível com a OpenAI conhece.
+
+::: warning Ferramentas e esforço de raciocínio
+O SDK chama a OpenAI pelo Chat Completions, onde os modelos GPT-5.4 e posteriores só chamam ferramentas com o esforço `none`. O modelo padrão, `gpt-5.4`, usa `none` enquanto você não definir outro esforço. GPT-5.5, GPT-5.6 e GPT-6 Sol e Luna têm `medium` por padrão: um agente com ferramentas falha com eles (`Function tools with reasoning_effort are not supported`) a não ser que você defina `reasoningEffort: 'none'`. O GPT-6 Astra não consegue chamar ferramentas pelo Chat Completions de forma alguma. O SDK envia o esforço que você define sem alterá-lo.
+:::
+
+| Opção | Padrão | |
+| --- | --- | --- |
+| `defaultModel` | `gpt-5.4` | Modelo de uma requisição que não indica nenhum, e de um fallback que não atende o modelo do agente |
+| `reasoningModels` | Deduzido do nome | `true` ou `false`: todos os modelos deste provedor são, ou não são, modelos de raciocínio. Uma lista: esses nomes são (deployments do Azure, aliases de gateway), e os outros são reconhecidos pelo nome |
+| `reasoningEffort` | O do modelo | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` ou `max`, enviado sem alteração somente aos modelos de raciocínio. Cada modelo aceita alguns desses valores, e a API recusa os outros |
+| `nativeToolMessages` | `true` | `false` para um servidor compatível que não aceita, na conversa, os `tool_calls` do assistente nem as mensagens `tool`: as chamadas de ferramenta anteriores e os seus resultados são então enviados como texto, enquanto as ferramentas continuam oferecidas e as chamadas de ferramenta das respostas continuam lidas. `false` no principal ou em qualquer fallback vale para a cadeia inteira |
+
+Essas opções ficam em `providerConfig.openai` ou no `config` de um fallback da OpenAI. Um fallback de outro fornecedor pega de `providerConfig.openai` cada opção que o seu `config` não define; um fallback do mesmo fornecedor que o principal não pega nenhuma. Um agente ou uma execução define o próprio esforço em `providerSettings.openai.reasoningEffort`: prevalece o da execução, depois o do agente, depois o do provedor. Um agente cognitivo só o aplica à seleção de ferramentas; os seus pensamentos, que não oferecem ferramentas, usam a sua opção `reasoningEffort`.
+
+```ts
+const sdk = createSDK({
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  providerConfig: {
+    openai: {
+      baseURL: 'https://my-resource.openai.azure.com/openai/v1/',
+      reasoningModels: ['analyst-o4-mini'], // a deployment name says nothing about its model
+      reasoningEffort: 'low',
+    },
+  },
+});
+
+const analyst = sdk.createAgent({
+  name: 'analyst',
+  model: 'analyst-o4-mini',
+  providerSettings: { openai: { reasoningEffort: 'high', maxTokens: 8_000 } },
+});
+```
 
 ## Agentes {#agents}
 
@@ -51,8 +87,8 @@ const sdk = createSDK(config);
 | `knowledge` | — | Memória entre execuções: `{ store, scope, recallLimit? (10), record? (true) }`, veja [Memória entre execuções](../guide/memory) |
 | `evaluator` | — | Um `OutcomeEvaluator` que testa as predições; ativa `test_prediction` |
 | `generator` | gerador LLM sobre `model` | O seu próprio `ThoughtGenerator` (incluindo as comparações de observações); os pensamentos dele continuam passando pelas regras de admissão do motor |
-| `temperature`, `maxTokens` | `0.4`, — | Parâmetros de geração dos pensamentos |
-| `providerSettings` | — | Parâmetros para a seleção de ferramentas (motor de raciocínio nativo) |
+| `temperature`, `maxTokens`, `reasoningEffort` | `0.4`, —, — | Parâmetros de geração dos pensamentos (`reasoningEffort`: somente modelos de raciocínio da OpenAI) |
+| `providerSettings` | — | Parâmetros para a seleção de ferramentas (motor de raciocínio nativo), incluindo `openai.reasoningEffort` |
 
 ### `CognitiveRunResult` {#cognitiverunresult}
 

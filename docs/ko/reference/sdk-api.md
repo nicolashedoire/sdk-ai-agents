@@ -11,7 +11,7 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | 기본 프로바이더의 키(`llmProvider`를 쓰면 필요 없음). 키가 전혀 없어도 도구와 MCP 서버는 동작하며, 모델이 필요한 호출은 명확한 오류와 함께 실패합니다 |
 | `provider` | `'openai' \| 'anthropic'` | 기본 프로바이더, 기본값 `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | 각 벤더의 `apiKey`, `defaultModel`, `baseURL`(`baseURL`: Azure OpenAI의 v1 API나 로컬 모델 서버 같은 호환 엔드포인트 또는 프록시). 기본 프로바이더는 자기 벤더의 항목을, 다른 벤더의 폴백은 그 벤더의 항목을 사용합니다 |
+| `providerConfig` | `{ openai?, anthropic? }` | 각 벤더의 `apiKey`, `defaultModel`, `baseURL`(`baseURL`: Azure OpenAI의 v1 API나 로컬 모델 서버 같은 호환 엔드포인트 또는 프록시). 기본 프로바이더는 자기 벤더의 항목을, 다른 벤더의 폴백은 그 벤더의 항목을 사용합니다. 기본 모델: `gpt-5.4`와 `claude-opus-5`. OpenAI 항목은 `reasoningModels`, `reasoningEffort`, `nativeToolMessages`도 받습니다. [OpenAI 모델](#openai-models) 참고 |
 | `fallbackProviders` | `Array<{ provider, config? }>` | 기본 프로바이더가 실패하면 순서대로 시도됩니다. `config`는 `providerConfig`보다 우선합니다. 기본 프로바이더와 같은 벤더의 폴백은 기본 프로바이더의 설정을 물려받지 않으며(전역 `apiKey`만), 다른 벤더의 폴백에는 자체 키가 필요합니다 |
 | `llmProvider` | `LLMProvider` | 직접 만든 프로바이더(로컬 모델, 게이트웨이, 테스트 대역). `nativeToolMessages`를 선언하면 도구 호출과 결과를 네이티브 형식(`LLMMessage`)으로, 그렇지 않으면 텍스트로 받습니다 |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM 재시도 정책, 프로바이더별로, 폴백 전에. 이 정책의 `maxRetries`와 `initialDelayMs`는 `jev.maxRetries`와 `jev.retryBaseDelayMs`의 기본값이기도 함. 다른 필드는 Jev 클라이언트에 전달되지 않으며, `retry: false`이면 Jev 클라이언트는 자체 재시도 2회와 500 ms를 유지함. 주입한 `llmProvider`에는 명시적으로 설정한 경우에만 적용되며, `llmProvider`로 넘긴 `FallbackProvider`와 그 안의 프로바이더에는 절대 적용되지 않음 |
@@ -22,6 +22,42 @@ const sdk = createSDK(config);
 | `eventStore` | `IEventStore` | 기본값은 `FileEventStore('./events')` |
 | `defaultPolicies` | `Policy[]` | 전역 정책 |
 | `goldenTracesDir`, `regressionTestSuitesDir`, `assertionsDir`, `impactAnalysesDir` | `string` | 테스트 산출물의 저장 위치 |
+
+### OpenAI 모델 {#openai-models}
+
+OpenAI의 추론 모델, 즉 o 시리즈(`o1`, `o3`, `o4-mini`…)와 GPT-5 이후 모델(`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`…)은 날짜가 붙거나 파인튜닝된 경우(`ft:o4-mini-…`)를 포함해 `max_tokens`를 거부하고, 추론 노력 수준이 `none`이 아니면 `temperature`도 거부합니다. OpenAI 프로바이더는 대소문자와 관계없이 이름으로 이들을 알아보고, `maxTokens`를 `max_completion_tokens`(추론 토큰도 포함해 셉니다)로 보내며 추론 노력 수준도 함께 보냅니다. 기본 노력 수준은 모델마다 다르므로 온도는 절대 보내지 않으며, 이 모델들에서는 에이전트나 엔진의 온도가 무시됩니다. 다른 모델은 모든 OpenAI 호환 서버가 아는 `temperature`와 `max_tokens`를 받습니다.
+
+::: warning 도구와 추론 노력 수준
+SDK는 Chat Completions로 OpenAI를 호출하는데, Chat Completions에서 GPT-5.4 이후 모델은 노력 수준이 `none`일 때만 도구를 호출합니다. 기본 모델 `gpt-5.4`는 다른 노력 수준을 정하지 않는 한 `none`을 사용합니다. GPT-5.5, GPT-5.6, GPT-6 Sol과 Luna는 기본값이 `medium`이므로, `reasoningEffort: 'none'`을 정하지 않으면 도구가 있는 에이전트가 이 모델들에서 실패합니다(`Function tools with reasoning_effort are not supported`). GPT-6 Astra는 Chat Completions로는 도구를 전혀 호출할 수 없습니다. SDK는 정한 노력 수준을 그대로 보냅니다.
+:::
+
+| 옵션 | 기본값 | |
+| --- | --- | --- |
+| `defaultModel` | `gpt-5.4` | 모델을 지정하지 않은 요청, 그리고 에이전트의 모델을 지원하지 않는 폴백이 쓰는 모델 |
+| `reasoningModels` | 이름으로 판별 | `true` 또는 `false`: 이 프로바이더의 모든 모델이 추론 모델이거나, 모두 아닙니다. 목록: 목록의 이름은 추론 모델이고(Azure 배포, 게이트웨이 별칭), 나머지는 이름으로 판별합니다 |
+| `reasoningEffort` | 모델의 기본값 | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` 중 하나이며 추론 모델에만 그대로 보냅니다. 모델마다 이 중 일부 값만 받으며, API는 나머지를 거부합니다 |
+| `nativeToolMessages` | `true` | 대화 안의 어시스턴트 `tool_calls`와 `tool` 메시지를 받지 않는 호환 서버에는 `false`: 이전 도구 호출과 결과를 텍스트로 보내며, 도구는 계속 제공되고 응답의 도구 호출도 계속 읽습니다. 기본 프로바이더나 어떤 폴백에서든 `false`이면 체인 전체에 적용됩니다 |
+
+이 옵션들은 `providerConfig.openai`나 OpenAI 폴백의 `config`에 넣습니다. 다른 벤더의 폴백은 자기 `config`가 정하지 않은 옵션을 `providerConfig.openai`에서 가져오고, 기본 프로바이더와 같은 벤더의 폴백은 아무것도 가져오지 않습니다. 에이전트나 실행은 `providerSettings.openai.reasoningEffort`로 자체 노력 수준을 정합니다. 실행의 값이 가장 우선하고, 그다음이 에이전트, 마지막이 프로바이더의 값입니다. 인지 에이전트는 이를 도구 선택에만 적용하며, 도구를 제공하지 않는 사고에는 에이전트의 `reasoningEffort` 옵션을 씁니다.
+
+```ts
+const sdk = createSDK({
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  providerConfig: {
+    openai: {
+      baseURL: 'https://my-resource.openai.azure.com/openai/v1/',
+      reasoningModels: ['analyst-o4-mini'], // a deployment name says nothing about its model
+      reasoningEffort: 'low',
+    },
+  },
+});
+
+const analyst = sdk.createAgent({
+  name: 'analyst',
+  model: 'analyst-o4-mini',
+  providerSettings: { openai: { reasoningEffort: 'high', maxTokens: 8_000 } },
+});
+```
 
 ## 에이전트 {#agents}
 
@@ -51,8 +87,8 @@ const sdk = createSDK(config);
 | `knowledge` | — | 실행 간 기억: `{ store, scope, recallLimit? (10), record? (true) }`, [실행 간 기억](../guide/memory) 참고 |
 | `evaluator` | — | 예측을 테스트하는 `OutcomeEvaluator`. `test_prediction`을 켭니다 |
 | `generator` | `model` 위의 LLM 생성기 | 직접 만든 `ThoughtGenerator`(관찰 비교 포함). 그 사고도 여전히 엔진의 수용 규칙을 거칩니다 |
-| `temperature`, `maxTokens` | `0.4`, — | 사고 생성 설정 |
-| `providerSettings` | — | 도구 선택(네이티브 추론 엔진)을 위한 설정 |
+| `temperature`, `maxTokens`, `reasoningEffort` | `0.4`, —, — | 사고 생성 설정(`reasoningEffort`: OpenAI 추론 모델 전용) |
+| `providerSettings` | — | 도구 선택(네이티브 추론 엔진)을 위한 설정, `openai.reasoningEffort` 포함 |
 
 ### `CognitiveRunResult` {#cognitiverunresult}
 

@@ -1,5 +1,10 @@
 import { ThoughtGenerationError, type ModelUsage } from '../errors/index.js';
-import type { LLMProvider, LLMRequest, LLMResponse } from '../providers/llm-provider.js';
+import type {
+  LLMProvider,
+  LLMRequest,
+  LLMResponse,
+  OpenAIReasoningEffort,
+} from '../providers/llm-provider.js';
 import type { MentalState } from './mental-state.js';
 import { unassessedHypotheses } from './patch-admission.js';
 import type { ThinkerProfile } from './thinker-profile.js';
@@ -41,6 +46,8 @@ export interface LLMThoughtGeneratorOptions {
   /** Defaults to 0.4: analytical rather than creative. */
   temperature?: number;
   maxTokens?: number;
+  /** Reasoning effort of an OpenAI reasoning model (the provider's when omitted). */
+  reasoningEffort?: OpenAIReasoningEffort;
   /** Extra instructions appended to the system prompt. */
   systemPrompt?: string;
   /** Extra attempts after an invalid reply, with the validation error fed back. Defaults to 1. */
@@ -86,6 +93,9 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
           messages: [...messages],
           temperature: this.options.temperature ?? 0.4,
           ...(this.options.maxTokens ? { maxTokens: this.options.maxTokens } : {}),
+          ...(this.options.reasoningEffort
+            ? { reasoningEffort: this.options.reasoningEffort }
+            : {}),
           ...(request.abortSignal ? { abortSignal: request.abortSignal } : {}),
         });
       } catch (error) {
