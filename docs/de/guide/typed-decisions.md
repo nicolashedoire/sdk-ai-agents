@@ -141,7 +141,7 @@ Beide fallen auf das LLM oder den heuristischen Controller zurück, wenn Jev uns
 
 ## Nachvollziehbarkeit und Kosten {#traceability-and-cost}
 
-Jede typisierte Entscheidung wird als Ereignis `decision.evaluated` mit ihrem Kontext, ihren Fragen, Antworten und dem Token-Verbrauch geschrieben – in der `runId`, die Sie übergeben, oder in einem eigenen Strom `decision_*`. Jev kostet **0,042 $ pro Million Eingabe-Tokens, Ausgabe kostenlos** (Stand der Dokumentation vom 23.09.2026), sodass `sdk.getRunCost(runId)` es von Haus aus einbezieht.
+Jede typisierte Entscheidung wird als Ereignis `decision.evaluated` mit ihrem Kontext, ihren Fragen, Antworten und dem Token-Verbrauch geschrieben – in der `runId`, die Sie übergeben, oder in einem eigenen Strom `decision_*`. Jev kostet **0,042 $ pro Million Eingabe-Tokens, Ausgabe kostenlos** (Stand der Dokumentation vom 23.09.2026), sodass `sdk.getRunCost(runId)` es von Haus aus einbezieht. Jede Entscheidung zählt außerdem in den Budgets pro Zeitraum – für die `agentId`, die sie nennt, und in Grenzen, die keinen Agenten nennen –, und ein Budget lehnt sie nie ab (siehe [API-Kosten](./costs#budgets)).
 
 Eine Antwort, die nicht zu den Fragen passt (eine Wahl, die keine der Optionen ist, eine fehlende Antwort oder eine vom falschen Typ), wurde trotzdem berechnet: Sie wird ebenfalls aufgezeichnet, mit dem `error` und leeren `answers`, bevor der Fehler geworfen wird. Meldet das Backend keine Token-Anzahl, hat das Ereignis kein `usage`, und die Kosten des Aufrufs werden als unbekannt ausgewiesen, nie als 0 $ – siehe [API-Kosten](./costs#unknown-costs).
 

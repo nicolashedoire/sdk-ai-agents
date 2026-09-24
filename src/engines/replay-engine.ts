@@ -24,7 +24,9 @@ export class ReplayEngine {
     modifications?: ReplayModifications,
     options: ReplayOptions = {}
   ): Promise<RunResult> {
-    const originalEvents = await this.eventStore.getEvents(runId);
+    // An event stored twice (an at-least-once store) is one event: every reading below —
+    // intentions, approvals, progress — sees the same list, so their positions match.
+    const originalEvents = uniqueById(await this.eventStore.getEvents(runId));
     this.validateEvents(originalEvents, runId);
 
     const newRunId = generateRunId();
@@ -386,7 +388,7 @@ function recordedCognitiveProgress(
   let step = 1;
   let tokensUsed = 0;
   const progress: Array<{ step: number; tokensUsed: number; elapsedMs: number }> = [];
-  for (const event of uniqueById(events)) {
+  for (const event of events) {
     if (event.type === 'cognition.operation_selected' && typeof event.data.step === 'number') {
       step = event.data.step;
     }

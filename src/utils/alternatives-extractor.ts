@@ -1,5 +1,6 @@
 import type { Event } from '../types/events.js';
 import type { AlternativesAnalysis, Alternative } from '../types/alternatives.js';
+import { readPolicyCheck } from './policy-check.js';
 
 export class AlternativesExtractor {
   /**
@@ -149,21 +150,19 @@ export class AlternativesExtractor {
 
       // Check for policy rejections (alternatives that were blocked)
       if (event.type === 'policy.checked') {
-        const policyData = event.data as {
-          rule?: string;
-          allowed?: boolean;
-          requiresApproval?: boolean;
-          reason?: string;
-        };
+        const policyData = readPolicyCheck(event.data);
+        // A refused tool call is one rejected alternative: the action engine's verdict. The
+        // policy engine's event for each policy it checked stands alone only for a step.
+        const verdict = policyData.level === 'verdict' || policyData.intentionType !== 'tool_call';
 
-        if (!policyData.allowed && !policyData.requiresApproval) {
+        if (policyData.result === 'denied' && verdict) {
           // Policy rejected - this represents a rejected alternative
           const relatedIntention = AlternativesExtractor.findRelatedIntention(event, sortedEvents);
           if (relatedIntention) {
             const alt: Alternative = {
               id: `alt-policy-${event.id}`,
               type: 'decision',
-              description: `Policy check: ${policyData.rule || 'unknown'}`,
+              description: `Policy check: ${policyData.rule}`,
               timestamp: event.timestamp,
               data: {
                 decision: {

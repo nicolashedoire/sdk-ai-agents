@@ -156,9 +156,9 @@ sdk.createCognitiveAgent({
 
 ### 限制与策略 {#limits-and-policies}
 
-适用于该智能体的预算和超时策略——它的 `policies` 中的策略以及全局策略——会在**每一步之前**、在这一步的任何模型调用之前检查，并在每次工具调用之前再次检查。它们看到的是运行的进度：`maxSteps` 统计已完成的步骤，`maxTokens` 统计该运行的模型调用（思维及其修复、工具选择、类型化决策）的 token 数，`maxDuration` 统计自运行开始以来的时间。按时间段计算的 token 和费用预算（带 `maxTokens` 或 `maxCost`、不带 `toolName` 的 `budgetLimit`）也会在每一步之前检查，运行记录的每次模型调用都会计入其中（参见 [API 成本](./costs#budgets)）。一个步骤会被当作类型为 `continue` 的意图来检查：条件要求工具调用（`intention.type` 等于 `tool_call`）的策略只适用于工具调用。允许列表、自定义策略、调用预算（`maxToolCalls`）和审批只涉及工具调用。
+适用于该智能体的预算和超时策略——它的 `policies` 中的策略以及全局策略——会在**每一步之前**、在这一步的任何模型调用之前检查，并在每次工具调用之前再次检查。它们看到的是运行的进度：`maxSteps` 统计已完成的步骤，`maxTokens` 统计该运行的模型调用（思维及其修复、工具选择、类型化决策）的 token 数，`maxDuration` 统计自运行开始以来的时间。按时间段计算的 token 和费用预算（带 `maxTokens` 或 `maxCost`、不带 `toolName` 的 `budgetLimit`）也会在每一步之前检查，运行记录的每次模型调用都会计入其中（参见 [API 成本](./costs#budgets)）。一个步骤会被当作类型为 `continue` 的意图来检查：条件要求工具调用（`intention.type` 等于 `tool_call`）的策略只适用于工具调用。允许列表、自定义策略、调用预算（`maxToolCalls`）和审批只涉及工具调用，动作为 `require_approval` 的限制规则也是如此：步骤从不等待审批。每一步的检查都会记录在策略审计（`sdk.getPolicyAuditTrail`）中，但只针对可能适用于步骤的策略。
 
-最先达到的限制会结束运行，而两类限制结束运行的方式不同：
+最先达到的限制会结束运行（工具调用的限制只会跳过调用），而两类限制结束运行的方式不同：
 
 | 限制 | 智能体的 `limits` | 策略 |
 | --- | --- | --- |

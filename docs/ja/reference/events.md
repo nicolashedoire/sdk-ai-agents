@@ -27,7 +27,8 @@ interface Event {
 | 種類 | データ |
 | --- | --- |
 | `intention.generated` | `message`、`toolCalls`、`model`、`requestedModel`、`usage`。認知エージェントの最終回答では、代わりに `intention` |
-| `policy.checked` / `policy.violated` | `intention`、`validation` / `reason`、`violatedPolicies`（呼び出し元が渡されていないツールを使った場合は `allowed-tools`、予算ポリシーの呼び出し予算を使い切った場合はそのポリシーの ID）、および予算またはタイムアウトのポリシーが認知エージェントの実行のステップを拒否した場合は `step`（このとき `intention` は `{ type: 'continue' }`） |
+| `policy.checked` | `intention`、`validation`：ツール呼び出しに対するアクションエンジンの判定。ポリシーエンジンも、確認したポリシーごとに 1 つのイベント（`policyId`、`policyType`、`intention`、`conditionEvaluated?`、`validationResult`、`applied`（ポリシーが適用されて拒否した場合は `true`）、`reason`）を記録します。記録されるのはツール呼び出しの前と、認知エージェントの実行の各ステップの前（ステップに適用されうる予算とタイムアウトのポリシーのみで、`intention` は `{ type: 'continue' }`）です |
+| `policy.violated` | `intention`、`reason`、`violatedPolicies`（呼び出し元が渡されていないツールを使った場合は `allowed-tools`、予算ポリシーの呼び出し予算を使い切った場合はそのポリシーの ID）、および予算またはタイムアウトのポリシーが認知エージェントの実行のステップを拒否した場合は `step`（このとき `intention` は `{ type: 'continue' }`） |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`、`intention`、`policyId`（ツール自身の `metadata.requiresApproval` が承認を求めた場合は `tool-requires-approval`）、`reason?`（呼び出し元が待つのをやめたか、実行が停止した場合は `cancelled before a decision`、`approvalTimeoutMs` を過ぎた場合は `no decision within N ms`） |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`、`parameters`、`result` / `error`、`duration`。`action.failed` は、不正な引数のために（どのポリシーよりも前に）拒否された呼び出しや、承認の後に呼び出し元が去ったために拒否された呼び出しも記録する |
 | `tool.called` | `toolName`、`parameters` |

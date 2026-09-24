@@ -27,7 +27,8 @@ interface Event {
 | 类型 | 数据 |
 | --- | --- |
 | `intention.generated` | `message`、`toolCalls`、`model`、`requestedModel`、`usage`——对于认知的最终答案则是 `intention` |
-| `policy.checked` / `policy.violated` | `intention`、`validation` / `reason`、`violatedPolicies`（当调用方使用了没有交给它的工具时为 `allowed-tools`；当调用预算耗尽时为该预算策略的 id），以及预算或超时策略拒绝了认知运行的某一步时的 `step`（此时 `intention` 为 `{ type: 'continue' }`） |
+| `policy.checked` | `intention`、`validation`：动作引擎对一次工具调用的判定。策略引擎还会为它检查的每条策略记录一个事件——`policyId`、`policyType`、`intention`、`conditionEvaluated?`、`validationResult`、`applied`（策略生效并拒绝时为 `true`）和 `reason`——在工具调用之前记录，也会在认知运行的每一步之前为可能适用于步骤的预算和超时策略记录（此时 `intention` 为 `{ type: 'continue' }`） |
+| `policy.violated` | `intention`、`reason`、`violatedPolicies`（当调用方使用了没有交给它的工具时为 `allowed-tools`；当调用预算耗尽时为该预算策略的 id），以及预算或超时策略拒绝了认知运行的某一步时的 `step`（此时 `intention` 为 `{ type: 'continue' }`） |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`、`intention`、`policyId`（当审批是由工具自己的 `metadata.requiresApproval` 要求的时为 `tool-requires-approval`）、`reason?`（当调用方放弃或运行停止时为 `cancelled before a decision`，超过 `approvalTimeoutMs` 后为 `no decision within N ms`） |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`、`parameters`、`result` / `error`、`duration`——`action.failed` 还会记录因参数无效而被拒绝的调用（在任何策略之前），或者因调用方在审批之后离开而被拒绝的调用 |
 | `tool.called` | `toolName`、`parameters` |

@@ -5,7 +5,14 @@ import {
   type DecisionEvaluationRecord,
 } from '../cognition/cognitive-controller.js';
 import { LLMThoughtGenerator, type ThoughtGenerator } from '../cognition/llm-thought-generator.js';
+import type {
+  DecisionRequest,
+  DecisionResponse,
+  TypedDecisionClient,
+  TypedQuestions,
+} from '../decisions/typed-decisions.js';
 import { PolicyViolationError } from '../errors/index.js';
+import { AlternativesExtractor } from '../utils/alternatives-extractor.js';
 import type { SDKConfig } from '../types/sdk.js';
 import type { Event } from '../types/events.js';
 import type { Policy, PolicyRule } from '../types/policy.js';
@@ -326,6 +333,123 @@ describe('policies of cognitive agents', () => {
     });
   });
 
+  describe('which policies a step is checked against', () => {
+    it('checks and records a step only against the policies that can apply to it', async () => {
+      const agent = analyst({
+        policies: [
+          policy('budget', { condition: 'maxSteps', action: 'deny', metadata: { value: 50 } }),
+          budget({ period: 'all', toolName: 'lookup_metric', maxTokens: 1_000_000 }, 'one-tool'),
+          budget({ period: 'all', agentId: 'someone-else', maxTokens: 1_000_000 }, 'another-agent'),
+          budget({ period: 'all', maxToolCalls: 10 }, 'calls-only'),
+          {
+            id: 'tool-calls-only',
+            type: 'budget',
+            scope: 'agent',
+            enabled: true,
+            rules: [
+              {
+                condition: {
+                  type: 'condition',
+                  conditions: [{ field: 'intention.type', operator: 'eq', value: 'tool_call' }],
+                },
+                action: 'deny',
+              },
+              { condition: 'maxTokens', action: 'deny', metadata: { value: 1_000_000 } },
+            ],
+          },
+        ],
+      });
+
+      const result = await agent.think({ problem: PROBLEM });
+
+      expect(result.status).toBe('completed');
+      const steps = env.sdk
+        .getPolicyAuditTrail(result.runId)
+        .filter((entry) => (entry.intention as { type?: string }).type === 'continue');
+      expect(steps.map((entry) => entry.policyId)).toEqual(Array(7).fill('limit-maxSteps'));
+    });
+
+    it('reads the checks of a completed run as allowed, and a refusal as denied', async () => {
+      const completed = analyst({
+        policies: [
+          policy('budget', { condition: 'maxSteps', action: 'deny', metadata: { value: 50 } }),
+        ],
+      });
+      const done = await completed.think({ problem: PROBLEM });
+      const graph = await env.sdk.getReasoningGraph(done.runId);
+      const results = graph.nodes.flatMap((node) =>
+        node.data?.policy ? [node.data.policy.result] : []
+      );
+      expect(results.length).toBeGreaterThan(7);
+      expect(new Set(results)).toEqual(new Set(['allowed']));
+      expect((await env.sdk.getAlternatives(done.runId)).summary.rejectedCount).toBe(0);
+      await env.dispose();
+
+      const refused = analyst({
+        policies: [
+          policy('budget', { condition: 'maxTokens', action: 'deny', metadata: { value: 500 } }),
+        ],
+      });
+      const failed = await refused.think({ problem: PROBLEM });
+      const events = await env.sdk.getEvents(failed.runId);
+      const denied = (await env.sdk.getReasoningGraph(failed.runId)).nodes.filter(
+        (node) => node.data?.policy?.result === 'denied'
+      );
+      // The tool call: the policy's own check and the call's verdict; then the refused step.
+      expect(denied.map((node) => node.data?.policy?.reason)).toEqual(
+        Array(3).fill('Max tokens (500) exceeded')
+      );
+      // One rejected alternative per refusal (the tool call, the step), whatever the clock:
+      // the events are replayed 10 ms apart so each refusal finds the intention before it.
+      const spaced = events.map((event, index) => ({ ...event, timestamp: 1_000 + index * 10 }));
+      const rejected = AlternativesExtractor.extractFromEvents(failed.runId, spaced)
+        .decisionPoints.flatMap((point) => point.alternatives)
+        .filter((alternative) => alternative.status === 'rejected');
+      expect(rejected.map((alternative) => alternative.reason)).toEqual([
+        'Max tokens (500) exceeded',
+        'Max tokens (500) exceeded',
+      ]);
+    });
+
+    it('never holds a step for an approval: a limit that requires one concerns tool calls', async () => {
+      const agent = analyst({
+        policies: [
+          policy('budget', {
+            condition: 'maxSteps',
+            action: 'require_approval',
+            metadata: { value: 1 },
+          }),
+        ],
+        limits: { maxSteps: 4 },
+      });
+
+      const result = await agent.think({ problem: PROBLEM });
+
+      expect(result.status).toBe('completed');
+      expect(env.sdk.getPendingApprovals()).toEqual([]);
+      expect(ofType(await env.sdk.getEvents(result.runId), 'policy.violated')).toEqual([]);
+    });
+
+    it('does not refuse a step for a call count that can no longer be checked', async () => {
+      const limit: Record<string, unknown> = {
+        period: 'all',
+        maxTokens: 1_000_000,
+        maxToolCalls: 5,
+      };
+      const agent = analyst({ policies: [budget(limit, 'caps')] });
+      limit.maxToolCalls = Number.NaN;
+
+      const result = await agent.think({ problem: PROBLEM });
+
+      // Every step runs; the tool call, which the call count concerns, is refused.
+      expect(result.status).toBe('completed');
+      expect(lookups).toBe(0);
+      expect(result.state.failures[0]?.description).toContain(
+        'Budget cannot be checked: budgetLimit.maxToolCalls must be a finite number >= 0, got NaN'
+      );
+    });
+  });
+
   describe('budgets per period', () => {
     it("counts the run's model calls: thoughts and tool selections", async () => {
       const agent = analyst(
@@ -530,12 +654,79 @@ describe('policies of cognitive agents', () => {
     const violations = ofType(await env.sdk.getEvents(replay.runId), 'policy.violated');
     expect(violations.map((event) => event.data.reason)).toEqual(['Max tokens (500) exceeded']);
   });
+
+  it('replays an event the store holds twice once', async () => {
+    const agent = analyst();
+    const original = await agent.think({ problem: PROBLEM });
+    expect(lookups).toBe(1);
+    const events = await env.sdk.getEvents(original.runId);
+    const selection = events.find(
+      (event) => event.type === 'intention.generated' && Array.isArray(event.data.toolCalls)
+    );
+    if (!selection) throw new Error('the run selected no tool');
+    // An at-least-once store may hand back the same event twice.
+    await env.store.append(original.runId, { ...selection });
+
+    const replay = await env.sdk.replay(original.runId);
+
+    expect(replay).toMatchObject({ status: 'completed', output: original.answer });
+    expect(lookups).toBe(2);
+  });
 });
+
+/** A typed-decision backend that answers without reporting its usage. */
+class UsagelessDecisionClient implements TypedDecisionClient {
+  readonly name = 'usageless';
+  private readonly inner = new InMemoryDecisionClient(() => yes(0.9));
+
+  async evaluate<Q extends TypedQuestions>(
+    request: DecisionRequest<Q>
+  ): Promise<DecisionResponse<Q>> {
+    const { usage: _usage, ...answered } = await this.inner.evaluate(request);
+    return answered as DecisionResponse<Q>;
+  }
+}
 
 describe('typed decisions made with sdk.decisions', () => {
   let env: TestSDK;
   afterEach(async () => {
     await env.dispose();
+  });
+
+  it('count a call that reports no usage as a call without token counts', async () => {
+    env = createTestSDK({ decisionClient: new UsagelessDecisionClient() });
+
+    const answer = await env.sdk.decisions.check({
+      context: 'A refund request',
+      question: 'Is it a refund?',
+      agentId: 'support',
+    });
+
+    expect(answer.yes).toBe(true);
+    const events = await env.sdk.getEvents(answer.runId);
+    expect(events.map((event) => event.type)).toEqual(['decision.evaluated']);
+    expect(await env.sdk.getBudgetUsage({ agentId: 'support', period: 'all' })).toMatchObject({
+      tokensUsed: 0,
+      unmeteredCalls: 1,
+    });
+  });
+
+  it('are never refused by a budget', async () => {
+    env = createTestSDK({ decisionClient: new InMemoryDecisionClient(() => yes(0.9)) });
+    env.sdk.defineGlobalPolicy({ ...budget({ period: 'all', maxTokens: 0 }), scope: 'global' });
+
+    const first = await env.sdk.decisions.check({
+      context: 'A refund',
+      question: 'Is it a refund?',
+    });
+    const second = await env.sdk.decisions.check({
+      context: 'A refund',
+      question: 'Is it a refund?',
+    });
+
+    // The budget is spent from the first call on; both still answer, and both are counted.
+    expect([first.yes, second.yes]).toEqual([true, true]);
+    expect((await env.sdk.getBudgetUsage({ period: 'all' })).tokensUsed).toBe(2_020);
   });
 
   it('count in budgets per period, for the agent they name and for everyone', async () => {

@@ -213,21 +213,26 @@ export class PolicyEngine {
    * that names no tool against its period's usage. The step is checked as an intention of
    * type `continue`, so a policy whose conditions need a tool call does not apply to it.
    * Allowlists, custom policies, call counts and approvals concern tool calls: `validate`
-   * checks them on each call. Every evaluation goes to the audit trail, like `validate`'s.
+   * checks them on each call. Only the policies that apply to the step are evaluated, and
+   * each evaluation goes to the audit trail, like `validate`'s.
    */
   async validateRunStep(context: PolicyContext): Promise<PolicyValidationResult> {
     const step: Intention = { type: 'continue' };
     const stepContext: PolicyContext = { ...context, intention: { type: step.type } };
-    const policies = this.getActivePolicies(context.agentId).filter(
-      (policy) => policy.type === 'budget' || policy.type === 'timeout'
-    );
+    const policies: Policy[] = [];
+    for (const policy of this.getActivePolicies(context.agentId)) {
+      const limits = stepLimits(policy, context.agentId);
+      if (limits) policies.push(limits);
+    }
     const violatedPolicies: string[] = [];
     const reasons = new Map<string, string>();
 
     for (const policy of policies) {
       const conditionResult = this.evaluatePolicyConditions(policy, step, stepContext);
-      await this.logPolicyAudit(policy, step, stepContext, conditionResult);
+      // A policy whose conditions do not hold for a step (one kept to tool calls) has nothing
+      // to say about it: it is neither checked nor recorded.
       if (!conditionResult.conditionsMet) continue;
+      await this.logPolicyAudit(policy, step, stepContext, conditionResult);
 
       const result = await this.validatePolicy(policy, step, stepContext);
       if (!result.allowed) {
@@ -584,9 +589,13 @@ export class PolicyEngine {
       return null; // This limit doesn't apply to this tool
     }
 
+    // A step of a cognitive run is not a tool call: only the token and cost caps concern it.
+    const toolCall = Boolean(context.intention?.toolName);
+    const limit = toolCall ? budgetLimit : withoutCallCount(budgetLimit);
+
     // A cap changed since the policy was applied that is no longer a count or an amount
     // refuses the calls it covers, like a cost that is unknown.
-    const problem = budgetLimitProblem(budgetLimit);
+    const problem = budgetLimitProblem(limit);
     if (problem) {
       return uncheckable(
         `Budget cannot be checked: budgetLimit${problem.field} ${problem.reason}`,
@@ -597,12 +606,10 @@ export class PolicyEngine {
     // A tool call consumes no tokens: model tokens are recorded as they are used
     // (recordModelUsage), so adding the run's total here would count them twice.
     const additionalTokens = 0;
-    const toolCall = Boolean(context.intention?.toolName);
     const additionalToolCalls = toolCall ? 1 : 0;
 
     const checkResult = await this.budgetTracker.checkBudget(
-      // A step of a cognitive run is not a tool call: only the token and cost caps concern it.
-      toolCall ? budgetLimit : withoutCallCount(budgetLimit),
+      limit,
       additionalTokens,
       additionalToolCalls
     );
@@ -873,6 +880,44 @@ function shownValue(value: unknown): string {
   if (typeof value === 'object' && value !== null)
     return Array.isArray(value) ? 'an array' : 'an object';
   return String(value);
+}
+
+/**
+ * The rules of a budget or timeout policy that concern a step of a cognitive run, with the
+ * conditions that gate them; undefined when none does. Left out, as they concern tool calls
+ * only: a `budgetLimit` that names a tool or another agent, or caps only the number of calls,
+ * and any rule whose action is `require_approval` (a step never waits for an approval).
+ */
+function stepLimits(policy: Policy, agentId: string): Policy | undefined {
+  if (policy.type !== 'budget' && policy.type !== 'timeout') return undefined;
+  const isGate = (rule: PolicyRule) =>
+    typeof rule.condition !== 'string' || !BUILT_IN_CONDITIONS.has(rule.condition);
+  const rules = policy.rules.filter(
+    (rule) => isGate(rule) || limitConcernsStep(policy.type, rule, agentId)
+  );
+  return rules.some((rule) => !isGate(rule)) ? { ...policy, rules } : undefined;
+}
+
+function limitConcernsStep(type: PolicyType, rule: PolicyRule, agentId: string): boolean {
+  if (rule.action === 'require_approval') return false;
+  if (type === 'timeout') return rule.condition === 'maxDuration';
+  if (rule.condition === 'maxSteps' || rule.condition === 'maxTokens') return true;
+  if (rule.condition !== 'budgetLimit') return false;
+  const limit: unknown = rule.metadata?.budgetLimit;
+  // A limit that no longer says whom it covers is checked: it refuses (see checkBudgetLimit).
+  if (typeof limit !== 'object' || limit === null) return true;
+  const agent: unknown = Reflect.get(limit, 'agentId');
+  const tool: unknown = Reflect.get(limit, 'toolName');
+  if (
+    (agent !== undefined && typeof agent !== 'string') ||
+    (tool !== undefined && typeof tool !== 'string')
+  ) {
+    return true;
+  }
+  if (tool || (agent && agent !== agentId)) return false;
+  return (
+    Reflect.get(limit, 'maxTokens') !== undefined || Reflect.get(limit, 'maxCost') !== undefined
+  );
 }
 
 /** A budget limit without its call count, for a check that is not a tool call. */

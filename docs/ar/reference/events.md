@@ -27,7 +27,8 @@ interface Event {
 | النوع | البيانات |
 | --- | --- |
 | `intention.generated` | `message`، و`toolCalls`، و`model`، و`requestedModel`، و`usage` — أو `intention` لإجابة نهائية معرفية |
-| `policy.checked` / `policy.violated` | `intention`، و`validation` / `reason`، و`violatedPolicies` (`allowed-tools` حين يستخدم مستدعٍ أداة لم تُعطَ له؛ ومعرّف سياسة الميزانية حين تُستنفَد ميزانية استدعاءاتها)، و`step` حين ترفض سياسة ميزانية أو مهلة زمنية خطوةً من تشغيل معرفي (وتكون `intention` عندها `{ type: 'continue' }`) |
+| `policy.checked` | `intention`، و`validation`: حكم محرّك الإجراءات على استدعاء أداة. ويسجّل محرّك السياسات أيضًا حدثًا لكل سياسة يفحصها — `policyId`، و`policyType`، و`intention`، و`conditionEvaluated?`، و`validationResult`، و`applied` (`true` حين انطبقت السياسة ورفضت)، و`reason` — قبل استدعاء الأداة، وقبل كل خطوة من تشغيل معرفي لسياسات الميزانية والمهلة الزمنية التي يمكن أن تنطبق على خطوة (وتكون `intention` عندها `{ type: 'continue' }`) |
+| `policy.violated` | `intention`، و`reason`، و`violatedPolicies` (`allowed-tools` حين يستخدم مستدعٍ أداة لم تُعطَ له؛ ومعرّف سياسة الميزانية حين تُستنفَد ميزانية استدعاءاتها)، و`step` حين ترفض سياسة ميزانية أو مهلة زمنية خطوةً من تشغيل معرفي (وتكون `intention` عندها `{ type: 'continue' }`) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`، و`intention`، و`policyId` (`tool-requires-approval` حين طلبتها `metadata.requiresApproval` الخاصة بالأداة نفسها)، و`reason?` (`cancelled before a decision` حين تخلّى المستدعي أو توقّف التشغيل، و`no decision within N ms` بعد `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`، و`parameters`، و`result` / `error`، و`duration` — ويسجّل `action.failed` أيضًا الاستدعاء المرفوض بسبب معاملات غير صالحة (قبل أي سياسة) أو لأن مستدعيه غادر بعد موافقة |
 | `tool.called` | `toolName`، و`parameters` |
