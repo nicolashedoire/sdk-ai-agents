@@ -11,6 +11,21 @@ import { anthropicError, anthropicMessage, openAIChat, openAIError } from './sup
 
 type FallbackConfig = NonNullable<SDKConfig['fallbackProviders']>[number];
 
+/**
+ * Runs `create` with an environment variable set, and restores it before returning: the change
+ * never spans an `await`, so nothing else running in this process sees it.
+ */
+function withEnv<T>(name: string, value: string, create: () => T): T {
+  const previous = process.env[name];
+  process.env[name] = value;
+  try {
+    return create();
+  } finally {
+    if (previous === undefined) delete process.env[name];
+    else process.env[name] = previous;
+  }
+}
+
 // The real SDK, adapters and vendor clients talk to local servers answering in each vendor's
 // wire format. The SDK's own retry policy is disabled unless a test is about retries.
 describe('SDK with Fallback Providers', () => {
@@ -320,14 +335,15 @@ describe('SDK with Fallback Providers', () => {
       const gateway = new LocalHttpServer().reply(openAIError(500, 'Gateway down'));
       const direct = new LocalHttpServer().reply(openAIChat({ content: 'Hello from OpenAI' }));
       const [gatewayURL, directURL] = await Promise.all([gateway.start(), direct.start()]);
-      const previous = process.env.OPENAI_BASE_URL;
-      process.env.OPENAI_BASE_URL = `${directURL}/v1`;
       try {
-        const sdk = buildSDK({
-          apiKey: undefined,
-          providerConfig: { openai: { apiKey: 'gateway-key', baseURL: `${gatewayURL}/v1` } },
-          fallbackProviders: [{ provider: 'openai', config: { apiKey: 'sk-direct-key' } }],
-        });
+        // The vendor clients are created, and read OPENAI_BASE_URL, inside createSDK.
+        const sdk = withEnv('OPENAI_BASE_URL', `${directURL}/v1`, () =>
+          buildSDK({
+            apiKey: undefined,
+            providerConfig: { openai: { apiKey: 'gateway-key', baseURL: `${gatewayURL}/v1` } },
+            fallbackProviders: [{ provider: 'openai', config: { apiKey: 'sk-direct-key' } }],
+          })
+        );
 
         const result = await runAgent(sdk);
 
@@ -339,8 +355,6 @@ describe('SDK with Fallback Providers', () => {
           'Bearer sk-direct-key',
         ]);
       } finally {
-        if (previous === undefined) delete process.env.OPENAI_BASE_URL;
-        else process.env.OPENAI_BASE_URL = previous;
         await Promise.all([gateway.stop(), direct.stop()]);
       }
     });

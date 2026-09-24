@@ -6,16 +6,12 @@ import { FileEventStore } from '../stores/file-event-store.js'
 import type { Event } from '../types/events.js'
 
 describe('FileEventStore', () => {
-  // Under the system's temporary folder, not in the working tree.
-  const testEventsDir = join(tmpdir(), `file-event-store-${process.pid}-${Date.now()}`)
+  let testEventsDir: string
   let store: FileEventStore
 
   beforeEach(async () => {
-    try {
-      await fs.rm(testEventsDir, { recursive: true, force: true })
-    } catch {
-      // Ignore
-    }
+    // A new folder for each test, under the system's temporary folder (not the working tree).
+    testEventsDir = await fs.mkdtemp(join(tmpdir(), 'file-event-store-'))
     store = new FileEventStore(testEventsDir)
   })
 
