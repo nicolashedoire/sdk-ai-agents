@@ -385,11 +385,4 @@ export class PostgreSQLEventStore extends SQLEventStore {
       }
     }
   }
-
-  /**
-   * Closes the PostgreSQL connection pool.
-   */
-  async close(): Promise<void> {
-    await this.connection.close();
-  }
 }

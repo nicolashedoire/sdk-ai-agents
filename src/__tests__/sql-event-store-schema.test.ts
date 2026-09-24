@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ValidationError } from '../errors/index.js';
 import { type SQLConnection, SQLEventStore } from '../stores/sql-event-store.js';
+import { SQLiteEventStore } from '../stores/sqlite-event-store.js';
+import { loadNodeSqlite } from './support/node-sqlite.js';
 import type { Event } from '../types/events.js';
 
 /**
@@ -12,7 +14,9 @@ class RecordingConnection implements SQLConnection {
   /** Full text of each statement that ran. */
   readonly sql: string[] = [];
 
-  constructor(private readonly schema: { delayMs?: number; failWith?: Error } = {}) {}
+  constructor(
+    private readonly schema: { delayMs?: number; failWith?: Error; failTimes?: number } = {}
+  ) {}
 
   async query<T = unknown>(sql: string): Promise<T[]> {
     this.statements.push(firstWords(sql));
@@ -21,7 +25,10 @@ class RecordingConnection implements SQLConnection {
 
   async execute(sql: string): Promise<void> {
     if (/CREATE TABLE/.test(sql)) {
-      if (this.schema.failWith) throw this.schema.failWith;
+      if (this.schema.failWith && (this.schema.failTimes ?? Number.POSITIVE_INFINITY) > 0) {
+        this.schema.failTimes = (this.schema.failTimes ?? Number.POSITIVE_INFINITY) - 1;
+        throw this.schema.failWith;
+      }
       await new Promise((resolve) => setTimeout(resolve, this.schema.delayMs ?? 0));
     }
     this.statements.push(firstWords(sql));
@@ -66,12 +73,65 @@ describe('SQLEventStore schema', () => {
     expect(connection.statements).toEqual(['CLOSE']);
   });
 
+  it('tries the schema again when the database becomes reachable', async () => {
+    // The database is not reachable at start-up (a pool connects on first use), then is. The
+    // first write shares the failed attempt started by the constructor; the next one retries.
+    const connection = new RecordingConnection({
+      failWith: new Error('ECONNREFUSED'),
+      failTimes: 1,
+    });
+    const store = new SQLEventStore({ connection });
+
+    await expect(store.append('run_1', event)).rejects.toThrow('ECONNREFUSED');
+    await store.append('run_1', event);
+
+    expect(connection.statements).toContain('INSERT INTO events');
+  });
+
+  it('lets a subclass written for the old hook create its schema through this.connection', async () => {
+    class LegacyStore extends SQLEventStore {
+      protected override async initializeSchema(): Promise<void> {
+        await this.connection.execute('CREATE TABLE IF NOT EXISTS events (id TEXT)');
+        await this.connection.execute('CREATE INDEX IF NOT EXISTS legacy_index ON events(id)');
+      }
+    }
+    const connection = new RecordingConnection({ delayMs: 5 });
+    const store = new LegacyStore({ connection });
+
+    // Before, this deadlocked: the schema's own queries waited for the schema.
+    await store.append('run_1', event);
+
+    expect(connection.statements).toEqual([
+      'CREATE TABLE IF',
+      'CREATE INDEX IF',
+      'INSERT INTO events',
+    ]);
+  });
+
+  it('closes only after a schema creation in progress', async () => {
+    const connection = new RecordingConnection({ delayMs: 20 });
+    const store = new SQLEventStore({ connection });
+
+    await store.close();
+
+    expect(connection.statements.at(-1)).toBe('CLOSE');
+    expect(connection.statements[0]).toBe('CREATE TABLE IF');
+  });
+
   it('refuses a table name that would change the SQL', () => {
     const connection = new RecordingConnection();
-    for (const tableName of ['events; DROP TABLE users', 'events--', 'a b', '1events', 'x.y.z']) {
+    for (const tableName of [
+      'events; DROP TABLE users',
+      'events--',
+      'a b',
+      '1events',
+      'x.y.z',
+      'e'.repeat(64),
+    ]) {
       expect(() => new SQLEventStore({ connection, tableName })).toThrow(ValidationError);
     }
     expect(connection.statements).toEqual([]);
+    expect(() => new SQLEventStore({ connection, tableName: 'e'.repeat(63) })).not.toThrow();
   });
 
   it('accepts a schema-qualified table, with index names it can create', async () => {
@@ -81,10 +141,55 @@ describe('SQLEventStore schema', () => {
     await store.append('run_1', event);
 
     expect(connection.statements).toContain('INSERT INTO app.events');
-    // An index name cannot contain the schema's dot.
+    // SQLite syntax: the schema goes on the index name, the table is named alone.
     expect(connection.sql).toContain(
-      'CREATE INDEX IF NOT EXISTS idx_app_events_run_id ON app.events(run_id)'
+      'CREATE INDEX IF NOT EXISTS app.idx_events_run_id ON events(run_id)'
     );
     await store.close();
+  });
+
+  const nodeSqlite = loadNodeSqlite();
+  describe.skipIf(!nodeSqlite)('with a real SQLite database (node:sqlite)', () => {
+    function indexesOf(
+      db: InstanceType<NonNullable<typeof nodeSqlite>['DatabaseSync']>,
+      schema: string
+    ) {
+      return db
+        .prepare(
+          `SELECT name FROM ${schema}.sqlite_master WHERE type = 'index' AND name LIKE 'idx_%'`
+        )
+        .all()
+        .map((row) => (row as { name: string }).name)
+        .sort();
+    }
+
+    it('creates the table and its indexes, then records and reads events', async () => {
+      const db = new (nodeSqlite as NonNullable<typeof nodeSqlite>).DatabaseSync(':memory:');
+      const store = new SQLiteEventStore({ db });
+
+      await store.append('run_1', event);
+
+      expect(await store.getEvents('run_1')).toHaveLength(1);
+      expect(indexesOf(db, 'main')).toHaveLength(5);
+      await store.close();
+    });
+
+    it('creates the indexes of a table in an attached database', async () => {
+      const db = new (nodeSqlite as NonNullable<typeof nodeSqlite>).DatabaseSync(':memory:');
+      db.exec("ATTACH DATABASE ':memory:' AS app");
+      const store = new SQLiteEventStore({ db, tableName: 'app.events' });
+
+      await store.append('run_1', event);
+
+      expect(await store.getEvents('run_1')).toHaveLength(1);
+      expect(indexesOf(db, 'app')).toEqual([
+        'idx_events_run_id',
+        'idx_events_run_timestamp',
+        'idx_events_timestamp',
+        'idx_events_type',
+        'idx_events_type_timestamp',
+      ]);
+      await store.close();
+    });
   });
 });
