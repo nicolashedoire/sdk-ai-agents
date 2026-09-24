@@ -235,7 +235,11 @@ export { parseRetryAfter } from './utils/http.js';
 export type { FetchLike, HttpResponseLike } from './utils/http.js';
 export { deriveRunStatus } from './utils/run-status.js';
 // The built-in providers, to compose your own chain (e.g. a FallbackProvider given as llmProvider).
-export { OpenAIProvider } from './providers/openai-provider.js';
+export { DEFAULT_OPENAI_MODEL, OpenAIProvider } from './providers/openai-provider.js';
+export type {
+  OpenAIProviderOptions,
+  OpenAIRequestOptions,
+} from './providers/openai-provider.js';
 export { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from './providers/anthropic-provider.js';
 export { FallbackProvider } from './providers/fallback-provider.js';
 export type { FallbackResult } from './providers/fallback-provider.js';
@@ -245,6 +249,7 @@ export type {
   LLMRequest,
   LLMResponse,
   LLMToolCall,
+  OpenAIReasoningEffort,
   VendorClientOptions,
 } from './providers/llm-provider.js';
 

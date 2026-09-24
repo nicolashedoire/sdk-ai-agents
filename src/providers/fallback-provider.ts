@@ -116,11 +116,16 @@ export class FallbackProvider implements LLMProvider {
     const maxTokens =
       providerSpecificSettings?.maxTokens ?? defaultSettings.maxTokens ?? request.maxTokens;
 
+    // OpenAI only (it has no default group): overrides the request's own.
+    const reasoningEffort =
+      providerName === 'openai' ? request.providerSettings.openai?.reasoningEffort : undefined;
+
     // Return new request with resolved settings
     return {
       ...request,
       temperature,
       maxTokens,
+      ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
       // Remove providerSettings to avoid double resolution
       providerSettings: undefined,
     };

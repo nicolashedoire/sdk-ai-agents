@@ -2,7 +2,7 @@ import type { ActionEngine } from '../engines/action-engine.js';
 import type { ReasoningEngine } from '../engines/reasoning-engine.js';
 import { PolicyViolationError, ToolExecutionError } from '../errors/index.js';
 import type { IEventStore } from '../stores/event-store.js';
-import type { ProviderSettings } from '../types/agent.js';
+import type { OpenAIProviderSettings, ProviderSettings } from '../types/agent.js';
 import type { Tool } from '../types/tool.js';
 import { nextUnknownToInvestigate } from './cognitive-operations.js';
 import type { ThoughtGenerator } from './llm-thought-generator.js';
@@ -21,7 +21,7 @@ export interface InformationSeekerDependencies {
   generator: ThoughtGenerator;
   systemPrompt?: string;
   providerSettings?: {
-    openai?: ProviderSettings;
+    openai?: OpenAIProviderSettings;
     anthropic?: ProviderSettings;
     default?: ProviderSettings;
   };

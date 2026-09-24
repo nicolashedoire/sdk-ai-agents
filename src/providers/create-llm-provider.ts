@@ -1,14 +1,18 @@
 import { ValidationError } from '../errors/index.js';
 import type { RetryPolicy } from '../resilience/retry.js';
 import { RetryingLLMProvider, type ProviderRetryInfo } from '../resilience/retrying-provider.js';
-import type { SDKConfig } from '../types/sdk.js';
+import type { OpenAIVendorConfig, SDKConfig } from '../types/sdk.js';
 import { DEFAULT_ANTHROPIC_MODEL } from './anthropic-provider.js';
 import { FallbackProvider } from './fallback-provider.js';
 import type { LLMProvider } from './llm-provider.js';
+import { DEFAULT_OPENAI_MODEL, type OpenAIRequestOptions } from './openai-provider.js';
 import { ProviderFactory } from './provider-factory.js';
 import { UnconfiguredLLMProvider } from './unconfigured-provider.js';
 
-const DEFAULT_MODELS = { openai: 'gpt-4', anthropic: DEFAULT_ANTHROPIC_MODEL } as const;
+const DEFAULT_MODELS = {
+  openai: DEFAULT_OPENAI_MODEL,
+  anthropic: DEFAULT_ANTHROPIC_MODEL,
+} as const;
 
 export interface ProviderSetup {
   /** When set, each vendor provider retries with this policy and its own client retries are disabled. */
@@ -32,7 +36,8 @@ export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}):
     provider: 'openai' | 'anthropic',
     apiKey: string | undefined,
     defaultModel?: string,
-    baseURL?: string
+    baseURL?: string,
+    openai?: OpenAIRequestOptions
   ) => {
     const vendor = ProviderFactory.createProvider({
       provider,
@@ -40,6 +45,7 @@ export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}):
       defaultModel: defaultModel || DEFAULT_MODELS[provider],
       ...(retryPolicy ? { clientMaxRetries: 0 } : {}),
       ...(baseURL ? { baseURL } : {}),
+      ...(openai ? { openai } : {}),
     });
     return retryPolicy ? new RetryingLLMProvider(vendor, retryPolicy, setup.onRetry) : vendor;
   };
@@ -55,7 +61,8 @@ export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}):
     primaryName,
     primaryKey,
     primaryConfig?.defaultModel,
-    primaryConfig?.baseURL
+    primaryConfig?.baseURL,
+    primaryName === 'openai' ? openAIRequestOptions(config.providerConfig?.openai) : undefined
   );
 
   if (!config.fallbackProviders || config.fallbackProviders.length === 0) {
@@ -81,8 +88,32 @@ export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}):
       fallback.provider,
       apiKey,
       fallback.config?.defaultModel || vendorConfig?.defaultModel,
-      fallback.config?.baseURL || vendorConfig?.baseURL
+      fallback.config?.baseURL || vendorConfig?.baseURL,
+      fallback.provider === 'openai'
+        ? openAIRequestOptions(
+            fallback.config,
+            sameVendor ? undefined : config.providerConfig?.openai
+          )
+        : undefined
     );
   });
   return new FallbackProvider(primary, fallbacks);
+}
+
+/**
+ * The OpenAI request options of a provider, field by field: from its own settings, else from
+ * the vendor's entry it inherits (a fallback of another vendor inherits `providerConfig.openai`).
+ */
+function openAIRequestOptions(
+  own: OpenAIVendorConfig | undefined,
+  inherited?: OpenAIVendorConfig
+): OpenAIRequestOptions {
+  const reasoningModels = own?.reasoningModels ?? inherited?.reasoningModels;
+  const reasoningEffort = own?.reasoningEffort ?? inherited?.reasoningEffort;
+  const nativeToolMessages = own?.nativeToolMessages ?? inherited?.nativeToolMessages;
+  return {
+    ...(reasoningModels !== undefined ? { reasoningModels } : {}),
+    ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
+    ...(nativeToolMessages !== undefined ? { nativeToolMessages } : {}),
+  };
 }

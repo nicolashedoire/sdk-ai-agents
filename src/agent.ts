@@ -4,7 +4,7 @@ import type { ReasoningEngine, ReasoningStep } from './engines/reasoning-engine.
 import type { LLMMessage } from './providers/llm-provider.js';
 import type { IEventStore } from './stores/event-store.js';
 import type { Event } from './types/events.js';
-import type { Agent, ProviderSettings } from './types/agent.js';
+import type { Agent, OpenAIProviderSettings, ProviderSettings } from './types/agent.js';
 import type { Policy } from './types/policy.js';
 import type { Intention, RunInput, RunResult } from './types/run.js';
 import type { Tool } from './types/tool.js';
@@ -27,7 +27,7 @@ interface RunState {
   cancelled?: boolean;
   abortController?: AbortController;
   providerSettings?: {
-    openai?: ProviderSettings;
+    openai?: OpenAIProviderSettings;
     anthropic?: ProviderSettings;
     default?: ProviderSettings;
   };
@@ -214,7 +214,7 @@ export class AgentImpl {
     runSettings?: RunInput['providerSettings']
   ):
     | {
-        openai?: ProviderSettings;
+        openai?: OpenAIProviderSettings;
         anthropic?: ProviderSettings;
         default?: ProviderSettings;
       }
@@ -225,7 +225,7 @@ export class AgentImpl {
 
     return {
       default: layerSettings(agentSettings?.default, runSettings?.default),
-      openai: layerSettings(
+      openai: layerOpenAISettings(
         agentSettings?.default,
         agentSettings?.openai,
         runSettings?.default,
@@ -353,5 +353,23 @@ function layerSettings(...layers: Array<ProviderSettings | undefined>): Provider
     if (layer?.temperature !== undefined) result.temperature = layer.temperature;
     if (layer?.maxTokens !== undefined) result.maxTokens = layer.maxTokens;
   }
+  return result;
+}
+
+/** The OpenAI group: the common fields layered, then the OpenAI-only ones of the OpenAI layers. */
+function layerOpenAISettings(
+  agentDefault: ProviderSettings | undefined,
+  agentOpenAI: OpenAIProviderSettings | undefined,
+  runDefault: ProviderSettings | undefined,
+  runOpenAI: OpenAIProviderSettings | undefined
+): OpenAIProviderSettings {
+  const result: OpenAIProviderSettings = layerSettings(
+    agentDefault,
+    agentOpenAI,
+    runDefault,
+    runOpenAI
+  );
+  const reasoningEffort = runOpenAI?.reasoningEffort ?? agentOpenAI?.reasoningEffort;
+  if (reasoningEffort !== undefined) result.reasoningEffort = reasoningEffort;
   return result;
 }

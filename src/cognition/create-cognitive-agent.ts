@@ -4,7 +4,7 @@ import { ValidationError } from '../errors/index.js';
 import type { TypedDecisionClient } from '../decisions/typed-decisions.js';
 import type { LLMProvider } from '../providers/llm-provider.js';
 import type { IEventStore } from '../stores/event-store.js';
-import type { ProviderSettings } from '../types/agent.js';
+import type { OpenAIProviderSettings, ProviderSettings } from '../types/agent.js';
 import type { Policy } from '../types/policy.js';
 import type { Tool } from '../types/tool.js';
 import { CognitiveAgent } from './cognitive-agent.js';
@@ -82,7 +82,7 @@ export interface CognitiveAgentConfig {
   temperature?: number;
   maxTokens?: number;
   providerSettings?: {
-    openai?: ProviderSettings;
+    openai?: OpenAIProviderSettings;
     anthropic?: ProviderSettings;
     default?: ProviderSettings;
   };

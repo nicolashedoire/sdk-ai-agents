@@ -3,10 +3,25 @@ import type { JevClientConfig } from '../decisions/jev-client.js';
 import type { TypedDecisionClient } from '../decisions/typed-decisions.js';
 import type { IncidentMonitorOptions } from '../incidents/monitored-event-store.js';
 import type { LLMProvider } from '../providers/llm-provider.js';
+import type { OpenAIRequestOptions } from '../providers/openai-provider.js';
 import type { RetryPolicy } from '../resilience/retry.js';
 import type { IEventStore } from '../stores/event-store.js';
 import type { Event } from './events.js';
 import type { Policy } from './policy.js';
+
+/** Settings of a built-in provider's vendor (see `SDKConfig.providerConfig`). */
+export interface VendorConfig {
+  apiKey?: string;
+  /** Model used when a request names none, or names one this vendor does not serve (fallbacks). */
+  defaultModel?: string;
+  baseURL?: string;
+}
+
+/**
+ * OpenAI settings: those of every vendor, and how requests are shaped for OpenAI models and
+ * compatible servers (`reasoningModels`, `reasoningEffort`, `nativeToolMessages`).
+ */
+export interface OpenAIVendorConfig extends VendorConfig, OpenAIRequestOptions {}
 
 export interface SDKConfig {
   /** API key of the primary provider. Not needed when `llmProvider` is given. */
@@ -35,21 +50,17 @@ export interface SDKConfig {
    * endpoint or a proxy.
    */
   providerConfig?: {
-    openai?: { apiKey?: string; defaultModel?: string; baseURL?: string };
-    anthropic?: { apiKey?: string; defaultModel?: string; baseURL?: string };
+    openai?: OpenAIVendorConfig;
+    anthropic?: VendorConfig;
   };
   /**
    * Tried in order when the primary provider fails. A fallback of another vendor never gets the
    * primary `apiKey`: it needs its own key, here or in `providerConfig`.
    */
-  fallbackProviders?: Array<{
-    provider: 'openai' | 'anthropic';
-    config?: {
-      apiKey?: string;
-      defaultModel?: string;
-      baseURL?: string;
-    };
-  }>;
+  fallbackProviders?: Array<
+    | { provider: 'openai'; config?: OpenAIVendorConfig }
+    | { provider: 'anthropic'; config?: VendorConfig }
+  >;
   eventStore?: IEventStore;
   defaultPolicies?: Policy[];
   goldenTracesDir?: string;

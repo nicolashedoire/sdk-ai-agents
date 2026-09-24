@@ -1,6 +1,6 @@
 import type { LLMProvider, VendorClientOptions } from './llm-provider.js';
 import { AnthropicProvider } from './anthropic-provider.js';
-import { OpenAIProvider } from './openai-provider.js';
+import { OpenAIProvider, type OpenAIRequestOptions } from './openai-provider.js';
 
 export interface ProviderConfig {
   provider: 'openai' | 'anthropic';
@@ -10,13 +10,18 @@ export interface ProviderConfig {
   clientMaxRetries?: number;
   /** Address of the API (the vendor's own when omitted). */
   baseURL?: string;
+  /** How the OpenAI provider shapes its requests (reasoning models, native tool messages). */
+  openai?: OpenAIRequestOptions;
 }
 
 export class ProviderFactory {
   static createProvider(config: ProviderConfig): LLMProvider {
     switch (config.provider) {
       case 'openai':
-        return new OpenAIProvider(config.apiKey, config.defaultModel, clientOptions(config));
+        return new OpenAIProvider(config.apiKey, config.defaultModel, {
+          ...clientOptions(config),
+          ...config.openai,
+        });
       case 'anthropic':
         return new AnthropicProvider(config.apiKey, config.defaultModel, clientOptions(config));
       default:

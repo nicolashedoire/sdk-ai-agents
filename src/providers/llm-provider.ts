@@ -42,6 +42,20 @@ export type LLMMessage =
     };
 
 /**
+ * How much an OpenAI reasoning model thinks before it answers (`reasoning_effort`). The values
+ * a model accepts depend on the model (`minimal` only exists for the first GPT-5 models, `none`
+ * from GPT-5.1 on, `xhigh` and `max` for recent ones): the API refuses the others.
+ */
+export type OpenAIReasoningEffort =
+  | 'none'
+  | 'minimal'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'max';
+
+/**
  * Normalized request to generate an LLM completion
  */
 export interface LLMRequest {
@@ -70,9 +84,15 @@ export interface LLMRequest {
   /** Maximum number of tokens to generate (optional) */
   maxTokens?: number;
 
+  /**
+   * Reasoning effort of an OpenAI reasoning model (optional). The OpenAI provider sends it to
+   * reasoning models only; other providers ignore it.
+   */
+  reasoningEffort?: OpenAIReasoningEffort;
+
   /** Per-provider settings (for FallbackProvider); take precedence over temperature/maxTokens when set */
   providerSettings?: {
-    openai?: { temperature?: number; maxTokens?: number };
+    openai?: { temperature?: number; maxTokens?: number; reasoningEffort?: OpenAIReasoningEffort };
     anthropic?: { temperature?: number; maxTokens?: number };
     default?: { temperature?: number; maxTokens?: number };
   };

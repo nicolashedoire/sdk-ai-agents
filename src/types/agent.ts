@@ -1,9 +1,16 @@
+import type { OpenAIReasoningEffort } from '../providers/llm-provider.js';
 import type { Policy } from './policy.js';
 import type { Tool } from './tool.js';
 
 export interface ProviderSettings {
   temperature?: number;
   maxTokens?: number;
+}
+
+/** OpenAI settings: those of every provider, and the reasoning effort of reasoning models. */
+export interface OpenAIProviderSettings extends ProviderSettings {
+  /** Sent to reasoning models only (o-series, GPT-5 and later); overrides the provider's. */
+  reasoningEffort?: OpenAIReasoningEffort;
 }
 
 export interface AgentConfig {
@@ -17,7 +24,7 @@ export interface AgentConfig {
   capabilities?: string[];
   version?: string;
   providerSettings?: {
-    openai?: ProviderSettings;
+    openai?: OpenAIProviderSettings;
     anthropic?: ProviderSettings;
     default?: ProviderSettings; // Default settings for every provider
   };
