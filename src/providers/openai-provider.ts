@@ -1,22 +1,19 @@
 import OpenAI from 'openai';
 import { LLMProviderError } from '../errors/index.js';
-import type { LLMProvider, LLMRequest, LLMResponse } from './llm-provider.js';
+import type { LLMProvider, LLMRequest, LLMResponse, VendorClientOptions } from './llm-provider.js';
 
 export class OpenAIProvider implements LLMProvider {
   private client: OpenAI;
   private defaultModel: string;
 
-  /**
-   * @param options.maxRetries Retries performed by the OpenAI client itself. The SDK sets it
-   * to 0 when its own retry policy is active, so retries are not stacked.
-   */
-  constructor(apiKey: string, defaultModel = 'gpt-4', options: { maxRetries?: number } = {}) {
+  constructor(apiKey: string, defaultModel = 'gpt-4', options: VendorClientOptions = {}) {
     if (!apiKey || apiKey.trim() === '') {
       throw new Error('OpenAI API key is required');
     }
     this.client = new OpenAI({
       apiKey,
       ...(options.maxRetries !== undefined ? { maxRetries: options.maxRetries } : {}),
+      ...(options.baseURL !== undefined ? { baseURL: options.baseURL } : {}),
     });
     this.defaultModel = defaultModel;
   }
@@ -104,10 +101,8 @@ export class OpenAIProvider implements LLMProvider {
 
   private wrapError(error: unknown): LLMProviderError {
     if (error instanceof Error) {
-      // Checked with instanceof so it survives minified bundles; guarded for test doubles.
-      const connectionError: unknown = Reflect.get(OpenAI, 'APIConnectionError');
-      const connectionFailure =
-        typeof connectionError === 'function' && error instanceof connectionError;
+      // Checked with instanceof so it survives minified bundles; timeouts are included.
+      const connectionFailure = error instanceof OpenAI.APIConnectionError;
       return new LLMProviderError('openai', error, true, { connectionFailure });
     }
     return new LLMProviderError('openai', new Error(String(error)), true);

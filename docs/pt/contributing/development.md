@@ -269,13 +269,12 @@ dist/
 
 - Testes unitários para cada módulo
 - Usa o Vitest
-- Nenhum teste chama um serviço pago real. As suítes dos módulos mais recentes não usam mocks de módulos: as portas do SDK são implementadas pelos dublês de teste de `src/__tests__/support/`, e os adaptadores HTTP rodam contra servidores locais
-- As suítes mais antigas (ponto de entrada do SDK, provedores OpenAI e Anthropic, motor de raciocínio, fallback, executor de testes de regressão) ainda substituem as bibliotecas dos fornecedores `openai` e `@anthropic-ai/sdk` por `vi.mock`, e algumas dependências, como o armazenamento de eventos, por `vi.fn()`
+- Nenhum teste chama um serviço pago real, e nenhum usa mocks de módulos nem espiões: as portas do SDK são implementadas pelos dublês de teste de `src/__tests__/support/`, e os adaptadores HTTP, incluindo os provedores OpenAI e Anthropic, rodam contra servidores locais. `no-mocks.test.ts` recusa `vi.mock`, `vi.fn` e `vi.spyOn`
 
 ### Testes de integração {#integration-tests}
 
 - Testes de integração para fluxos completos
-- Os provedores de LLM são substituídos por uma biblioteca do fornecedor mockada (`vi.mock`); nenhum teste chama uma API real
+- O modelo é um provedor roteirizado, ou o cliente real da OpenAI ou da Anthropic falando com um servidor local que responde no formato do fornecedor; nenhum teste chama uma API real
 - Testes com diferentes armazenamentos de eventos
 
 ### Exemplo de estrutura de teste {#example-test-structure}
@@ -355,7 +354,7 @@ Se você receber erros de TypeScript:
 
 Se os testes falharem:
 
-1. Verifique se os dublês de teste de `src/__tests__/support/`, ou os mocks das suítes mais antigas, ainda correspondem às interfaces que substituem
+1. Verifique se os dublês de teste de `src/__tests__/support/` ainda correspondem às interfaces que substituem
 2. Verifique se as dependências estão atualizadas
 3. Execute os testes em modo watch para ver os erros em tempo real
 

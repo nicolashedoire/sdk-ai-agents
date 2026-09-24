@@ -1,4 +1,4 @@
-import type { LLMProvider } from './llm-provider.js';
+import type { LLMProvider, VendorClientOptions } from './llm-provider.js';
 import { AnthropicProvider } from './anthropic-provider.js';
 import { OpenAIProvider } from './openai-provider.js';
 
@@ -8,6 +8,8 @@ export interface ProviderConfig {
   defaultModel?: string;
   /** Retries performed by the vendor client itself (vendor default when omitted). */
   clientMaxRetries?: number;
+  /** Address of the API (the vendor's own when omitted). */
+  baseURL?: string;
 }
 
 export class ProviderFactory {
@@ -39,6 +41,9 @@ export class ProviderFactory {
   }
 }
 
-function clientOptions(config: ProviderConfig): { maxRetries?: number } {
-  return config.clientMaxRetries !== undefined ? { maxRetries: config.clientMaxRetries } : {};
+function clientOptions(config: ProviderConfig): VendorClientOptions {
+  return {
+    ...(config.clientMaxRetries !== undefined ? { maxRetries: config.clientMaxRetries } : {}),
+    ...(config.baseURL !== undefined ? { baseURL: config.baseURL } : {}),
+  };
 }

@@ -1,164 +1,100 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createSDK } from '../sdk.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { type SDK, createSDK } from '../sdk.js';
 import { FileEventStore } from '../stores/file-event-store.js';
+import { LocalHttpServer } from './support/local-http-server.js';
+import { anthropicMessage, openAIError } from './support/vendor-api.js';
 
-// Mock OpenAI
-const mockOpenAICreate = vi.fn();
-vi.mock('openai', () => {
-  return {
-    default: class MockOpenAI {
-      chat = {
-        completions: {
-          create: mockOpenAICreate,
-        },
-      };
-    },
-  };
-});
-
-// Mock Anthropic
-const mockAnthropicCreate = vi.fn();
-vi.mock('@anthropic-ai/sdk', () => {
-  return {
-    default: class MockAnthropic {
-      messages = {
-        create: mockAnthropicCreate,
-      };
-    },
-  };
-});
-
+// The real SDK fails over from a local OpenAI server that answers with a server error to a
+// local Anthropic server; the settings are read on the requests each vendor actually receives.
 describe('Provider Settings with FallbackProvider', () => {
+  let directory: string;
   let eventStore: FileEventStore;
+  let openai: LocalHttpServer;
+  let anthropic: LocalHttpServer;
+  let sdk: SDK;
 
-  beforeEach(() => {
-    eventStore = new FileEventStore();
-    mockOpenAICreate.mockClear();
-    mockAnthropicCreate.mockClear();
-  });
-
-  it('should apply correct settings when fallback occurs', async () => {
-    // Primary provider fails
-    mockOpenAICreate.mockRejectedValue(new Error('OpenAI API error'));
-
-    // Fallback provider succeeds
-    const mockAnthropicResponse = {
-      id: 'msg-123',
-      type: 'message' as const,
-      role: 'assistant' as const,
-      content: [
-        {
-          type: 'text' as const,
-          text: 'Hello from Anthropic',
-        },
-      ],
-      model: 'claude-3-opus-20240229',
-      stop_reason: 'end_turn' as const,
-      stop_sequence: null,
-      usage: {
-        input_tokens: 10,
-        output_tokens: 5,
-      },
-    };
-
-    mockAnthropicCreate.mockResolvedValue(mockAnthropicResponse);
-
-    const sdk = createSDK({
+  beforeEach(async () => {
+    directory = mkdtempSync(join(tmpdir(), 'provider-settings-fallback-'));
+    eventStore = new FileEventStore(join(directory, 'events'));
+    openai = new LocalHttpServer().reply(openAIError(500, 'OpenAI API error'));
+    anthropic = new LocalHttpServer().reply(anthropicMessage({ text: ['Hello from Anthropic'] }));
+    const [openaiAddress, anthropicAddress] = await Promise.all([
+      openai.start(),
+      anthropic.start(),
+    ]);
+    sdk = createSDK({
       apiKey: 'test-key',
       provider: 'openai',
+      providerConfig: { openai: { baseURL: `${openaiAddress}/v1` } },
       fallbackProviders: [
-        {
-          provider: 'anthropic',
-          config: {
-            apiKey: 'anthropic-key',
-          },
-        },
+        { provider: 'anthropic', config: { apiKey: 'anthropic-key', baseURL: anthropicAddress } },
       ],
+      // One attempt per provider: the primary fails over at once, without backoff delays.
+      retry: { maxRetries: 0 },
       eventStore,
     });
+  });
 
+  afterEach(async () => {
+    await Promise.all([openai.stop(), anthropic.stop(), eventStore.destroy()]);
+    rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
+  });
+
+  /** The primary was tried once, then the run completed on the Anthropic fallback. */
+  async function expectFailoverToAnthropic(runId: string): Promise<void> {
+    expect(openai.requests).toHaveLength(1);
+    expect(anthropic.requests).toHaveLength(1);
+    expect(anthropic.requests[0]?.url).toBe('/v1/messages');
+    expect(anthropic.requests[0]?.headers['x-api-key']).toBe('anthropic-key');
+    const fallbacks = await sdk.getEvents(runId, { type: 'provider.fallback' });
+    expect(fallbacks.map((event) => event.data)).toEqual([
+      {
+        primaryProvider: 'openai',
+        usedProvider: 'anthropic',
+        attemptedProviders: ['openai', 'anthropic'],
+      },
+    ]);
+  }
+
+  it('should apply correct settings when fallback occurs', async () => {
     const agent = sdk.createAgent({
       name: 'test-agent',
       model: 'gpt-4', // Model suggests OpenAI, but fallback will use Anthropic
       maxSteps: 1,
       providerSettings: {
-        openai: {
-          temperature: 0.5,
-          maxTokens: 1000,
-        },
-        anthropic: {
-          temperature: 0.8,
-          maxTokens: 2000,
-        },
+        openai: { temperature: 0.5, maxTokens: 1000 },
+        anthropic: { temperature: 0.8, maxTokens: 2000 },
       },
     });
 
-    await agent.run({ message: 'Hello' });
+    const result = await agent.run({ message: 'Hello' });
 
-    // Should use Anthropic settings (0.8, 2000) not OpenAI settings (0.5, 1000)
-    expect(mockAnthropicCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        temperature: 0.8,
-        max_tokens: 2000,
-      })
-    );
+    expect(result).toMatchObject({ status: 'completed', output: 'Hello from Anthropic' });
+    await expectFailoverToAnthropic(result.runId);
+    // Each vendor receives its own settings: OpenAI (0.5, 1000), then Anthropic (0.8, 2000).
+    // The model is not asserted: Anthropic is sent 'gpt-4', a known bug the real API would
+    // refuse (see the `.fails` test in sdk-fallback.test.ts).
+    expect(openai.jsonBody(0)).toMatchObject({ temperature: 0.5, max_tokens: 1000 });
+    expect(anthropic.jsonBody(0)).toMatchObject({ temperature: 0.8, max_tokens: 2000 });
   });
 
   it('should apply default settings when provider-specific not available', async () => {
-    mockOpenAICreate.mockRejectedValue(new Error('OpenAI API error'));
-
-    const mockAnthropicResponse = {
-      id: 'msg-123',
-      type: 'message' as const,
-      role: 'assistant' as const,
-      content: [{ type: 'text' as const, text: 'OK' }],
-      model: 'claude-3-opus-20240229',
-      stop_reason: 'end_turn' as const,
-      stop_sequence: null,
-      usage: {
-        input_tokens: 10,
-        output_tokens: 5,
-      },
-    };
-
-    mockAnthropicCreate.mockResolvedValue(mockAnthropicResponse);
-
-    const sdk = createSDK({
-      apiKey: 'test-key',
-      provider: 'openai',
-      fallbackProviders: [
-        {
-          provider: 'anthropic',
-          config: {
-            apiKey: 'anthropic-key',
-          },
-        },
-      ],
-      eventStore,
-    });
-
     const agent = sdk.createAgent({
       name: 'test-agent',
       model: 'gpt-4',
       maxSteps: 1,
-      providerSettings: {
-        default: {
-          temperature: 0.7,
-          maxTokens: 1500,
-        },
-      },
+      providerSettings: { default: { temperature: 0.7, maxTokens: 1500 } },
     });
 
-    await agent.run({ message: 'Hello' });
+    const result = await agent.run({ message: 'Hello' });
 
-    // Should use default settings for Anthropic
-    expect(mockAnthropicCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        temperature: 0.7,
-        max_tokens: 1500,
-      })
-    );
+    expect(result).toMatchObject({ status: 'completed', output: 'Hello from Anthropic' });
+    await expectFailoverToAnthropic(result.runId);
+    // Default settings for Anthropic (and for the primary before it).
+    expect(anthropic.jsonBody(0)).toMatchObject({ temperature: 0.7, max_tokens: 1500 });
+    expect(openai.jsonBody(0)).toMatchObject({ temperature: 0.7, max_tokens: 1500 });
   });
 });
-
-

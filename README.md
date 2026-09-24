@@ -208,7 +208,7 @@ npx vitest run         # tests
 npm run docs:dev       # documentation site
 ```
 
-Tests of the new modules use no module mocks: ports are implemented in memory (scripted LLM provider, in-memory decision client, a PostgreSQL client that records its statements), HTTP adapters run against local servers, folders are real temporary directories (symbolic links included), SQLite runs on the built-in `node:sqlite` (Node 22+), and MCP runs over the official in-memory transport.
+Tests use no module mocks, and a guard test refuses them: ports are implemented in memory (scripted LLM provider, in-memory decision client, a PostgreSQL client that records its statements), HTTP adapters, the OpenAI and Anthropic providers included, run against local servers answering in the vendor's format, folders are real temporary directories (symbolic links included), SQLite runs on the built-in `node:sqlite` (Node 22+), and MCP runs over the official in-memory transport.
 
 ## License
 

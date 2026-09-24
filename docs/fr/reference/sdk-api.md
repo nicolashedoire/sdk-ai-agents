@@ -11,8 +11,8 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Clé du fournisseur principal (inutile avec `llmProvider`). Sans aucune clé, les outils et les serveurs MCP fonctionnent, et les appels qui ont besoin d'un modèle échouent avec une erreur explicite |
 | `provider` | `'openai' \| 'anthropic'` | Fournisseur principal, `openai` par défaut |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey` et `defaultModel` par fournisseur |
-| `fallbackProviders` | `Array<{ provider, config? }>` | Essayés dans l'ordre quand le fournisseur principal échoue |
+| `providerConfig` | `{ openai?, anthropic? }` | Réglages du fournisseur principal, sous son nom : `apiKey`, `defaultModel` et `baseURL` (un endpoint compatible, comme l'API v1 d'Azure OpenAI ou un serveur de modèles local, ou un proxy) |
+| `fallbackProviders` | `Array<{ provider, config? }>` | Essayés dans l'ordre quand le fournisseur principal échoue ; chaque `config` prend ses propres `apiKey`, `defaultModel` et `baseURL` |
 | `llmProvider` | `LLMProvider` | Votre propre fournisseur (modèle local, passerelle, doublure de test) |
 | `retry` | `Partial<RetryPolicy> \| false` | Politique de nouvelles tentatives pour le LLM, par fournisseur, avant le repli |
 | `jev` | `JevClientConfig` | Active TypeSafe Jev pour les décisions typées — directement, ou via [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) avec `baseUrl` et `model: 'typesafe-ai/jev'` |

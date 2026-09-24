@@ -1,251 +1,278 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { AnthropicProvider } from '../providers/anthropic-provider.js';
-import { ReasoningEngine } from '../engines/reasoning-engine.js';
-import { FileEventStore } from '../stores/file-event-store.js';
+import { type ReasoningContext, ReasoningEngine } from '../engines/reasoning-engine.js';
 import { LLMProviderError } from '../errors/index.js';
+import { AnthropicProvider } from '../providers/anthropic-provider.js';
+import { FileEventStore } from '../stores/file-event-store.js';
+import type { Tool } from '../types/tool.js';
+import { DEFAULT_LLM_TEMPERATURE } from '../utils/constants.js';
+import { LocalHttpServer } from './support/local-http-server.js';
+import { anthropicError, anthropicMessage } from './support/vendor-api.js';
 
-const mockCreate = vi.fn();
+const ENGINE_MODEL = 'claude-3-5-haiku-20241022';
+const RUN_ID = 'test-run-id';
 
-vi.mock('@anthropic-ai/sdk', () => {
-  return {
-    default: class MockAnthropic {
-      messages = {
-        create: mockCreate,
-      };
-    },
-  };
+const calculatorSchema = z.object({
+  operation: z.enum(['add', 'subtract']),
+  a: z.number(),
+  b: z.number(),
 });
 
-describe('AnthropicProvider Integration', () => {
-  let provider: AnthropicProvider;
-  let reasoningEngine: ReasoningEngine;
-  let eventStore: FileEventStore;
+const calculator: Tool = {
+  id: 'calc-1',
+  name: 'calculator',
+  description: 'Performs calculations',
+  schema: calculatorSchema,
+  handler: async (params) => {
+    const { operation, a, b } = calculatorSchema.parse(params);
+    return { result: operation === 'add' ? a + b : a - b };
+  },
+  version: '1.0.0',
+};
 
-  beforeEach(() => {
-    provider = new AnthropicProvider('test-api-key');
-    reasoningEngine = new ReasoningEngine(provider, 'claude-3-opus-20240229');
-    eventStore = new FileEventStore();
-    mockCreate.mockClear();
+/** Waits (briefly) until a condition observed through real I/O holds. */
+async function until(condition: () => boolean): Promise<void> {
+  const deadline = Date.now() + 2_000;
+  while (!condition()) {
+    if (Date.now() > deadline) {
+      throw new Error('condition not met in time');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+// The ReasoningEngine drives the real AnthropicProvider and Anthropic client against a local
+// server answering in the Anthropic wire format; events go to a throwaway directory.
+describe('AnthropicProvider Integration', () => {
+  let server: LocalHttpServer;
+  let directory: string;
+  let eventStore: FileEventStore;
+  let reasoningEngine: ReasoningEngine;
+
+  const context = (overrides: Partial<ReasoningContext> = {}): ReasoningContext => ({
+    runId: RUN_ID,
+    agentId: 'test-agent-id',
+    input: 'Hello',
+    conversationHistory: [],
+    availableTools: [],
+    ...overrides,
+  });
+
+  beforeEach(async () => {
+    server = new LocalHttpServer();
+    const provider = new AnthropicProvider('test-api-key', undefined, {
+      baseURL: await server.start(),
+      maxRetries: 0,
+    });
+    reasoningEngine = new ReasoningEngine(provider, ENGINE_MODEL);
+    directory = mkdtempSync(join(tmpdir(), 'sdk-ai-agents-anthropic-'));
+    eventStore = new FileEventStore(join(directory, 'events'));
+  });
+
+  afterEach(async () => {
+    await server.stop();
+    await eventStore.destroy();
+    rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
   });
 
   describe('ReasoningEngine with AnthropicProvider', () => {
     it('should generate intention with text response', async () => {
-      const mockResponse = {
-        id: 'msg-123',
-        type: 'message' as const,
-        role: 'assistant' as const,
-        content: [
-          {
-            type: 'text' as const,
-            text: 'I will help you with that.',
-          },
-        ],
-        model: 'claude-3-opus-20240229',
-        stop_reason: 'end_turn' as const,
-        stop_sequence: null,
-        usage: {
-          input_tokens: 10,
-          output_tokens: 5,
-        },
-      };
-
-      mockCreate.mockResolvedValue(mockResponse);
+      server.reply(
+        anthropicMessage({ text: ['I will help you with that.'], usage: { input: 10, output: 5 } })
+      );
 
       const intention = await reasoningEngine.generateIntention(
-        {
-          runId: 'test-run-id',
-          agentId: 'test-agent-id',
+        context({
           input: 'Hello, can you help me?',
-          conversationHistory: [],
-          availableTools: [],
           systemPrompt: 'You are a helpful assistant.',
-          model: 'claude-3-opus-20240229',
-        },
+          model: ENGINE_MODEL,
+        }),
         eventStore
       );
 
-      expect(intention.type).toBe('final_answer');
-      expect(intention.reasoning).toBe('I will help you with that.');
-      expect(mockCreate).toHaveBeenCalled();
+      expect(intention).toEqual({ type: 'final_answer', reasoning: 'I will help you with that.' });
+      expect(server.requests).toHaveLength(1);
+      expect(server.requests[0]?.url).toBe('/v1/messages');
+      expect(server.jsonBody(0)).toMatchObject({
+        model: ENGINE_MODEL,
+        system: 'You are a helpful assistant.',
+        messages: [{ role: 'user', content: 'Hello, can you help me?' }],
+        temperature: DEFAULT_LLM_TEMPERATURE,
+        max_tokens: 4096,
+      });
+      expect(await eventStore.getEvents(RUN_ID)).toMatchObject([
+        {
+          type: 'intention.generated',
+          data: {
+            message: 'I will help you with that.',
+            requestedModel: ENGINE_MODEL,
+            usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+          },
+          metadata: { agentId: 'test-agent-id', provider: 'anthropic' },
+        },
+      ]);
     });
 
     it('should generate intention with tool call', async () => {
-      const mockResponse = {
-        id: 'msg-123',
-        type: 'message' as const,
-        role: 'assistant' as const,
-        content: [
-          {
-            type: 'tool_use' as const,
-            id: 'tool-1',
-            name: 'calculator',
-            input: { operation: 'add', a: 1, b: 2 },
-          },
-        ],
-        model: 'claude-3-opus-20240229',
-        stop_reason: 'tool_use' as const,
-        stop_sequence: null,
-        usage: {
-          input_tokens: 20,
-          output_tokens: 10,
-        },
-      };
-
-      mockCreate.mockResolvedValue(mockResponse);
+      server.reply(
+        anthropicMessage({
+          toolUses: [{ name: 'calculator', input: { operation: 'add', a: 1, b: 2 } }],
+          usage: { input: 20, output: 10 },
+        })
+      );
 
       const intention = await reasoningEngine.generateIntention(
-        {
-          runId: 'test-run-id',
-          agentId: 'test-agent-id',
-          input: 'Calculate 1 + 2',
-          conversationHistory: [],
-          availableTools: [
-            {
-              id: 'calc-1',
-              name: 'calculator',
-              description: 'Performs calculations',
-              schema: z.object({}),
-              handler: async () => ({}),
-              version: '1.0.0',
-            },
-          ],
-          model: 'claude-3-opus-20240229',
-        },
+        context({ input: 'Calculate 1 + 2', availableTools: [calculator] }),
         eventStore
       );
 
-      expect(intention.type).toBe('tool_call');
-      if (intention.type === 'tool_call') {
-        expect(intention.toolName).toBe('calculator');
-        expect(intention.parameters).toEqual({ operation: 'add', a: 1, b: 2 });
-      }
+      expect(intention).toEqual({
+        type: 'tool_call',
+        toolName: 'calculator',
+        parameters: { operation: 'add', a: 1, b: 2 },
+        reasoning: undefined,
+      });
+      // The tool's Zod schema reaches Anthropic as a JSON Schema in `input_schema`.
+      expect(server.jsonBody(0)).toMatchObject({
+        tools: [
+          {
+            name: 'calculator',
+            description: 'Performs calculations',
+            input_schema: {
+              type: 'object',
+              properties: {
+                operation: { type: 'string', enum: ['add', 'subtract'] },
+                a: { type: 'number' },
+                b: { type: 'number' },
+              },
+              required: ['operation', 'a', 'b'],
+            },
+          },
+        ],
+        tool_choice: { type: 'auto' },
+      });
     });
 
     it('should handle conversation history correctly', async () => {
-      const mockResponse = {
-        id: 'msg-123',
-        type: 'message' as const,
-        role: 'assistant' as const,
-        content: [
-          {
-            type: 'text' as const,
-            text: 'Yes, I remember. The answer is 3.',
-          },
-        ],
-        model: 'claude-3-opus-20240229',
-        stop_reason: 'end_turn' as const,
-        stop_sequence: null,
-        usage: {
-          input_tokens: 15,
-          output_tokens: 8,
-        },
-      };
-
-      mockCreate.mockResolvedValue(mockResponse);
+      server.reply(
+        anthropicMessage({
+          text: ['Yes, I remember. The answer is 3.'],
+          usage: { input: 15, output: 8 },
+        })
+      );
 
       await reasoningEngine.generateIntention(
-        {
-          runId: 'test-run-id',
-          agentId: 'test-agent-id',
+        context({
           input: 'What was the result?',
           conversationHistory: [
             { role: 'user', content: 'Calculate 1 + 2' },
             { role: 'assistant', content: 'I calculated 1 + 2 = 3' },
           ],
-          availableTools: [],
-          model: 'claude-3-opus-20240229',
-        },
+        }),
         eventStore
       );
 
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          messages: expect.arrayContaining([
-            { role: 'user', content: 'Calculate 1 + 2' },
-            { role: 'assistant', content: 'I calculated 1 + 2 = 3' },
-            { role: 'user', content: 'What was the result?' },
-          ]),
-        })
-      );
+      const body = server.jsonBody(0);
+      expect(body).toMatchObject({
+        messages: [
+          { role: 'user', content: 'Calculate 1 + 2' },
+          { role: 'assistant', content: 'I calculated 1 + 2 = 3' },
+          { role: 'user', content: 'What was the result?' },
+        ],
+      });
+      expect(body).not.toHaveProperty('system');
     });
 
     it('should handle system prompt correctly', async () => {
-      const mockResponse = {
-        id: 'msg-123',
-        type: 'message' as const,
-        role: 'assistant' as const,
-        content: [{ type: 'text' as const, text: 'OK' }],
-        model: 'claude-3-opus-20240229',
-        stop_reason: 'end_turn' as const,
-        stop_sequence: null,
-        usage: {
-          input_tokens: 10,
-          output_tokens: 5,
-        },
-      };
-
-      mockCreate.mockResolvedValue(mockResponse);
+      server.reply(anthropicMessage({ text: ['OK'] }));
 
       await reasoningEngine.generateIntention(
-        {
-          runId: 'test-run-id',
-          agentId: 'test-agent-id',
-          input: 'Hello',
-          conversationHistory: [],
-          availableTools: [],
-          systemPrompt: 'You are a math expert.',
-          model: 'claude-3-opus-20240229',
-        },
+        context({ systemPrompt: 'You are a math expert.' }),
         eventStore
       );
 
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          system: 'You are a math expert.',
-          messages: [{ role: 'user', content: 'Hello' }],
-        })
+      expect(server.jsonBody(0)).toMatchObject({
+        system: 'You are a math expert.',
+        messages: [{ role: 'user', content: 'Hello' }],
+      });
+    });
+
+    it('should send the model named by the context, or the engine model otherwise', async () => {
+      server.reply(anthropicMessage({ text: ['OK'] }));
+
+      await reasoningEngine.generateIntention(
+        context({ model: 'claude-3-5-sonnet-20241022' }),
+        eventStore
       );
+      await reasoningEngine.generateIntention(context(), eventStore);
+
+      expect(server.jsonBody(0)).toMatchObject({ model: 'claude-3-5-sonnet-20241022' });
+      expect(server.jsonBody(1)).toMatchObject({ model: ENGINE_MODEL });
+    });
+
+    it('should send the Anthropic settings of the run', async () => {
+      server.reply(anthropicMessage({ text: ['OK'] }));
+
+      await reasoningEngine.generateIntention(
+        context({
+          providerSettings: {
+            default: { temperature: 0.9, maxTokens: 2000 },
+            openai: { temperature: 0.1, maxTokens: 100 },
+            anthropic: { temperature: 0.2, maxTokens: 512 },
+          },
+        }),
+        eventStore
+      );
+
+      expect(server.jsonBody(0)).toMatchObject({ temperature: 0.2, max_tokens: 512 });
     });
 
     it('should handle errors and wrap them correctly', async () => {
-      const mockError = new Error('API Error');
-      mockCreate.mockRejectedValue(mockError);
+      server.reply(anthropicError(500, 'Internal server error'));
 
-      await expect(
-        reasoningEngine.generateIntention(
-          {
-            runId: 'test-run-id',
-            agentId: 'test-agent-id',
-            input: 'Hello',
-            conversationHistory: [],
-            availableTools: [],
-            model: 'claude-3-opus-20240229',
-          },
-          eventStore
-        )
-      ).rejects.toThrow(LLMProviderError);
+      const failure = await reasoningEngine
+        .generateIntention(context(), eventStore)
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(LLMProviderError);
+      expect(failure).toMatchObject({ provider: 'anthropic', connectionFailure: false });
+      expect(failure).toHaveProperty('message', expect.stringContaining('Internal server error'));
+      // No intention was generated, so none is recorded.
+      expect(await eventStore.getEvents(RUN_ID)).toEqual([]);
     });
 
     it('should handle abort signal', async () => {
+      server.reply(anthropicMessage({ text: ['too late'] }));
       const abortController = new AbortController();
       abortController.abort();
 
       await expect(
-        reasoningEngine.generateIntention(
-          {
-            runId: 'test-run-id',
-            agentId: 'test-agent-id',
-            input: 'Hello',
-            conversationHistory: [],
-            availableTools: [],
-            abortSignal: abortController.signal,
-            model: 'claude-3-opus-20240229',
-          },
-          eventStore
-        )
-      ).rejects.toThrow();
+        reasoningEngine.generateIntention(context(), eventStore, abortController.signal)
+      ).rejects.toThrow('Run cancelled');
+      // A run cancelled beforehand never reaches Anthropic.
+      expect(server.requests).toHaveLength(0);
+    });
+
+    it('should cancel a run aborted while Anthropic is answering', async () => {
+      server.reply({ ...anthropicMessage({ text: ['too late'] }), delayMs: 100 });
+      const abortController = new AbortController();
+
+      const outcome = reasoningEngine
+        .generateIntention(context(), eventStore, abortController.signal)
+        .then(
+          () => 'answered',
+          (error: unknown) => error
+        );
+      await until(() => server.requests.length === 1);
+      abortController.abort();
+
+      const failure = await outcome;
+      expect(failure).toBeInstanceOf(Error);
+      expect(failure).toHaveProperty('message', 'Run cancelled');
+      expect(await eventStore.getEvents(RUN_ID)).toEqual([]);
     });
   });
 });
-
