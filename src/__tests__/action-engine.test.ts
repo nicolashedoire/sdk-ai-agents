@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { ActionEngine } from '../engines/action-engine.js'
 import { PolicyEngine } from '../engines/policy-engine.js'
 import { ToolRegistry } from '../registry/tool-registry.js'

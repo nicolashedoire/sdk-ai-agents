@@ -11,8 +11,8 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | 主プロバイダーのキー（`llmProvider` を使う場合は不要）。キーがまったくなくてもツールと MCP サーバーは動作し、モデルを必要とする呼び出しは明確なエラーで失敗する |
 | `provider` | `'openai' \| 'anthropic'` | 主プロバイダー。デフォルトは `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | 主プロバイダーの設定を、その名前の下に書く：`apiKey`、`defaultModel`、`baseURL`（Azure OpenAI の v1 API やローカルのモデルサーバーなどの互換エンドポイント、またはプロキシ） |
-| `fallbackProviders` | `Array<{ provider, config? }>` | 主プロバイダーが失敗したときに、順番に試される。各 `config` は独自の `apiKey`、`defaultModel`、`baseURL` を持つ |
+| `providerConfig` | `{ openai?, anthropic? }` | 各プロバイダーの設定：`apiKey`、`defaultModel`、`baseURL`（Azure OpenAI の v1 API やローカルのモデルサーバーなどの互換エンドポイント、またはプロキシ）。主プロバイダーと、同じベンダーのフォールバックが使う |
+| `fallbackProviders` | `Array<{ provider, config? }>` | 主プロバイダーが失敗したときに、順番に試される。`config` はそのベンダーの `providerConfig` より優先される。別のベンダーのフォールバックには独自の `apiKey` が必要 |
 | `llmProvider` | `LLMProvider` | 独自のプロバイダー（ローカルモデル、ゲートウェイ、テストダブル） |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM のリトライポリシー。プロバイダーごとに、フォールバックの前に適用される |
 | `jev` | `JevClientConfig` | 型付き決定のために TypeSafe Jev を有効にする。直接使うか、`baseUrl` と `model: 'typesafe-ai/jev'` を指定して [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) 経由で使う |

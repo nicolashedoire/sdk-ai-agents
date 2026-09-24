@@ -24,6 +24,8 @@ const sdk = createSDK({
 });
 ```
 
+A fallback of another vendor needs its own key, in its `config` or in `providerConfig`: the primary key is never sent to another vendor. It gets the agent's model only if it serves it, and otherwise its own `defaultModel` (Anthropic refuses an OpenAI model name, and the other way round). The `intention.generated` event names the provider that answered and the model it used.
+
 | Option | Default | |
 | --- | --- | --- |
 | `maxRetries` | `2` | Retries after the first attempt |

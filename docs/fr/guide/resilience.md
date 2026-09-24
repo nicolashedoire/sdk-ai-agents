@@ -24,6 +24,8 @@ const sdk = createSDK({
 });
 ```
 
+Un fournisseur de repli d'un autre éditeur a besoin de sa propre clé, dans son `config` ou dans `providerConfig` : la clé du fournisseur principal n'est jamais envoyée à un autre éditeur. Il reçoit le modèle de l'agent seulement s'il le sert, et sinon son propre `defaultModel` (Anthropic refuse un nom de modèle OpenAI, et inversement). L'événement `intention.generated` indique le fournisseur qui a répondu et le modèle utilisé.
+
 | Option | Valeur par défaut | |
 | --- | --- | --- |
 | `maxRetries` | `2` | Nouvelles tentatives après la première tentative |
