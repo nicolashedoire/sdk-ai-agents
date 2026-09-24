@@ -36,6 +36,9 @@ export interface ReasoningStep {
   intention: Intention;
   /** Tokens the call used, when the provider reports them. */
   usage?: LLMResponse['usage'];
+  /** Model that answered, and the model asked for (absent when a provider used its default). */
+  model?: string;
+  requestedModel?: string;
   /**
    * Set exactly when the model called a tool: the call's id and name (the tool's result refers
    * to the id), and the model's turn to add to the conversation before that result.
@@ -185,8 +188,13 @@ export class ReasoningEngine {
         id: call.id ?? `call_${randomUUID().replaceAll('-', '')}`,
       }));
       const [first, ...others] = calls;
+      const served = {
+        usage: response.usage,
+        model: response.model,
+        ...(requestedModel ? { requestedModel } : {}),
+      };
       if (intention.type !== 'tool_call' || !first) {
-        return { intention, usage: response.usage };
+        return { intention, ...served };
       }
       const turn = {
         role: 'assistant' as const,
@@ -196,7 +204,7 @@ export class ReasoningEngine {
       };
       return {
         intention,
-        usage: response.usage,
+        ...served,
         toolCall: {
           id: first.id,
           name: first.function.name,

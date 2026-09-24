@@ -8,7 +8,27 @@ export interface BudgetUsage {
   periodEnd: number;
   tokensUsed: number;
   toolCallsCount: number;
+  /** USD spent by model calls whose model has a price. */
+  costUsd: number;
+  /** Model calls of a model without a price: their cost is unknown, maxCost cannot be checked. */
+  unpricedCalls: number;
+  /** Model calls that reported no input/output token counts: their cost is unknown too. */
+  unmeteredCalls: number;
   lastUpdated: number;
+}
+
+/** A model call as budgets count it: its tokens, and its cost or why it has none. */
+export type ModelCallUsage =
+  | { tokens: number; costUsd: number }
+  | { tokens: number; uncosted: 'no-price' | 'no-usage' };
+
+/** What one operation adds to a scope's usage. */
+interface UsageDelta {
+  tokens?: number;
+  toolCalls?: number;
+  costUsd?: number;
+  unpricedCalls?: number;
+  unmeteredCalls?: number;
 }
 
 export interface BudgetLimit {
@@ -106,13 +126,36 @@ export class BudgetTracker {
       const boundaries = this.getPeriodBoundaries(period, timestamp);
 
       // Record for agent-level usage, and for limits that name no agent
-      this.addUsage(agentId, undefined, period, boundaries, tokensUsed, 0, timestamp);
-      this.addUsage(undefined, undefined, period, boundaries, tokensUsed, 0, timestamp);
+      this.addUsage(agentId, undefined, period, boundaries, { tokens: tokensUsed }, timestamp);
+      this.addUsage(undefined, undefined, period, boundaries, { tokens: tokensUsed }, timestamp);
 
       // Record for tool-level usage if toolName provided
       if (toolName) {
-        this.addUsage(agentId, toolName, period, boundaries, 0, 1, timestamp);
+        this.addUsage(agentId, toolName, period, boundaries, { toolCalls: 1 }, timestamp);
       }
+    }
+  }
+
+  /**
+   * Records a model call: its tokens, and its cost, or why it has none (a model without a
+   * price, a call without token counts), for which a `maxCost` limit cannot be checked.
+   * Counted for the agent and for limits that name no agent.
+   */
+  async recordModelUsage(
+    agentId: string,
+    call: ModelCallUsage,
+    timestamp: number = Date.now()
+  ): Promise<void> {
+    const delta: UsageDelta =
+      'costUsd' in call
+        ? { tokens: call.tokens, costUsd: call.costUsd }
+        : call.uncosted === 'no-price'
+          ? { tokens: call.tokens, unpricedCalls: 1 }
+          : { tokens: call.tokens, unmeteredCalls: 1 };
+    for (const period of ['hour', 'day', 'week', 'month', 'all'] as const) {
+      const boundaries = this.getPeriodBoundaries(period, timestamp);
+      this.addUsage(agentId, undefined, period, boundaries, delta, timestamp);
+      this.addUsage(undefined, undefined, period, boundaries, delta, timestamp);
     }
   }
 
@@ -161,7 +204,7 @@ export class BudgetTracker {
     for (const period of periods) {
       const boundaries = this.getPeriodBoundaries(period, timestamp);
       for (const [scopeAgent, scopeTool] of scopes) {
-        this.addUsage(scopeAgent, scopeTool, period, boundaries, 0, 1, timestamp);
+        this.addUsage(scopeAgent, scopeTool, period, boundaries, { toolCalls: 1 }, timestamp);
       }
     }
   }
@@ -172,8 +215,7 @@ export class BudgetTracker {
     toolName: string | undefined,
     period: BudgetLimit['period'],
     boundaries: { start: number; end: number },
-    tokensDelta: number,
-    toolCallsDelta: number,
+    delta: UsageDelta,
     timestamp: number
   ): void {
     const key = this.getCacheKey(agentId, toolName, period);
@@ -185,8 +227,11 @@ export class BudgetTracker {
       period,
       periodStart: boundaries.start,
       periodEnd: boundaries.end,
-      tokensUsed: (existing?.tokensUsed ?? 0) + tokensDelta,
-      toolCallsCount: (existing?.toolCallsCount ?? 0) + toolCallsDelta,
+      tokensUsed: (existing?.tokensUsed ?? 0) + (delta.tokens ?? 0),
+      toolCallsCount: (existing?.toolCallsCount ?? 0) + (delta.toolCalls ?? 0),
+      costUsd: (existing?.costUsd ?? 0) + (delta.costUsd ?? 0),
+      unpricedCalls: (existing?.unpricedCalls ?? 0) + (delta.unpricedCalls ?? 0),
+      unmeteredCalls: (existing?.unmeteredCalls ?? 0) + (delta.unmeteredCalls ?? 0),
       lastUpdated: timestamp,
     });
   }
@@ -218,6 +263,9 @@ export class BudgetTracker {
       periodEnd: boundaries.end,
       tokensUsed: 0,
       toolCallsCount: 0,
+      costUsd: 0,
+      unpricedCalls: 0,
+      unmeteredCalls: 0,
       lastUpdated: timestamp,
     };
   }
@@ -244,13 +292,34 @@ export class BudgetTracker {
       limit.maxToolCalls !== undefined &&
       currentUsage.toolCallsCount + additionalToolCalls > limit.maxToolCalls;
 
-    const wouldExceed = wouldExceedTokens || wouldExceedToolCalls;
+    // Spend is not tracked per tool (a model call serves no single tool): a cost cap that names
+    // a tool gates that tool on the spend of its agent, or of everyone.
+    const spend =
+      limit.maxCost !== undefined && limit.toolName !== undefined
+        ? await this.getUsage(withoutTool(limit))
+        : currentUsage;
+    // A cost cap that cannot be checked (a model without a price, a call without token counts)
+    // refuses like one that is exceeded: costs are never guessed.
+    const costUnknown =
+      limit.maxCost !== undefined && spend.unpricedCalls + spend.unmeteredCalls > 0;
+    const wouldExceedCost =
+      limit.maxCost !== undefined &&
+      (costUnknown || spend.costUsd > limit.maxCost + COST_TOLERANCE_USD);
+
+    const wouldExceed = wouldExceedTokens || wouldExceedToolCalls || wouldExceedCost;
 
     let reason: string | undefined;
     if (wouldExceedTokens) {
       reason = `Token budget exceeded: ${currentUsage.tokensUsed + additionalTokens} > ${limit.maxTokens}`;
     } else if (wouldExceedToolCalls) {
       reason = `Tool call budget exceeded: ${currentUsage.toolCallsCount + additionalToolCalls} > ${limit.maxToolCalls}`;
+    } else if (costUnknown && spend.unpricedCalls > 0) {
+      reason = `Cost budget cannot be checked: ${spend.unpricedCalls} model call(s) of a model without a price (add it to SDKConfig.pricing)`;
+    } else if (costUnknown) {
+      reason = `Cost budget cannot be checked: ${spend.unmeteredCalls} model call(s) reported no token counts`;
+    } else if (wouldExceedCost) {
+      const [spent, cap] = usdOverCap(spend.costUsd, limit.maxCost ?? 0);
+      reason = `Cost budget exceeded: $${spent} > $${cap}`;
     }
 
     return {
@@ -274,4 +343,31 @@ export class BudgetTracker {
   getAllUsage(): BudgetUsage[] {
     return Array.from(this.usageCache.values());
   }
+}
+
+/** Rounding noise allowed when comparing sums of float costs with a cap. */
+const COST_TOLERANCE_USD = 1e-9;
+
+/**
+ * A spend and its cap in dollars, without float noise, needless zeros or exponent ($2.4 > $2).
+ * When six decimals would show them equal, or show a non-zero amount as 0, nine are used: a
+ * refused spend is over its cap by more than COST_TOLERANCE_USD, so they then differ
+ * ($0.00000025 > $0, $1.0000002 > $1).
+ */
+function usdOverCap(spend: number, cap: number): [string, string] {
+  const shown = (amount: number, digits: number) =>
+    amount
+      .toFixed(digits)
+      .replace(/(\.\d*?)0+$/, '$1')
+      .replace(/\.$/, '');
+  const short: [string, string] = [shown(spend, 6), shown(cap, 6)];
+  const hidden = (text: string, amount: number) => text === '0' && amount !== 0;
+  return short[0] === short[1] || hidden(short[0], spend) || hidden(short[1], cap)
+    ? [shown(spend, 9), shown(cap, 9)]
+    : short;
+}
+
+function withoutTool(limit: BudgetLimit): BudgetLimit {
+  const { toolName: _tool, ...scope } = limit;
+  return scope;
 }

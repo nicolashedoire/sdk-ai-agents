@@ -129,8 +129,9 @@ export class AgentImpl {
       this.checkTimeout(state);
 
       try {
-        const { intention, usage, toolCall } = await this.generateStep(runId, state);
-        await this.recordTokens(state, usage);
+        const step = await this.generateStep(runId, state);
+        const { intention, toolCall } = step;
+        await this.recordModelCall(state, step);
 
         this.checkCancellation(runId, state);
 
@@ -169,12 +170,12 @@ export class AgentImpl {
     }
   }
 
-  /** Adds a model call's tokens to the run and to the agent's token budgets. */
-  private async recordTokens(state: RunState, usage: ReasoningStep['usage']): Promise<void> {
-    const tokens =
+  /** Adds a model call's tokens to the run, and its tokens and cost to the agent's budgets. */
+  private async recordModelCall(state: RunState, step: ReasoningStep): Promise<void> {
+    const { usage } = step;
+    state.tokensUsed +=
       usage?.totalTokens ?? (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0);
-    state.tokensUsed += tokens;
-    await this.policyEngine.recordTokenUsage(this.agent.id, tokens);
+    await this.policyEngine.recordModelUsage(this.agent.id, step);
   }
 
   private async generateStep(runId: string, state: RunState): Promise<ReasoningStep> {
