@@ -5,7 +5,12 @@ import type {
   RunComparison,
   ComparisonDifference,
 } from '../types/comparison.js';
-import { alignEvents, firstDifference, VOLATILE_EVENT_FIELDS } from './event-alignment.js';
+import {
+  alignEvents,
+  comparedEvents,
+  firstDifference,
+  VOLATILE_METADATA_FIELDS,
+} from './event-alignment.js';
 import { describeEvent } from './trace-validator.js';
 
 export class RunComparator {
@@ -27,7 +32,7 @@ export class RunComparator {
   }
 
   private static filterEvents(events: Event[], options: ComparisonOptions): Event[] {
-    let filtered = [...events];
+    let filtered = comparedEvents(events);
 
     const ignored = options.ignoreEventTypes;
     if (ignored && ignored.length > 0) {
@@ -91,7 +96,7 @@ export class RunComparator {
     options: ComparisonOptions
   ): ComparisonDifference[] {
     const differences: ComparisonDifference[] = [];
-    const ignored = new Set(VOLATILE_EVENT_FIELDS);
+    const ignored = new Set(VOLATILE_METADATA_FIELDS);
 
     for (const step of alignEvents(events1, events2)) {
       switch (step.kind) {
@@ -149,25 +154,26 @@ export class RunComparator {
             });
           }
           break;
-        case 'same': {
-          const metadataDiff = options.includeMetadata
-            ? firstDifference(
-                withoutVolatile(step.expected.metadata, ignored),
-                withoutVolatile(step.actual.metadata, ignored)
-              )
-            : null;
-          if (metadataDiff) {
-            differences.push({
-              type: 'data_changed',
-              eventId: step.expected.id,
-              eventType: step.expected.type,
-              run1: step.expected,
-              run2: step.actual,
-              details: `${describeEvent(step.expected)} metadata differs: ${metadataDiff}`,
-              severity: 'low',
-            });
-          }
+        case 'same':
           break;
+      }
+
+      // With `includeMetadata`, the metadata of every pair of events, changed or not.
+      if (options.includeMetadata && step.kind !== 'removed' && step.kind !== 'added') {
+        const metadataDiff = firstDifference(
+          withoutVolatile(step.expected.metadata, ignored),
+          withoutVolatile(step.actual.metadata, ignored)
+        );
+        if (metadataDiff) {
+          differences.push({
+            type: 'data_changed',
+            eventId: step.expected.id,
+            eventType: step.expected.type,
+            run1: step.expected,
+            run2: step.actual,
+            details: `${describeEvent(step.expected)} metadata differs: ${metadataDiff}`,
+            severity: 'low',
+          });
         }
       }
     }

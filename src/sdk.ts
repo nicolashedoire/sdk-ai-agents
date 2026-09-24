@@ -35,6 +35,7 @@ import type { TypedDecisionClient } from './decisions/typed-decisions.js';
 import { LLMProviderError, ValidationError } from './errors/index.js';
 import { incidentSchema, type Incident } from './incidents/incident.js';
 import { MonitoredEventStore } from './incidents/monitored-event-store.js';
+import { computeConfigHash } from './utils/config-hash.js';
 import { deriveRunStatus } from './utils/run-status.js';
 import { CapabilityRegistry } from './registry/capability-registry.js';
 import { ToolRegistry } from './registry/tool-registry.js';
@@ -83,6 +84,7 @@ import { ComparisonReportGenerator } from './utils/comparison-report-generator.j
 import { ImpactAnalyzer } from './utils/impact-analyzer.js';
 import { ImpactAnalysisManager } from './managers/impact-analysis-manager.js';
 import { AdvancedEventFilterEvaluator } from './utils/advanced-event-filter.js';
+import { inTimeOrder } from './utils/event-filters.js';
 import type {
   RegressionTestSuite,
   RegressionTestSuiteConfig,
@@ -192,7 +194,7 @@ export interface SDK {
   getTraceVisualization(runId: string): Promise<TraceVisualization>;
   /** Keeps a run as a reference, with the name of the governed agent that ran it. */
   createGoldenTrace(runId: string, config: GoldenTraceConfig): Promise<GoldenTrace>;
-  /** Golden traces, newest first; with `agent` (id or name), only that agent's. */
+  /** Golden traces, newest first; with `agent` (an id or a name), only that agent's. */
   getGoldenTraces(agent?: string): Promise<GoldenTrace[]>;
   getGoldenTrace(goldenTraceId: string): Promise<GoldenTrace>;
   deleteGoldenTrace(goldenTraceId: string): Promise<void>;
@@ -224,6 +226,9 @@ export interface SDK {
 
   // Regression suites. An agent is given by its id or its name: ids are new in every process,
   // so a suite also records the agent's name and runs, elsewhere, with the agent of that name.
+  // In one SDK, an agent's id is its own: two agents with the same name (two versions) keep
+  // their own suites, assertions and golden traces; a name designates all of them. Every agent
+  // created with createAgent stays in the SDK: create each agent once, or pass ids.
 
   /**
    * Saves a suite of golden traces whose inputs run again with `agent` (an agent of this SDK,
@@ -252,8 +257,8 @@ export interface SDK {
     options?: RegressionTestOptions
   ): Promise<RegressionTestSuiteResult>;
   /**
-   * Formats results as JUnit XML (one `<testsuite>` per suite; timeouts count as errors),
-   * JSON or a JSON summary; `outputPath` also writes the text to that file.
+   * Formats results as JUnit XML (one `<testsuite>` per suite; tests that could not run are
+   * `<error>`s), JSON or a JSON summary; `outputPath` also writes the text to that file.
    */
   exportTestResults(
     results: RegressionTestSuiteResult | RegressionTestRunResult,
@@ -314,9 +319,10 @@ export interface SDK {
   ): Promise<ImpactAnalysis>;
   getImpactAnalysis(analysisId: string): Promise<ImpactAnalysis>;
   /**
-   * `analyzeImpact` on the runs of a governed agent (by name, or by the id of an agent of
-   * this SDK) recorded with each version: a `version` of its configuration or a
-   * `configHash`. Replays are left out.
+   * `analyzeImpact` on the runs of every governed agent with a name (given, or the name of the
+   * agent of this SDK whose id is given) recorded with each version: a `version` of its
+   * configuration or a `configHash`. Replays are left out. Two equal versions, or two that
+   * select the same runs, are refused with a `ValidationError`.
    */
   compareVersions(
     agent: string,
@@ -328,8 +334,10 @@ export interface SDK {
   // Queries across runs, on any event store.
 
   /**
-   * Events of one run (`runId`) or of every run, in time order, that match the conditions
-   * (see `AdvancedEventFilter`). Without `runId`, the file store reads every run.
+   * Events of one run (`runId`) or of every run, in time order (ties by event id), that match
+   * the conditions (see `AdvancedEventFilter`). Without `runId`, the file store reads each run
+   * file once; a SQL store lets the database narrow the events when every condition must hold,
+   * and returns every event in scope with `or` or `not`.
    */
   queryEventsAdvanced(filter: AdvancedEventFilter): Promise<AdvancedEventQueryResult>;
   /** Number of matching events (`limit` does not apply). */
@@ -697,7 +705,6 @@ export class SDKImpl implements SDK {
     // Before anything is registered: a policy that cannot be checked creates no agent.
     for (const policy of config.policies ?? []) assertCheckableLimits(policy);
     const now = Date.now();
-    const configHash = this.computeConfigHash(config);
     const agent: Agent = {
       id: uuidv4(),
       name: config.name,
@@ -709,7 +716,6 @@ export class SDKImpl implements SDK {
       capabilities: config.capabilities || [],
       createdAt: now,
       updatedAt: now,
-      configHash,
     };
 
     if (config.capabilities) {
@@ -735,6 +741,8 @@ export class SDKImpl implements SDK {
         this.toolRegistry.registerTool(tool);
       }
     }
+    // With the tools its capabilities brought: what the agent will actually use.
+    agent.configHash = computeConfigHash(agent);
 
     for (const policy of agent.policies) {
       this.policyEngine.applyAgentPolicy(agent.id, policy);
@@ -952,7 +960,7 @@ export class SDKImpl implements SDK {
     const traces = await this.goldenTraceManager.getGoldenTraces();
     if (agent === undefined) return traces;
     const ref = this.agentRef(agent);
-    return traces.filter((trace) => refersTo(trace, ref));
+    return traces.filter((trace) => this.belongsTo(trace, ref));
   }
 
   async getGoldenTrace(goldenTraceId: string): Promise<GoldenTrace> {
@@ -1060,7 +1068,7 @@ export class SDKImpl implements SDK {
   async getRegressionTestSuites(agent?: string): Promise<RegressionTestSuite[]> {
     if (agent === undefined) return this.regressionTestManager.getTestSuites();
     const ref = this.agentRef(agent);
-    return this.regressionTestManager.getTestSuites((suite) => refersTo(suite, ref));
+    return this.regressionTestManager.getTestSuites((suite) => this.belongsTo(suite, ref));
   }
 
   async runRegressionTests(
@@ -1069,9 +1077,9 @@ export class SDKImpl implements SDK {
   ): Promise<RegressionTestRunResult> {
     checkRegressionTestOptions(options);
     const target = this.resolveAgent(agent);
-    const ref = { id: target.id, name: target.name };
+    const ref = this.agentRef(target.id);
     const suites = (
-      await this.regressionTestManager.getTestSuites((suite) => refersTo(suite, ref))
+      await this.regressionTestManager.getTestSuites((suite) => this.belongsTo(suite, ref))
     ).sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
     if (suites.length === 0) {
       throw new Error(`No regression test suites found for agent ${agent}`);
@@ -1082,9 +1090,16 @@ export class SDKImpl implements SDK {
     for (const suite of suites) {
       const result = await this.runSuiteWith(suite, target, options);
       results.push(result);
-      if (options.stopOnFirstFailure && !options.parallel && result.failedTests > 0) break;
+      // A test that failed, errored or timed out stops the next suites too.
+      if (
+        options.stopOnFirstFailure &&
+        !options.parallel &&
+        result.passedTests < result.totalTests
+      ) {
+        break;
+      }
     }
-    return RegressionTestRunner.combine(ref, results, startTime);
+    return RegressionTestRunner.combine({ id: target.id, name: target.name }, results, startTime);
   }
 
   async runRegressionTestSuite(
@@ -1176,7 +1191,7 @@ export class SDKImpl implements SDK {
   async getAssertions(agent?: string, tags?: string[]): Promise<Assertion[]> {
     const ref = agent === undefined ? undefined : this.agentRef(agent);
     return this.assertionManager.getAssertions(
-      ref ? (assertion) => refersTo(assertion, ref) : undefined,
+      ref ? (assertion) => this.belongsTo(assertion, ref) : undefined,
       tags
     );
   }
@@ -1203,11 +1218,11 @@ export class SDKImpl implements SDK {
     }
     if (!assertions) {
       // The assertions for every run, and those of the run's agent.
-      const runAgent = agentOfRun(events);
+      const runAgent = this.agentOfRun(events);
       assertions = await this.assertionManager.getAssertions(
         (assertion) =>
           (assertion.agentId === undefined && assertion.agentName === undefined) ||
-          (runAgent !== undefined && refersTo(assertion, runAgent))
+          (runAgent !== undefined && this.belongsTo(assertion, runAgent))
       );
     }
 
@@ -1290,13 +1305,20 @@ export class SDKImpl implements SDK {
     version2: string,
     options?: ImpactAnalysisOptions
   ): Promise<ImpactAnalysis> {
-    const ref = this.agentRef(agent);
-    const { events } = await this.queryEventsAdvanced({ type: 'run.started' });
-    // The agent's runs; a replay re-executes a run's tools without its model: left out.
+    if (version1 === version2) {
+      throw new ValidationError('version2', `must differ from version1 ("${version1}")`);
+    }
+    // Versions of one agent are different agents of the same name (ids differ even in one
+    // process): every agent with this name counts, and the id for runs that record no name.
+    const name = this.activeAgentInstances.get(agent)?.name ?? agent;
+    const { events } = await this.matchingEvents({ type: 'run.started' });
+    // A replay re-executes a run's tools without its model: left out.
     const starts = events.filter(
       (event) =>
         event.data.replayOf === undefined &&
-        refersTo({ agentId: event.metadata?.agentId, agentName: event.metadata?.agentName }, ref)
+        (event.metadata?.agentName !== undefined
+          ? event.metadata.agentName === name
+          : event.metadata?.agentId === agent)
     );
     const runsOf = (version: string) => [
       ...new Set(
@@ -1318,11 +1340,12 @@ export class SDKImpl implements SDK {
       if (runIds.length === 0) {
         const recorded = [
           ...new Set(
-            starts.map((event) =>
-              event.metadata?.configHash
-                ? `${event.metadata.agentVersion} (config ${event.metadata.configHash})`
-                : String(event.metadata?.agentVersion)
-            )
+            starts.map((event) => {
+              const declared = event.metadata?.agentVersion ?? 'no version';
+              return event.metadata?.configHash
+                ? `${declared} (config ${event.metadata.configHash})`
+                : declared;
+            })
           ),
         ];
         throw new ValidationError(
@@ -1331,39 +1354,65 @@ export class SDKImpl implements SDK {
         );
       }
     }
+    // A declared version and a config hash can select the same runs (every agent is 1.0.0 by
+    // default): a run on both sides would compare the agent with itself.
+    const shared = before.filter((runId) => after.includes(runId));
+    if (shared.length > 0) {
+      throw new ValidationError(
+        'version2',
+        `"${version1}" and "${version2}" both select ${shared.length} run(s): compare two declared versions, or two config hashes`
+      );
+    }
 
     return this.analyzeImpact(before, after, options);
   }
 
   async queryEventsAdvanced(filter: AdvancedEventFilter): Promise<AdvancedEventQueryResult> {
-    const limit = filter.limit;
-    if (limit !== undefined && (!Number.isInteger(limit) || limit < 0)) {
-      throw new ValidationError('limit', 'must be a whole number >= 0');
-    }
     const startTime = Date.now();
-    const { candidates, total } = await this.eventsInScope(filter);
-    const matching = candidates.filter((event) =>
-      AdvancedEventFilterEvaluator.matchesConditions(event, filter)
-    );
-
+    const { events, filtered, total } = await this.matchingEvents(filter, { countScope: true });
     return {
-      events: limit === undefined ? matching : matching.slice(0, limit),
-      total,
-      filtered: matching.length,
+      events,
+      total: total ?? filtered,
+      filtered,
       filters: filter,
       executionTime: Date.now() - startTime,
     };
   }
 
   /**
+   * The events matching a filter, in time order (ties by event id), at most `limit`; with
+   * `countScope`, also the number of events in scope, which may cost the store a second query.
+   */
+  private async matchingEvents(
+    filter: AdvancedEventFilter,
+    { countScope = false }: { countScope?: boolean } = {}
+  ): Promise<{ events: Event[]; filtered: number; total?: number }> {
+    const limit = filter.limit;
+    if (limit !== undefined && (!Number.isInteger(limit) || limit < 0)) {
+      throw new ValidationError('limit', 'must be a whole number >= 0');
+    }
+    const { candidates, total } = await this.eventsInScope(filter, countScope);
+    const matching = candidates.filter((event) =>
+      AdvancedEventFilterEvaluator.matchesConditions(event, filter)
+    );
+    return {
+      events: limit === undefined ? matching : matching.slice(0, limit),
+      filtered: matching.length,
+      ...(total !== undefined ? { total } : {}),
+    };
+  }
+
+  /**
    * The events in the filter's scope (`runId`, `since`, `until`), in time order: one run, or
-   * every run through the store's `queryEvents`, or by reading each run (file store, any store
-   * without `queryEvents`). A store may narrow them by type and ids itself only when every
-   * condition must hold; `total` is then counted separately.
+   * every run through the store's `queryEvents` (the file store reads each run file once), or
+   * by reading each run (a store without `queryEvents`). When every condition must hold, the
+   * store narrows them by type and ids itself; with `or` or `not`, it returns every event in
+   * scope and the conditions are checked here. `total` is set when known or asked for.
    */
   private async eventsInScope(
-    filter: AdvancedEventFilter
-  ): Promise<{ candidates: Event[]; total: number }> {
+    filter: AdvancedEventFilter,
+    countScope: boolean
+  ): Promise<{ candidates: Event[]; total?: number }> {
     const inScope = (event: Event) => AdvancedEventFilterEvaluator.inScope(event, filter);
     const store = this.eventStore;
     if (filter.runId !== undefined) {
@@ -1385,43 +1434,42 @@ export class SDKImpl implements SDK {
         ...(filter.userId ? { userId: filter.userId } : {}),
         ...(filter.sessionId ? { sessionId: filter.sessionId } : {}),
       };
-      const narrows = Object.keys(narrowed).length > Object.keys(scope).length;
-      if (narrows && store.countEvents && AdvancedEventFilterEvaluator.canNarrowInStore(filter)) {
+      const narrows =
+        Object.keys(narrowed).length > Object.keys(scope).length &&
+        AdvancedEventFilterEvaluator.canNarrowInStore(filter) &&
+        (!countScope || store.countEvents !== undefined);
+      if (narrows) {
         const [result, total] = await Promise.all([
           store.queryEvents(narrowed),
-          store.countEvents(scope),
+          countScope ? store.countEvents?.(scope) : undefined,
         ]);
-        return { candidates: result.events.filter(inScope), total };
+        return {
+          candidates: inTimeOrder(result.events.filter(inScope)),
+          ...(total !== undefined ? { total } : {}),
+        };
       }
-      const events = (await store.queryEvents(scope)).events.filter(inScope);
+      const events = inTimeOrder((await store.queryEvents(scope)).events.filter(inScope));
       return { candidates: events, total: events.length };
     }
 
-    const found: Array<{ event: Event; runId: string; index: number }> = [];
+    const found: Event[] = [];
     for (const runId of await store.getRunIds()) {
-      (await store.getEvents(runId)).forEach((event, index) => {
-        if (inScope(event)) found.push({ event, runId, index });
-      });
+      found.push(...(await store.getEvents(runId)).filter(inScope));
     }
-    found.sort(
-      (a, b) =>
-        a.event.timestamp - b.event.timestamp || a.runId.localeCompare(b.runId) || a.index - b.index
-    );
-    return { candidates: found.map(({ event }) => event), total: found.length };
+    return { candidates: inTimeOrder(found), total: found.length };
   }
 
   async countEventsAdvanced(filter: AdvancedEventFilter): Promise<number> {
-    const result = await this.queryEventsAdvanced(filter);
-    return result.filtered;
+    return (await this.matchingEvents(filter)).filtered;
   }
 
   async getEventStatistics(filter: AdvancedEventFilter): Promise<EventStatistics> {
-    const result = await this.queryEventsAdvanced({ ...filter, limit: undefined });
+    const { events, filtered } = await this.matchingEvents({ ...filter, limit: undefined });
 
     const byType: Record<string, number> = {};
     const byAgent: Record<string, number> = {};
 
-    for (const event of result.events) {
+    for (const event of events) {
       byType[event.type] = (byType[event.type] || 0) + 1;
 
       const agentId = event.metadata?.agentId as string | undefined;
@@ -1431,7 +1479,7 @@ export class SDKImpl implements SDK {
     }
 
     return {
-      total: result.filtered,
+      total: filtered,
       byType,
       byAgent,
     };
@@ -1447,7 +1495,7 @@ export class SDKImpl implements SDK {
       'agent',
       named.length === 0
         ? `no agent of this SDK has the id or name "${String(agent).slice(0, 80)}": create it with createAgent first`
-        : `${named.length} agents are named "${agent}" in this SDK: give the id of the one to use`
+        : `${named.length} agents are named "${agent}" in this SDK (every agent created with createAgent stays in it): pass the id of the one to use, or create each agent once and reuse it`
     );
   }
 
@@ -1457,12 +1505,46 @@ export class SDKImpl implements SDK {
 
   /**
    * Whom `agent` designates among saved suites, assertions, golden traces and recorded runs:
-   * an agent of this SDK by id also brings its name (the same agent in another process);
-   * anything else is taken as an id or a name.
+   * the id of an agent of this SDK designates that agent (and, from another process, the
+   * agent of the same name); anything else is taken as an id or a name.
    */
   private agentRef(agent: string): AgentRef {
     const active = this.activeAgentInstances.get(agent);
-    return active ? { id: active.id, name: active.name } : { id: agent, name: agent };
+    return active
+      ? { id: active.id, name: active.name, inThisSdk: true }
+      : { id: agent, name: agent, inThisSdk: false };
+  }
+
+  /**
+   * Whether something saved or recorded for `stored` belongs to the agent `ref`: the same id,
+   * or the same name when the stored id is not another agent of this SDK. Two agents of one SDK
+   * with the same name (two versions, say) each keep their own suites and assertions; an agent
+   * of another process, whose id is unknown here, is found by its name.
+   */
+  private belongsTo(stored: { agentId?: string; agentName?: string }, ref: AgentRef): boolean {
+    if (stored.agentId !== undefined && stored.agentId === ref.id) return true;
+    if (
+      ref.inThisSdk &&
+      stored.agentId !== undefined &&
+      this.activeAgentInstances.has(stored.agentId)
+    ) {
+      return false;
+    }
+    return stored.agentName !== undefined && stored.agentName === ref.name;
+  }
+
+  /** The agent that ran a run, as its events record it (its `run.started` first). */
+  private agentOfRun(events: Event[]): AgentRef | undefined {
+    const recorded =
+      events.find((event) => event.type === 'run.started' && event.metadata?.agentId) ??
+      events.find((event) => event.metadata?.agentId);
+    const agentId = recorded?.metadata?.agentId;
+    if (!agentId) return undefined;
+    return {
+      id: agentId,
+      ...(recorded.metadata?.agentName ? { name: recorded.metadata.agentName } : {}),
+      inThisSdk: this.activeAgentInstances.has(agentId),
+    };
   }
 
   defineGlobalPolicy(policy: Policy): void {
@@ -1647,21 +1729,6 @@ export class SDKImpl implements SDK {
     );
     return `Timeline:\n${lines.join('\n')}`;
   }
-
-  private computeConfigHash(config: AgentConfig): string {
-    const configString = JSON.stringify({
-      name: config.name,
-      model: config.model,
-      systemPrompt: config.systemPrompt,
-      maxSteps: config.maxSteps,
-      timeout: config.timeout,
-      tools: config.tools?.map((t) => ({ name: t.name, version: t.version })),
-      policies: config.policies?.map((p) => ({ id: p.id, type: p.type })),
-      capabilities: config.capabilities,
-      version: config.version,
-    });
-    return createHash('sha256').update(configString).digest('hex').substring(0, 16);
-  }
 }
 
 export function createSDK(config: SDKConfig): SDK {
@@ -1672,33 +1739,21 @@ export function createSDK(config: SDKConfig): SDK {
 interface AgentRef {
   id?: string;
   name?: string;
+  /** `id` is an agent of this SDK: another agent of this SDK is never it, even by name. */
+  inThisSdk: boolean;
 }
 
-/** Whether something saved or recorded for `stored` belongs to the agent `ref`. */
-function refersTo(stored: { agentId?: string; agentName?: string }, ref: AgentRef): boolean {
-  return (
-    (stored.agentId !== undefined && stored.agentId === ref.id) ||
-    (stored.agentName !== undefined && stored.agentName === ref.name)
-  );
-}
+/** The longest delay a Node.js timer holds; longer ones would fire at once. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 function checkRegressionTestOptions(options: RegressionTestOptions): void {
   const timeout = options.timeout;
   if (timeout !== undefined && !(Number.isFinite(timeout) && timeout > 0)) {
     throw new ValidationError('timeout', 'must be a positive number of milliseconds');
   }
-}
-
-/** The agent that ran a run, as its events record it (its `run.started` first). */
-function agentOfRun(events: Event[]): AgentRef | undefined {
-  const recorded =
-    events.find((event) => event.type === 'run.started' && event.metadata?.agentId) ??
-    events.find((event) => event.metadata?.agentId);
-  if (!recorded?.metadata?.agentId) return undefined;
-  return {
-    id: recorded.metadata.agentId,
-    ...(recorded.metadata.agentName ? { name: recorded.metadata.agentName } : {}),
-  };
+  if (timeout !== undefined && timeout > MAX_TIMEOUT_MS) {
+    throw new ValidationError('timeout', `must be at most ${MAX_TIMEOUT_MS} ms (about 24.8 days)`);
+  }
 }
 
 /**

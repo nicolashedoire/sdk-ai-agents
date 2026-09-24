@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import type { AgentImpl } from '../agent.js';
+import type { Incident, IncidentNotifier } from '../incidents/incident.js';
 import { defineTool } from '../sdk.js';
 import type { RegressionTestSuiteConfig } from '../types/regression-test.js';
 import { ScriptedLLMProvider } from './support/scripted-llm-provider.js';
@@ -287,8 +289,9 @@ describe('regression suites', () => {
       name: 'metrics',
       goldenTraces: [{ goldenTraceId, name: 'churn' }],
     });
-    // Another process sharing the folders, whose model is slower than the test's timeout.
-    const slow = createTestSDK(env.folders, new ScriptedLLMProvider({ delayMs: 200 }));
+    // Another process sharing the folders, whose model takes far longer than the test's
+    // timeout (the cancellation stops the wait at once).
+    const slow = createTestSDK(env.folders, new ScriptedLLMProvider({ delayMs: 10_000 }));
     try {
       const slowAnalyst = createAnalyst(slow);
       scriptRun(slow.provider);
@@ -306,12 +309,165 @@ describe('regression suites', () => {
       expect(events.at(-1)?.type).toBe('run.cancelled');
       const junit = await slow.sdk.exportTestResults(results, 'junit');
       expect(junit).toContain('errors="1"');
-      expect(junit).toContain('<failure message="Test timeout after 30 ms" type="timeout">');
+      expect(junit).toContain('<error message="Test timeout after 30 ms" type="timeout">');
       await expect(slow.sdk.runRegressionTests('analyst', { timeout: 0 })).rejects.toThrow(
         /timeout - must be a positive number/
+      );
+      // A Node.js timer cannot wait longer: it would fire at once.
+      await expect(slow.sdk.runRegressionTests('analyst', { timeout: 2 ** 31 })).rejects.toThrow(
+        /timeout - must be at most 2147483647 ms/
       );
     } finally {
       await slow.dispose();
     }
+  });
+});
+
+describe('what a comparison leaves out, and what it never does', () => {
+  let env: TestSDK;
+
+  afterEach(async () => {
+    await env.dispose();
+  });
+
+  const scheduleSchema = z.object({ title: z.string(), duration: z.number() });
+  const schedule = defineTool({
+    name: 'schedule',
+    description: 'Books a meeting',
+    schema: scheduleSchema,
+    handler: async (params: unknown) => ({ booked: scheduleSchema.parse(params) }),
+  });
+
+  function scriptMeeting(provider: ScriptedLLMProvider, duration: number, text?: string): void {
+    provider.enqueue(
+      'tool-selection',
+      {
+        toolCall: { name: 'schedule', arguments: { title: 'Sync', duration } },
+        ...(text ? { content: text } : {}),
+      },
+      { content: 'Booked.' }
+    );
+  }
+
+  const recipe = {
+    tolerance: {
+      ignoreEventTypes: ['intention.generated' as const],
+      ignoreDataFields: ['output'],
+    },
+  };
+
+  it("reports a tool parameter named like a volatile field (a meeting's duration)", async () => {
+    env = createTestSDK();
+    const planner = env.sdk.createAgent({
+      name: 'planner',
+      model: 'test-model',
+      tools: [schedule],
+    });
+    scriptMeeting(env.provider, 30);
+    const golden = await env.sdk.createGoldenTrace((await planner.run({ message: 'Book' })).runId, {
+      name: 'sync',
+    });
+    scriptMeeting(env.provider, 60);
+    const rerun = await planner.run({ message: 'Book' });
+
+    const report = await env.sdk.detectRegressions(rerun.runId, golden.id, recipe);
+    const validation = await env.sdk.validateAgainstGoldenTrace(rerun.runId, golden.id);
+
+    // Before, `duration` was dropped at every depth: no regression, and a `pass`.
+    expect(report.status).toBe('regressions_detected');
+    expect(report.regressions.map((regression) => regression.description)).toContain(
+      'tool.called (schedule) data differs: parameters.duration: 30 → 60'
+    );
+    expect(validation.status).toBe('fail');
+  });
+
+  it('passes the same call written with another preamble, with the documented recipe', async () => {
+    env = createTestSDK();
+    const planner = env.sdk.createAgent({
+      name: 'planner',
+      model: 'test-model',
+      tools: [schedule],
+    });
+    scriptMeeting(env.provider, 30, 'Let me book that for you.');
+    const golden = await env.sdk.createGoldenTrace((await planner.run({ message: 'Book' })).runId, {
+      name: 'sync',
+    });
+    scriptMeeting(env.provider, 30, 'Booking the meeting now.');
+    const rerun = await planner.run({ message: 'Book' });
+
+    const report = await env.sdk.detectRegressions(rerun.runId, golden.id, recipe);
+    const validation = await env.sdk.validateAgainstGoldenTrace(rerun.runId, golden.id);
+
+    // Before, the preamble copied into each event's intention made the same call a regression.
+    expect(report.regressions).toEqual([]);
+    expect(validation.differences.map((difference) => difference.details)).toEqual([
+      'intention.generated (schedule) data differs: message: "Let me book that for you." → "Booking the meeting now."',
+    ]);
+  });
+
+  it('leaves the incidents out: they depend on deliveries and throttling', async () => {
+    const delivered: Incident[] = [];
+    const notifier: IncidentNotifier = {
+      name: 'recorder',
+      notify: async (incident) => {
+        delivered.push(incident);
+      },
+    };
+    const provider = new ScriptedLLMProvider()
+      .enqueue('default', { error: new Error('model unavailable') })
+      .enqueue('default', { error: new Error('model unavailable') });
+    env = createTestSDK({ incidents: { notifiers: [notifier] } }, provider);
+    const greeter = env.sdk.createAgent({ name: 'greeter', model: 'test-model' });
+    const first = await greeter.run({ message: 'Hi' });
+    const golden = await env.sdk.createGoldenTrace(first.runId, { name: 'outage' });
+    const second = await greeter.run({ message: 'Hi' });
+
+    const validation = await env.sdk.validateAgainstGoldenTrace(second.runId, golden.id);
+
+    // The second incident was throttled: another id, no delivery, `suppressed`.
+    expect(delivered).toHaveLength(1);
+    expect(await env.sdk.getEvents(second.runId, { type: 'incident.reported' })).toHaveLength(1);
+    expect(validation).toMatchObject({ status: 'pass', differences: [] });
+  });
+});
+
+describe('two agents of one SDK with the same name', () => {
+  let env: TestSDK;
+  let v1: AgentImpl;
+  let v2: AgentImpl;
+
+  beforeEach(() => {
+    env = createTestSDK();
+    v1 = createAnalyst(env, { version: '1.0.0' });
+    v2 = createAnalyst(env, { version: '2.0.0' });
+  });
+
+  afterEach(async () => {
+    await env.dispose();
+  });
+
+  it("keep their own suites: an agent's id never picks another agent's suite", async () => {
+    scriptRun(env.provider);
+    const golden = await env.sdk.createGoldenTrace((await v1.run(QUESTION)).runId, {
+      name: 'churn',
+    });
+    const suite = await env.sdk.createRegressionTestSuite(v1.id, {
+      name: 'v1 suite',
+      goldenTraces: [{ goldenTraceId: golden.id, name: 'churn' }],
+    });
+
+    // Before, v2 ran v1's suite: both are named "analyst".
+    await expect(env.sdk.runRegressionTests(v2.id)).rejects.toThrow(
+      `No regression test suites found for agent ${v2.id}`
+    );
+    expect(await env.sdk.getRegressionTestSuites(v2.id)).toEqual([]);
+    expect(await env.sdk.getGoldenTraces(v2.id)).toEqual([]);
+    // By name, every agent of that name.
+    expect((await env.sdk.getRegressionTestSuites('analyst')).map((found) => found.id)).toEqual([
+      suite.id,
+    ]);
+    await expect(
+      env.sdk.createRegressionTestSuite('analyst', { name: 'x', goldenTraces: [] })
+    ).rejects.toThrow(/pass the id of the one to use, or create each agent once and reuse it/);
   });
 });

@@ -9,6 +9,7 @@ import type { IEventStore, BackupData } from './event-store.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { ValidationError } from '../errors/index.js';
 import { deriveRunStatus } from '../utils/run-status.js';
+import { aggregateEvents, type FieldQuery, fieldQueryPath } from '../utils/event-filters.js';
 
 export interface SQLConnection {
   query<T = unknown>(sql: string, params?: unknown[]): Promise<T[]>;
@@ -325,84 +326,15 @@ export class SQLEventStore implements IEventStore {
       resultParams.push(filters.sessionId);
     }
 
-    // JSON data queries
-    if (filters.dataQuery) {
-      const { field, operator, value } = filters.dataQuery;
-      const jsonPath = `JSON_EXTRACT(data, '$.${field}')`;
-
-      switch (operator) {
-        case 'eq':
-          resultSQL += ` AND ${jsonPath} = ${paramPlaceholder}`;
-          resultParams.push(JSON.stringify(value));
-          break;
-        case 'ne':
-          resultSQL += ` AND ${jsonPath} != ${paramPlaceholder}`;
-          resultParams.push(JSON.stringify(value));
-          break;
-        case 'gt':
-          resultSQL += ` AND CAST(${jsonPath} AS REAL) > ${paramPlaceholder}`;
-          resultParams.push(value);
-          break;
-        case 'gte':
-          resultSQL += ` AND CAST(${jsonPath} AS REAL) >= ${paramPlaceholder}`;
-          resultParams.push(value);
-          break;
-        case 'lt':
-          resultSQL += ` AND CAST(${jsonPath} AS REAL) < ${paramPlaceholder}`;
-          resultParams.push(value);
-          break;
-        case 'lte':
-          resultSQL += ` AND CAST(${jsonPath} AS REAL) <= ${paramPlaceholder}`;
-          resultParams.push(value);
-          break;
-        case 'contains':
-          resultSQL += ` AND ${jsonPath} LIKE ${paramPlaceholder}`;
-          resultParams.push(`%${value}%`);
-          break;
-        case 'exists':
-          resultSQL += ` AND ${jsonPath} IS NOT NULL`;
-          break;
-      }
-    }
-
-    // JSON metadata queries
-    if (filters.metadataQuery) {
-      const { field, operator, value } = filters.metadataQuery;
-      const jsonPath = `JSON_EXTRACT(metadata, '$.${field}')`;
-
-      switch (operator) {
-        case 'eq':
-          resultSQL += ` AND ${jsonPath} = ${paramPlaceholder}`;
-          resultParams.push(typeof value === 'string' ? value : JSON.stringify(value));
-          break;
-        case 'ne':
-          resultSQL += ` AND ${jsonPath} != ${paramPlaceholder}`;
-          resultParams.push(typeof value === 'string' ? value : JSON.stringify(value));
-          break;
-        case 'gt':
-          resultSQL += ` AND CAST(${jsonPath} AS REAL) > ${paramPlaceholder}`;
-          resultParams.push(value);
-          break;
-        case 'gte':
-          resultSQL += ` AND CAST(${jsonPath} AS REAL) >= ${paramPlaceholder}`;
-          resultParams.push(value);
-          break;
-        case 'lt':
-          resultSQL += ` AND CAST(${jsonPath} AS REAL) < ${paramPlaceholder}`;
-          resultParams.push(value);
-          break;
-        case 'lte':
-          resultSQL += ` AND CAST(${jsonPath} AS REAL) <= ${paramPlaceholder}`;
-          resultParams.push(value);
-          break;
-        case 'contains':
-          resultSQL += ` AND ${jsonPath} LIKE ${paramPlaceholder}`;
-          resultParams.push(`%${value}%`);
-          break;
-        case 'exists':
-          resultSQL += ` AND ${jsonPath} IS NOT NULL`;
-          break;
-      }
+    // JSON data and metadata queries: paths and values are bound, never written into the SQL.
+    for (const [column, query, name] of [
+      ['data', filters.dataQuery, 'dataQuery'],
+      ['metadata', filters.metadataQuery, 'metadataQuery'],
+    ] as const) {
+      if (!query) continue;
+      const condition = sqliteFieldCondition(column, query, name, paramPlaceholder);
+      resultSQL += ` AND ${condition.sql}`;
+      resultParams.push(...condition.params);
     }
 
     return { sql: resultSQL, params: resultParams };
@@ -426,7 +358,8 @@ export class SQLEventStore implements IEventStore {
     sql = filteredSQL;
     params.push(...filteredParams);
 
-    sql += ' ORDER BY timestamp ASC';
+    // Ties by id: the same order on every store.
+    sql += ' ORDER BY timestamp ASC, id ASC';
 
     if (filters?.limit !== undefined) {
       sql += ' LIMIT ?';
@@ -561,50 +494,7 @@ export class SQLEventStore implements IEventStore {
     events: Event[],
     aggregation: EventAggregation
   ): Promise<EventQueryResult['aggregation']> {
-    const result: EventQueryResult['aggregation'] = {};
-
-    if (aggregation.count) {
-      result.total = events.length;
-    }
-
-    if (aggregation.groupBy) {
-      const groups = new Map<string, number>();
-
-      for (const event of events) {
-        let key: string;
-
-        switch (aggregation.groupBy) {
-          case 'type':
-            key = event.type;
-            break;
-          case 'agentId':
-            key = (event.metadata?.agentId as string) || 'unknown';
-            break;
-          case 'userId':
-            key = (event.metadata?.userId as string) || 'unknown';
-            break;
-          case 'sessionId':
-            key = (event.metadata?.sessionId as string) || 'unknown';
-            break;
-          case 'day':
-            key = new Date(event.timestamp).toISOString().split('T')[0];
-            break;
-          case 'hour': {
-            const date = new Date(event.timestamp);
-            key = `${date.toISOString().split('T')[0]} ${date.getHours()}:00:00`;
-            break;
-          }
-          default:
-            key = 'unknown';
-        }
-
-        groups.set(key, (groups.get(key) || 0) + 1);
-      }
-
-      result.groups = Array.from(groups.entries()).map(([key, count]) => ({ key, count }));
-    }
-
-    return result;
+    return aggregateEvents(events, aggregation);
   }
 
   /**
@@ -728,4 +618,58 @@ function afterSchema(
     },
     close: () => connection.close(),
   };
+}
+
+/**
+ * The SQLite condition of a field query on a JSON column. The path and the value are bound;
+ * `json_type` keeps each comparison to values of the right JSON type, as the other stores do.
+ */
+function sqliteFieldCondition(
+  column: 'data' | 'metadata',
+  query: FieldQuery,
+  name: 'dataQuery' | 'metadataQuery',
+  placeholder: string
+): { sql: string; params: unknown[] } {
+  const path = `$.${fieldQueryPath(query, name).join('.')}`;
+  const type = `json_type(${column}, ${placeholder})`;
+  const value = `JSON_EXTRACT(${column}, ${placeholder})`;
+  const equals = (): { sql: string; params: unknown[] } => {
+    const expected = query.value;
+    if (expected === null) return { sql: `${type} = 'null'`, params: [path] };
+    if (typeof expected === 'boolean') {
+      return { sql: `${type} = ${placeholder}`, params: [path, expected ? 'true' : 'false'] };
+    }
+    const types = typeof expected === 'number' ? "('integer', 'real')" : "('text')";
+    return {
+      sql: `(${type} IN ${types} AND ${value} = ${placeholder})`,
+      params: [path, path, expected],
+    };
+  };
+  switch (query.operator) {
+    case 'eq':
+      return equals();
+    case 'ne': {
+      const condition = equals();
+      // A missing field is different from any value.
+      return { sql: `(${condition.sql}) IS NOT 1`, params: condition.params };
+    }
+    case 'gt':
+    case 'gte':
+    case 'lt':
+    case 'lte': {
+      const operator = { gt: '>', gte: '>=', lt: '<', lte: '<=' }[query.operator];
+      return {
+        sql: `(${type} IN ('integer', 'real') AND ${value} ${operator} ${placeholder})`,
+        params: [path, path, query.value],
+      };
+    }
+    case 'contains':
+      // instr is case-sensitive and needs no escaping, unlike LIKE.
+      return {
+        sql: `(${type} = 'text' AND instr(${value}, ${placeholder}) > 0)`,
+        params: [path, path, query.value],
+      };
+    case 'exists':
+      return { sql: `${value} IS NOT NULL`, params: [path] };
+  }
 }

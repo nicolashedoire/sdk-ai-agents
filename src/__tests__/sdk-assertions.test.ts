@@ -191,6 +191,46 @@ describe('assertions', () => {
     await expect(
       env.sdk.defineAssertion('bad order', { type: 'event_order', beforeEventType: 'run.started' })
     ).rejects.toThrow(/afterEventType/);
+    // Before, both were accepted: a count without a bound always passed, an empty list of types
+    // (which wins over eventType) matched no event.
+    await expect(
+      env.sdk.defineAssertion('no bound', { type: 'event_count', eventType: 'tool.called' })
+    ).rejects.toThrow(/event_count requires count, minCount or maxCount/);
+    await expect(
+      env.sdk.defineAssertion('empty list', {
+        type: 'event_present',
+        eventType: 'tool.called',
+        eventTypes: [],
+      })
+    ).rejects.toThrow(/eventTypes must list at least one event type/);
     expect(await env.sdk.getAssertions()).toEqual([]);
+  });
+});
+
+describe('assertions of two agents of one SDK with the same name', () => {
+  let env: TestSDK;
+
+  afterEach(async () => {
+    await env.dispose();
+  });
+
+  it("apply to their own agent's runs only", async () => {
+    env = createTestSDK();
+    const v1 = env.sdk.createAgent({ name: 'greeter', model: 'test-model', version: '1.0.0' });
+    const v2 = env.sdk.createAgent({ name: 'greeter', model: 'test-model', version: '2.0.0' });
+    await env.sdk.defineAssertion(
+      'v1 never fails',
+      { type: 'event_absent', eventType: 'run.failed' },
+      { agentId: v1.id }
+    );
+
+    const forV1 = await env.sdk.evaluateAssertions(await greeterRun(env, v1));
+    const forV2 = await env.sdk.evaluateAssertions(await greeterRun(env, v2));
+
+    expect(forV1.totalAssertions).toBe(1);
+    // Before, v2 had v1's assertion: both are named "greeter".
+    expect(forV2.totalAssertions).toBe(0);
+    expect(await env.sdk.getAssertions(v2.id)).toEqual([]);
+    expect(await env.sdk.getAssertions('greeter')).toHaveLength(1);
   });
 });

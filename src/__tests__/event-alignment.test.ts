@@ -61,10 +61,14 @@ describe('alignEvents', () => {
     expect(aligned.map((step) => step.kind)).toEqual(reference.map(() => 'same'));
   });
 
-  it('ignores volatile fields but not the arguments of a call', () => {
+  it('leaves out the values the SDK writes that change between runs, at their place only', () => {
     const volatile: Step[] = reference.map(([type, data]) => [
       type,
-      type === 'action.executed' ? { ...data, duration: 999, approvalId: 'x' } : data,
+      type === 'action.executed'
+        ? { ...data, duration: 999 }
+        : type === 'intention.generated'
+          ? { ...data, usage: { promptTokens: 7 } }
+          : data,
     ]);
     const spaced = [
       reference[0] as Step,
@@ -89,6 +93,68 @@ describe('alignEvents', () => {
       'parameters.metric: "churn" → "revenue"',
       'parameters.metric: "churn" → "revenue"',
     ]);
+  });
+
+  it("compares a tool's own keys whatever their names (duration, usage, agentId…)", () => {
+    const meeting = (duration: number): Step[] => [
+      ['tool.called', { toolName: 'schedule', parameters: { title: 'Sync', duration } }],
+      [
+        'action.executed',
+        {
+          toolName: 'schedule',
+          parameters: { title: 'Sync', duration },
+          result: { usage: duration, agentId: 'room-1', eventId: 'e1' },
+          duration: 3,
+        },
+      ],
+    ];
+
+    const changes = alignEvents(run('a', meeting(30)), run('b', meeting(60))).filter(
+      (step) => step.kind !== 'same'
+    );
+
+    // Before, `duration` (and `usage`, `agentId`…) were dropped at every depth: no change seen.
+    expect(changes.map((step) => (step.kind === 'changed' ? step.detail : step.kind))).toEqual([
+      'parameters.duration: 30 → 60',
+      'parameters.duration: 30 → 60',
+    ]);
+    const result: Step[] = [
+      ['action.executed', { toolName: 'schedule', result: { usage: 1, agentId: 'a' } }],
+    ];
+    const otherResult: Step[] = [
+      ['action.executed', { toolName: 'schedule', result: { usage: 2, agentId: 'b' } }],
+    ];
+    expect(alignEvents(run('a', result), run('b', otherResult))).toMatchObject([
+      { kind: 'changed', detail: 'result.agentId: "a" → "b"' },
+    ]);
+  });
+
+  it('compares the text a model writes next to a tool call only in its intention', () => {
+    const withText = (text: string): Step[] => [
+      [
+        'intention.generated',
+        { message: text, toolCalls: [{ function: { name: 'lookup', arguments: '{}' } }] },
+      ],
+      [
+        'action.executing',
+        { intention: { type: 'tool_call', toolName: 'lookup', parameters: {}, reasoning: text } },
+      ],
+      [
+        'policy.checked',
+        {
+          intention: { type: 'tool_call', toolName: 'lookup', parameters: {}, reasoning: text },
+          validation: { allowed: true },
+        },
+      ],
+    ];
+
+    const changes = alignEvents(
+      run('a', withText('Let me look.')),
+      run('b', withText('Checking now.'))
+    ).filter((step) => step.kind !== 'same');
+
+    // Before, the same call with another preamble also changed action.executing and policy.checked.
+    expect(changes).toMatchObject([{ kind: 'changed', expected: { type: 'intention.generated' } }]);
   });
 
   it('reports an event added in the middle once, without shifting the others', () => {
@@ -130,6 +196,54 @@ describe('alignEvents', () => {
       { kind: 'changed', typeChanged: true, detail: 'action.executed → action.failed' },
       { kind: 'removed', expected: { type: 'intention.generated' } },
       { kind: 'changed', typeChanged: true, detail: 'run.completed → run.failed' },
+    ]);
+  });
+
+  it('reports a call inserted before an identical one as added, not as a changed call', () => {
+    const search = (query: string): Step[] => [
+      [
+        'intention.generated',
+        { toolCalls: [{ function: { name: 'search', arguments: `{"q":"${query}"}` } }] },
+      ],
+      [
+        'action.executing',
+        { intention: { type: 'tool_call', toolName: 'search', parameters: { q: query } } },
+      ],
+      [
+        'policy.checked',
+        { intention: { type: 'tool_call', toolName: 'search', parameters: { q: query } } },
+      ],
+      ['tool.called', { toolName: 'search', parameters: { q: query } }],
+      ['action.executed', { toolName: 'search', parameters: { q: query }, result: query }],
+    ];
+    const golden: Step[] = [['run.started', {}], ...search('a'), ['run.completed', {}]];
+    const extra: Step[] = [
+      ['run.started', {}],
+      ...search('b'),
+      ...search('a'),
+      ['run.completed', {}],
+    ];
+
+    const changes = alignEvents(run('a', golden), run('b', extra)).filter(
+      (step) => step.kind !== 'same'
+    );
+
+    // Before: search(b) was paired with the golden search(a) (5 changes), and search(a) added.
+    expect(changes.map((step) => step.kind)).toEqual(['added', 'added', 'added', 'added', 'added']);
+    expect(changes.map((step) => (step.kind === 'added' ? step.actualIndex : -1))).toEqual([
+      1, 2, 3, 4, 5,
+    ]);
+  });
+
+  it('pairs a policy check that became a violation for the same tool as one change', () => {
+    const intention = { type: 'tool_call', toolName: 'refund', parameters: { amount: 90 } };
+    const allowed: Step[] = [['policy.checked', { intention, validation: { allowed: true } }]];
+    const denied: Step[] = [
+      ['policy.violated', { intention, reason: 'over the limit', violatedPolicies: ['caps'] }],
+    ];
+
+    expect(alignEvents(run('a', allowed), run('b', denied))).toMatchObject([
+      { kind: 'changed', typeChanged: true, detail: 'policy.checked → policy.violated' },
     ]);
   });
 
@@ -278,6 +392,45 @@ describe('TraceValidator and RegressionDetector without event ids', () => {
   });
 });
 
+describe('TraceValidator statuses', () => {
+  const changedAnswer: Step[] = [
+    ...reference.slice(0, -1),
+    ['run.completed', { output: 'No idea' }],
+  ];
+
+  it('fails on a data difference even when timing is ignored', () => {
+    const validation = TraceValidator.validate(
+      trace(run('b', changedAnswer)),
+      trace(run('a', reference)),
+      'g',
+      { ignoreTimestampDiff: true }
+    );
+
+    // Before, ignoreTimestampDiff turned every modification into `partial`.
+    expect(validation.status).toBe('fail');
+  });
+
+  it('gives partial only for data differences in a structure-only comparison', () => {
+    const failed: Step[] = [
+      ...reference.slice(0, 3),
+      ['action.failed', { toolName: 'lookup', parameters: { metric: 'churn' }, error: 'down' }],
+      ...reference.slice(4),
+    ];
+    const golden = trace(run('a', reference));
+
+    const data = TraceValidator.validate(trace(run('b', changedAnswer)), golden, 'g', {
+      compareStructureOnly: true,
+    });
+    const type = TraceValidator.validate(trace(run('c', failed)), golden, 'g', {
+      compareStructureOnly: true,
+    });
+
+    expect(data.status).toBe('partial');
+    expect(type.differences).toMatchObject([{ type: 'event_modified' }]);
+    expect(type.status).toBe('fail');
+  });
+});
+
 describe('RunComparator without event ids', () => {
   it('finds no difference between two runs that did the same thing', () => {
     const comparison = RunComparator.compare(
@@ -288,6 +441,23 @@ describe('RunComparator without event ids', () => {
 
     // The agent id in the metadata is new in every process: not a difference.
     expect(comparison.differences).toEqual([]);
+  });
+
+  it('compares the metadata of changed events too, with includeMetadata', () => {
+    const golden = run('a', reference);
+    const other = run('b', [...reference.slice(0, -1), ['run.completed', { output: 'No idea' }]]);
+    const last = other.at(-1) as Event;
+    last.metadata = { ...last.metadata, agentVersion: '2.0.0' };
+
+    const comparison = RunComparator.compare(trace(golden), trace(other), {
+      includeMetadata: true,
+    });
+
+    // Before, the metadata of a pair whose data changed was not compared.
+    expect(comparison.differences.map((difference) => difference.details)).toEqual([
+      'run.completed data differs: output: "Churn is 4%" → "No idea"',
+      'run.completed metadata differs: agentVersion: nothing → "2.0.0"',
+    ]);
   });
 
   it('reports only structural changes with compareStructureOnly', () => {

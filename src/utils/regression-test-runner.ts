@@ -10,6 +10,8 @@ import type { RegressionReport } from '../types/regression.js';
 import type { RunInput } from '../types/run.js';
 
 const DEFAULT_TIMEOUT_MS = 60_000;
+/** How long a timed-out run has, once cancelled, to record its cancellation. */
+const CANCELLATION_GRACE_MS = 1_000;
 
 type SuiteTest = RegressionTestSuite['goldenTraces'][number];
 
@@ -55,7 +57,8 @@ export class RegressionTestRunner {
         );
         results.push(result);
 
-        if (options.stopOnFirstFailure && result.status === 'fail') {
+        // A failure, an error or a timeout: the first test that does not pass.
+        if (options.stopOnFirstFailure && result.status !== 'pass') {
           break;
         }
       }
@@ -128,10 +131,10 @@ export class RegressionTestRunner {
       const run = agent.run({ ...test.input, signal: controller.signal });
       const outcome = await Promise.race([run, timer.promise]);
       if (outcome === 'elapsed') {
-        // The run is cancelled, not left running; its cancellation is recorded before the
-        // result is returned, within the same time again.
+        // The run is cancelled, not left running; the result waits (a little) for the run to
+        // record its cancellation, so it can name the run.
         controller.abort();
-        const grace = settleAfter(timeout);
+        const grace = settleAfter(CANCELLATION_GRACE_MS);
         const stopped = await Promise.race([run, grace.promise]);
         grace.cancel();
         return {

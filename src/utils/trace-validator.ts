@@ -5,7 +5,7 @@ import type {
   ValidationResult,
   ValidationDifference,
 } from '../types/validation.js';
-import { alignEvents, eventSubject } from './event-alignment.js';
+import { alignEvents, comparedEvents, eventSubject } from './event-alignment.js';
 
 /** What a comparison found, before it is turned into a verdict. */
 export interface TraceComparison {
@@ -15,6 +15,8 @@ export interface TraceComparison {
   actualCount: number;
   /** Golden events found unchanged, at their place. */
   unchanged: number;
+  /** Differences in the data of paired events, the only ones a structure-only check lowers. */
+  dataChanges: number;
 }
 
 /**
@@ -28,9 +30,10 @@ export class TraceValidator {
     goldenTraceId: string,
     options: ValidationOptions = {}
   ): ValidationResult {
-    const { differences } = TraceValidator.compare(actualTrace, expectedTrace, options);
+    const comparison = TraceValidator.compare(actualTrace, expectedTrace, options);
+    const { differences } = comparison;
     const metrics = TraceValidator.calculateMetrics(expectedTrace, actualTrace);
-    const status = TraceValidator.determineStatus(differences, options);
+    const status = TraceValidator.determineStatus(comparison, options);
     const summary = TraceValidator.generateSummary(status, differences, metrics);
 
     return {
@@ -56,6 +59,7 @@ export class TraceValidator {
     const timing = TraceValidator.timing(expectedTrace, actualTrace, options);
     const differences: ValidationDifference[] = [];
     let unchanged = 0;
+    let dataChanges = 0;
 
     for (const step of aligned) {
       switch (step.kind) {
@@ -92,6 +96,7 @@ export class TraceValidator {
           });
           break;
         case 'changed':
+          if (!step.typeChanged) dataChanges++;
           differences.push({
             type: 'event_modified',
             eventId: step.expected.id,
@@ -133,6 +138,7 @@ export class TraceValidator {
       expectedCount: expectedEvents.length,
       actualCount: actualEvents.length,
       unchanged,
+      dataChanges,
     };
   }
 
@@ -160,7 +166,7 @@ export class TraceValidator {
   }
 
   private static filterEvents(events: Event[], options: ValidationOptions): Event[] {
-    let filtered = [...events];
+    let filtered = comparedEvents(events);
 
     const ignored = options.ignoreEventTypes;
     if (ignored && ignored.length > 0) {
@@ -208,27 +214,19 @@ export class TraceValidator {
     };
   }
 
+  /**
+   * `pass` without differences; `partial` when a structure-only comparison found nothing but
+   * data differences; `fail` otherwise (events added, removed, moved or of another type, data
+   * differences, timing beyond its tolerance).
+   */
   private static determineStatus(
-    differences: ValidationDifference[],
+    comparison: TraceComparison,
     options: ValidationOptions
   ): 'pass' | 'fail' | 'partial' {
-    if (differences.length === 0) {
-      return 'pass';
-    }
-
-    const criticalDifferences = differences.filter(
-      (d) => d.type === 'event_removed' || d.type === 'event_added'
-    );
-
-    if (criticalDifferences.length > 0) {
-      return 'fail';
-    }
-
-    if (options.compareStructureOnly || options.ignoreTimestampDiff) {
-      return 'partial';
-    }
-
-    return 'fail';
+    if (comparison.differences.length === 0) return 'pass';
+    return options.compareStructureOnly && comparison.dataChanges === comparison.differences.length
+      ? 'partial'
+      : 'fail';
   }
 
   private static generateSummary(
@@ -284,6 +282,5 @@ export class TraceValidator {
 /** `tool.called (lookup_metric)`: the type and, when it has one, what the event is about. */
 export function describeEvent(event: Event): string {
   const subject = eventSubject(event);
-  const about = subject.replace(/^\|/, '').replace(/\|$/, '').replace('|', ', ');
-  return about ? `${event.type} (${about})` : event.type;
+  return subject ? `${event.type} (${subject})` : event.type;
 }

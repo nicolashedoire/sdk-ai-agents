@@ -20,14 +20,30 @@ export class AssertionEvaluator {
     if (!ASSERTION_TYPES.includes(condition.type)) {
       return `type must be one of ${ASSERTION_TYPES.join(', ')}`;
     }
-    const hasTypes =
-      typeof condition.eventType === 'string' ||
-      (Array.isArray(condition.eventTypes) && condition.eventTypes.length > 0);
+    // `eventTypes` wins over `eventType`: an empty list would match no event at all.
+    if (condition.eventTypes !== undefined) {
+      if (!Array.isArray(condition.eventTypes) || condition.eventTypes.length === 0) {
+        return 'eventTypes must list at least one event type';
+      }
+    }
+    const hasTypes = typeof condition.eventType === 'string' || condition.eventTypes !== undefined;
+    for (const bound of ['count', 'minCount', 'maxCount'] as const) {
+      const value = condition[bound];
+      if (value !== undefined && !(Number.isInteger(value) && value >= 0)) {
+        return `${bound} must be a whole number >= 0`;
+      }
+    }
     switch (condition.type) {
       case 'event_present':
       case 'event_absent':
-      case 'event_count':
         return hasTypes ? null : `${condition.type} requires eventType or eventTypes`;
+      case 'event_count':
+        if (!hasTypes) return 'event_count requires eventType or eventTypes';
+        return condition.count !== undefined ||
+          condition.minCount !== undefined ||
+          condition.maxCount !== undefined
+          ? null
+          : 'event_count requires count, minCount or maxCount';
       case 'event_order':
         return condition.beforeEventType && condition.afterEventType
           ? null

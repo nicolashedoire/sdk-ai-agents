@@ -13,6 +13,7 @@ import type { Agent, OpenAIProviderSettings, ProviderSettings } from './types/ag
 import type { Policy } from './types/policy.js';
 import type { Intention, RunInput, RunResult } from './types/run.js';
 import type { Tool } from './types/tool.js';
+import { computeConfigHash } from './utils/config-hash.js';
 import { DEFAULT_MAX_STEPS, DEFAULT_TIMEOUT_MS } from './utils/constants.js';
 import { generateEventId, generateRunId } from './utils/id.js';
 
@@ -41,8 +42,15 @@ interface RunState {
 }
 
 export class AgentImpl {
-  private activeRuns: Map<string, { cancelled: boolean; abortController: AbortController }> =
-    new Map();
+  private activeRuns: Map<
+    string,
+    {
+      cancelled: boolean;
+      abortController: AbortController;
+      /** The configuration the run started with: its lifecycle events record this hash. */
+      configHash: string | undefined;
+    }
+  > = new Map();
 
   constructor(
     private agent: Agent,
@@ -66,8 +74,11 @@ export class AgentImpl {
   }
 
   /**
-   * Hash of the configuration (name, model, system prompt, limits, tools and their versions,
-   * policies, capabilities, version): two agents with the same hash are configured alike.
+   * Hash of the configuration: name, model, system prompt, `maxSteps` and `timeout`, provider
+   * settings, `version`, capabilities, tools (name, description, version, parameter schema,
+   * metadata, retry settings) and the agent's own policies with their rules. Two agents with
+   * the same hash are configured alike (tool handlers aside). It changes with `setPolicy` and
+   * `addTools`; each run records the hash it started with.
    */
   get configHash(): string | undefined {
     return this.agent.configHash;
@@ -91,7 +102,11 @@ export class AgentImpl {
     input: RunInput,
     abortController: AbortController
   ): Promise<RunResult> {
-    this.activeRuns.set(runId, { cancelled: false, abortController });
+    this.activeRuns.set(runId, {
+      cancelled: false,
+      abortController,
+      configHash: this.agent.configHash,
+    });
     // The caller's signal stops the run: a pending approval is cancelled with it. Neither it
     // nor the listener and the text callbacks are recorded.
     const { signal, onEvent: _listener, onText, onTextRestart, ...recorded } = input;
@@ -116,12 +131,20 @@ export class AgentImpl {
 
   addTools(tools: Tool[]): void {
     this.agent.tools.push(...tools);
+    this.configurationChanged();
   }
 
   setPolicy(policy: Policy): void {
     // Applied first: a policy the engine refuses is not listed as the agent's.
     this.policyEngine.applyAgentPolicy(this.agent.id, policy);
     this.agent.policies.push(policy);
+    this.configurationChanged();
+  }
+
+  /** Runs started from now on record the new configuration. */
+  private configurationChanged(): void {
+    this.agent.configHash = computeConfigHash(this.agent);
+    this.agent.updatedAt = Date.now();
   }
 
   async stop(runId?: string): Promise<void> {
@@ -373,6 +396,7 @@ export class AgentImpl {
     type: Event['type'],
     data: Record<string, unknown>
   ): Promise<void> {
+    const configHash = this.activeRuns.get(runId)?.configHash ?? this.agent.configHash;
     await this.eventStore.append(runId, {
       id: generateEventId(),
       runId,
@@ -384,7 +408,7 @@ export class AgentImpl {
         agentVersion: this.agent.version,
         // The id is new in every process: the name and the configuration say which agent ran.
         agentName: this.agent.name,
-        ...(this.agent.configHash ? { configHash: this.agent.configHash } : {}),
+        ...(configHash ? { configHash } : {}),
       },
     });
   }

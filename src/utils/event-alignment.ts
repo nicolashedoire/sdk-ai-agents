@@ -1,23 +1,55 @@
-import type { Event } from '../types/events.js';
+import type { Event, EventType } from '../types/events.js';
+import { stableJson } from './stable-json.js';
+
+/** A path inside event data; `*` stands for every element of an array. */
+type DataPath = readonly string[];
 
 /**
- * Fields of event data that differ between two runs doing the same thing: random ids, clock
- * readings and token counts. They are never compared, at any depth.
+ * Where the SDK itself writes values that differ between two runs doing the same thing: clock
+ * readings, token counts, random ids. Only these paths are left out of comparisons: a tool's
+ * parameters, result or input are always compared, whatever their keys.
  */
-export const VOLATILE_EVENT_FIELDS: readonly string[] = [
-  'agentId',
-  'approvalId',
-  'delayMs',
-  'duration',
-  'durationMs',
-  'elapsedMs',
-  'eventId',
-  'observedAt',
-  'recordedAt',
-  'replayOf',
-  'sourceEventId',
-  'usage',
-];
+export const VOLATILE_DATA_PATHS: Readonly<Partial<Record<EventType, readonly DataPath[]>>> = {
+  'run.started': [['replayOf']],
+  'run.completed': [['replayOf']],
+  'run.failed': [['replayOf']],
+  'run.stopped': [['agentId']],
+  'intention.generated': [['usage']],
+  'action.executed': [['duration']],
+  'action.failed': [['duration']],
+  'tool.retry': [['delayMs']],
+  'provider.retry': [['delayMs']],
+  'approval.requested': [['approvalId']],
+  'approval.approved': [['approvalId']],
+  'approval.rejected': [['approvalId']],
+  'decision.evaluated': [['usage']],
+  'cognition.evaluated': [['durationMs']],
+  'cognition.started': [
+    ['observations', '*', 'observedAt'],
+    ['observations', '*', 'sourceEventId'],
+  ],
+  'cognition.thought': [
+    ['usage'],
+    ['patch', 'observations', '*', 'observedAt'],
+    ['patch', 'observations', '*', 'sourceEventId'],
+    ['patch', 'evaluations', '*', 'observation', 'observedAt'],
+    ['patch', 'evaluations', '*', 'observation', 'sourceEventId'],
+  ],
+};
+
+/** Metadata fields that change from one process to the next. */
+export const VOLATILE_METADATA_FIELDS: readonly string[] = ['agentId'];
+
+/**
+ * Event types never compared. An `incident.reported` event records deliveries and throttling,
+ * which depend on the process; the event that raised the incident is compared itself.
+ */
+export const UNCOMPARED_EVENT_TYPES: readonly EventType[] = ['incident.reported'];
+
+/** The events of a run that comparisons look at. */
+export function comparedEvents(events: readonly Event[]): Event[] {
+  return events.filter((event) => !UNCOMPARED_EVENT_TYPES.includes(event.type));
+}
 
 /** How two events recorded by different runs relate once aligned. */
 export type AlignedEvent =
@@ -42,188 +74,208 @@ export interface AlignmentOptions {
   ignoredFields?: readonly string[];
 }
 
+/** A pair found by one of the passes: 0 identical, 1 same type and subject, 2 type changed. */
+interface Pair {
+  expectedIndex: number;
+  actualIndex: number;
+  pass: 0 | 1 | 2;
+}
+
 /**
  * Aligns the events of two runs by what they mean, never by their ids (every run has new
- * ones): an event is identified by its type and its subject (the tool, the policy, the
- * operation, the answer), in order. The longest common sequence of those is paired first;
- * each pair is `same` or `changed` depending on its data. Between two pairs, an event whose
- * type changed for the same subject (`action.executed` → `action.failed` for one tool) is
- * `changed`; an identical event found at another position is `moved`; the rest is `removed`
- * (only in `expected`) or `added` (only in `actual`).
+ * ones). An event is known by its type, its subject (the tool, the operation, the answer) and
+ * its comparable data. Three passes pair them in order, each inside the gaps the previous one
+ * left: identical events first (a longest common subsequence), then events of the same type
+ * and subject whose data changed, then events of the same family and subject whose type
+ * changed (`action.executed` → `action.failed` for one tool). An identical event found at
+ * another position is `moved`; the rest is `removed` (only in `expected`) or `added` (only in
+ * `actual`).
  */
 export function alignEvents(
   expected: readonly Event[],
   actual: readonly Event[],
   options: AlignmentOptions = {}
 ): AlignedEvent[] {
-  const ignored = new Set([...VOLATILE_EVENT_FIELDS, ...(options.ignoredFields ?? [])]);
+  const ignored = options.ignoredFields ?? [];
+  const expectedData = expected.map((event) => comparableData(event, ignored));
+  const actualData = actual.map((event) => comparableData(event, ignored));
   const expectedSubjects = expected.map(eventSubject);
   const actualSubjects = actual.map(eventSubject);
-  const expectedKeys = expected.map((event, index) => keyOf(event, expectedSubjects[index]));
-  const actualKeys = actual.map((event, index) => keyOf(event, actualSubjects[index]));
-  const anchors = longestCommonSubsequence(expectedKeys, actualKeys);
-  const actualData = new Map<number, unknown>();
-  const dataOfActual = (index: number) => {
-    if (!actualData.has(index)) {
-      actualData.set(index, comparableData(actual[index] as Event, ignored));
-    }
-    return actualData.get(index);
-  };
+  const keys = new Interner();
+  const levels: Array<[string[], string[]]> = [
+    [
+      expected.map((event, i) =>
+        keys.id(`${event.type}|${expectedSubjects[i]}|${stableJson(expectedData[i])}`)
+      ),
+      actual.map((event, i) =>
+        keys.id(`${event.type}|${actualSubjects[i]}|${stableJson(actualData[i])}`)
+      ),
+    ],
+    [
+      expected.map((event, i) => keys.id(`${event.type}|${expectedSubjects[i]}`)),
+      actual.map((event, i) => keys.id(`${event.type}|${actualSubjects[i]}`)),
+    ],
+    [
+      expected.map((event, i) => keys.id(`${family(event)}.*|${expectedSubjects[i]}`)),
+      actual.map((event, i) => keys.id(`${family(event)}.*|${actualSubjects[i]}`)),
+    ],
+  ];
 
-  const steps: Array<{ order: number; tie: number; step: AlignedEvent }> = [];
-  const pairedExpected = new Set<number>();
-  const pairedActual = new Set<number>();
+  const pairs: Pair[] = [];
+  pairWithin(levels, 0, 0, expected.length, 0, actual.length, pairs);
+  const pairedExpected = new Set(pairs.map((pair) => pair.expectedIndex));
+  const pairedActual = new Set(pairs.map((pair) => pair.actualIndex));
 
-  for (const [expectedIndex, actualIndex] of anchors) {
+  // An identical event left over on both sides has moved.
+  const [identicalExpected, identicalActual] = levels[0] as [string[], string[]];
+  const unpairedByKey = new Map<string, number[]>();
+  actual.forEach((_, actualIndex) => {
+    if (pairedActual.has(actualIndex)) return;
+    const key = identicalActual[actualIndex] as string;
+    unpairedByKey.set(key, [...(unpairedByKey.get(key) ?? []), actualIndex]);
+  });
+  const moves: Array<[number, number]> = [];
+  expected.forEach((_, expectedIndex) => {
+    if (pairedExpected.has(expectedIndex)) return;
+    const candidates = unpairedByKey.get(identicalExpected[expectedIndex] as string);
+    const actualIndex = candidates?.shift();
+    if (actualIndex === undefined) return;
+    moves.push([expectedIndex, actualIndex]);
     pairedExpected.add(expectedIndex);
     pairedActual.add(actualIndex);
+  });
+
+  const steps: Array<{ order: number; tie: number; step: AlignedEvent }> = [];
+  for (const { expectedIndex, actualIndex, pass } of pairs) {
     const expectedEvent = expected[expectedIndex] as Event;
     const actualEvent = actual[actualIndex] as Event;
-    const detail = firstDifference(
-      comparableData(expectedEvent, ignored),
-      dataOfActual(actualIndex)
-    );
+    const both = { expected: expectedEvent, actual: actualEvent, expectedIndex, actualIndex };
+    const step: AlignedEvent =
+      pass === 0
+        ? { kind: 'same', ...both }
+        : pass === 1
+          ? {
+              kind: 'changed',
+              ...both,
+              typeChanged: false,
+              detail:
+                firstDifference(expectedData[expectedIndex], actualData[actualIndex]) ??
+                'data differs',
+            }
+          : {
+              kind: 'changed',
+              ...both,
+              typeChanged: true,
+              detail: `${expectedEvent.type} → ${actualEvent.type}`,
+            };
+    steps.push({ order: expectedIndex, tie: 0, step });
+  }
+  for (const [expectedIndex, actualIndex] of moves) {
     steps.push({
       order: expectedIndex,
       tie: 0,
-      step: detail
-        ? {
-            kind: 'changed',
-            expected: expectedEvent,
-            actual: actualEvent,
-            expectedIndex,
-            actualIndex,
-            typeChanged: false,
-            detail,
-          }
-        : {
-            kind: 'same',
-            expected: expectedEvent,
-            actual: actualEvent,
-            expectedIndex,
-            actualIndex,
-          },
+      step: {
+        kind: 'moved',
+        expected: expected[expectedIndex] as Event,
+        actual: actual[actualIndex] as Event,
+        expectedIndex,
+        actualIndex,
+      },
     });
   }
-
-  // Between two anchors: an event whose type changed for the same subject, in order.
-  const bounds: Array<[number, number]> = [[-1, -1], ...anchors, [expected.length, actual.length]];
-  for (let gap = 0; gap + 1 < bounds.length; gap++) {
-    const [fromExpected, fromActual] = bounds[gap] as [number, number];
-    const [toExpected, toActual] = bounds[gap + 1] as [number, number];
-    for (let expectedIndex = fromExpected + 1; expectedIndex < toExpected; expectedIndex++) {
-      const expectedEvent = expected[expectedIndex] as Event;
-      for (let actualIndex = fromActual + 1; actualIndex < toActual; actualIndex++) {
-        const actualEvent = actual[actualIndex] as Event;
-        // Same family (`action`, `run`, `tool`…) and subject, another type.
-        if (
-          pairedActual.has(actualIndex) ||
-          family(expectedEvent) !== family(actualEvent) ||
-          expectedSubjects[expectedIndex] !== actualSubjects[actualIndex]
-        ) {
-          continue;
-        }
-        pairedExpected.add(expectedIndex);
-        pairedActual.add(actualIndex);
-        steps.push({
-          order: expectedIndex,
-          tie: 0,
-          step: {
-            kind: 'changed',
-            expected: expectedEvent,
-            actual: actualEvent,
-            expectedIndex,
-            actualIndex,
-            typeChanged: true,
-            detail: `${expectedEvent.type} → ${actualEvent.type}`,
-          },
-        });
-        break;
-      }
-    }
-  }
-
-  // An identical event at another position has moved.
-  for (let expectedIndex = 0; expectedIndex < expected.length; expectedIndex++) {
-    if (pairedExpected.has(expectedIndex)) continue;
-    const expectedEvent = expected[expectedIndex] as Event;
-    const expectedData = comparableData(expectedEvent, ignored);
-    for (let actualIndex = 0; actualIndex < actual.length; actualIndex++) {
-      if (
-        pairedActual.has(actualIndex) ||
-        actualKeys[actualIndex] !== expectedKeys[expectedIndex]
-      ) {
-        continue;
-      }
-      const actualEvent = actual[actualIndex] as Event;
-      if (firstDifference(expectedData, dataOfActual(actualIndex))) continue;
-      pairedExpected.add(expectedIndex);
-      pairedActual.add(actualIndex);
+  expected.forEach((event, expectedIndex) => {
+    if (!pairedExpected.has(expectedIndex)) {
       steps.push({
         order: expectedIndex,
         tie: 0,
-        step: {
-          kind: 'moved',
-          expected: expectedEvent,
-          actual: actualEvent,
-          expectedIndex,
-          actualIndex,
-        },
+        step: { kind: 'removed', expected: event, expectedIndex },
       });
-      break;
     }
-  }
-
-  for (let expectedIndex = 0; expectedIndex < expected.length; expectedIndex++) {
-    if (pairedExpected.has(expectedIndex)) continue;
-    steps.push({
-      order: expectedIndex,
-      tie: 0,
-      step: { kind: 'removed', expected: expected[expectedIndex] as Event, expectedIndex },
-    });
-  }
+  });
   // An added event is listed before the next paired event, after what its gap removed.
-  let anchor = 0;
-  for (let actualIndex = 0; actualIndex < actual.length; actualIndex++) {
-    while (anchor < anchors.length && (anchors[anchor] as [number, number])[1] < actualIndex) {
-      anchor++;
+  const expectedOfActual = new Map(pairs.map((pair) => [pair.actualIndex, pair.expectedIndex]));
+  let next = expected.length;
+  for (let actualIndex = actual.length - 1; actualIndex >= 0; actualIndex--) {
+    const pairedWith = expectedOfActual.get(actualIndex);
+    if (pairedWith !== undefined) {
+      next = pairedWith;
+    } else if (!pairedActual.has(actualIndex)) {
+      steps.push({
+        order: next - 0.5,
+        tie: actualIndex,
+        step: { kind: 'added', actual: actual[actualIndex] as Event, actualIndex },
+      });
     }
-    if (pairedActual.has(actualIndex)) continue;
-    const next =
-      anchor < anchors.length ? (anchors[anchor] as [number, number])[0] : expected.length;
-    steps.push({
-      order: next - 0.5,
-      tie: actualIndex,
-      step: { kind: 'added', actual: actual[actualIndex] as Event, actualIndex },
-    });
   }
 
   return steps.sort((a, b) => a.order - b.order || a.tie - b.tie).map(({ step }) => step);
 }
 
-/** What an event is about, besides its type: the tool, the policy, the operation… */
+/**
+ * Pairs the events of `expected[fromExpected..toExpected)` and `actual[fromActual..toActual)`
+ * with a longest common subsequence of the keys of one level, then each gap it leaves with the
+ * next level. Pairs are in increasing order on both sides.
+ */
+function pairWithin(
+  levels: Array<[string[], string[]]>,
+  level: number,
+  fromExpected: number,
+  toExpected: number,
+  fromActual: number,
+  toActual: number,
+  out: Pair[]
+): void {
+  const keys = levels[level];
+  if (!keys || fromExpected >= toExpected || fromActual >= toActual) return;
+  const found = longestCommonSubsequence(
+    keys[0].slice(fromExpected, toExpected),
+    keys[1].slice(fromActual, toActual)
+  ).map(([e, a]): [number, number] => [e + fromExpected, a + fromActual]);
+  let gapExpected = fromExpected;
+  let gapActual = fromActual;
+  for (const [expectedIndex, actualIndex] of found) {
+    pairWithin(levels, level + 1, gapExpected, expectedIndex, gapActual, actualIndex, out);
+    out.push({ expectedIndex, actualIndex, pass: level as Pair['pass'] });
+    gapExpected = expectedIndex + 1;
+    gapActual = actualIndex + 1;
+  }
+  pairWithin(levels, level + 1, gapExpected, toExpected, gapActual, toActual, out);
+}
+
+/** What an event is about, besides its type: the tool, the operation, the answer… */
 export function eventSubject(event: Event): string {
   const data = event.data ?? {};
-  const tool = toolNameOf(data);
   switch (event.type) {
     case 'intention.generated':
       return firstToolCallName(data) ?? 'answer';
-    case 'policy.checked':
-    case 'policy.violated':
-    case 'approval.requested':
-    case 'approval.approved':
-    case 'approval.rejected':
-      return `${policiesOf(data)}|${tool ?? ''}`;
     case 'resource.read':
       return stringField(data, 'uri') ?? '';
     default:
-      return tool ?? stringField(data, 'operation') ?? '';
+      // Policy and approval events are about the call they check, like the action events.
+      return toolNameOf(data) ?? stringField(data, 'operation') ?? '';
   }
 }
 
-/** The data compared: volatile and ignored fields removed, tool arguments parsed. */
-export function comparableData(event: Event, ignored: ReadonlySet<string>): unknown {
-  const data = withoutFields(event.data ?? {}, ignored);
+/**
+ * The data compared: the volatile values the SDK writes removed (`VOLATILE_DATA_PATHS`), the
+ * keys the caller ignores removed at any depth, tool arguments parsed. The text a model writes
+ * next to a tool call is compared once, in `intention.generated`: the copies other events carry
+ * in their `intention.reasoning` are left out.
+ */
+export function comparableData(event: Event, ignoredFields: readonly string[] = []): unknown {
+  let data: unknown = copy(event.data ?? {});
+  for (const path of VOLATILE_DATA_PATHS[event.type] ?? []) {
+    removePath(data, path);
+  }
+  if (isRecord(data)) {
+    const intention = data.intention;
+    if (isRecord(intention) && intention.type === 'tool_call') {
+      intention.reasoning = undefined;
+    }
+  }
+  if (ignoredFields.length > 0) {
+    data = withoutFields(data, new Set(ignoredFields));
+  }
   if (event.type !== 'intention.generated' || !isRecord(data) || !Array.isArray(data.toolCalls)) {
     return data;
   }
@@ -266,13 +318,45 @@ export function firstDifference(expected: unknown, actual: unknown, path = ''): 
   return `${at}${describe(expected)} → ${describe(actual)}`;
 }
 
-/** What aligns two events: their type and their subject. */
-function keyOf(event: Event, subject: string | undefined): string {
-  return `${event.type}\u0000${subject ?? ''}`;
+/** Short ids for long keys, so the subsequence search compares short strings. */
+class Interner {
+  private readonly ids = new Map<string, string>();
+
+  id(key: string): string {
+    let id = this.ids.get(key);
+    if (id === undefined) {
+      id = String(this.ids.size);
+      this.ids.set(key, id);
+    }
+    return id;
+  }
 }
 
 function family(event: Event): string {
   return event.type.split('.')[0] ?? event.type;
+}
+
+/** A copy of the arrays and plain objects of a JSON value, which the caller may then edit. */
+function copy(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(copy);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, copy(item)]));
+}
+
+/** Removes the value at `path` (`*` for each array element), wherever it exists. */
+function removePath(value: unknown, path: DataPath): void {
+  const [head, ...rest] = path;
+  if (head === undefined) return;
+  if (head === '*') {
+    if (Array.isArray(value)) for (const item of value) removePath(item, rest);
+    return;
+  }
+  if (!isRecord(value)) return;
+  if (rest.length === 0) {
+    value[head] = undefined;
+  } else {
+    removePath(value[head], rest);
+  }
 }
 
 /**
@@ -427,12 +511,6 @@ function firstToolCallName(data: Record<string, unknown>): string | undefined {
   const first: unknown = Array.isArray(calls) ? calls[0] : undefined;
   const fn = isRecord(first) ? first.function : undefined;
   return isRecord(fn) ? stringField(fn, 'name') : undefined;
-}
-
-function policiesOf(data: Record<string, unknown>): string {
-  const violated = data.violatedPolicies;
-  if (Array.isArray(violated)) return violated.filter((id) => typeof id === 'string').join(',');
-  return stringField(data, 'policyId') ?? '';
 }
 
 function stringField(record: Record<string, unknown>, key: string): string | undefined {

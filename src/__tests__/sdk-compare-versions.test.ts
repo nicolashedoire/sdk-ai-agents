@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import type { AgentImpl } from '../agent.js';
+import { defineTool } from '../sdk.js';
+import type { AgentConfig } from '../types/agent.js';
+import type { Policy } from '../types/policy.js';
 import { ValidationError } from '../errors/index.js';
 import { SQLiteEventStore } from '../stores/sqlite-event-store.js';
 import { loadNodeSqlite } from './support/node-sqlite.js';
@@ -90,6 +94,33 @@ describe('compareVersions', () => {
     );
   });
 
+  it('refuses to compare a version with itself, or two versions that select the same runs', async () => {
+    const greeter = env.sdk.createAgent({ name: 'greeter', model: 'test-model' });
+    await runTwice(env, greeter);
+
+    await expect(env.sdk.compareVersions('greeter', '1.0.0', '1.0.0')).rejects.toThrow(
+      'version2 - must differ from version1 ("1.0.0")'
+    );
+    // Every agent is 1.0.0 by default: its config hash selects the same runs.
+    await expect(
+      env.sdk.compareVersions('greeter', '1.0.0', greeter.configHash ?? '')
+    ).rejects.toThrow(`"1.0.0" and "${greeter.configHash}" both select 2 run(s)`);
+  });
+
+  it('names runs recorded without a version as such', async () => {
+    const lookup = env.sdk.defineTool({
+      name: 'lookup',
+      description: 'Looks up',
+      schema: z.object({}),
+      handler: async () => 'ok',
+    });
+    await env.sdk.executeTool(lookup.name, {}, { agentId: 'mcp:crm' });
+
+    await expect(env.sdk.compareVersions('mcp:crm', '1.0.0', '2.0.0')).rejects.toThrow(
+      '(recorded: no version)'
+    );
+  });
+
   it('prices the cost metric in USD from the model calls, as getRunCost does', async () => {
     const before = await runTwice(env, env.sdk.createAgent({ name: 'a', model: 'test-model' }));
     const after = await runTwice(env, env.sdk.createAgent({ name: 'b', model: 'test-model' }));
@@ -132,5 +163,79 @@ describe.skipIf(!nodeSqlite)('compareVersions on SQLite', () => {
     } finally {
       await env.dispose();
     }
+  });
+});
+
+describe('configHash', () => {
+  let env: TestSDK;
+
+  beforeEach(() => {
+    env = createTestSDK();
+  });
+
+  afterEach(async () => {
+    await env.dispose();
+  });
+
+  const caps = (maxToolCalls: number): Policy => ({
+    id: 'caps',
+    type: 'budget',
+    scope: 'agent',
+    enabled: true,
+    rules: [
+      {
+        condition: 'true',
+        action: 'deny',
+        metadata: { budgetLimit: { period: 'day', maxToolCalls } },
+      },
+    ],
+  });
+
+  const hashOf = (config: Partial<AgentConfig>) =>
+    env.sdk.createAgent({ name: 'greeter', model: 'test-model', ...config }).configHash;
+
+  it('changes with what makes the agent behave differently', () => {
+    const tool = (description: string, schema: z.ZodTypeAny) =>
+      defineTool({ name: 'lookup', description, schema, handler: async () => 'ok' });
+
+    // Before, only the policies' id and type, and the tools' name and version, were hashed.
+    expect(hashOf({ policies: [caps(5)] })).not.toBe(hashOf({ policies: [caps(50)] }));
+    expect(hashOf({ providerSettings: { default: { temperature: 0 } } })).not.toBe(
+      hashOf({ providerSettings: { default: { temperature: 1 } } })
+    );
+    expect(hashOf({ tools: [tool('Looks up', z.object({ id: z.string() }))] })).not.toBe(
+      hashOf({ tools: [tool('Looks up', z.object({ id: z.number() }))] })
+    );
+    expect(hashOf({ tools: [tool('Looks up', z.object({}))] })).not.toBe(
+      hashOf({ tools: [tool('Finds a customer', z.object({}))] })
+    );
+    expect(hashOf({ model: 'test-model', systemPrompt: 'A' })).toBe(
+      hashOf({ model: 'test-model', systemPrompt: 'A' })
+    );
+  });
+
+  it('follows setPolicy and addTools, and each run records the hash it started with', async () => {
+    const greeter = env.sdk.createAgent({ name: 'greeter', model: 'test-model' });
+    const [before] = await runTwice(env, greeter);
+    const initial = greeter.configHash;
+
+    greeter.setPolicy(caps(5));
+    const withPolicy = greeter.configHash;
+    greeter.addTools([
+      defineTool({
+        name: 'lookup',
+        description: 'Looks up',
+        schema: z.object({}),
+        handler: async () => 'ok',
+      }),
+    ]);
+    const [after] = await runTwice(env, greeter);
+
+    expect(withPolicy).not.toBe(initial);
+    expect(greeter.configHash).not.toBe(withPolicy);
+    const [started] = await env.sdk.getEvents(before ?? '', { type: 'run.started' });
+    const [startedAfter] = await env.sdk.getEvents(after ?? '', { type: 'run.started' });
+    expect(started?.metadata?.configHash).toBe(initial);
+    expect(startedAfter?.metadata?.configHash).toBe(greeter.configHash);
   });
 });

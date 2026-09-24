@@ -44,13 +44,19 @@ export interface RegressionTestSuite {
 export interface RegressionTestOptions {
   /** Runs the tests of a suite at the same time. `stopOnFirstFailure` then has no effect. */
   parallel?: boolean;
-  /** Sequential runs only: the tests after the first failing one are not run. */
+  /**
+   * Sequential runs only: the tests after the first one that does not pass (a regression, an
+   * error or a timeout) are not run, nor are the next suites.
+   */
   stopOnFirstFailure?: boolean;
   /** Only the golden traces with one of these tags. */
   filterTags?: string[];
   /** Not the golden traces with one of these tags. */
   excludeTags?: string[];
-  /** Longest run of one test, in ms (default 60 000). Past it, the run is cancelled. */
+  /**
+   * Longest run of one test, in ms (default 60 000, at most 2 147 483 647). Past it, the run is
+   * cancelled and the test is `timeout`.
+   */
   timeout?: number;
   /** How each run is compared with its golden trace (see `detectRegressions`). */
   detection?: RegressionDetectionOptions;

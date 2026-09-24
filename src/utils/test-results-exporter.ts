@@ -9,6 +9,34 @@ import type {
   TestResultsJSON,
 } from '../types/test-results-export.js';
 
+/**
+ * The text without the characters XML 1.0 cannot hold (outside its `Char` production: control
+ * characters other than tab, line feed and carriage return, U+FFFE, U+FFFF) nor surrogates
+ * without their pair.
+ */
+function withoutXmlForbidden(text: string): string {
+  let kept = '';
+  for (let index = 0; index < text.length; index++) {
+    const code = text.charCodeAt(index);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = text.charCodeAt(index + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        kept += text[index] + text[index + 1];
+        index++;
+      }
+      continue;
+    }
+    const allowed =
+      code === 0x09 ||
+      code === 0x0a ||
+      code === 0x0d ||
+      (code >= 0x20 && code < 0xdc00) ||
+      (code > 0xdfff && code < 0xfffe);
+    if (allowed) kept += text[index];
+  }
+  return kept;
+}
+
 /** One suite's results, or every suite of an agent (`runRegressionTests`). */
 export type ExportableTestResults = RegressionTestSuiteResult | RegressionTestRunResult;
 
@@ -87,8 +115,9 @@ export class TestResultsExporter {
             details: TestResultsExporter.formatRegressionDetails(result.regressionReport),
           };
         } else if (result.status === 'error' || result.status === 'timeout') {
+          // Counted in `errors`: written as <error>, which JUnit readers report as such.
           const message = result.error ?? (result.status === 'timeout' ? 'Test timeout' : 'Error');
-          testCase.failure = { message, type: result.status, details: message };
+          testCase.error = { message, type: result.status, details: message };
         }
 
         return testCase;
@@ -105,11 +134,13 @@ export class TestResultsExporter {
 ${suite.testCases
   .map((tc) => {
     const testCaseXML = `    <testcase name="${xml(tc.name)}" classname="${xml(tc.classname)}" time="${tc.time.toFixed(3)}">`;
-    if (tc.failure) {
+    const element = tc.failure ? 'failure' : tc.error ? 'error' : undefined;
+    const problem = tc.failure ?? tc.error;
+    if (element && problem) {
       return `${testCaseXML}
-      <failure message="${xml(tc.failure.message)}" type="${xml(tc.failure.type)}">
-${xml(tc.failure.details)}
-      </failure>
+      <${element} message="${xml(problem.message)}" type="${xml(problem.type)}">
+${xml(problem.details)}
+      </${element}>
     </testcase>`;
     }
     return `${testCaseXML}
@@ -239,8 +270,13 @@ ${testSuites.join('\n')}
     return lines.join('\n');
   }
 
+  /**
+   * Text or attribute value for XML 1.0. Characters XML cannot hold at all (control characters
+   * such as the ANSI escape of colored logs, U+FFFE, U+FFFF, unpaired surrogates) are removed:
+   * a single one makes the whole report unreadable for a CI server.
+   */
   private static escapeXML(str: string): string {
-    return str
+    return withoutXmlForbidden(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')

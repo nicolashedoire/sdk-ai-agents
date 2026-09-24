@@ -2,6 +2,7 @@ import type { SQLConnection, SQLEventStoreConfig } from './sql-event-store.js';
 import type { Event, EventFilters, EventAggregation, EventQueryResult } from '../types/events.js';
 import type { BackupData } from './event-store.js';
 import { SQLEventStore } from './sql-event-store.js';
+import { fieldQueryPath } from '../utils/event-filters.js';
 
 export interface PostgreSQLConfig {
   host: string;
@@ -190,7 +191,8 @@ export class PostgreSQLEventStore extends SQLEventStore {
       params,
       filters
     );
-    let sql = `${filtered} ORDER BY timestamp ASC`;
+    // Ties by id: the same order on every store.
+    let sql = `${filtered} ORDER BY timestamp ASC, id ASC`;
     if (filters?.limit !== undefined) {
       sql += ` LIMIT $${paramIndex}`;
       params.push(filters.limit);
@@ -228,14 +230,15 @@ export class PostgreSQLEventStore extends SQLEventStore {
   ): { sql: string; params: unknown[] } {
     if (!filters) return { sql, params };
 
-    // Use PostgreSQL-specific filter application
+    // PostgreSQL numbers its placeholders: the ones added continue after the given parameters.
+    const allParams = [...params];
     const { sql: updatedSQL } = this.applyFiltersToSQLPostgreSQL(
       sql,
-      params,
+      allParams,
       filters,
       params.length + 1
     );
-    return { sql: updatedSQL, params };
+    return { sql: updatedSQL, params: allParams };
   }
 
   /**
@@ -292,22 +295,43 @@ export class PostgreSQLEventStore extends SQLEventStore {
       params.push(filters.sessionId);
     }
 
-    // JSON data queries - PostgreSQL JSONB syntax
-    if (filters.dataQuery) {
-      const { field, operator, value } = filters.dataQuery;
-      const jsonPath = `data->>'${field}'`;
-
-      switch (operator) {
+    // JSON data and metadata queries: the path (a text[]) and the value are bound parameters.
+    for (const [column, query, name] of [
+      ['data', filters.dataQuery, 'dataQuery'],
+      ['metadata', filters.metadataQuery, 'metadataQuery'],
+    ] as const) {
+      if (!query) continue;
+      const path = `$${paramIndex++}::text[]`;
+      params.push(fieldQueryPath(query, name));
+      const at = `(${column} #> ${path})`;
+      const text = `(${column} #>> ${path})`;
+      switch (query.operator) {
         case 'eq':
-          resultSQL += ` AND ${jsonPath} = $${paramIndex++}`;
-          params.push(JSON.stringify(value));
+          // jsonb equality: "4%" matches only the string, 5 the number 5 or 5.0.
+          resultSQL += ` AND ${at} = $${paramIndex++}::jsonb`;
+          params.push(JSON.stringify(query.value));
           break;
         case 'ne':
-          resultSQL += ` AND ${jsonPath} != $${paramIndex++}`;
-          params.push(JSON.stringify(value));
+          // A missing field is different from any value.
+          resultSQL += ` AND (${at} = $${paramIndex++}::jsonb) IS NOT TRUE`;
+          params.push(JSON.stringify(query.value));
+          break;
+        case 'gt':
+        case 'gte':
+        case 'lt':
+        case 'lte': {
+          const operator = { gt: '>', gte: '>=', lt: '<', lte: '<=' }[query.operator];
+          // CASE keeps the cast from running on values that are not numbers.
+          resultSQL += ` AND (CASE WHEN jsonb_typeof(${at}) = 'number' THEN ${text}::numeric END) ${operator} $${paramIndex++}`;
+          params.push(query.value);
+          break;
+        }
+        case 'contains':
+          resultSQL += ` AND jsonb_typeof(${at}) = 'string' AND strpos(${text}, $${paramIndex++}) > 0`;
+          params.push(query.value);
           break;
         case 'exists':
-          resultSQL += ` AND ${jsonPath} IS NOT NULL`;
+          resultSQL += ` AND COALESCE(jsonb_typeof(${at}), 'null') <> 'null'`;
           break;
       }
     }

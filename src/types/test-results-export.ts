@@ -16,7 +16,14 @@ export interface JUnitTestSuite {
     classname: string;
     time: number;
     status: 'pass' | 'fail' | 'error' | 'skipped';
+    /** A test that found a regression. */
     failure?: {
+      message: string;
+      type: string;
+      details: string;
+    };
+    /** A test that could not run (an error, or its timeout). */
+    error?: {
       message: string;
       type: string;
       details: string;
