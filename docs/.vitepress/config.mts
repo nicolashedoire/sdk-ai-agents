@@ -1,13 +1,87 @@
-import { defineConfig } from 'vitepress';
+import { defineConfig, type DefaultTheme, type LocaleSpecificConfig } from 'vitepress';
 import { withMermaid } from 'vitepress-plugin-mermaid';
+import { text as ar } from './i18n/ar';
+import { text as de } from './i18n/de';
+import { text as en } from './i18n/en';
+import { text as es } from './i18n/es';
+import { text as fr } from './i18n/fr';
+import { text as hi } from './i18n/hi';
+import { text as ja } from './i18n/ja';
+import { text as ko } from './i18n/ko';
+import { text as pt } from './i18n/pt';
+import { text as ru } from './i18n/ru';
+import { LANGUAGES, SIDEBAR, type LanguageCode } from './i18n/structure';
+import type { LocaleText } from './i18n/types';
+import { text as zh } from './i18n/zh';
 
 const repository = 'https://github.com/nicolashedoire/sdk-ai-agents';
+const version = 'v0.2.0';
+
+const TRANSLATIONS: Record<LanguageCode, LocaleText> = { fr, es, de, zh, pt, ja, ko, ru, ar, hi };
+
+/** The site's interface in one language; `prefix` is '' for English and '/fr' for French. */
+function localeConfig(text: LocaleText, prefix: string): LocaleSpecificConfig<DefaultTheme.Config> {
+  return {
+    description: text.description,
+    themeConfig: {
+      nav: [
+        { text: text.nav.guide, link: `${prefix}/guide/introduction`, activeMatch: `${prefix}/guide/` },
+        { text: text.nav.reference, link: `${prefix}/reference/sdk-api`, activeMatch: `${prefix}/reference/` },
+        {
+          text: version,
+          items: [
+            { text: text.nav.changelog, link: `${repository}/blob/main/CHANGELOG.md` },
+            { text: text.nav.contributing, link: `${prefix}/contributing/development` },
+          ],
+        },
+      ],
+      sidebar: SIDEBAR.map((section) => ({
+        text: text.groups[section.group],
+        ...('collapsed' in section ? { collapsed: section.collapsed } : {}),
+        items: section.pages.map((page) => ({ text: text.pages[page], link: `${prefix}/${page}` })),
+      })),
+      editLink: { pattern: `${repository}/edit/main/docs/:path`, text: text.ui.editLink },
+      outline: { level: [2, 3], label: text.ui.outline },
+      docFooter: { prev: text.ui.previousPage, next: text.ui.nextPage },
+      lastUpdated: { text: text.ui.lastUpdated },
+      returnToTopLabel: text.ui.returnToTop,
+      sidebarMenuLabel: text.ui.sidebarMenu,
+      darkModeSwitchLabel: text.ui.darkModeSwitch,
+      lightModeSwitchTitle: text.ui.lightModeSwitchTitle,
+      darkModeSwitchTitle: text.ui.darkModeSwitchTitle,
+      langMenuLabel: text.ui.languageMenu,
+      skipToContentLabel: text.ui.skipToContent,
+      notFound: { ...text.ui.notFound },
+      footer: { message: text.ui.footerMessage, copyright: 'Copyright © 2026 Nicolas Hedoire' },
+    },
+  };
+}
+
+function searchTranslations(text: LocaleText) {
+  const { search } = text;
+  return {
+    button: { buttonText: search.buttonText, buttonAriaLabel: search.buttonAriaLabel },
+    modal: {
+      displayDetails: search.displayDetails,
+      resetButtonTitle: search.resetButtonTitle,
+      backButtonTitle: search.backButtonTitle,
+      noResultsText: search.noResultsText,
+      footer: {
+        selectText: search.selectText,
+        selectKeyAriaLabel: search.selectKeyAriaLabel,
+        navigateText: search.navigateText,
+        navigateUpKeyAriaLabel: search.navigateUpKeyAriaLabel,
+        navigateDownKeyAriaLabel: search.navigateDownKeyAriaLabel,
+        closeText: search.closeText,
+        closeKeyAriaLabel: search.closeKeyAriaLabel,
+      },
+    },
+  };
+}
 
 export default withMermaid(
   defineConfig({
     title: 'SDK AI Agents',
-    description:
-      'Governed AI agents that think before they act: explicit reasoning, typed decisions with Jev, MCP connectors, event sourcing, costs, retries and incident alerts.',
     base: '/sdk-ai-agents/',
     cleanUrls: true,
     lastUpdated: true,
@@ -17,84 +91,35 @@ export default withMermaid(
       ['meta', { property: 'og:title', content: 'SDK AI Agents' }],
       ['meta', { property: 'og:description', content: 'Governed AI agents that think before they act.' }],
     ],
+    locales: {
+      root: { label: 'English', lang: 'en-US', ...localeConfig(en, '') },
+      ...Object.fromEntries(
+        LANGUAGES.map((language) => [
+          language.code,
+          {
+            label: language.label,
+            lang: language.lang,
+            ...('dir' in language ? { dir: language.dir } : {}),
+            link: `/${language.code}/`,
+            ...localeConfig(TRANSLATIONS[language.code], `/${language.code}`),
+          },
+        ])
+      ),
+    },
     themeConfig: {
       logo: '/logo.svg',
-      nav: [
-        { text: 'Guide', link: '/guide/introduction', activeMatch: '/guide/' },
-        { text: 'Reference', link: '/reference/sdk-api', activeMatch: '/reference/' },
-        {
-          text: 'v0.2.0',
-          items: [
-            { text: 'Changelog', link: `${repository}/blob/main/CHANGELOG.md` },
-            { text: 'Contributing', link: '/contributing/development' },
-          ],
-        },
-      ],
-      sidebar: [
-        {
-          text: 'Start here',
-          items: [
-            { text: 'Introduction', link: '/guide/introduction' },
-            { text: 'Why this SDK', link: '/guide/why' },
-            { text: 'Getting started', link: '/guide/getting-started' },
-            { text: 'Core concepts', link: '/guide/concepts' },
-            { text: 'Key terms in plain words', link: '/guide/glossary' },
-          ],
-        },
-        {
-          text: 'Agents that think',
-          items: [
-            { text: 'Cognitive agents', link: '/guide/cognitive-agents' },
-            { text: 'Evidence & verification', link: '/guide/evidence-and-verification' },
-            { text: 'Memory across runs', link: '/guide/memory' },
-            { text: 'Reason like a given person', link: '/guide/thinker-profiles' },
-            { text: 'Governed agents', link: '/guide/governed-agents' },
-          ],
-        },
-        {
-          text: 'Connect',
-          items: [
-            { text: 'Typed decisions (Jev)', link: '/guide/typed-decisions' },
-            { text: 'MCP in plain words', link: '/guide/mcp' },
-            { text: 'Your first MCP server', link: '/guide/mcp-first-server' },
-            { text: 'An MCP server for anything', link: '/guide/mcp-recipes' },
-            { text: 'Deploy, secure, troubleshoot', link: '/guide/mcp-deploy' },
-          ],
-        },
-        {
-          text: 'Operate',
-          items: [
-            { text: 'Traceability & replay', link: '/guide/observability' },
-            { text: 'API costs', link: '/guide/costs' },
-            { text: 'Retries & fallback', link: '/guide/resilience' },
-            { text: 'Incident alerts', link: '/guide/incidents' },
-          ],
-        },
-        {
-          text: 'Reference',
-          items: [
-            { text: 'SDK API', link: '/reference/sdk-api' },
-            { text: 'Event catalog', link: '/reference/events' },
-            { text: 'Architecture', link: '/reference/architecture' },
-            { text: 'Project overview', link: '/reference/project-overview' },
-          ],
-        },
-        {
-          text: 'Contributing',
-          collapsed: true,
-          items: [
-            { text: 'Development guide', link: '/contributing/development' },
-            { text: 'Source tree', link: '/contributing/source-tree' },
-          ],
-        },
-      ],
       socialLinks: [{ icon: 'github', link: repository }],
-      search: { provider: 'local' },
-      editLink: { pattern: `${repository}/edit/main/docs/:path`, text: 'Edit this page on GitHub' },
-      outline: { level: [2, 3] },
-      footer: {
-        message: 'Released under the MIT License.',
-        copyright: 'Copyright © 2026 Nicolas Hedoire',
+      search: {
+        provider: 'local',
+        options: {
+          locales: Object.fromEntries([
+            ['root', { translations: searchTranslations(en) }],
+            ...LANGUAGES.map((language) => [
+              language.code,
+              { translations: searchTranslations(TRANSLATIONS[language.code]) },
+            ]),
+          ]),
+        },
       },
     },
     mermaid: {

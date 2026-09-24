@@ -1,0 +1,72 @@
+# リトライとフォールバック
+
+ネットワークは障害を起こし、プロバイダーはレート制限をかけ、ツールはタイムアウトします。SDK は、リトライできるものはリトライし、できないものは別のプロバイダーにフェイルオーバーします。そして **すべてのリトライを実行に書き込む** ので、隠されるものは何もありません。
+
+```mermaid
+flowchart LR
+  R["リクエスト"] --> P1{"主プロバイダー"}
+  P1 -- "一時的なエラー" --> W1["待機（バックオフ）"] --> P1
+  P1 -- "リトライの上限に到達" --> P2{"フォールバックプロバイダー"}
+  P2 -- "一時的なエラー" --> W2["待機（バックオフ）"] --> P2
+  P1 -- "成功" --> OK(["応答"])
+  P2 -- "成功" --> OK
+```
+
+## LLM プロバイダー {#llm-providers}
+
+リトライポリシーは、**フォールバックに移る前に、プロバイダーごとに個別に** 適用されます。
+
+```ts
+const sdk = createSDK({
+  apiKey: process.env.OPENAI_API_KEY,
+  fallbackProviders: [{ provider: 'anthropic', config: { apiKey: process.env.ANTHROPIC_API_KEY } }],
+  retry: { maxRetries: 3, initialDelayMs: 500, maxDelayMs: 8_000 },
+});
+```
+
+| オプション | デフォルト | |
+| --- | --- | --- |
+| `maxRetries` | `2` | 最初の試行の後に行うリトライの回数 |
+| `initialDelayMs` | `500` | リトライのたびに 2 倍になる（`multiplier`） |
+| `maxDelayMs` | `8000` | 1 回のバックオフで待つ時間の上限 |
+| `maxRetryAfterMs` | `60000` | 従う `retry-after` の最大値（フォールバックがある場合は `maxDelayMs`） |
+| `jitter` | `true` | 各待ち時間を [delay/2, delay] の範囲でランダムにする |
+| `retryOn` | `isTransientError` | 独自の判定関数 |
+
+リトライされるのは **一時的な** エラーだけです。408、409、425、429、5xx、529、接続の失敗、タイムアウトがこれにあたり、OpenAI と Anthropic の接続エラーも含まれます。これらは、エラーのクラスと、その `cause` に含まれるネットワークコードで見分けられます。認証、検証、ポリシーのエラーは、直ちに失敗します。アカウントのクレジットやクォータが尽きたことを意味する 429（`insufficient_quota`、`credit_balance_exhausted`…）も同じです。待ってもクレジットは戻らないからです。エラーメッセージには、提供元による説明が含まれます。プロバイダーが `retry-after-ms` または `retry-after` を送ってきた場合、SDK は独自のバックオフの代わりにその時間だけ待ちます。ただし、待つのは `maxRetryAfterMs`（デフォルトは 60 秒）までです。`fallbackProviders` が設定されている場合、この上限は `maxDelayMs` に引き下げられます。長い休止を求めるプロバイダーは、実行を止めてしまうのではなく、フォールバックに任されます。それより長い待機を求められた時点で、リトライは終わります。
+
+SDK のリトライポリシーが有効なときは、OpenAI と Anthropic のクライアント自身のリトライは無効になります。**リトライが積み重なることはありません**。各リトライは、プロバイダー、モデル、試行回数、待ち時間、エラーとともに `provider.retry` イベントとして記録されます。提供元のデフォルトのリトライを代わりに使いたい場合は、`retry: false` を渡してください。
+
+`llmProvider` で注入したプロバイダーは、`retry` を明示的に設定しない限り、渡されたままの形で使われます。また、`FallbackProvider` がラップされることはないので、そのフェイルオーバーはトレースに見えたままになります。
+
+## ツール {#tools}
+
+冪等なツールには、リトライしてよいという印を付けます。
+
+```ts
+sdk.defineTool({
+  name: 'lookup_metric',
+  description: 'Reads a metric',
+  schema: z.object({ metric: z.string() }),
+  retry: { maxRetries: 2, initialDelayMs: 200 },
+  handler: async ({ metric }) => warehouse.read(metric),
+});
+```
+
+リトライされるのはツールの失敗だけです。ポリシーによる拒否や検証エラーが、リトライされることは決してありません。各リトライは `tool.retry` イベントになります。
+
+## 型付き決定 {#typed-decisions}
+
+Jev クライアントは、408、429、5xx、529 の応答とネットワークエラーをリトライし、**`retry-after` に従います**。デフォルトでは SDK のリトライポリシーを使います（`jev.maxRetries` で上書きできます）。LLM プロバイダーとは違い、429 は原因にかかわらず、すべて `maxRetries` までリトライします。
+
+## そのほかの場所 {#anywhere-else}
+
+`withRetry` は、あなた自身のコードで使えるようにエクスポートされています。
+
+```ts
+import { withRetry, DEFAULT_RETRY_POLICY } from '@sdk-ai-agents/core';
+
+const data = await withRetry(() => fetchPartnerFeed(), DEFAULT_RETRY_POLICY, {
+  onRetry: ({ retry, delayMs, error }) => logger.warn({ retry, delayMs, error }),
+});
+```

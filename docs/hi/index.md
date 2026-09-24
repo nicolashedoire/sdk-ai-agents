@@ -1,0 +1,112 @@
+---
+layout: home
+
+hero:
+  name: SDK AI Agents
+  text: ऐसे नियंत्रित एजेंट जो काम करने से पहले सोचते हैं
+  tagline: ऐसी मानसिक स्थिति के साथ स्पष्ट तर्क जिसे आप जाँच सकते हैं, Jev के साथ टाइप्ड निर्णय, MCP कनेक्टर — और इन सबके आधार में इवेंट सोर्सिंग, रीप्ले, लागत, दोबारा प्रयास और घटना अलर्ट।
+  image:
+    src: /images/reasoning-loop.svg
+    alt: एक स्पष्ट मानसिक स्थिति के चारों ओर संज्ञानात्मक चक्र
+  actions:
+    - theme: brand
+      text: शुरुआत करें
+      link: /hi/guide/getting-started
+    - theme: alt
+      text: एजेंट कैसे सोचते हैं
+      link: /hi/guide/cognitive-agents
+    - theme: alt
+      text: GitHub पर देखें
+      link: https://github.com/nicolashedoire/sdk-ai-agents
+
+features:
+  - icon: 🧠
+    title: सिर्फ़ prompt नहीं, तर्क
+    details: समस्या को दर्शाना, अवलोकनों की तुलना, परिकल्पना बनाना, सिमुलेशन, परीक्षण, संशोधन, आलोचना, जानकारी खोजना, तुलना, निर्णय। हर कदम एक स्पष्ट मानसिक स्थिति पर किया गया ऑपरेशन है, जिसे एक कंट्रोलर चुनता है और एक इवेंट के रूप में दर्ज किया जाता है।
+    link: /hi/guide/cognitive-agents
+    linkText: संज्ञानात्मक चक्र
+  - icon: 🔬
+    title: वही मानता है जिसे साबित कर सके
+    details: अवलोकन अपना उद्गम साथ रखते हैं, नियमों के साथ ऐसे पूर्वानुमान आते हैं जिन्हें गलत साबित किया जा सके, आपका अपना मूल्यांकनकर्ता उन्हें परखता है, खंडित नियम संशोधित होते हैं — और कोई उत्तर तभी पक्का होता है जब वह code में लिखे एक गार्ड को पार कर ले।
+    link: /hi/guide/evidence-and-verification
+    linkText: साक्ष्य और सत्यापन
+  - icon: 🪞
+    title: किसी खास व्यक्ति की तरह तर्क करता है
+    details: हाँ, यह नकल कर सकता है कि कोई व्यक्ति कैसे तर्क करता है। कुछ विषयों को अपने शब्दों में समझाइए, और यह आपके ध्यान के क्रम, प्राथमिकताओं और सहज प्रतिक्रियाओं का सार निकालकर एक प्रोफ़ाइल बनाता है, जो तर्क के हर कदम के निर्देशों में लिखी जाती है। हर सुधार उसमें जुड़ता है, और आपकी सहमति दिखाती है कि नकल कितनी करीब पहुँची।
+    link: /hi/guide/thinker-profiles
+    linkText: किसी खास व्यक्ति की तरह तर्क करें
+  - icon: 🎯
+    title: Jev के साथ टाइप्ड निर्णय
+    details: कोई भी संदर्भ जोड़िए, हाँ/ना, एक या कई विकल्पों वाले और रेटिंग वाले सवाल पूछिए, और ऐसी कैलिब्रेटेड संभावनाएँ पाइए जिन पर आपका code काम कर सके।
+    link: /hi/guide/typed-decisions
+    linkText: भरोसे के साथ निर्णय लें
+  - icon: 🔌
+    title: किसी भी चीज़ के लिए MCP सर्वर
+    details: किसी वेब API, दस्तावेज़ों के फ़ोल्डर, केवल-पढ़ने-योग्य डेटाबेस या एजेंट को एक ही लाइन में MCP सर्वर बनाइए, नियंत्रित और ट्रेस किया हुआ, और अपने एजेंटों को किसी भी MCP सर्वर के टूल दीजिए।
+    link: /hi/guide/mcp
+    linkText: अपने सिस्टम जोड़ें
+  - icon: 🛡️
+    title: शुरू से ही नियंत्रण
+    details: मॉडल प्रस्ताव रखता है, इंजन तय करता है। हर कार्रवाई से पहले नीतियाँ, अनुमति-सूचियाँ, बजट और इंसानी मंज़ूरियाँ जाँची जाती हैं।
+    link: /hi/guide/governed-agents
+    linkText: नियंत्रित एजेंट
+  - icon: 🎞️
+    title: सब कुछ एक इवेंट है
+    details: LLM को बुलाए बिना runs को रीप्ले करें, किसी भी run की मानसिक स्थिति फिर से बनाएँ, runs की तुलना करें और उन्हें गोल्डन टेस्ट में बदलें।
+    link: /hi/guide/observability
+    linkText: ट्रेसबिलिटी और रीप्ले
+  - icon: 💸
+    title: लागत जो आपको दिखती है
+    details: हर LLM कॉल और हर टाइप्ड निर्णय का token उपयोग दर्ज होता है, और उसकी कीमत हर run और हर मॉडल के हिसाब से निकाली जाती है।
+    link: /hi/guide/costs
+    linkText: API लागत
+  - icon: 🔁
+    title: दोबारा प्रयास जो एक-दूसरे पर नहीं चढ़ते
+    details: फ़ेलओवर से पहले हर प्रदाता के लिए एक ही retry नीति, idempotent टूल के लिए दोबारा प्रयास, और हर दोबारा प्रयास ट्रेस में लिखा जाता है।
+    link: /hi/guide/resilience
+    linkText: दोबारा प्रयास और फ़ॉलबैक
+  - icon: 🚨
+    title: घटनाएँ जो आप तक पहुँचती हैं
+    details: विफल runs, रोकी गई कार्रवाइयाँ और प्रदाता के फ़ेलओवर अपनी समय-रेखा के साथ घटनाएँ बन जाते हैं, और ईमेल या वेबहुक से भेजे जाते हैं।
+    link: /hi/guide/incidents
+    linkText: घटना अलर्ट
+---
+
+<div class="vp-doc" style="max-width: 1152px; margin: 0 auto; padding: 48px 24px 0;">
+
+## एक prompt से ऐसे निर्णय तक जिसका आप ऑडिट कर सकें {#from-a-prompt-to-a-decision-you-can-audit}
+
+एक साधारण LLM कॉल सीधे सवाल से जवाब पर पहुँच जाती है। एक संज्ञानात्मक एजेंट समस्या की एक स्पष्ट तस्वीर बनाता है, कई विकल्पों को खोजता है, उन्हें कड़ी परख से गुज़ारता है, नियंत्रित टूल से तथ्यों की जाँच करता है और उसके बाद ही किसी निर्णय पर पक्का होता है — और बाद में आप हर कदम पढ़ सकते हैं।
+
+```ts
+import { createSDK } from '@sdk-ai-agents/core';
+
+const sdk = createSDK({ apiKey: process.env.OPENAI_API_KEY, jev: { apiKey: process.env.TYPESAFE_API_KEY } });
+
+const lookupMetric = sdk.defineTool({ /* name, description, zod schema, handler */ });
+const analyst = sdk.createCognitiveAgent({ name: 'analyst', model: 'gpt-4o', tools: [lookupMetric] });
+const { answer, decision, state, runId } = await analyst.think({
+  problem: 'Should we build or buy our analytics module?',
+});
+
+console.log(answer);                          // the decision, in plain words
+console.log(state.hypotheses);                // every option considered, with its support
+console.log(await sdk.getRunCost(runId));     // what it cost, per model
+```
+
+![इवेंट लॉग से दोबारा बनाई गई एक मानसिक स्थिति](/images/mental-state.svg){.illustration}
+
+## एक SDK, हर परत {#one-sdk-every-layer}
+
+![SDK का आर्किटेक्चर](/images/architecture.svg){.illustration}
+
+| आपको चाहिए | सीधा LLM API | SDK AI Agents |
+| --- | --- | --- |
+| जवाब देने से पहले तर्क करना | एक ही बार में जनरेशन | स्पष्ट स्थिति पर परिकल्पनाएँ, सिमुलेशन और आलोचना |
+| किसी खास व्यक्ति की तरह तर्क करना | एक लंबा system prompt | वर्ज़न वाली विचारक प्रोफ़ाइल, जो फ़ीडबैक से निखरती है |
+| तेज़, कैलिब्रेटेड निर्णय | खुले टेक्स्ट को पार्स करना | संभावनाओं और विश्वास स्तर के साथ टाइप्ड उत्तर (Jev) |
+| कंपनी के टूल जोड़ना | हर टूल के लिए अलग जोड़-तोड़ वाला code | MCP सर्वर और क्लाइंट, नीतियों से नियंत्रित |
+| जानना कि क्या हुआ | लॉग, अगर हों तो | इवेंट लॉग, रीप्ले, मानसिक स्थिति का पुनर्निर्माण |
+| जोखिम और खर्च पर नियंत्रण | बस उम्मीद | नीतियाँ, मंज़ूरियाँ, बजट, हर run की लागत, घटना अलर्ट |
+
+</div>

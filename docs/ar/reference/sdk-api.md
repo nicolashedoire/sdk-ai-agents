@@ -1,0 +1,177 @@
+# واجهة SDK البرمجية
+
+```ts
+import { createSDK } from '@sdk-ai-agents/core';
+const sdk = createSDK(config);
+```
+
+## `SDKConfig` {#sdkconfig}
+
+| الخيار | النوع | الوصف |
+| --- | --- | --- |
+| `apiKey` | `string` | مفتاح المزوّد الأساسي (غير مطلوب مع `llmProvider`). دون أي مفتاح، تعمل الأدوات وخوادم MCP، وتفشل الاستدعاءات التي تحتاج إلى نموذج بخطأ واضح |
+| `provider` | `'openai' \| 'anthropic'` | المزوّد الأساسي، والافتراضي `openai` |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey` و`defaultModel` لكل مزوّد |
+| `fallbackProviders` | `Array<{ provider, config? }>` | تُجرَّب بالترتيب حين يفشل المزوّد الأساسي |
+| `llmProvider` | `LLMProvider` | مزوّدك الخاص (نموذج محلي، أو بوابة، أو بديل اختباري) |
+| `retry` | `Partial<RetryPolicy> \| false` | سياسة إعادة المحاولة للنموذج اللغوي، لكل مزوّد، قبل التحويل إلى البديل |
+| `jev` | `JevClientConfig` | يفعّل TypeSafe Jev للقرارات المُنمَّطة — مباشرةً، أو عبر [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) مع `baseUrl` و`model: 'typesafe-ai/jev'` |
+| `decisionClient` | `TypedDecisionClient` | أي واجهة خلفية للقرارات المُنمَّطة (لها الأولوية على `jev`) |
+| `pricing` | `PricingTable` | دولار أمريكي لكل مليون رمز، يُدمَج فوق القيم الافتراضية |
+| `incidents` | `IncidentMonitorOptions` | المُبلِّغون، والقواعد، وعتبة الخطورة، والكبح |
+| `eventStore` | `IEventStore` | الافتراضي `FileEventStore('./events')` |
+| `defaultPolicies` | `Policy[]` | السياسات العامة |
+| `goldenTracesDir`، `regressionTestSuitesDir`، `assertionsDir`، `impactAnalysesDir` | `string` | مواضع تخزين مخرجات الاختبار |
+
+## الوكلاء {#agents}
+
+| الدالة | تعيد | |
+| --- | --- | --- |
+| `createAgent(config)` | `AgentImpl` | وكيل خاضع للحوكمة: `run({ message, context?, signal? })`، و`stop(runId?)`، و`addTools()`، و`setPolicy()`، و`id`، و`name`. لا يستطيع تشغيل إلا أدواته الخاصة (`tools`، `capabilities`)، حتى لو ذكر النموذج أداة أخرى مسجَّلة في حزمة SDK؛ ويلغي `signal` التشغيل |
+| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`، و`stop(runId?)`، و`learnFromFeedback(runId, feedback)`، و`getProfile()`، و`setProfile()` |
+| `defineTool(definition)` | `Tool` | يسجّل أداة؛ ويُستنتَج نوع المعالج من مخطط Zod الخاص بها |
+| `defineCapability(definition)` | `Capability` | يجمّع الأدوات |
+| `listTools()` | `Tool[]` | كل أداة مسجَّلة |
+| `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs? })` | `Promise<unknown>` | تنفيذ خاضع للحوكمة خارج وكيل (يستخدمه خادم MCP): المعاملات، والسياسات، والموافقة، والميزانية (تُحتسَب حين يبدأ الاستدعاء)، ثم الأداة. يلغي `signal` موافقة معلّقة ويصل إلى المعالج؛ وتلغي `approvalTimeoutMs` موافقة لم يقرّر فيها أحد |
+| `traceResourceRead(uri, read, { agentId? })` | `Promise<ResourceContent>` | يشغّل `read()` تشغيلًا مستقلًا: `run.started`، و`resource.read` (معرّف URI، والحجم، وSHA-256)، و`run.completed` أو `run.failed` |
+| `stopRun(runId)` | `Promise<void>` | يوقف تشغيلًا خاضعًا للحوكمة أو معرفيًا |
+
+### `CognitiveAgentConfig` {#cognitiveagentconfig}
+
+| الخيار | القيمة الافتراضية | |
+| --- | --- | --- |
+| `name`، `model` | — | مطلوبان |
+| `profile` | `DEFAULT_THINKER_PROFILE` | كيف يستدل الوكيل |
+| `tools`، `policies` | `[]` | خاضعة للحوكمة كما في كل مكان آخر |
+| `systemPrompt` | — | تعليمات إضافية لكل موجّه |
+| `limits` | انظر [الوكلاء المعرفيون](../guide/cognitive-agents#limits) | `maxSteps`، `timeoutMs`، `maxHypotheses`، `maxToolCalls`، `decisionThreshold`، `maxConsecutiveFailures`، `maxPredictionTests`، `preferenceWeight`، `minProposalSupport` |
+| `controller` | `'auto'` | `'heuristic'` أو `'typed'` أو `CognitiveController` |
+| `controllerOptions` | — | `minConfidence` (0.35)، و`readinessThreshold` (0.8)، و`fallback`، و`model` |
+| `assessment` | `'auto'` | `'llm'` أو `'typed'` أو `HypothesisAssessor` خاص بك لعملية `compare` |
+| `knowledge` | — | الذاكرة عبر عمليات التشغيل: `{ store, scope, recallLimit? (10), record? (true) }`، انظر [الذاكرة عبر عمليات التشغيل](../guide/memory) |
+| `evaluator` | — | `OutcomeEvaluator` يختبر التنبؤات؛ ويفعّل `test_prediction` |
+| `generator` | مولّد يعتمد على النموذج اللغوي `model` | `ThoughtGenerator` الخاص بك (بما في ذلك مقارنات الملاحظات)؛ وتظل أفكاره تمرّ بقواعد القبول في المحرّك |
+| `temperature`، `maxTokens` | `0.4`، — | إعدادات توليد الأفكار |
+| `providerSettings` | — | إعدادات اختيار الأدوات (محرّك الاستدلال الأصيل) |
+
+### `CognitiveRunResult` {#cognitiverunresult}
+
+`{ runId, status, answer?, decision?, state, error? }` — قيمة `status` هي `completed` أو `failed` أو `cancelled`؛ وقيمة `decision.status` هي `committed` أو `provisional` أو `abstain`، مع `decision.missing` الذي يسرد ما لم يثبت؛ و`state` هي `MentalState` النهائية.
+
+### `OutcomeEvaluator` {#outcomeevaluator}
+
+```ts
+interface OutcomeEvaluator {
+  readonly id: string;
+  readonly version: string;
+  evaluate(input: { prediction; hypothesis; state; abortSignal? }): Promise<{
+    verdict: 'confirmed' | 'refuted' | 'inconclusive';
+    observed?: unknown;
+    summary?: string;
+    context?: string;
+    metrics?: Record<string, number>;
+    causeCandidates?: string[];
+    reason?: string;
+  }>;
+}
+```
+
+انظر [الأدلة والتحقّق](../guide/evidence-and-verification).
+
+## الاستدلال والملفات {#reasoning-profiles}
+
+| الدالة | تعيد |
+| --- | --- |
+| `getMentalState(runId)` | `Promise<MentalState>` — يُعاد بناؤها من الأحداث |
+| `distillThinkerProfile({ id, name, samples, model })` | `Promise<ThinkerProfile>` |
+| `exportControllerDataset(runIds?)` | `Promise<string>` — بصيغة JSON Lines |
+
+## القرارات المُنمَّطة — `sdk.decisions` {#typed-decisions-—-sdk-decisions}
+
+ترمي `ValidationError` حين لا تكون هناك واجهة خلفية مُعدّة.
+
+| الدالة | تعيد |
+| --- | --- |
+| `ask({ context, questions, runId?, model? })` | `{ model, answers, usage, runId }` — تُستنتَج أنواع الإجابات من الأسئلة |
+| `choose({ context, question, options, minConfidence? })` | `{ choice, confidence, probabilities, confident, runId }` |
+| `selectMany({ context, question, options, threshold? })` | `{ selected, probabilities, runId }` |
+| `check({ context, question, criteria?, threshold? })` | `{ probability, yes, runId }` |
+| `rate({ context, question, levels })` | `{ score, normalized, level, confidence, runId }` |
+
+الدوال المساعدة للأسئلة: `noul(instructions, criteria?)`، و`choice(instructions, options)`، و`score(instructions, levels)`.
+
+## العمليات التشغيلية {#operations}
+
+| الدالة | تعيد |
+| --- | --- |
+| `getRunCost(runId)` | `Promise<RunCostReport>` |
+| `getIncidents(runId)` | `Promise<Incident[]>` |
+| `approveAction(approvalId, by, reason?)`، `rejectAction(...)`، `getPendingApprovals(runId?)` | الموافقات البشرية |
+| `getBudgetUsage(limit)`، `getPolicyAuditTrail(runId)` | الميزانيات وتدقيق السياسات |
+
+## الآثار وإعادة التشغيل والاختبار {#traces-replay-and-testing}
+
+| الدالة | |
+| --- | --- |
+| `getTrace(runId)`، `exportTrace(runId, 'json' \| 'text')`، `getEvents(runId, filters?)` | قراءة عمليات التشغيل |
+| `replay(runId, modifications?)` | إعادة التنفيذ دون النموذج اللغوي |
+| `getReasoningGraph`، `exportReasoningGraph`، `getAlternatives`، `getDecisionPatterns`، `getTraceVisualization` | فهم القرارات |
+| `createGoldenTrace`، `getGoldenTraces`، `validateAgainstGoldenTrace`، `replayAndValidate`، `detectRegressions` | اختبار الوكلاء كما تُختبَر الشيفرة |
+
+## الأدوات: `ToolDefinition` {#tools-tooldefinition}
+
+| الحقل | |
+| --- | --- |
+| `name`، `description` | ما يراه النموذج |
+| `schema` | مخطط Zod للمعاملات؛ وتُرفَض الاستدعاءات التي لا تطابقه |
+| `handler(params, context?)` | يتلقّى المعاملات المُتحقَّق منها و`{ runId, agentId, signal? }` — ويُلغى `signal` حين يتخلّى المستدعي |
+| `retry` | `{ maxRetries, initialDelayMs?, maxDelayMs?, retryOn?(error) }` — للأدوات المتساوية القوة (idempotent) فقط؛ ولا تُعاد محاولة المعاملات غير الصالحة أبدًا |
+| `metadata` | `{ category?, riskLevel?, requiresApproval?, readOnly? }` — تجعل `requiresApproval: true` كل استدعاء ينتظر `approveAction`؛ وتُعرَض `readOnly` على عملاء MCP بوصفها `readOnlyHint` |
+| `inputJsonSchema` | JSON Schema تُعرَض بدل تلك المشتقة من `schema` |
+| `capability`، `version` | التجميع، والإصدار |
+
+## مصادر الأدوات {#tool-sources}
+
+يعيد كل منها تعريفات `ToolDefinition` جاهزة: مرّرها إلى `sdk.defineTool`، أو إلى وكيل، أو مباشرةً إلى `tools` في خادم MCP. انظر [خادم MCP لأيّ شيء](../guide/mcp-recipes).
+
+| الدالة | تعيد | |
+| --- | --- | --- |
+| `openApiTools({ spec, baseUrl?, headers?, include?, exclude?, tags?, prefix?, metadata?, retry?, fetch?, timeoutMs?, maxResponseBytes?, maxSpecBytes? })` | `Promise<ToolDefinition[]>` | أداة لكل عملية في وصف OpenAPI 3؛ `GET` فقط ما لم تُسرَد العملية في `include`؛ والطرق الأخرى تتطلّب موافقة افتراضيًا. يعيد الاستدعاء `{ status, data, truncated? }` |
+| `folderTools({ root, name?, prefix?, extensions?, include?, exclude?, includeHidden?, maxFileBytes?, maxEntries?, maxDepth?, maxMatches?, maxSearchBytes?, maxExaminedEntries? })` | `ToolDefinition[]` | `list_files`، و`read_file`، و`search_files` على مجلد واحد، ولا تخرج منه أبدًا؛ والمجلد المستبعَد يخفي كل ما يحتويه |
+| `folderResources(options)` | `ResourceProvider` | الملفات نفسها بوصفها موارد MCP `folder://<name>/<path>` |
+| `databaseTools({ database, name?, prefix?, maxRows?, maxTextLength?, maxTables?, maxSqlLength? })` | `ToolDefinition[]` | `list_tables`، و`describe_table`، و`query` (عبارة واحدة للقراءة فقط، وبحدّ أقصى `maxRows` صفًا، والافتراضي 100) |
+| `sqliteReadOnly(db)` | `ReadOnlyDatabase` | لـ `DatabaseSync` من `node:sqlite` أو لـ `better-sqlite3`؛ يشغّل الاستعلامات مع `PRAGMA query_only = ON` |
+| `postgresReadOnly({ pool } \| { client }, { statementTimeoutMs?, schemas? })` | `ReadOnlyDatabase` | لـ `pg` (عميل مخصّص، أو مجمَّع pool)؛ كل استعلام داخل `BEGIN READ ONLY` (ويُرفَض على اتصال موجود بالفعل داخل معاملة) … `ROLLBACK` + `pg_advisory_unlock_all()`، مع `SET LOCAL statement_timeout` (الافتراضي 10 ثوانٍ)؛ ولا تحدّ `schemas` إلا السرد والوصف |
+| `cognitiveAgentTool(agent, { name?, description?, metadata?, maxInputLength?, maxContextLength?, exposeErrors? })` | `ToolDefinition` | `ask_<agent>`: `{ problem, context? }` → `{ runId, status, decisionStatus?, answer?, rationale?, confidence?, missing?, nextActions?, error? }`؛ ويُلغى مع المستدعي؛ و`error` عامّ ما لم تُفعَّل `exposeErrors` |
+| `governedAgentTool(agent, options)` | `ToolDefinition` | `{ message, context? }` → `{ runId, status, output?, error? }` |
+| `assertSingleQuery(sql, 'sqlite' \| 'postgres')` | `string` | فحص العبارة الذي تستخدمه محوِّلات قواعد البيانات (صياغة SQLite وPostgreSQL فقط) |
+
+```ts
+interface ReadOnlyDatabase {
+  readonly dialect: string;
+  listTables(options: { maxTables: number }): Promise<TableSummary[]>;
+  describeTable(name: string): Promise<ColumnSummary[]>;
+  /** Must refuse writes itself; rows converted with toJsonRow(row, maxTextLength) as they arrive. */
+  query(sql: string, options: { maxRows: number; maxTextLength: number }): Promise<{ columns: string[]; rows: Array<Record<string, unknown>>; truncated: boolean }>;
+}
+
+interface ResourceProvider {
+  handles(uri: string): boolean;
+  list(): Promise<Array<{ uri: string; name: string; description?: string; mimeType?: string; size?: number }>>;
+  read(uri: string): Promise<{ uri: string; mimeType?: string; text: string }>;
+}
+```
+
+## MCP — `@sdk-ai-agents/core/mcp` {#mcp-—-sdk-ai-agents-core-mcp}
+
+| الدالة | |
+| --- | --- |
+| `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | `Server` لـ MCP يعرض بالضبط ما تسرده `tools`: أسماء الأدوات المعرَّفة و/أو تعريفات `ToolDefinition` (تُعرَّف على حزمة SDK نيابةً عنك؛ ويجوز تمرير التعريف نفسه مرة أخرى، وتُرفَض أداة أخرى باسم محجوز). `resources`: مزوّد `ResourceProvider` واحد أو أكثر؛ وكل قراءة مُتتبَّعة. تعمل الاستدعاءات بوصفها `mcp:<name>` (أو `agentId`)؛ وتُلغى الموافقة التي لا يقرّر فيها أحد خلال `approvalTimeoutMs` (الافتراضي 50 000 ملّي ثانية)؛ ويُشرَح رفض المُدخَلات للعميل، أما الأسباب الأخرى فلا تُشرَح إلا مع `exposeErrorDetails` |
+| `serveMcpOverStdio(sdk, options)` | الشيء نفسه، موصولًا بـ stdin/stdout؛ يكتب سطر «جاهز» واحدًا إلى stderr، ويُغلَق حين ينتهي stdin (تُجهَض الاستدعاءات الجارية، وتُلغى الموافقات المعلّقة). القيمة الافتراضية لـ `approvalTimeoutMs` هي 50 000، كما في `createMcpServer` |
+| `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry? })` | `{ tools, client, close() }` — أدوات أي خادم MCP، في صورة تعريفات `ToolDefinition` |
+
+`GovernedToolHost` هو ما يحتاجه الخادم من حزمة SDK (`listTools`، و`defineTool`، و`executeTool`، و`traceResourceRead`)؛ ويعيد `createSDK()` كائنًا ينفّذه.
+
+## اللبنات الأساسية {#building-blocks}
+
+كل ما تستخدمه حزمة SDK مُصدَّر لأجل الإعدادات المخصّصة: `JevClient`، و`DecisionService`، و`LLMThoughtGenerator`، و`HeuristicController`، و`TypedDecisionController`، و`TypedHypothesisAssessor`، و`PredictionTester`، و`applyThought`، و`assembleThought`، و`assessReadiness`، و`rankHypotheses`، و`rebuildMentalState`، و`describeMentalState`، و`fingerprint`، و`defineThinkerProfile`، و`refineProfile`، و`withRetry`، و`RetryingLLMProvider`، و`MonitoredEventStore`، و`EmailIncidentNotifier`، و`WebhookIncidentNotifier`، و`ResendEmailTransport`، و`computeRunCost`، و`FileEventStore`، و`SQLiteEventStore`، و`PostgreSQLEventStore`، وجميع الأنواع.
