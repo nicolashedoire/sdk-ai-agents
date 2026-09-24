@@ -39,7 +39,7 @@ const sdk = createSDK({
 
 SDK 정책이 활성화되어 있으면 OpenAI와 Anthropic 클라이언트 자체의 재시도는 꺼집니다. **재시도는 절대 중첩되지 않습니다.** 각 재시도는 프로바이더, 모델, 시도 횟수, 지연 시간, 오류와 함께 `provider.retry` 이벤트로 기록됩니다. 대신 공급사 기본값을 유지하려면 `retry: false`를 넘기세요.
 
-`llmProvider`로 주입한 프로바이더는 `retry`를 명시적으로 설정하지 않는 한 주어진 그대로 쓰이며, `FallbackProvider`는 절대 감싸지 않으므로 그 페일오버가 트레이스에 계속 보입니다.
+`llmProvider`로 주입한 프로바이더는 `retry`를 명시적으로 설정하지 않는 한 주어진 그대로 쓰이며, `FallbackProvider`는 절대 감싸지 않으므로 그 페일오버가 트레이스에 계속 보입니다. 그 안의 프로바이더도 감싸지 않으므로 `retry`가 적용되지 않습니다. 페일오버 전에 재시도하려면 해당 프로바이더를 `RetryingLLMProvider`로 감싸고 그 클라이언트에 `maxRetries: 0`을 지정하세요.
 
 ## 도구 {#tools}
 

@@ -237,14 +237,15 @@ export { deriveRunStatus } from './utils/run-status.js';
 // The built-in providers, to compose your own chain (e.g. a FallbackProvider given as llmProvider).
 export { OpenAIProvider } from './providers/openai-provider.js';
 export { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from './providers/anthropic-provider.js';
-export { FallbackProvider, type FallbackResult } from './providers/fallback-provider.js';
+export { FallbackProvider } from './providers/fallback-provider.js';
+export type { FallbackResult } from './providers/fallback-provider.js';
 export type {
-  VendorClientOptions,
   LLMMessage,
   LLMProvider,
   LLMRequest,
   LLMResponse,
   LLMToolCall,
+  VendorClientOptions,
 } from './providers/llm-provider.js';
 
 // Tool sources: a web API, a folder, a database or an agent as tools (and MCP servers)
