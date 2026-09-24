@@ -315,7 +315,7 @@ await serveMcpOverStdio(sdk, {
 | `statementTimeoutMs` | `10000` | PostgreSQL stops any query that runs longer. |
 | `schemas` | all but the system ones | Schemas listed and described. |
 
-`sqliteReadOnly(db)` has no options: open the file read-only (`{ readOnly: true }` with `node:sqlite`, `{ readonly: true }` with better-sqlite3).
+`sqliteReadOnly(db)` has no options: open the file read-only (`{ readOnly: true }` with `node:sqlite`, `{ readonly: true }` with better-sqlite3). It relies only on `prepare`, `exec` and the statement methods both drivers share; the test suite runs it on a real `node:sqlite` database, not on better-sqlite3.
 
 ### What the model sees
 
