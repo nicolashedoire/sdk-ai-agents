@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import type { Assertion } from '../types/assertion.js';
+import { fileInFolder } from '../utils/file-in-folder.js';
 
 export class AssertionManager {
   private assertionsDir: string;
@@ -44,7 +45,7 @@ export class AssertionManager {
       createdAt: Date.now(),
     };
 
-    const filePath = join(this.assertionsDir, `${assertion.id}.json`);
+    const filePath = fileInFolder(this.assertionsDir, assertion.id, '.json', 'id');
     await fs.writeFile(filePath, JSON.stringify(assertion, null, 2), 'utf-8');
 
     this.assertionsCache.set(assertion.id, assertion);
@@ -61,7 +62,7 @@ export class AssertionManager {
     await this.ensureAssertionsDir();
 
     try {
-      const filePath = join(this.assertionsDir, `${assertionId}.json`);
+      const filePath = fileInFolder(this.assertionsDir, assertionId, '.json', 'id');
       const content = await fs.readFile(filePath, 'utf-8');
       const assertion = JSON.parse(content) as Assertion;
       this.assertionsCache.set(assertionId, assertion);
@@ -114,7 +115,7 @@ export class AssertionManager {
     await this.ensureAssertionsDir();
 
     try {
-      const filePath = join(this.assertionsDir, `${assertionId}.json`);
+      const filePath = fileInFolder(this.assertionsDir, assertionId, '.json', 'id');
       await fs.unlink(filePath);
       this.assertionsCache.delete(assertionId);
       return true;

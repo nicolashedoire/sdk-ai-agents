@@ -1,8 +1,8 @@
 import { promises as fs } from 'node:fs';
-import { join } from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import type { Event, EventFilters, EventLog } from '../types/events.js';
 import type { IEventStore } from './event-store.js';
+import { fileInFolder } from '../utils/file-in-folder.js';
 import { deriveRunStatus } from '../utils/run-status.js';
 
 export class FileEventStore implements IEventStore {
@@ -66,6 +66,8 @@ export class FileEventStore implements IEventStore {
   }
 
   async append(runId: string, event: Event): Promise<void> {
+    // Refused before anything is kept: an id that cannot name a file inside the folder.
+    this.getEventFilePath(runId);
     this.ensureEventId(event);
     this.ensureEventTimestamp(event);
 
@@ -249,7 +251,7 @@ export class FileEventStore implements IEventStore {
   }
 
   private getEventFilePath(runId: string): string {
-    return join(this.eventsDir, `${runId}.json`);
+    return fileInFolder(this.eventsDir, runId, '.json', 'runId');
   }
 
   private filterEvents(events: Event[], filters?: EventFilters): Event[] {
