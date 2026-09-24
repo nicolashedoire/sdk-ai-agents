@@ -349,6 +349,9 @@ const COST_TOLERANCE_USD = 1e-9;
 
 /** A dollar amount without float noise or needless zeros ($2.4, $0.000005). */
 function usd(amount: number): string {
+  // Below a millionth of a dollar, two significant digits: a tiny spend over a $0 cap must not
+  // read "$0 > $0".
+  if (amount !== 0 && Math.abs(amount) < 1e-6) return String(Number(amount.toPrecision(2)));
   return String(Number(amount.toFixed(6)));
 }
 

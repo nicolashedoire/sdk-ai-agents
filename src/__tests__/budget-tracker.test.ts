@@ -170,6 +170,15 @@ describe('BudgetTracker', () => {
       expect(result.wouldExceed).toBe(false);
     });
 
+    it('shows a tiny spend over a $0 cost cap as it is', async () => {
+      await tracker.recordModelUsage('agent-1', { tokens: 1, costUsd: 0.00000025 });
+
+      const result = await tracker.checkBudget({ agentId: 'agent-1', period: 'all', maxCost: 0 });
+
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe('Cost budget exceeded: $2.5e-7 > $0');
+    });
+
     it('should reject action if token budget would be exceeded', async () => {
       await tracker.recordUsage('agent-1', 50);
 
