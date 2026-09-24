@@ -27,7 +27,7 @@ interface Event {
 | 유형 | 데이터 |
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` — 또는 인지 최종 답의 경우 `intention` |
-| `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies`(호출한 쪽이 받지 않은 도구를 쓴 경우 `allowed-tools`, 호출 예산이 소진된 경우 예산 정책의 id) |
+| `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies`(호출한 쪽이 받지 않은 도구를 쓴 경우 `allowed-tools`, 호출 예산이 소진된 경우 예산 정책의 id), 그리고 예산 또는 타임아웃 정책이 인지 실행의 단계를 거부한 경우 `step`(이때 `intention`은 `{ type: 'continue' }`) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId`(도구 자체의 `metadata.requiresApproval`이 요구한 경우 `tool-requires-approval`), `reason?`(호출한 쪽이 포기했거나 실행이 멈춘 경우 `cancelled before a decision`, `approvalTimeoutMs`가 지난 경우 `no decision within N ms`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` — `action.failed`는 (모든 정책보다 먼저) 잘못된 인자 때문에 거부된 호출이나, 승인 뒤에 호출한 쪽이 떠나서 거부된 호출도 기록합니다 |
 | `tool.called` | `toolName`, `parameters` |

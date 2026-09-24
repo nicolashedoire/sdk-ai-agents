@@ -27,7 +27,7 @@ interface Event {
 | Type | Données |
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` — ou `intention` pour une réponse finale cognitive |
-| `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools` quand un appelant a utilisé un outil qui ne lui avait pas été donné ; l'identifiant de la politique de budget quand son budget d'appels est épuisé) |
+| `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools` quand un appelant a utilisé un outil qui ne lui avait pas été donné ; l'identifiant de la politique de budget quand son budget d'appels est épuisé), et `step` quand une politique de budget ou de durée a refusé une étape d'une exécution cognitive (son `intention` est alors `{ type: 'continue' }`) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval` quand c'est le `metadata.requiresApproval` de l'outil lui-même qui l'a demandée), `reason?` (`cancelled before a decision` quand l'appelant a abandonné ou que l'exécution s'est arrêtée, `no decision within N ms` après `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` — `action.failed` enregistre aussi un appel refusé pour arguments invalides (avant toute politique) ou parce que son appelant est parti après une approbation |
 | `tool.called` | `toolName`, `parameters` |

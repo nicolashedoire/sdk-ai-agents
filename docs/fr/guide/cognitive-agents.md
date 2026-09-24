@@ -128,7 +128,7 @@ sdk.createCognitiveAgent({
 
 ## Les outils au sein du raisonnement {#tools-inside-reasoning}
 
-`seek_information` utilise les **moteurs natifs de raisonnement et d'action** : le LLM choisit un outil pour l'inconnue ouverte, le moteur d'action vérifie que l'outil a bien été **donné à cet agent**, valide l'appel au regard des politiques, des approbations et des budgets, et le résultat est enregistré comme une **observation** qui pointe vers son événement `action.executed`, puis intégré sous forme de faits avec `source: "tool"`. L'observation est conservée même si son interprétation échoue. Un outil refusé, bloqué ou en échec devient un échec enregistré, et le raisonnement continue.
+`seek_information` utilise les **moteurs natifs de raisonnement et d'action** : le LLM choisit un outil pour l'inconnue ouverte, le moteur d'action vérifie que l'outil a bien été **donné à cet agent**, valide l'appel au regard des politiques (limites d'exécution comprises, voir [Limites et politiques](#limits-and-policies)), des approbations et des budgets, et le résultat est enregistré comme une **observation** qui pointe vers son événement `action.executed`, puis intégré sous forme de faits avec `source: "tool"`. L'observation est conservée même si son interprétation échoue. Un outil refusé, bloqué ou en échec devient un échec enregistré, et le raisonnement continue.
 
 ## Les limites {#limits}
 
@@ -153,6 +153,21 @@ sdk.createCognitiveAgent({
 ```
 
 Les limites sont validées à la création de l'agent : `maxSteps: 0` ou un délai maximal au-delà de ce qu'un minuteur peut gérer lève une `ValidationError` au lieu de désactiver silencieusement une protection. `minProposalSupport` ne peut pas dépasser `decisionThreshold` ; donnez-lui la même valeur que `decisionThreshold` pour que seules les preuves puissent rendre une réponse ferme. Si vous abaissez `decisionThreshold` sans définir `minProposalSupport`, ce plancher baisse avec lui.
+
+### Limites et politiques {#limits-and-policies}
+
+Les politiques de budget et de durée qui s'appliquent à l'agent — celles de ses `policies` et les politiques globales — sont vérifiées **avant chaque étape**, avant tout appel au modèle de cette étape, puis de nouveau avant chaque appel d'outil. Elles voient la progression de l'exécution : `maxSteps` compte les étapes déjà effectuées, `maxTokens` les tokens des appels au modèle de l'exécution (pensées et leurs réparations, sélections d'outil, décisions typées), `maxDuration` le temps écoulé depuis le début de l'exécution. Les budgets de tokens et de coût par période (`budgetLimit` avec `maxTokens` ou `maxCost`, sans `toolName`) sont eux aussi vérifiés avant chaque étape, et chaque appel au modèle que l'exécution enregistre y est compté (voir [Coûts d'API](./costs#budgets)). Une étape est vérifiée comme une intention de type `continue` : une politique dont les conditions exigent un appel d'outil (`intention.type` égal à `tool_call`) ne s'applique qu'aux appels d'outils. Les listes d'autorisation, les politiques personnalisées, les budgets d'appels (`maxToolCalls`) et les approbations ne concernent que les appels d'outils.
+
+La première limite atteinte met fin à l'exécution, et les deux sortes de limites n'y mettent pas fin de la même façon :
+
+| Limite | `limits` de l'agent | Politiques |
+| --- | --- | --- |
+| Étapes | `maxSteps` : la dernière étape décide ; `completed`, avec une décision `committed`, `provisional` ou `abstain` | `maxSteps` : l'étape suivante est refusée ; `failed` |
+| Durée | `timeoutMs` : l'exécution est interrompue, un appel en cours reçoit le signal d'interruption ; `failed`, `Timeout exceeded (… ms)` | `maxDuration` : vérifiée entre les étapes et avant les appels d'outils, un appel en cours va à son terme ; `failed`, `Timeout (… ms) exceeded` |
+| Tokens, coût | — | `maxTokens`, budgets par période : l'étape suivante est refusée ; `failed` |
+| Appels d'outils | `maxToolCalls` : `seek_information` n'est plus proposée | Un appel refusé est un échec enregistré, et le raisonnement continue |
+
+Une étape refusée est enregistrée comme `policy.violated` — avec `intention: { type: 'continue' }`, l'étape (`step`), la raison (`reason`) et les politiques en cause (`violatedPolicies`) — puis `run.failed` avec la raison de la politique ; le résultat a `status: 'failed'` et une `PolicyViolationError` pour `error`. Un appel d'outil refusé par une limite d'exécution est enregistré comme `policy.violated` et comme une opération en échec ; la limite restant dépassée, l'étape suivante est refusée et l'exécution échoue. Pour finir sur une décision plutôt que sur un refus, gardez le `maxSteps` de l'agent inférieur ou égal à celui de la politique : sa dernière étape décide alors avant que la politique ne refuse quoi que ce soit.
 
 ## Sortie invalide du modèle {#invalid-model-output}
 
@@ -186,6 +201,6 @@ Le journal d'événements stocke l'objectif, le contexte et chaque pensée, et l
 Une exécution cognitive est une exécution normale :
 
 - `sdk.getTrace(runId)` montre les événements `cognition.*` à côté de `policy.checked`, `tool.called`, …
-- `sdk.replay(runId)` exécute de nouveau ses appels d'outils sans appeler le LLM et reproduit la réponse finale — avec la même restriction d'outils que l'exécution d'origine, si bien qu'un outil refusé à l'agent est refusé de nouveau ;
+- `sdk.replay(runId)` exécute de nouveau ses appels d'outils sans appeler le LLM et reproduit la réponse finale — avec la même restriction d'outils que l'exécution d'origine, si bien qu'un outil refusé à l'agent est refusé de nouveau, et avec la progression de l'exécution à chaque appel, si bien qu'un appel refusé par une limite d'exécution est refusé de nouveau ;
 - `sdk.getMentalState(runId)` reconstruit l'état ;
 - `sdk.exportControllerDataset()` transforme des exécutions en données d'entraînement (voir [Profils de penseur](./thinker-profiles#train-your-own-controller)).

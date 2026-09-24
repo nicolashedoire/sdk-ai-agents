@@ -27,7 +27,7 @@ interface Event {
 | Typ | Daten |
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` – oder `intention` für eine kognitive endgültige Antwort |
-| `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools`, wenn ein Aufrufer ein Tool verwendet hat, das ihm nicht gegeben wurde; die Kennung der Budgetrichtlinie, wenn ihr Aufrufbudget aufgebraucht ist) |
+| `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools`, wenn ein Aufrufer ein Tool verwendet hat, das ihm nicht gegeben wurde; die Kennung der Budgetrichtlinie, wenn ihr Aufrufbudget aufgebraucht ist), und `step`, wenn eine Budget- oder Timeout-Richtlinie einen Schritt eines kognitiven Laufs abgelehnt hat (sein `intention` ist dann `{ type: 'continue' }`) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval`, wenn das eigene `metadata.requiresApproval` des Tools sie verlangt hat), `reason?` (`cancelled before a decision`, wenn der Aufrufer aufgegeben hat oder der Lauf angehalten wurde, `no decision within N ms` nach `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` – `action.failed` zeichnet auch einen Aufruf auf, der wegen ungültiger Argumente (vor jeder Richtlinie) abgelehnt wurde oder weil sein Aufrufer nach einer Freigabe gegangen war |
 | `tool.called` | `toolName`, `parameters` |

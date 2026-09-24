@@ -27,7 +27,7 @@ interface Event {
 | النوع | البيانات |
 | --- | --- |
 | `intention.generated` | `message`، و`toolCalls`، و`model`، و`requestedModel`، و`usage` — أو `intention` لإجابة نهائية معرفية |
-| `policy.checked` / `policy.violated` | `intention`، و`validation` / `reason`، و`violatedPolicies` (`allowed-tools` حين يستخدم مستدعٍ أداة لم تُعطَ له؛ ومعرّف سياسة الميزانية حين تُستنفَد ميزانية استدعاءاتها) |
+| `policy.checked` / `policy.violated` | `intention`، و`validation` / `reason`، و`violatedPolicies` (`allowed-tools` حين يستخدم مستدعٍ أداة لم تُعطَ له؛ ومعرّف سياسة الميزانية حين تُستنفَد ميزانية استدعاءاتها)، و`step` حين ترفض سياسة ميزانية أو مهلة زمنية خطوةً من تشغيل معرفي (وتكون `intention` عندها `{ type: 'continue' }`) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`، و`intention`، و`policyId` (`tool-requires-approval` حين طلبتها `metadata.requiresApproval` الخاصة بالأداة نفسها)، و`reason?` (`cancelled before a decision` حين تخلّى المستدعي أو توقّف التشغيل، و`no decision within N ms` بعد `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`، و`parameters`، و`result` / `error`، و`duration` — ويسجّل `action.failed` أيضًا الاستدعاء المرفوض بسبب معاملات غير صالحة (قبل أي سياسة) أو لأن مستدعيه غادر بعد موافقة |
 | `tool.called` | `toolName`، و`parameters` |

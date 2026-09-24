@@ -27,7 +27,7 @@ interface Event {
 | Tipo | Dados |
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` — ou `intention` para uma resposta final cognitiva |
-| `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools` quando quem chamou usou uma ferramenta que não recebeu; o id da política de orçamento quando o seu orçamento de chamadas se esgotou) |
+| `policy.checked` / `policy.violated` | `intention`, `validation` / `reason`, `violatedPolicies` (`allowed-tools` quando quem chamou usou uma ferramenta que não recebeu; o id da política de orçamento quando o seu orçamento de chamadas se esgotou), e `step` quando uma política de orçamento ou de timeout recusou uma etapa de uma execução cognitiva (o seu `intention` é então `{ type: 'continue' }`) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval` quando foi o próprio `metadata.requiresApproval` da ferramenta que a pediu), `reason?` (`cancelled before a decision` quando quem chamou desistiu ou a execução parou, `no decision within N ms` depois de `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` — `action.failed` também registra uma chamada recusada por argumentos inválidos (antes de qualquer política) ou porque quem chamou saiu depois de uma aprovação |
 | `tool.called` | `toolName`, `parameters` |

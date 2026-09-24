@@ -128,7 +128,7 @@ sdk.createCognitiveAgent({
 
 ## Tools inside reasoning
 
-`seek_information` uses the **native reasoning and action engines**: the LLM picks one tool for the open unknown, the action engine checks that the tool was **given to this agent**, validates the call against policies, approvals and budgets, and the result is recorded as an **observation** pointing to its `action.executed` event, then integrated as facts with `source: "tool"`. The observation is kept even if its interpretation fails. A denied, blocked or failing tool becomes a recorded failure, and the reasoning continues.
+`seek_information` uses the **native reasoning and action engines**: the LLM picks one tool for the open unknown, the action engine checks that the tool was **given to this agent**, validates the call against policies (run limits included, see [Limits and policies](#limits-and-policies)), approvals and budgets, and the result is recorded as an **observation** pointing to its `action.executed` event, then integrated as facts with `source: "tool"`. The observation is kept even if its interpretation fails. A denied, blocked or failing tool becomes a recorded failure, and the reasoning continues.
 
 ## Limits
 
@@ -153,6 +153,21 @@ sdk.createCognitiveAgent({
 ```
 
 Limits are validated when the agent is created: `maxSteps: 0` or a timeout beyond what a timer supports throws a `ValidationError` instead of silently disabling a safeguard. `minProposalSupport` may not exceed `decisionThreshold`; set it equal to `decisionThreshold` to let only the evidence commit an answer. If you lower `decisionThreshold` without setting `minProposalSupport`, the floor follows it down.
+
+### Limits and policies
+
+The budget and timeout policies that apply to the agent — those in its `policies` and global ones — are checked **before each step**, before any of its model calls, and again before each tool call. They see the run's progress: `maxSteps` counts the steps already taken, `maxTokens` the tokens of the run's model calls (thoughts and their repairs, tool selections, typed decisions), `maxDuration` the time since the run started. Token and cost budgets per period (`budgetLimit` with `maxTokens` or `maxCost`, without `toolName`) are checked before each step too, and every model call the run records counts in them (see [API costs](./costs#budgets)). A step is checked as an intention of type `continue`: a policy whose conditions require a tool call (`intention.type` equal to `tool_call`) only applies to tool calls. Allowlists, custom policies, call budgets (`maxToolCalls`) and approvals concern tool calls only.
+
+The first limit reached ends the run, and the two kinds of limits do not end it the same way:
+
+| Limit | Agent `limits` | Policies |
+| --- | --- | --- |
+| Steps | `maxSteps`: the last step decides; `completed`, with a `committed`, `provisional` or `abstain` decision | `maxSteps`: the next step is refused; `failed` |
+| Time | `timeoutMs`: the run is aborted, a call in flight gets the abort signal; `failed`, `Timeout exceeded (… ms)` | `maxDuration`: checked between steps and before tool calls, a call in flight goes on; `failed`, `Timeout (… ms) exceeded` |
+| Tokens, cost | — | `maxTokens`, budgets per period: the next step is refused; `failed` |
+| Tool calls | `maxToolCalls`: `seek_information` is no longer offered | A refused call is a recorded failure, and the reasoning continues |
+
+A refused step is recorded as `policy.violated` — with `intention: { type: 'continue' }`, the `step`, the `reason` and the `violatedPolicies` — then `run.failed` with the policy's reason; the result has `status: 'failed'` and a `PolicyViolationError` as `error`. A tool call refused by a run limit is recorded as `policy.violated` and as a failed operation; as the limit is still exceeded, the next step is refused and the run fails. To end with a decision rather than a refusal, keep the agent's `maxSteps` within the policy's: its last step then decides before the policy refuses anything.
 
 ## Invalid model output
 
@@ -186,6 +201,6 @@ The event log stores the goal, the context and every thought, and `decision.eval
 A cognitive run is a normal run:
 
 - `sdk.getTrace(runId)` shows `cognition.*` events next to `policy.checked`, `tool.called`, …
-- `sdk.replay(runId)` re-executes its tool calls without calling the LLM and reproduces the final answer — with the same tool restriction as the original run, so a tool the agent was denied is denied again;
+- `sdk.replay(runId)` re-executes its tool calls without calling the LLM and reproduces the final answer — with the same tool restriction as the original run, so a tool the agent was denied is denied again, and with the run's progress at each call, so a call a run limit refused is refused again;
 - `sdk.getMentalState(runId)` rebuilds the state;
 - `sdk.exportControllerDataset()` turns runs into training data (see [Thinker profiles](./thinker-profiles#train-your-own-controller)).
