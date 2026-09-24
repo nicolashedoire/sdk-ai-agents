@@ -121,20 +121,34 @@ const topics = await sdk.decisions.selectMany({
 
 Works with TypeSafe's API or any compatible self-hosted clone (`jev.baseUrl`).
 
-## MCP connectors, both ways
+## An MCP server for anything
 
 <p align="center"><img src="docs/public/images/mcp-bridge.svg" alt="MCP in both directions" width="100%" /></p>
 
+**MCP** is the standard plug between AI applications (Claude Desktop, Claude Code, IDE assistants, agents) and your systems. Turn a web API, a folder, a database or an agent into an MCP server in one line — governed: nothing is exposed unless listed, every call is checked against your policies, write operations of web APIs wait for a human by default, and everything lands in the event log.
+
 ```ts
-import { connectMcpServer, serveMcpOverStdio } from '@sdk-ai-agents/core/mcp';
+import { createSDK, openApiTools, folderTools, folderResources, databaseTools, sqliteReadOnly, cognitiveAgentTool } from '@sdk-ai-agents/core';
+import { serveMcpOverStdio } from '@sdk-ai-agents/core/mcp';
 
-// Expose governed tools to Claude Desktop, IDEs and other agents
-await serveMcpOverStdio(sdk, { name: 'acme-crm', tools: ['lookup_customer'] });
+const sdk = createSDK({}); // no model key needed for tools (the guide shows where to keep the event log)
+// …except for the agent line below: an agent thinks with a model, so that server needs
+// createSDK({ apiKey: process.env.OPENAI_API_KEY })
 
-// Import the tools of any MCP server — governed like local tools
-const crm = await connectMcpServer({ name: 'crm', transport: { type: 'http', url }, toolPrefix: 'crm_' });
-const tools = crm.tools.map((tool) => sdk.defineTool(tool));
+// Any web API, from its OpenAPI description: one tool per operation, GET only unless you list more
+await serveMcpOverStdio(sdk, { name: 'petstore', tools: await openApiTools({ spec: 'https://petstore3.swagger.io/api/v3/openapi.json' }) });
+
+// A folder of documents: list, read, search — never outside the folder — plus MCP resources
+await serveMcpOverStdio(sdk, { name: 'handbook', tools: folderTools({ root }), resources: folderResources({ root }) });
+
+// A database, read-only: SELECT only, in a read-only mode the database enforces, with a row limit
+await serveMcpOverStdio(sdk, { name: 'shop', tools: databaseTools({ database: sqliteReadOnly(db) }) });
+
+// An agent: "what would Nicolas think?" asked from Claude Desktop to your reasoning twin
+await serveMcpOverStdio(sdk, { name: 'twin', tools: [cognitiveAgentTool(twin, { name: 'ask_nicolas' })] });
 ```
+
+(One server per process: each line above is its own program.) The other direction works too: `connectMcpServer` gives your agents the tools of any MCP server, governed like local tools. New to MCP? [Your first MCP server in 5 minutes](https://nicolashedoire.github.io/sdk-ai-agents/guide/mcp-first-server) goes from an empty folder to Claude Desktop.
 
 ## Built for operations
 
@@ -158,7 +172,7 @@ Not on npm yet — install from GitHub (the package builds itself on install):
 
 ```sh
 npm install github:nicolashedoire/sdk-ai-agents zod@^3.25.28
-npm install @modelcontextprotocol/sdk   # only for MCP connectors
+npm install @modelcontextprotocol/sdk@^1.30.0   # only for MCP servers and clients
 ```
 
 Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet).
@@ -176,7 +190,10 @@ Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet).
 | [Memory across runs](https://nicolashedoire.github.io/sdk-ai-agents/guide/memory) | Reuse what real tests established in earlier runs |
 | [Reason like a given person](https://nicolashedoire.github.io/sdk-ai-agents/guide/thinker-profiles) | Distill a profile, correct it, measure how close it gets |
 | [Typed decisions](https://nicolashedoire.github.io/sdk-ai-agents/guide/typed-decisions) | Jev, context injection, choices |
-| [MCP connectors](https://nicolashedoire.github.io/sdk-ai-agents/guide/mcp) | Expose and import tools |
+| [MCP in plain words](https://nicolashedoire.github.io/sdk-ai-agents/guide/mcp) | What MCP is, the words, what the SDK adds |
+| [Your first MCP server](https://nicolashedoire.github.io/sdk-ai-agents/guide/mcp-first-server) | From an empty folder to Claude Desktop and Claude Code, step by step |
+| [An MCP server for anything](https://nicolashedoire.github.io/sdk-ai-agents/guide/mcp-recipes) | A web API, a folder, a database, an agent — one line each, with their security rules |
+| [Deploy, secure, troubleshoot](https://nicolashedoire.github.io/sdk-ai-agents/guide/mcp-deploy) | HTTP deployment, approvals, budgets, checklist, common problems |
 | [Operations](https://nicolashedoire.github.io/sdk-ai-agents/guide/costs) | Costs, retries, incidents |
 | [SDK API](https://nicolashedoire.github.io/sdk-ai-agents/reference/sdk-api) · [Events](https://nicolashedoire.github.io/sdk-ai-agents/reference/events) | Reference |
 
@@ -191,7 +208,7 @@ npx vitest run         # tests
 npm run docs:dev       # documentation site
 ```
 
-Tests of the new modules use no module mocks: ports are implemented in memory (scripted LLM provider, in-memory decision client), HTTP adapters run against local servers, and MCP runs over the official in-memory transport.
+Tests of the new modules use no module mocks: ports are implemented in memory (scripted LLM provider, in-memory decision client, a PostgreSQL client that records its statements), HTTP adapters run against local servers, folders are real temporary directories (symbolic links included), SQLite runs on the built-in `node:sqlite` (Node 22+), and MCP runs over the official in-memory transport.
 
 ## License
 

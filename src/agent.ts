@@ -50,7 +50,12 @@ export class AgentImpl {
     const runId = generateRunId();
     const abortController = new AbortController();
     this.activeRuns.set(runId, { cancelled: false, abortController });
-    await this.logRunStarted(runId, input);
+    // The caller's signal stops the run: a pending approval is cancelled with it.
+    const { signal, ...recorded } = input;
+    const cancel = () => abortController.abort();
+    signal?.addEventListener('abort', cancel, { once: true });
+    if (signal?.aborted) cancel();
+    await this.logRunStarted(runId, recorded);
 
     try {
       const state = this.initializeRunState(input, abortController);
@@ -61,6 +66,7 @@ export class AgentImpl {
       }
       return await this.handleRunError(runId, error);
     } finally {
+      signal?.removeEventListener('abort', cancel);
       this.activeRuns.delete(runId);
     }
   }
@@ -225,6 +231,8 @@ export class AgentImpl {
       runId,
       agentId: this.agent.id,
       abortSignal: state.abortController?.signal,
+      // Only this agent's tools, even if the model names another tool registered in the SDK.
+      allowedTools: this.agent.tools.map((tool) => tool.name),
     });
 
     state.conversationHistory.push({

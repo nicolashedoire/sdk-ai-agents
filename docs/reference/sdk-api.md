@@ -9,7 +9,7 @@ const sdk = createSDK(config);
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `apiKey` | `string` | Key of the primary provider (not needed with `llmProvider`) |
+| `apiKey` | `string` | Key of the primary provider (not needed with `llmProvider`). Without any key, tools and MCP servers work and calls that need a model fail with a clear error |
 | `provider` | `'openai' \| 'anthropic'` | Primary provider, default `openai` |
 | `providerConfig` | `{ openai?, anthropic? }` | Per-provider `apiKey` and `defaultModel` |
 | `fallbackProviders` | `Array<{ provider, config? }>` | Tried in order when the primary fails |
@@ -27,12 +27,13 @@ const sdk = createSDK(config);
 
 | Method | Returns | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | Governed agent: `run(input)`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name` |
+| `createAgent(config)` | `AgentImpl` | Governed agent: `run({ message, context?, signal? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. It can only run its own tools (`tools`, `capabilities`), even if the model names another tool registered in the SDK; `signal` cancels the run |
 | `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()` |
 | `defineTool(definition)` | `Tool` | Registers a tool; the handler is typed from its Zod schema |
 | `defineCapability(definition)` | `Capability` | Groups tools |
 | `listTools()` | `Tool[]` | Every registered tool |
-| `executeTool(name, params, { agentId?, runId?, allowedTools? })` | `Promise<unknown>` | Governed execution outside an agent (used by the MCP server) |
+| `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs? })` | `Promise<unknown>` | Governed execution outside an agent (used by the MCP server): arguments, policies, approval, budget (counted when the call starts), then the tool. `signal` cancels a pending approval and reaches the handler; `approvalTimeoutMs` cancels an approval nobody decided |
+| `traceResourceRead(uri, read, { agentId? })` | `Promise<ResourceContent>` | Runs `read()` as its own run: `run.started`, `resource.read` (URI, size, SHA-256), `run.completed` or `run.failed` |
 | `stopRun(runId)` | `Promise<void>` | Stops a governed or cognitive run |
 
 ### `CognitiveAgentConfig`
@@ -117,13 +118,59 @@ Question helpers: `noul(instructions, criteria?)`, `choice(instructions, options
 | `getReasoningGraph`, `exportReasoningGraph`, `getAlternatives`, `getDecisionPatterns`, `getTraceVisualization` | Understand decisions |
 | `createGoldenTrace`, `getGoldenTraces`, `validateAgainstGoldenTrace`, `replayAndValidate`, `detectRegressions` | Test agents like code |
 
+## Tools: `ToolDefinition`
+
+| Field | |
+| --- | --- |
+| `name`, `description` | What the model sees |
+| `schema` | Zod schema of the arguments; calls that do not match are refused |
+| `handler(params, context?)` | Receives the validated arguments and `{ runId, agentId, signal? }` — `signal` is aborted when the caller gives up |
+| `retry` | `{ maxRetries, initialDelayMs?, maxDelayMs?, retryOn?(error) }` — idempotent tools only; invalid arguments are never retried |
+| `metadata` | `{ category?, riskLevel?, requiresApproval?, readOnly? }` — `requiresApproval: true` makes every call wait for `approveAction`; `readOnly` is shown to MCP clients as `readOnlyHint` |
+| `inputJsonSchema` | JSON Schema shown instead of the one derived from `schema` |
+| `capability`, `version` | Grouping, version |
+
+## Tool sources
+
+Each returns ready-made `ToolDefinition`s: pass them to `sdk.defineTool`, to an agent, or directly to an MCP server's `tools`. See [An MCP server for anything](../guide/mcp-recipes).
+
+| Function | Returns | |
+| --- | --- | --- |
+| `openApiTools({ spec, baseUrl?, headers?, include?, exclude?, tags?, prefix?, metadata?, retry?, fetch?, timeoutMs?, maxResponseBytes?, maxSpecBytes? })` | `Promise<ToolDefinition[]>` | One tool per operation of an OpenAPI 3 description; only `GET` unless listed in `include`; other methods require approval by default. A call returns `{ status, data, truncated? }` |
+| `folderTools({ root, name?, prefix?, extensions?, include?, exclude?, includeHidden?, maxFileBytes?, maxEntries?, maxDepth?, maxMatches?, maxSearchBytes?, maxExaminedEntries? })` | `ToolDefinition[]` | `list_files`, `read_file`, `search_files` over one folder, never outside it; an excluded folder hides all it holds |
+| `folderResources(options)` | `ResourceProvider` | The same files as MCP resources `folder://<name>/<path>` |
+| `databaseTools({ database, name?, prefix?, maxRows?, maxTextLength?, maxTables?, maxSqlLength? })` | `ToolDefinition[]` | `list_tables`, `describe_table`, `query` (one read-only statement, at most `maxRows` rows, default 100) |
+| `sqliteReadOnly(db)` | `ReadOnlyDatabase` | For `node:sqlite` `DatabaseSync` or `better-sqlite3`; runs queries with `PRAGMA query_only = ON` |
+| `postgresReadOnly({ pool } \| { client }, { statementTimeoutMs?, schemas? })` | `ReadOnlyDatabase` | For `pg` (a dedicated client, or a pool); each query in `BEGIN READ ONLY` (refused on a connection already inside a transaction) … `ROLLBACK` + `pg_advisory_unlock_all()`, with `SET LOCAL statement_timeout` (default 10 s); `schemas` limits listing and describing only |
+| `cognitiveAgentTool(agent, { name?, description?, metadata?, maxInputLength?, maxContextLength?, exposeErrors? })` | `ToolDefinition` | `ask_<agent>`: `{ problem, context? }` → `{ runId, status, decisionStatus?, answer?, rationale?, confidence?, missing?, nextActions?, error? }`; cancelled with the caller; `error` is generic unless `exposeErrors` |
+| `governedAgentTool(agent, options)` | `ToolDefinition` | `{ message, context? }` → `{ runId, status, output?, error? }` |
+| `assertSingleQuery(sql, 'sqlite' \| 'postgres')` | `string` | The statement check used by the database adapters (SQLite and PostgreSQL syntax only) |
+
+```ts
+interface ReadOnlyDatabase {
+  readonly dialect: string;
+  listTables(options: { maxTables: number }): Promise<TableSummary[]>;
+  describeTable(name: string): Promise<ColumnSummary[]>;
+  /** Must refuse writes itself; rows converted with toJsonRow(row, maxTextLength) as they arrive. */
+  query(sql: string, options: { maxRows: number; maxTextLength: number }): Promise<{ columns: string[]; rows: Array<Record<string, unknown>>; truncated: boolean }>;
+}
+
+interface ResourceProvider {
+  handles(uri: string): boolean;
+  list(): Promise<Array<{ uri: string; name: string; description?: string; mimeType?: string; size?: number }>>;
+  read(uri: string): Promise<{ uri: string; mimeType?: string; text: string }>;
+}
+```
+
 ## MCP — `@sdk-ai-agents/core/mcp`
 
 | Function | |
 | --- | --- |
-| `createMcpServer(sdk, { name, tools, agentId?, instructions?, exposeErrorDetails? })` | MCP `Server` exposing the listed governed tools (`tools` is required) |
-| `serveMcpOverStdio(sdk, options)` | Same, connected to stdin/stdout |
-| `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry? })` | `{ tools, client, close() }` |
+| `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | MCP `Server` exposing exactly what `tools` lists: names of defined tools and/or `ToolDefinition`s (defined on the SDK for you; the same definition may be passed again, another tool with a taken name is refused). `resources`: one or several `ResourceProvider`s; every read is traced. Calls run as `mcp:<name>` (or `agentId`); an approval nobody decides within `approvalTimeoutMs` (default 50 000 ms) is cancelled; input refusals are explained to the client, other causes only with `exposeErrorDetails` |
+| `serveMcpOverStdio(sdk, options)` | Same, connected to stdin/stdout; writes one "ready" line to stderr, and closes when stdin ends (calls in progress are aborted, pending approvals cancelled). `approvalTimeoutMs` defaults to 50 000, as for `createMcpServer` |
+| `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry? })` | `{ tools, client, close() }` — the tools of any MCP server, as `ToolDefinition`s |
+
+`GovernedToolHost` is what the server needs from the SDK (`listTools`, `defineTool`, `executeTool`, `traceResourceRead`); `createSDK()` returns an object that implements it.
 
 ## Building blocks
 

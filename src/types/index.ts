@@ -1,6 +1,7 @@
 export * from './events.js';
 export * from './agent.js';
 export * from './tool.js';
+export * from './resource.js';
 export * from './policy.js';
 export * from './run.js';
 export * from './sdk.js';

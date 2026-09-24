@@ -81,6 +81,28 @@ export class PolicyEngine {
     return policies;
   }
 
+  /**
+   * Call-count limits of the active budget policies that apply to this agent and tool, for
+   * the atomic admission of a tool call (see `BudgetTracker.admitToolCall`).
+   */
+  toolCallLimits(
+    agentId: string,
+    toolName: string
+  ): Array<{ policyId: string; limit: BudgetLimit }> {
+    const limits: Array<{ policyId: string; limit: BudgetLimit }> = [];
+    for (const policy of this.getActivePolicies(agentId)) {
+      if (policy.type !== 'budget') continue;
+      for (const rule of policy.rules) {
+        const limit: unknown = rule.metadata?.budgetLimit;
+        if (rule.condition !== 'budgetLimit' || !isToolCallLimit(limit)) continue;
+        if (limit.agentId && limit.agentId !== agentId) continue;
+        if (limit.toolName && limit.toolName !== toolName) continue;
+        limits.push({ policyId: policy.id, limit });
+      }
+    }
+    return limits;
+  }
+
   async validate(intention: Intention, context: PolicyContext): Promise<PolicyValidationResult> {
     const policies = this.getActivePolicies(context.agentId);
     const violatedPolicies: string[] = [];
@@ -616,4 +638,22 @@ export class PolicyEngine {
   clearAgentPolicies(agentId: string): void {
     this.agentPolicies.delete(agentId);
   }
+}
+
+const PERIODS = new Set(['hour', 'day', 'week', 'month', 'all']);
+
+/** A budget limit with a call count, read from policy metadata (plain data from the caller). */
+function isToolCallLimit(value: unknown): value is BudgetLimit & { maxToolCalls: number } {
+  if (typeof value !== 'object' || value === null) return false;
+  const period: unknown = Reflect.get(value, 'period');
+  const maxToolCalls: unknown = Reflect.get(value, 'maxToolCalls');
+  const agentId: unknown = Reflect.get(value, 'agentId');
+  const toolName: unknown = Reflect.get(value, 'toolName');
+  return (
+    typeof period === 'string' &&
+    PERIODS.has(period) &&
+    typeof maxToolCalls === 'number' &&
+    (agentId === undefined || typeof agentId === 'string') &&
+    (toolName === undefined || typeof toolName === 'string')
+  );
 }

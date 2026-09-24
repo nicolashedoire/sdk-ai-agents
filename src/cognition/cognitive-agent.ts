@@ -58,6 +58,8 @@ export interface ThinkInput {
   /** What was already observed (measurements, cases, documents), with its origin. */
   observations?: ObservationInput[];
   metadata?: Record<string, unknown>;
+  /** Cancels the run when aborted (e.g. the MCP client that asked gave up). Not recorded. */
+  signal?: AbortSignal;
 }
 
 export interface CognitiveRunResult {
@@ -166,6 +168,11 @@ export class CognitiveAgent {
       run.timedOut = true;
       run.abortController.abort();
     }, limits.timeoutMs);
+    const cancel = () => run.abortController.abort();
+    input.signal?.addEventListener('abort', cancel, { once: true });
+    if (input.signal?.aborted) {
+      cancel();
+    }
 
     const commitRules: CommitRules = {
       decisionThreshold: limits.decisionThreshold,
@@ -261,6 +268,7 @@ export class CognitiveAgent {
       return { runId: run.runId, status: 'failed', error: failure, state };
     } finally {
       clearTimeout(timer);
+      input.signal?.removeEventListener('abort', cancel);
       this.activeRuns.delete(run.runId);
       // Tests stay valid whatever the run's outcome: a failed or stopped run still learned them.
       await this.rememberFindings(run, state);

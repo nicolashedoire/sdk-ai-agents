@@ -23,7 +23,7 @@ yarn add github:nicolashedoire/sdk-ai-agents zod@^3.25.28
 Requirements: **Node.js 20+**, TypeScript 5+ and **zod 3.25.28 or later within v3** — zod 4 schemas are not supported yet. MCP connectors additionally need the official MCP SDK:
 
 ```sh
-npm install @modelcontextprotocol/sdk
+npm install @modelcontextprotocol/sdk@^1.30.0
 ```
 
 ## 1. Create the SDK
@@ -36,7 +36,7 @@ const sdk = createSDK({
 });
 ```
 
-Everything is optional except a way to reach an LLM: an `apiKey` for the built-in OpenAI and Anthropic providers, or your own `llmProvider`.
+Agents need a way to reach an LLM: an `apiKey` for the built-in OpenAI and Anthropic providers, or your own `llmProvider`. Everything else is optional — and without a key the SDK still runs tools and [MCP servers](./mcp-first-server); only a call that needs a model fails, with a message saying so.
 
 ## 2. Define a governed tool
 

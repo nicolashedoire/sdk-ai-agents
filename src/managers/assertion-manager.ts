@@ -8,8 +8,9 @@ export class AssertionManager {
   private assertionsCache: Map<string, Assertion> = new Map();
 
   constructor(assertionsDir = './assertions') {
+    // Created on first use, not at start-up: an SDK used only for tools (an MCP server
+    // started from any working directory) leaves no empty folders behind.
     this.assertionsDir = assertionsDir;
-    this.ensureAssertionsDir();
   }
 
   private async ensureAssertionsDir(): Promise<void> {

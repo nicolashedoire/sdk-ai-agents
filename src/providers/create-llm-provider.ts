@@ -4,6 +4,7 @@ import type { SDKConfig } from '../types/sdk.js';
 import { FallbackProvider } from './fallback-provider.js';
 import type { LLMProvider } from './llm-provider.js';
 import { ProviderFactory } from './provider-factory.js';
+import { UnconfiguredLLMProvider } from './unconfigured-provider.js';
 
 const DEFAULT_MODELS = { openai: 'gpt-4', anthropic: 'claude-3-5-sonnet-20241022' } as const;
 
@@ -41,11 +42,12 @@ export function createLLMProvider(config: SDKConfig, setup: ProviderSetup = {}):
 
   const primaryName = config.provider ?? 'openai';
   const primaryConfig = config.providerConfig?.[primaryName];
-  const primary = build(
-    primaryName,
-    primaryConfig?.apiKey || config.apiKey,
-    primaryConfig?.defaultModel
-  );
+  const primaryKey = primaryConfig?.apiKey || config.apiKey;
+  if (!primaryKey && !canFailOver) {
+    // No model at all: tool-only uses (MCP servers, governed tool calls) still work.
+    return new UnconfiguredLLMProvider();
+  }
+  const primary = build(primaryName, primaryKey, primaryConfig?.defaultModel);
 
   if (!config.fallbackProviders || config.fallbackProviders.length === 0) {
     return primary;

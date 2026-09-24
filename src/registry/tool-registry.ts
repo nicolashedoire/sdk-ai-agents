@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { ToolExecutionError, ToolNotFoundError, ValidationError } from '../errors/index.js';
-import type { Tool, ToolDefinition, ToolResult } from '../types/tool.js';
+import type { Tool, ToolCallContext, ToolDefinition, ToolResult } from '../types/tool.js';
 
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
@@ -68,14 +68,19 @@ export class ToolRegistry {
     return true;
   }
 
-  async executeTool(name: string, parameters: unknown, allowlist?: string[]): Promise<ToolResult> {
+  async executeTool(
+    name: string,
+    parameters: unknown,
+    allowlist?: string[],
+    context?: ToolCallContext
+  ): Promise<ToolResult> {
     this.validateToolAccess(name, allowlist);
 
     const tool = this.getToolOrThrow(name);
 
     try {
       const validated = tool.schema.parse(parameters);
-      const result = await tool.handler(validated);
+      const result = await tool.handler(validated, context);
 
       return {
         success: true,
@@ -84,6 +89,19 @@ export class ToolRegistry {
     } catch (error) {
       throw this.handleExecutionError(error, name, tool.schema, parameters);
     }
+  }
+
+  /**
+   * Checks parameters against the tool's schema without running it. Returns the refusal, or
+   * nothing when they are valid or the tool is unknown (reported when it is executed).
+   */
+  validateParameters(name: string, parameters: unknown): ValidationError | undefined {
+    const tool = this.tools.get(name);
+    if (!tool) return undefined;
+    const parsed = tool.schema.safeParse(parameters);
+    return parsed.success
+      ? undefined
+      : new ValidationError(name, this.formatZodErrors(parsed.error), tool.schema);
   }
 
   private validateToolAccess(name: string, allowlist?: string[]): void {

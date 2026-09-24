@@ -299,5 +299,22 @@ describe('ApprovalManager', () => {
       expect(run2Approvals.length).toBe(1);
     });
   });
-});
 
+  describe('memory', () => {
+    it('keeps a bounded history of decided requests', async () => {
+      const intention: Intention = { type: 'tool_call', toolName: 'refund' };
+      const ids: string[] = [];
+      for (let index = 0; index < 1_001; index++) {
+        const { approvalId, waitForApproval } = await manager.requestApproval('run-1', 'agent-1', intention, 'p');
+        manager.approve(approvalId, 'alice');
+        await waitForApproval;
+        ids.push(approvalId);
+      }
+
+      expect(manager.getAllPendingApprovals()).toEqual([]);
+      // The oldest decision was forgotten; the most recent ones are still known.
+      expect(manager.getApproval(ids[0] ?? '')).toBeUndefined();
+      expect(manager.getApproval(ids[1_000] ?? '')?.status).toBe('approved');
+    });
+  });
+});

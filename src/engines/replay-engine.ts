@@ -3,7 +3,7 @@ import type { IEventStore } from '../stores/event-store.js';
 import type { Event } from '../types/events.js';
 import type { Intention, ReplayModifications, RunResult } from '../types/run.js';
 import { generateEventId, generateRunId } from '../utils/id.js';
-import type { ActionEngine } from './action-engine.js';
+import { type ActionEngine, TOOL_APPROVAL_POLICY } from './action-engine.js';
 
 export class ReplayEngine {
   constructor(
@@ -17,11 +17,13 @@ export class ReplayEngine {
 
     const newRunId = generateRunId();
     const intentions = this.extractIntentions(originalEvents);
+    const approved = approvedIntentions(originalEvents);
     await this.logReplayStart(newRunId, originalEvents, runId, modifications);
 
     const result = await this.executeIntentions(
       newRunId,
       intentions,
+      approved,
       recordedAllowedTools(originalEvents)
     );
 
@@ -71,11 +73,12 @@ export class ReplayEngine {
       data: { intention: Intention };
       metadata?: Record<string, unknown>;
     }>,
+    approved: ReadonlySet<number>,
     allowedTools?: string[]
   ): Promise<{ hasError: boolean; finalResult: unknown; error?: string }> {
     let finalResult: unknown = null;
 
-    for (const intentionEvent of intentions) {
+    for (const [index, intentionEvent] of intentions.entries()) {
       const intention = intentionEvent.data.intention as Intention;
 
       try {
@@ -83,6 +86,7 @@ export class ReplayEngine {
           runId: newRunId,
           agentId: (intentionEvent.metadata?.agentId as string) || '',
           mode: 'replay',
+          ...(approved.has(index) ? { preApproved: true } : {}),
           ...(allowedTools ? { allowedTools } : {}),
         });
 
@@ -214,6 +218,83 @@ export class ReplayEngine {
         };
       });
   }
+}
+
+/**
+ * Positions (among the `intention.generated` events) of the tool calls a human approved
+ * in the original run: an `approval.approved` for the tool's own approval, recorded after
+ * that intention and before the next one, for the same tool and the same parameters.
+ */
+function approvedIntentions(events: Event[]): Set<number> {
+  const approved = new Set<number>();
+  let position = -1;
+  let current: unknown;
+  for (const event of events) {
+    if (event.type === 'intention.generated') {
+      position++;
+      current = event.data;
+      continue;
+    }
+    if (
+      event.type === 'approval.approved' &&
+      position >= 0 &&
+      event.data.policyId === TOOL_APPROVAL_POLICY &&
+      sameCall(event.data.intention, current)
+    ) {
+      approved.add(position);
+    }
+  }
+  return approved;
+}
+
+/** The approved intention names the tool call recorded by the intention event. */
+function sameCall(approvedIntention: unknown, intentionData: unknown): boolean {
+  const approvedCall = toolCallOf(approvedIntention);
+  const recorded = toolCallOfEvent(intentionData);
+  return (
+    approvedCall !== undefined &&
+    recorded !== undefined &&
+    approvedCall.toolName === recorded.toolName &&
+    stableJson(approvedCall.parameters) === stableJson(recorded.parameters)
+  );
+}
+
+function toolCallOf(value: unknown): { toolName: string; parameters: unknown } | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const toolName: unknown = Reflect.get(value, 'toolName');
+  return typeof toolName === 'string'
+    ? { toolName, parameters: Reflect.get(value, 'parameters') ?? {} }
+    : undefined;
+}
+
+/** The tool call of an `intention.generated` event: its `intention`, or its first tool call. */
+function toolCallOfEvent(data: unknown): { toolName: string; parameters: unknown } | undefined {
+  if (typeof data !== 'object' || data === null) return undefined;
+  const intention = toolCallOf(Reflect.get(data, 'intention'));
+  if (intention) return intention;
+  const toolCalls: unknown = Reflect.get(data, 'toolCalls');
+  const first: unknown = Array.isArray(toolCalls) ? toolCalls[0] : undefined;
+  const fn: unknown =
+    typeof first === 'object' && first !== null ? Reflect.get(first, 'function') : undefined;
+  if (typeof fn !== 'object' || fn === null) return undefined;
+  const name: unknown = Reflect.get(fn, 'name');
+  const args: unknown = Reflect.get(fn, 'arguments');
+  if (typeof name !== 'string') return undefined;
+  try {
+    const parameters: unknown = typeof args === 'string' ? JSON.parse(args || '{}') : {};
+    return { toolName: name, parameters };
+  } catch {
+    return undefined;
+  }
+}
+
+/** JSON with sorted keys, to compare parameters whatever their key order. */
+function stableJson(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    typeof item === 'object' && item !== null && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
+      : item
+  );
 }
 
 /** Tools a cognitive run was restricted to, as recorded in its `cognition.started` event. */
