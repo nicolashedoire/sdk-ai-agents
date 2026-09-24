@@ -6,6 +6,7 @@ import type {
   Intention,
   ReplayModifications,
   ReplayOptions,
+  RunInput,
   RunProgress,
   RunResult,
 } from '../types/run.js';
@@ -83,13 +84,16 @@ export class ReplayEngine {
     modifications?: ReplayModifications
   ): Promise<void> {
     const originalStartEvent = originalEvents.find((e) => e.type === 'run.started');
+    // Callbacks and a signal given anyway (from JavaScript) are not recorded.
+    const { signal, onEvent, onText, onTextRestart, ...input } = (modifications?.input ??
+      {}) as RunInput;
     await this.eventStore.append(newRunId, {
       id: generateEventId(),
       runId: newRunId,
       type: 'run.started',
       timestamp: Date.now(),
       data: {
-        input: modifications?.input || originalStartEvent?.data.input || {},
+        input: modifications?.input ? input : originalStartEvent?.data.input || {},
         replayOf: originalRunId,
       },
       metadata: originalStartEvent?.metadata,

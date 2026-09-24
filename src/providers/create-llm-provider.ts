@@ -122,9 +122,11 @@ function openAIRequestOptions(
   const reasoningModels = own?.reasoningModels ?? inherited?.reasoningModels;
   const reasoningEffort = own?.reasoningEffort ?? inherited?.reasoningEffort;
   const nativeToolMessages = own?.nativeToolMessages ?? inherited?.nativeToolMessages;
+  const includeStreamUsage = own?.includeStreamUsage ?? inherited?.includeStreamUsage;
   return {
     ...(reasoningModels !== undefined ? { reasoningModels } : {}),
     ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
     ...(nativeToolMessages !== undefined ? { nativeToolMessages } : {}),
+    ...(includeStreamUsage !== undefined ? { includeStreamUsage } : {}),
   };
 }

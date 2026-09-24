@@ -17,6 +17,17 @@ import type {
  */
 export const DEFAULT_OPENAI_MODEL = 'gpt-5.4';
 
+/** Address of OpenAI's own API. */
+const OPENAI_API = 'https://api.openai.com/v1';
+
+/**
+ * Whether a streamed request asks for its usage (`stream_options.include_usage`): as set, else
+ * only on OpenAI's own API, since a compatible server may refuse the field or ignore it.
+ */
+export function asksForStreamUsage(baseURL: string, includeStreamUsage?: boolean): boolean {
+  return includeStreamUsage ?? baseURL.replace(/\/+$/, '') === OPENAI_API;
+}
+
 /** How the OpenAI provider shapes its requests, for OpenAI models and compatible servers. */
 export interface OpenAIRequestOptions {
   /**
@@ -44,6 +55,12 @@ export interface OpenAIRequestOptions {
    * text. Default `true`.
    */
   nativeToolMessages?: boolean;
+  /**
+   * Whether a streamed request asks for its usage (`stream_options: { include_usage: true }`).
+   * By default only on OpenAI's own API: a compatible server may refuse the field, or ignore
+   * it. Without usage, the call counts as unmetered.
+   */
+  includeStreamUsage?: boolean;
 }
 
 /** Options of the OpenAI provider: its client's, and how it shapes requests. */
@@ -66,6 +83,10 @@ export class OpenAIProvider implements LLMProvider {
   private defaultModel: string;
   private reasoningModels?: boolean | readonly string[];
   private reasoningEffort?: OpenAIReasoningEffort;
+  /** Streamed requests ask for their usage; off for good once the server refused the field. */
+  private streamUsage: boolean;
+  /** Models the API refused to stream (an organization not verified for them). */
+  private readonly unstreamable = new Set<string>();
 
   constructor(
     apiKey: string,
@@ -80,11 +101,13 @@ export class OpenAIProvider implements LLMProvider {
       apiKey,
       ...(options.maxRetries !== undefined ? { maxRetries: options.maxRetries } : {}),
       ...(options.baseURL !== undefined ? { baseURL: options.baseURL } : {}),
+      ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
     });
     this.defaultModel = defaultModel;
     this.nativeToolMessages = options.nativeToolMessages ?? true;
     this.reasoningModels = options.reasoningModels;
     this.reasoningEffort = options.reasoningEffort;
+    this.streamUsage = asksForStreamUsage(this.client.baseURL, options.includeStreamUsage);
   }
 
   async generateCompletion(request: LLMRequest): Promise<LLMResponse> {
@@ -93,36 +116,36 @@ export class OpenAIProvider implements LLMProvider {
       throw new Error('Request aborted');
     }
     try {
+      const body = this.requestBody(request);
+
       // The signal cancels the HTTP request itself: the answer is not waited for.
-      const response = await this.client.chat.completions.create(
-        this.requestBody(request) as OpenAI.ChatCompletionCreateParamsNonStreaming,
-        { signal: request.abortSignal }
-      );
+      const completion = request.onTextDelta
+        ? await this.streamCompletion(body, request.onTextDelta, request.abortSignal)
+        : await this.complete(body, request.abortSignal);
 
       if (request.abortSignal?.aborted) {
         throw new Error('Request aborted');
       }
 
-      const choice = response.choices[0];
-      if (!choice) {
-        // Billed all the same: the caller is told what it cost before this call fails.
-        if (response.usage) {
+      const message = completion.message;
+      if (!message) {
+        // Billed all the same: the caller is told what it cost before this call fails. A
+        // stream reports its usage in its last chunk, when asked for.
+        if (completion.usage) {
           request.onDiscardedAnswer?.({
             provider: 'openai',
             // The model that answered, else the one the request body named.
-            model: response.model || request.model || this.defaultModel,
+            model: completion.model || request.model || this.defaultModel,
             usage: {
-              promptTokens: response.usage.prompt_tokens,
-              completionTokens: response.usage.completion_tokens,
-              totalTokens: response.usage.total_tokens,
+              promptTokens: completion.usage.prompt_tokens,
+              completionTokens: completion.usage.completion_tokens,
+              totalTokens: completion.usage.total_tokens,
             },
             reason: 'No response from LLM',
           });
         }
         throw new Error('No response from LLM');
       }
-
-      const message = choice.message;
 
       const content = message.content || null;
       const toolCalls = message.tool_calls?.map((tc) => ({
@@ -136,12 +159,12 @@ export class OpenAIProvider implements LLMProvider {
       return {
         content,
         toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
-        model: response.model,
-        usage: response.usage
+        model: completion.model,
+        usage: completion.usage
           ? {
-              promptTokens: response.usage.prompt_tokens,
-              completionTokens: response.usage.completion_tokens,
-              totalTokens: response.usage.total_tokens,
+              promptTokens: completion.usage.prompt_tokens,
+              completionTokens: completion.usage.completion_tokens,
+              totalTokens: completion.usage.total_tokens,
             }
           : undefined,
       };
@@ -151,6 +174,165 @@ export class OpenAIProvider implements LLMProvider {
       }
       throw this.wrapError(error);
     }
+  }
+
+  /** The answer in one response. */
+  private async complete(
+    body: ChatCompletionBody,
+    signal: AbortSignal | undefined
+  ): Promise<Completion> {
+    const response = await this.client.chat.completions.create(
+      body as OpenAI.ChatCompletionCreateParamsNonStreaming,
+      { signal }
+    );
+    return { model: response.model, message: response.choices[0]?.message, usage: response.usage };
+  }
+
+  /**
+   * The answer streamed, each piece of text passed on as it arrives. When the API refuses to
+   * stream this model (OpenAI does for an organization that is not verified for it), the answer
+   * comes in one response, its text in one piece, and the model is no longer streamed.
+   */
+  private async streamCompletion(
+    body: ChatCompletionBody,
+    onTextDelta: (delta: string) => void,
+    signal: AbortSignal | undefined
+  ): Promise<Completion> {
+    if (!this.unstreamable.has(body.model)) {
+      try {
+        return await this.readStream(body, onTextDelta, signal);
+      } catch (error) {
+        if (!refusesStreaming(error)) throw error;
+        this.unstreamable.add(body.model);
+      }
+    }
+    const completion = await this.complete(body, signal);
+    if (completion.message?.content) onTextDelta(completion.message.content);
+    return completion;
+  }
+
+  /** Sends the streamed request; a server that refuses `stream_options` gets it without. */
+  private async openStream(
+    body: ChatCompletionBody,
+    signal: AbortSignal
+  ): Promise<AsyncIterable<OpenAI.ChatCompletionChunk>> {
+    const send = () =>
+      this.client.chat.completions.create(
+        {
+          ...(body as OpenAI.ChatCompletionCreateParamsNonStreaming),
+          stream: true,
+          ...(this.streamUsage ? { stream_options: { include_usage: true } } : {}),
+        },
+        { signal }
+      );
+    try {
+      return await send();
+    } catch (error) {
+      if (!this.streamUsage || !refusesStreamUsage(error)) throw error;
+      // Asked once more without it, and never again: its answers then carry no usage.
+      this.streamUsage = false;
+      return await send();
+    }
+  }
+
+  /**
+   * Reads the stream, passing each piece of text on as it arrives, and assembles what the
+   * non-streaming API returns: the text, the tool calls (their pieces joined by index), the
+   * model and the usage (sent in a last chunk when asked for). The client's timeout ends when
+   * the answer starts: a stream that then sends nothing for as long is cut here.
+   */
+  private async readStream(
+    body: ChatCompletionBody,
+    onTextDelta: (delta: string) => void,
+    signal: AbortSignal | undefined
+  ): Promise<Completion> {
+    const reading = new AbortController();
+    const cancel = () => reading.abort();
+    if (signal?.aborted) cancel();
+    signal?.addEventListener('abort', cancel, { once: true });
+    const idleMs = this.client.timeout;
+    let stalled = false;
+    let timer: NodeJS.Timeout | undefined;
+    const awaitNextEvent = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        stalled = true;
+        reading.abort();
+      }, idleMs);
+    };
+
+    let model = body.model;
+    let usage: OpenAI.CompletionUsage | undefined;
+    let answered = false;
+    let content: string | null = null;
+    let finishReason: string | null = null;
+    const toolCalls = new Map<string, { rank: number; call: CompletionToolCall }>();
+    let lastCall: string | undefined;
+
+    try {
+      const stream = await this.openStream(body, reading.signal);
+      awaitNextEvent();
+      for await (const chunk of stream) {
+        awaitNextEvent();
+        if (chunk.model) model = chunk.model;
+        if (chunk.usage) usage = chunk.usage;
+        // The SDK asks for one answer: the choice of index 0, as without streaming.
+        const choice = chunk.choices?.find((candidate) => candidate.index === 0);
+        if (!choice) continue;
+        answered = true;
+        const { delta } = choice;
+        if (delta.content) {
+          content = (content ?? '') + delta.content;
+          onTextDelta(delta.content);
+        }
+        for (const piece of delta.tool_calls ?? []) {
+          // Compatible servers may leave out `index`: a new id then starts a new call, and a
+          // piece with neither continues the last one.
+          const index: number | undefined = piece.index;
+          const key =
+            index !== undefined ? `#${index}` : piece.id ? `id ${piece.id}` : (lastCall ?? '#0');
+          const entry = toolCalls.get(key) ?? {
+            rank: index ?? toolCalls.size,
+            call: { function: { name: '', arguments: '' } },
+          };
+          toolCalls.set(key, entry);
+          lastCall = key;
+          if (piece.id) entry.call.id = piece.id;
+          if (piece.function?.name) entry.call.function.name = piece.function.name;
+          if (piece.function?.arguments) entry.call.function.arguments += piece.function.arguments;
+        }
+        if (choice.finish_reason) finishReason = choice.finish_reason;
+      }
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', cancel);
+    }
+
+    if (stalled) {
+      throw new OpenAI.APIConnectionTimeoutError({
+        message: `The answer stream sent nothing for ${idleMs} ms`,
+      });
+    }
+    // A cancelled stream ends early without an error: the caller sees the abort.
+    if (signal?.aborted || !answered) {
+      return { model, usage };
+    }
+    if (!finishReason) {
+      // Every answer ends with a reason: without it, the stream was cut short.
+      throw new OpenAI.APIConnectionError({
+        message: 'The answer stream ended before the answer was complete',
+      });
+    }
+    return {
+      model,
+      usage,
+      message: {
+        content,
+        tool_calls: [...toolCalls.values()]
+          .sort((first, second) => first.rank - second.rank)
+          .map((entry) => entry.call),
+      },
+    };
   }
 
   supportsModel(model: string): boolean {
@@ -239,6 +421,7 @@ export function assertOpenAIRequestOptions(
   const reasoningModels: unknown = options.reasoningModels;
   const reasoningEffort: unknown = options.reasoningEffort;
   const nativeToolMessages: unknown = options.nativeToolMessages;
+  const includeStreamUsage: unknown = options.includeStreamUsage;
   if (
     reasoningModels !== undefined &&
     typeof reasoningModels !== 'boolean' &&
@@ -264,6 +447,12 @@ export function assertOpenAIRequestOptions(
       `must be true or false, got ${shownValue(nativeToolMessages)}`
     );
   }
+  if (includeStreamUsage !== undefined && typeof includeStreamUsage !== 'boolean') {
+    throw new ValidationError(
+      `${path}.includeStreamUsage`,
+      `must be true or false, got ${shownValue(includeStreamUsage)}`
+    );
+  }
 }
 
 /** A plain value as an error can show it ("true" for a string, not true). */
@@ -273,6 +462,40 @@ function shownValue(value: unknown): string {
   if (typeof value === 'object' && value !== null) return 'an object';
   if (typeof value === 'function') return 'a function';
   return String(value);
+}
+
+/** A 400 (or 422) naming `stream_options`: a compatible server that does not take it. */
+function refusesStreamUsage(error: unknown): boolean {
+  return (
+    error instanceof OpenAI.APIError &&
+    (error.status === 400 || error.status === 422) &&
+    (error.param === 'stream_options' || error.message.includes('stream_options'))
+  );
+}
+
+/**
+ * A 400 refusing to stream: `param: 'stream'`, or a message about streaming, such as OpenAI's
+ * "Your organization must be verified to stream this model".
+ */
+function refusesStreaming(error: unknown): boolean {
+  return (
+    error instanceof OpenAI.APIError &&
+    error.status === 400 &&
+    (error.param === 'stream' || /\bstream(ing)?\b/i.test(error.message))
+  );
+}
+
+/** A tool call of the answer; the stream may leave out its id, which the SDK then gives. */
+interface CompletionToolCall {
+  id?: string;
+  function: { name: string; arguments: string };
+}
+
+/** What both ways of calling the API give: the first choice's message, the model and usage. */
+interface Completion {
+  model: string;
+  message?: { content: string | null; tool_calls?: CompletionToolCall[] };
+  usage?: OpenAI.CompletionUsage | null;
 }
 
 /** A message in the OpenAI format: tool calls on the assistant turn, results as `tool` messages. */

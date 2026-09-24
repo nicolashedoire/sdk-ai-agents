@@ -47,7 +47,8 @@ export interface SDKConfig {
   /**
    * Settings of each vendor, used by the primary provider and by any fallback of that vendor
    * (a fallback's own `config` takes precedence). `baseURL` points a provider at a compatible
-   * endpoint or a proxy.
+   * endpoint or a proxy. `includeStreamUsage` (OpenAI): whether a streamed answer is asked for
+   * its usage; by default only on OpenAI's own API.
    */
   providerConfig?: {
     openai?: OpenAIVendorConfig;

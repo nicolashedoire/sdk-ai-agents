@@ -10,7 +10,10 @@ export interface ProviderConfig {
   clientMaxRetries?: number;
   /** Address of the API (the vendor's own when omitted). */
   baseURL?: string;
-  /** How the OpenAI provider shapes its requests (reasoning models, native tool messages). */
+  /**
+   * How the OpenAI provider shapes its requests (reasoning models, native tool messages, the
+   * usage of streamed answers).
+   */
   openai?: OpenAIRequestOptions;
 }
 

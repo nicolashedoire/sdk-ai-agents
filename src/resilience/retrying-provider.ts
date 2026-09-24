@@ -1,4 +1,5 @@
 import type { LLMProvider, LLMRequest, LLMResponse } from '../providers/llm-provider.js';
+import { StreamedTextRelay } from '../providers/streamed-text.js';
 import { withRetry, type RetryAttemptInfo, type RetryPolicy } from './retry.js';
 
 export interface ProviderRetryInfo extends RetryAttemptInfo {
@@ -9,7 +10,9 @@ export interface ProviderRetryInfo extends RetryAttemptInfo {
 
 /**
  * Decorates any LLM provider with a retry policy. `onRetry` receives the run id carried by
- * the request, which lets the SDK record each retry in the run's event log.
+ * the request, which lets the SDK record each retry in the run's event log. When the request
+ * streams its text, an attempt that had streamed some before failing is followed by
+ * `onTextRestart`: the retry writes the answer again.
  */
 export class RetryingLLMProvider implements LLMProvider {
   constructor(
@@ -19,15 +22,18 @@ export class RetryingLLMProvider implements LLMProvider {
   ) {}
 
   generateCompletion(request: LLMRequest): Promise<LLMResponse> {
-    return withRetry(() => this.inner.generateCompletion(request), this.policy, {
+    const text = new StreamedTextRelay(request);
+    return withRetry(() => this.inner.generateCompletion(text.begin()), this.policy, {
       ...(request.abortSignal ? { signal: request.abortSignal } : {}),
-      onRetry: (info) =>
-        this.onRetry?.({
+      onRetry: (info) => {
+        text.restart();
+        return this.onRetry?.({
           ...info,
           provider: this.inner.getProviderName(),
           model: request.model,
           ...(request.runId ? { runId: request.runId } : {}),
-        }),
+        });
+      },
     });
   }
 
