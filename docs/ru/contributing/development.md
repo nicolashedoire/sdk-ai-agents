@@ -224,6 +224,19 @@ export class MyProvider implements LLMProvider {
 }
 ```
 
+Чтобы передавать текст потоком (запуск с `onText`), вызывайте `request.onTextDelta` с каждым куском, как только модель его пишет, и всё равно возвращайте полный ответ. Провайдер без потоковой передачи это поле игнорирует: тогда SDK передаёт текст одним куском.
+
+```typescript
+async generateCompletion(request: LLMRequest): Promise<LLMResponse> {
+  let content = '';
+  for await (const piece of myModel.stream(request.messages, { signal: request.abortSignal })) {
+    content += piece;
+    request.onTextDelta?.(piece);
+  }
+  return { content, model: 'my-model' };
+}
+```
+
 2. Добавьте его в `ProviderFactory`:
 
 ```typescript

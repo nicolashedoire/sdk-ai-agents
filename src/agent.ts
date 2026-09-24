@@ -31,6 +31,8 @@ interface RunState {
   startTime: number;
   cancelled?: boolean;
   abortController?: AbortController;
+  /** Where the text the model writes goes, as it is written. */
+  text: Pick<RunInput, 'onText' | 'onTextRestart'>;
   providerSettings?: {
     openai?: OpenAIProviderSettings;
     anthropic?: ProviderSettings;
@@ -77,8 +79,9 @@ export class AgentImpl {
     abortController: AbortController
   ): Promise<RunResult> {
     this.activeRuns.set(runId, { cancelled: false, abortController });
-    // The caller's signal stops the run: a pending approval is cancelled with it.
-    const { signal, onEvent: _listener, ...recorded } = input;
+    // The caller's signal stops the run: a pending approval is cancelled with it. Neither it
+    // nor the listener and the text callbacks are recorded.
+    const { signal, onEvent: _listener, onText, onTextRestart, ...recorded } = input;
     const cancel = () => abortController.abort();
     signal?.addEventListener('abort', cancel, { once: true });
     if (signal?.aborted) cancel();
@@ -140,6 +143,7 @@ export class AgentImpl {
       timeout: this.agent.config.timeout || DEFAULT_TIMEOUT_MS,
       startTime: Date.now(),
       abortController,
+      text: { onText: input.onText, onTextRestart: input.onTextRestart },
       providerSettings: input.providerSettings,
     };
   }
@@ -220,6 +224,7 @@ export class AgentImpl {
         model: this.agent.model,
         providerSettings, // Pass providerSettings instead of resolved settings
         onModelUsage: (call) => this.recordModelCall(state, call),
+        ...state.text,
       },
       this.eventStore,
       state.abortController?.signal

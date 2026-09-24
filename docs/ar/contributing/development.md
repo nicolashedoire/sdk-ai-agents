@@ -224,6 +224,19 @@ export class MyProvider implements LLMProvider {
 }
 ```
 
+لبثّ النص تدريجيًا (تشغيل مع `onText`)، استدعِ `request.onTextDelta` مع كل جزء فور أن يكتبه نموذجك، وأعِد مع ذلك الاستجابة كاملةً. المزوّد الذي لا يستطيع البث التدريجي يتجاهله: فتمرّر حزمة SDK النص حينئذٍ دفعةً واحدة.
+
+```typescript
+async generateCompletion(request: LLMRequest): Promise<LLMResponse> {
+  let content = '';
+  for await (const piece of myModel.stream(request.messages, { signal: request.abortSignal })) {
+    content += piece;
+    request.onTextDelta?.(piece);
+  }
+  return { content, model: 'my-model' };
+}
+```
+
 2. أضفه إلى `ProviderFactory`:
 
 ```typescript

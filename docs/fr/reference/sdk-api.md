@@ -11,9 +11,9 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | Clé du fournisseur principal (inutile avec `llmProvider`). Sans aucune clé, les outils et les serveurs MCP fonctionnent, et les appels qui ont besoin d'un modèle échouent avec une erreur explicite |
 | `provider` | `'openai' \| 'anthropic'` | Fournisseur principal, `openai` par défaut |
-| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel` et `baseURL` de chaque éditeur (`baseURL` : un endpoint compatible, comme l'API v1 d'Azure OpenAI ou un serveur de modèles local, ou un proxy). Le fournisseur principal utilise l'entrée de son éditeur, et un repli d'un autre éditeur celle du sien. Modèles par défaut : `gpt-5.4` et `claude-opus-5`. L'entrée OpenAI accepte aussi `reasoningModels`, `reasoningEffort` et `nativeToolMessages` : voir [Modèles OpenAI](#openai-models) |
+| `providerConfig` | `{ openai?, anthropic? }` | `apiKey`, `defaultModel`, `baseURL` et `timeout` de chaque éditeur (`baseURL` : un endpoint compatible, comme l'API v1 d'Azure OpenAI ou un serveur de modèles local, ou un proxy ; `timeout` : l'attente maximale d'une réponse en millisecondes, 10 minutes par défaut, et pour une réponse en streaming l'attente maximale entre deux de ses événements). Le fournisseur principal utilise l'entrée de son éditeur, et un repli d'un autre éditeur celle du sien. Modèles par défaut : `gpt-5.4` et `claude-opus-5`. L'entrée OpenAI accepte aussi `reasoningModels`, `reasoningEffort`, `nativeToolMessages` et `includeStreamUsage` : voir [Modèles OpenAI](#openai-models) |
 | `fallbackProviders` | `Array<{ provider, config? }>` | Essayés dans l'ordre quand le fournisseur principal échoue ; un `config` l'emporte sur `providerConfig`. Un repli du même éditeur que le principal n'hérite d'aucun de ses réglages (seulement de l'`apiKey` globale) ; un repli d'un autre éditeur a besoin de sa propre clé |
-| `llmProvider` | `LLMProvider` | Votre propre fournisseur (modèle local, passerelle, doublure de test). Il reçoit les appels d'outils et leurs résultats au format natif (`LLMMessage`) s'il déclare `nativeToolMessages`, en texte sinon |
+| `llmProvider` | `LLMProvider` | Votre propre fournisseur (modèle local, passerelle, doublure de test). Il reçoit les appels d'outils et leurs résultats au format natif (`LLMMessage`) s'il déclare `nativeToolMessages`, en texte sinon, et il peut transmettre son texte en streaming (voir [`LLMProvider`](#llmprovider)) |
 | `retry` | `Partial<RetryPolicy> \| false` | Politique de nouvelles tentatives pour le LLM, par fournisseur, avant le repli. Ses `maxRetries` et `initialDelayMs` sont aussi les valeurs par défaut de `jev.maxRetries` et `jev.retryBaseDelayMs` ; ses autres champs n'atteignent pas le client Jev, qui garde ses propres 2 nouvelles tentatives et 500 ms avec `retry: false`. Appliquée à un `llmProvider` injecté seulement si elle est définie explicitement, et jamais à un `FallbackProvider` passé comme `llmProvider` ni à ses fournisseurs |
 | `jev` | `JevClientConfig` | Active TypeSafe Jev pour les décisions typées — directement, ou via [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) avec `baseUrl` et `model: 'typesafe-ai/jev'` |
 | `decisionClient` | `TypedDecisionClient` | N'importe quel backend de décisions typées (prioritaire sur `jev`) |
@@ -36,6 +36,7 @@ Le SDK appelle OpenAI par Chat Completions, où les modèles GPT-5.4 et suivants
 | `defaultModel` | `gpt-5.4` | Modèle d'une requête qui n'en nomme aucun, et d'un repli qui ne sert pas le modèle de l'agent |
 | `reasoningModels` | Déduit du nom | `true` ou `false` : tous les modèles de ce fournisseur sont, ou ne sont pas, des modèles de raisonnement. Une liste : ces noms en sont (déploiements Azure, alias de passerelle), les autres sont reconnus à leur nom |
 | `reasoningEffort` | Celui du modèle | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` ou `max`, envoyé tel quel aux seuls modèles de raisonnement. Chaque modèle accepte certaines de ces valeurs, et l'API refuse les autres |
+| `includeStreamUsage` | Sur l'API d'OpenAI elle-même | `true` : la consommation d'une réponse en streaming est demandée (`stream_options`), si bien que son coût est compté ; `false` : elle ne l'est pas. Par défaut sur `https://api.openai.com/v1` et sur les hôtes régionaux comme `https://eu.api.openai.com/v1` (dans `baseURL` ou `OPENAI_BASE_URL`), car un serveur compatible peut refuser ce champ (la requête est alors envoyée à nouveau sans lui) ou l'ignorer, et un appel en streaming sans consommation compte comme non mesuré. Avec un budget de coût sur un serveur compatible qui fournit la consommation (c'est le cas de l'API v1 d'Azure OpenAI), fixez `true` |
 | `nativeToolMessages` | `true` | `false` pour un serveur compatible qui n'accepte pas, dans la conversation, les `tool_calls` de l'assistant ni les messages `tool` : les appels d'outils précédents et leurs résultats sont alors envoyés en texte, tandis que les outils restent proposés et que les appels d'outils des réponses sont toujours lus. `false` sur le fournisseur principal ou sur n'importe quel repli s'applique à toute la chaîne |
 
 Ces options se placent dans `providerConfig.openai` ou dans le `config` d'un repli OpenAI. Un repli d'un autre éditeur prend dans `providerConfig.openai` chaque option que son `config` ne fixe pas ; un repli du même éditeur que le principal n'en prend aucune. Un agent ou une exécution fixe son propre effort dans `providerSettings.openai.reasoningEffort` : celui de l'exécution l'emporte, puis celui de l'agent, puis celui du fournisseur. Un agent cognitif ne l'applique qu'à la sélection d'outil ; ses pensées, qui ne proposent pas d'outils, prennent son option `reasoningEffort`.
@@ -59,12 +60,21 @@ const analyst = sdk.createAgent({
 });
 ```
 
+### `LLMProvider` {#llmprovider}
+
+Votre propre fournisseur implémente `generateCompletion(request)`, `supportsModel(model)` et `getProviderName()`, et peut déclarer `nativeToolMessages`. Deux champs de la requête concernent le streaming :
+
+| Champ de `LLMRequest` | |
+| --- | --- |
+| `onTextDelta?(delta)` | Défini quand l'appelant veut le texte à mesure qu'il est écrit (une exécution avec `onText`). Appelez-le avec chaque fragment de texte dès qu'il arrive, puis renvoyez comme d'habitude la `LLMResponse` complète : les fragments mis bout à bout doivent former son `content`. Un fournisseur qui ne gère pas le streaming l'ignore, et le SDK transmet tout le `content` d'un seul bloc. Il ne doit pas lever d'exception (celui que fournit le SDK n'en lève jamais) |
+| `onTextRestart?()` | Appelez-le quand vous réessayez après une tentative qui avait déjà transmis du texte (une nouvelle tentative que vous faites vous-même) : ce texte n'est plus valable, et les fragments suivants recommencent la réponse. `RetryingLLMProvider` et `FallbackProvider` l'appellent pour les fournisseurs qu'ils enveloppent |
+
 ## Agents {#agents}
 
 | Méthode | Renvoie | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | Agent gouverné : `run({ message, context?, signal? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. Il ne peut exécuter que ses propres outils (`tools`, `capabilities`), même si le modèle nomme un autre outil enregistré dans le SDK ; `signal` annule l'exécution |
-| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()` |
+| `createAgent(config)` | `AgentImpl` | Agent gouverné : `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. Il ne peut exécuter que ses propres outils (`tools`, `capabilities`), même si le modèle nomme un autre outil enregistré dans le SDK ; `signal` annule l'exécution ; `onText` reçoit le texte que le modèle écrit à mesure qu'il l'écrit, et `onTextRestart` la partie à retirer quand un appel au modèle en échec est retenté (voir [Recevoir la réponse en streaming](../guide/governed-agents#_7-streaming-the-answer)) |
+| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()`. Ses pensées sont structurées et ne sont pas transmises en streaming |
 | `defineTool(definition)` | `Tool` | Enregistre un outil ; le gestionnaire est typé à partir de son schéma Zod |
 | `defineCapability(definition)` | `Capability` | Regroupe des outils |
 | `listTools()` | `Tool[]` | Tous les outils enregistrés |

@@ -1,5 +1,6 @@
 import { LLMProviderError } from '../errors/index.js';
 import type { LLMProvider, LLMRequest, LLMResponse } from './llm-provider.js';
+import { StreamedTextRelay } from './streamed-text.js';
 
 /** A completion from a fallback chain, and which provider gave it. */
 export interface FallbackResult {
@@ -18,7 +19,9 @@ export interface FallbackResult {
  * Provider wrapper that implements fallback logic between multiple providers.
  *
  * When a request fails with the primary provider, it automatically tries
- * the fallback providers in order until one succeeds or all fail.
+ * the fallback providers in order until one succeeds or all fail. When the request streams its
+ * text, a provider that had streamed some before failing is followed by `onTextRestart`: the
+ * next provider writes the answer again.
  */
 export class FallbackProvider implements LLMProvider {
   private providers: LLMProvider[];
@@ -49,18 +52,23 @@ export class FallbackProvider implements LLMProvider {
   async generateCompletionWithFallback(request: LLMRequest): Promise<FallbackResult> {
     const attemptedProviders: string[] = [];
     const failures: Array<{ provider: string; error: Error }> = [];
+    const text = new StreamedTextRelay(request);
 
     for (const [index, provider] of this.providers.entries()) {
       if (request.abortSignal?.aborted) {
         // A cancelled call stops the chain: no fallback is tried for it.
         throw new Error('Request aborted');
       }
+      if (index > 0) {
+        // The text the failed provider streamed is void: this one writes the answer again.
+        text.restart();
+      }
       const providerName = provider.getProviderName();
       attemptedProviders.push(providerName);
       const providerRequest = this.requestFor(provider, index, request);
 
       try {
-        const response = await provider.generateCompletion(providerRequest);
+        const response = await provider.generateCompletion(text.begin(providerRequest));
         return {
           response,
           usedProvider: providerName,

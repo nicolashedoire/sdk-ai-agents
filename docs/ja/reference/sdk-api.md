@@ -11,9 +11,9 @@ const sdk = createSDK(config);
 | --- | --- | --- |
 | `apiKey` | `string` | 主プロバイダーのキー（`llmProvider` を使う場合は不要）。キーがまったくなくてもツールと MCP サーバーは動作し、モデルを必要とする呼び出しは明確なエラーで失敗する |
 | `provider` | `'openai' \| 'anthropic'` | 主プロバイダー。デフォルトは `openai` |
-| `providerConfig` | `{ openai?, anthropic? }` | 各ベンダーの `apiKey`、`defaultModel`、`baseURL`（`baseURL`：Azure OpenAI の v1 API やローカルのモデルサーバーなどの互換エンドポイント、またはプロキシ）。主プロバイダーは自分のベンダーの項目を使い、別のベンダーのフォールバックはそのベンダーの項目を使う。デフォルトのモデルは `gpt-5.4` と `claude-opus-5`。OpenAI の項目では `reasoningModels`、`reasoningEffort`、`nativeToolMessages` も指定できる（[OpenAI のモデル](#openai-models) を参照） |
+| `providerConfig` | `{ openai?, anthropic? }` | 各ベンダーの `apiKey`、`defaultModel`、`baseURL`、`timeout`（`baseURL`：Azure OpenAI の v1 API やローカルのモデルサーバーなどの互換エンドポイント、またはプロキシ。`timeout`：回答を待つ最長時間をミリ秒で指定し、デフォルトは 10 分。ストリーミングされた回答では、その 2 つのイベントの間に待つ最長時間）。主プロバイダーは自分のベンダーの項目を使い、別のベンダーのフォールバックはそのベンダーの項目を使う。デフォルトのモデルは `gpt-5.4` と `claude-opus-5`。OpenAI の項目では `reasoningModels`、`reasoningEffort`、`nativeToolMessages`、`includeStreamUsage` も指定できる（[OpenAI のモデル](#openai-models) を参照） |
 | `fallbackProviders` | `Array<{ provider, config? }>` | 主プロバイダーが失敗したときに、順番に試される。`config` は `providerConfig` より優先される。主プロバイダーと同じベンダーのフォールバックは、主プロバイダーの設定を引き継がない（全体の `apiKey` のみ）。別のベンダーのフォールバックには独自のキーが必要 |
-| `llmProvider` | `LLMProvider` | 独自のプロバイダー（ローカルモデル、ゲートウェイ、テストダブル）。`nativeToolMessages` を宣言していれば、ツール呼び出しとその結果をネイティブ形式（`LLMMessage`）で、そうでなければテキストで受け取る |
+| `llmProvider` | `LLMProvider` | 独自のプロバイダー（ローカルモデル、ゲートウェイ、テストダブル）。`nativeToolMessages` を宣言していれば、ツール呼び出しとその結果をネイティブ形式（`LLMMessage`）で、そうでなければテキストで受け取る。テキストをストリーミングすることもできる（[`LLMProvider`](#llmprovider) を参照） |
 | `retry` | `Partial<RetryPolicy> \| false` | LLM のリトライポリシー。プロバイダーごとに、フォールバックの前に適用される。その `maxRetries` と `initialDelayMs` は `jev.maxRetries` と `jev.retryBaseDelayMs` のデフォルトにもなる。ほかのフィールドは Jev クライアントには届かず、`retry: false` の場合、Jev クライアントは独自の 2 回のリトライと 500 ms を使う。注入した `llmProvider` には明示的に設定した場合にのみ適用され、`llmProvider` として渡した `FallbackProvider` とその中のプロバイダーには適用されない |
 | `jev` | `JevClientConfig` | 型付き決定のために TypeSafe Jev を有効にする。直接使うか、`baseUrl` と `model: 'typesafe-ai/jev'` を指定して [Vercel AI Gateway](../guide/typed-decisions#through-vercel-ai-gateway) 経由で使う |
 | `decisionClient` | `TypedDecisionClient` | 任意の型付き決定のバックエンド（`jev` より優先される） |
@@ -36,6 +36,7 @@ SDK は Chat Completions を通じて OpenAI を呼び出します。Chat Comple
 | `defaultModel` | `gpt-5.4` | モデルを指定しないリクエストと、エージェントのモデルに対応していないフォールバックが使うモデル |
 | `reasoningModels` | 名前から判別 | `true` または `false`：このプロバイダーのすべてのモデルを推論モデルとして扱うか、扱わないか。リスト：挙げた名前（Azure のデプロイ、ゲートウェイのエイリアス）は推論モデルで、ほかは名前から判別される |
 | `reasoningEffort` | モデルのデフォルト | `none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max` のいずれか。推論モデルにだけ、そのまま送られる。各モデルが受け付けるのはこのうち一部の値で、API はそれ以外を拒否する |
+| `includeStreamUsage` | OpenAI 自身の API では有効 | `true`：ストリーミングされた回答に使用量を要求し（`stream_options`）、その費用が数えられる。`false`：要求しない。デフォルトでは `https://api.openai.com/v1` と、`https://eu.api.openai.com/v1` などのリージョンのホスト（`baseURL` または `OPENAI_BASE_URL` から判断）で有効になる。互換サーバーはこのフィールドを拒否する（その場合、リクエストはこのフィールドなしで再送される）か、無視することがあり、使用量のないストリーミングの呼び出しは未計測として扱われるためである。使用量を報告する互換サーバー（Azure OpenAI の v1 API は報告する）で費用予算を使う場合は `true` にする |
 | `nativeToolMessages` | `true` | 会話の中でアシスタントの `tool_calls` と `tool` メッセージを受け付けない互換サーバーでは `false`：それまでのツール呼び出しとその結果はテキストで送られる。ツールは引き続き提示され、応答に含まれるツール呼び出しも引き続き読み取られる。主プロバイダーまたはいずれかのフォールバックで `false` にすると、チェーン全体に適用される |
 
 これらのオプションは `providerConfig.openai`、または OpenAI のフォールバックの `config` に指定します。別のベンダーのフォールバックは、自身の `config` が指定していないオプションを `providerConfig.openai` から取ります。主プロバイダーと同じベンダーのフォールバックは何も引き継ぎません。エージェントや実行は、`providerSettings.openai.reasoningEffort` で独自の努力度を指定できます。実行の値が最優先で、次にエージェント、最後にプロバイダーの値が使われます。認知エージェントはこれをツール選択にだけ適用し、ツールを提示しない思考には、エージェントの `reasoningEffort` オプションが使われます。
@@ -59,12 +60,21 @@ const analyst = sdk.createAgent({
 });
 ```
 
+### `LLMProvider` {#llmprovider}
+
+独自のプロバイダーは `generateCompletion(request)`、`supportsModel(model)`、`getProviderName()` を実装し、`nativeToolMessages` を宣言することもできます。リクエストの 2 つのフィールドがストリーミングに関係します。
+
+| `LLMRequest` のフィールド | |
+| --- | --- |
+| `onTextDelta?(delta)` | 呼び出し元がテキストを書かれるそばから受け取りたい場合（`onText` を指定した実行）に設定される。テキストの断片が届くたびに、その断片を渡してこれを呼び出し、その後、通常どおり完全な `LLMResponse` を返す。断片をつなげたものが、その `content` にならなければならない。ストリーミングできないプロバイダーはこれを無視し、SDK が `content` 全体を一度に渡す。これは例外をスローしてはならない（SDK 自身が設定するものは決してスローしない） |
+| `onTextRestart?()` | すでにテキストをストリーミングした試行の後にもう一度試すとき（独自のリトライ）に、これを呼び出す。そのテキストは無効になり、次の断片から回答がやり直される。`RetryingLLMProvider` と `FallbackProvider` は、ラップしているプロバイダーのためにこれを呼び出す |
+
 ## エージェント {#agents}
 
 | メソッド | 戻り値 | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | ガバナンス付きエージェント：`run({ message, context?, signal? })`、`stop(runId?)`、`addTools()`、`setPolicy()`、`id`、`name`。モデルが SDK に登録されている別のツールの名前を挙げても、実行できるのは自分のツール（`tools`、`capabilities`）だけ。`signal` は実行をキャンセルする |
-| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`、`stop(runId?)`、`learnFromFeedback(runId, feedback)`、`getProfile()`、`setProfile()` |
+| `createAgent(config)` | `AgentImpl` | ガバナンス付きエージェント：`run({ message, context?, signal?, onText?, onTextRestart? })`、`stop(runId?)`、`addTools()`、`setPolicy()`、`id`、`name`。モデルが SDK に登録されている別のツールの名前を挙げても、実行できるのは自分のツール（`tools`、`capabilities`）だけ。`signal` は実行をキャンセルする。`onText` はモデルが書くテキストを書かれるそばから受け取り、`onTextRestart` は失敗したモデル呼び出しがもう一度試されるときに捨てる部分を受け取る（[回答のストリーミング](../guide/governed-agents#_7-streaming-the-answer) を参照） |
+| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`、`stop(runId?)`、`learnFromFeedback(runId, feedback)`、`getProfile()`、`setProfile()`。その思考は構造化されており、ストリーミングされない |
 | `defineTool(definition)` | `Tool` | ツールを登録する。ハンドラーの型は、その Zod スキーマから決まる |
 | `defineCapability(definition)` | `Capability` | ツールをグループにまとめる |
 | `listTools()` | `Tool[]` | 登録されているすべてのツール |

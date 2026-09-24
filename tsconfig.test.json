@@ -49,6 +49,8 @@
     "src/__tests__/provider-settings-fallback.test.ts",
     "src/__tests__/sdk-fallback.test.ts",
     "src/__tests__/fallback-provider.test.ts",
+    "src/__tests__/provider-streaming.test.ts",
+    "src/__tests__/sdk-text-streaming.test.ts",
     "src/__tests__/sdk.test.ts",
     "src/__tests__/integration.test.ts",
     "src/__tests__/regression-test-runner.test.ts",

@@ -108,6 +108,24 @@ export interface LLMRequest {
    * can still count it. Passed unchanged to the providers of a fallback chain and to retries.
    */
   onDiscardedAnswer?: (answer: DiscardedAnswer) => void;
+
+  /**
+   * Streams the answer's text: called with each piece of text as the model writes it. A provider
+   * that can stream (the built-in OpenAI and Anthropic ones) then calls the vendor's streaming
+   * API, and still returns the complete response, the same as without this callback: the pieces
+   * joined make its `content`. A provider that cannot stream ignores it (a run's `onText` then
+   * gets the whole `content` in one piece). Called while the answer is read, it must not throw
+   * (the SDK's own callback never does).
+   */
+  onTextDelta?: (delta: string) => void;
+
+  /**
+   * Called when the text passed to `onTextDelta` so far is void: the attempt that wrote it
+   * failed and the request is tried again (`RetryingLLMProvider`) or by another provider
+   * (`FallbackProvider`). The deltas that follow start the answer over. Only called when that
+   * attempt had streamed some text.
+   */
+  onTextRestart?: () => void;
 }
 
 /** An answer a vendor billed, with the usage it reported, that the provider could not use. */
@@ -157,6 +175,11 @@ export interface VendorClientOptions {
    * gateway) or a proxy. The vendor's own address when omitted.
    */
   baseURL?: string;
+  /**
+   * Longest wait for an answer, in milliseconds (the vendor client's default: 10 minutes). A
+   * streamed answer that sends nothing for this long is cut, and fails as a connection failure.
+   */
+  timeout?: number;
 }
 
 /**

@@ -224,6 +224,19 @@ export class MyProvider implements LLMProvider {
 }
 ```
 
+要流式输出文本（使用 `onText` 的运行），请在你的模型写出每一段文本时，用这段文本调用 `request.onTextDelta`，并且仍然返回完整的响应。无法流式输出的提供商会忽略它：这时 SDK 会把文本一次性传递出去。
+
+```typescript
+async generateCompletion(request: LLMRequest): Promise<LLMResponse> {
+  let content = '';
+  for await (const piece of myModel.stream(request.messages, { signal: request.abortSignal })) {
+    content += piece;
+    request.onTextDelta?.(piece);
+  }
+  return { content, model: 'my-model' };
+}
+```
+
 2. 把它添加到 `ProviderFactory` 中：
 
 ```typescript

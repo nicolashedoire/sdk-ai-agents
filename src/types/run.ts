@@ -15,6 +15,18 @@ export interface RunInput {
    * never thrown into the run. Not recorded. A replay takes it in the options of `sdk.replay`.
    */
   onEvent?: LiveEventListener;
+  /**
+   * Receives the text the model writes, delta by delta: as it is generated when the provider
+   * streams (the built-in OpenAI and Anthropic ones do), in one piece when a model call ends
+   * otherwise. What it throws is ignored: abort `signal` to stop the run. Not recorded.
+   */
+  onText?: (delta: string) => void;
+  /**
+   * Called when text already given to `onText` is void: the model call that wrote it failed
+   * and is retried or passed to a fallback provider, which writes the answer again.
+   * `discarded` is that text, the end of what `onText` received. Not recorded.
+   */
+  onTextRestart?: (discarded: string) => void;
   metadata?: Record<string, unknown>;
   providerSettings?: {
     openai?: OpenAIProviderSettings;
@@ -105,7 +117,11 @@ export interface ActionResult {
 }
 
 export interface ReplayModifications {
-  input?: RunInput;
+  /**
+   * The input to record for the replay. A replay neither streams nor can be cancelled, and its
+   * live events are asked for in the options of `sdk.replay`.
+   */
+  input?: Omit<RunInput, 'signal' | 'onEvent' | 'onText' | 'onTextRestart'>;
   policies?: string[];
   tools?: string[];
 }

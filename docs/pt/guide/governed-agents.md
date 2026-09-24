@@ -289,6 +289,33 @@ await agent.stop(); // Stop all runs of this agent
 await sdk.stopRun(runId);
 ```
 
+### 7. Streaming da resposta {#_7-streaming-the-answer}
+
+Mostre a resposta enquanto o modelo a escreve: `onText` recebe o texto delta por delta.
+
+```typescript
+let shown = '';
+const result = await agent.run({
+  message: 'Summarize the incident report',
+  onText: (delta) => {
+    shown += delta;
+    render(shown);
+  },
+  onTextRestart: (discarded) => {
+    shown = shown.slice(0, shown.length - discarded.length);
+    render(shown);
+  },
+});
+```
+
+- Com `onText`, os provedores OpenAI e Anthropic integrados chamam a API de streaming do seu fornecedor, e o resultado e os eventos da execução continuam os mesmos que sem essa opção. Os custos também, exceto com um servidor compatível com a OpenAI (uma `baseURL`, ou `OPENAI_BASE_URL`): o consumo de uma resposta enviada em streaming só é pedido na própria API da OpenAI, incluindo os hosts regionais, a menos que `providerConfig.openai.includeStreamUsage` esteja definido, e uma chamada sem consumo informado conta como não medida nos orçamentos. Com um orçamento de custo em um servidor compatível que informa o consumo (a API v1 do Azure OpenAI informa), defina `includeStreamUsage: true`.
+- O texto de cada chamada ao modelo da execução é repassado, uma chamada depois da outra: o que o modelo escreve antes de chamar uma ferramenta, depois a sua resposta, com uma linha em branco (`\n\n`) antes do texto de uma chamada quando uma chamada anterior já escreveu algum. Os argumentos de ferramenta e o raciocínio (thinking) do Claude não são repassados.
+- Um provedor que não consegue fazer streaming (o seu próprio `llmProvider`, a menos que ele leia `onTextDelta`) entrega o texto inteiro de cada chamada ao modelo de uma só vez, quando a chamada termina. O mesmo vale para a OpenAI com um modelo que ela se recusa a enviar em streaming (uma organização não verificada para isso): o provedor pede de novo sem streaming, e não faz mais streaming desse modelo. Um servidor que recusa `stream_options` recebe o pedido de novo sem esse campo.
+- Quando uma chamada ao modelo falha depois que parte do seu texto foi repassada e é tentada de novo (uma nova tentativa, ou um provedor de fallback), `onTextRestart` recebe essa parte (`discarded`, o final do que `onText` recebeu, incluindo a linha em branco): descarte-a, a próxima tentativa escreve a resposta de novo. A execução registra mesmo assim `provider.retry` ou `provider.fallback`. Uma chamada que falha de vez deixa o seu texto como estava, e a execução falha.
+- O que os callbacks lançam, ou rejeitam quando são assíncronos, é ignorado: a execução continua. Para interrompê-la, aborte o seu `signal`. Nenhum dos dois callbacks é registrado na execução.
+
+Os agentes cognitivos não fazem streaming: cada chamada ao modelo deles devolve um pensamento estruturado (JSON) que o motor verifica e admite por inteiro, e meio pensamento ainda não significa nada.
+
 ## Fluxo de trabalho típico {#typical-workflow}
 
 1. **Inicialize o SDK** com a sua chave de API

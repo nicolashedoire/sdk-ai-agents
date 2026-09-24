@@ -8,6 +8,7 @@ import type {
   LLMToolCall,
   VendorClientOptions,
 } from './llm-provider.js';
+import { assertVendorTimeout } from './vendor-timeout.js';
 
 /** Model used when neither the request nor the configuration names one. */
 export const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-5';
@@ -25,6 +26,7 @@ export class AnthropicProvider implements LLMProvider {
     if (!apiKey || apiKey.trim() === '') {
       throw new Error('Anthropic API key is required');
     }
+    assertVendorTimeout(options.timeout, 'options.timeout');
     this.client = new Anthropic({
       apiKey,
       // Only the given key authenticates: the client would otherwise also send the
@@ -32,6 +34,7 @@ export class AnthropicProvider implements LLMProvider {
       authToken: null,
       ...(options.maxRetries !== undefined ? { maxRetries: options.maxRetries } : {}),
       ...(options.baseURL !== undefined ? { baseURL: options.baseURL } : {}),
+      ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
     });
     this.defaultModel = defaultModel;
   }
@@ -46,7 +49,7 @@ export class AnthropicProvider implements LLMProvider {
       const { system, messages } = this.convertMessages(request.messages);
       const tools = this.convertTools(request.tools);
 
-      const params: Anthropic.MessageCreateParams = {
+      const params: Anthropic.MessageCreateParamsNonStreaming = {
         model,
         max_tokens: request.maxTokens || defaultMaxTokens(model),
         system,
@@ -65,9 +68,9 @@ export class AnthropicProvider implements LLMProvider {
       }
 
       // The signal cancels the HTTP request itself: the answer is not waited for.
-      const response = await this.client.messages.create(params, {
-        signal: request.abortSignal,
-      });
+      const response = request.onTextDelta
+        ? await this.streamMessage(params, request.onTextDelta, request.abortSignal)
+        : await this.client.messages.create(params, { signal: request.abortSignal });
 
       if (request.abortSignal?.aborted) {
         throw new Error('Request aborted');
@@ -79,6 +82,77 @@ export class AnthropicProvider implements LLMProvider {
         throw new Error('Request aborted');
       }
       throw this.wrapError(error);
+    }
+  }
+
+  /**
+   * Streams the answer, passing each piece of text on as it arrives. The vendor client
+   * assembles the message the non-streaming API returns: text, thinking blocks with their
+   * signature, and the usage of `message_start` and `message_delta`; tool inputs are parsed
+   * here from their JSON pieces. The client's timeout ends when the answer starts: a stream
+   * that then sends nothing for as long is cut here.
+   */
+  private async streamMessage(
+    params: Anthropic.MessageCreateParamsNonStreaming,
+    onTextDelta: (delta: string) => void,
+    signal: AbortSignal | undefined
+  ): Promise<Anthropic.Message> {
+    const reading = new AbortController();
+    const cancel = () => reading.abort();
+    if (signal?.aborted) cancel();
+    signal?.addEventListener('abort', cancel, { once: true });
+    const idleMs = this.client.timeout;
+    let stalled = false;
+    let timer: NodeJS.Timeout | undefined;
+    const awaitNextEvent = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        stalled = true;
+        reading.abort();
+      }, idleMs);
+    };
+
+    const stream = this.client.messages.stream(params, { signal: reading.signal });
+    let textBlocks = 0;
+    let stopped = false;
+    /** The JSON of each tool input, by block index, as the vendor sent it. */
+    const inputs = new Map<number, string>();
+    stream.on('connect', awaitNextEvent);
+    stream.on('streamEvent', (event) => {
+      awaitNextEvent();
+      if (event.type === 'content_block_start' && event.content_block.type === 'text') {
+        // The response's content joins its text blocks with a blank line: so do the pieces.
+        if (textBlocks > 0) onTextDelta('\n\n');
+        textBlocks++;
+        if (event.content_block.text) onTextDelta(event.content_block.text);
+      } else if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        if (event.delta.text) onTextDelta(event.delta.text);
+      } else if (event.type === 'content_block_delta' && event.delta.type === 'input_json_delta') {
+        inputs.set(event.index, (inputs.get(event.index) ?? '') + event.delta.partial_json);
+      } else if (event.type === 'message_stop') {
+        stopped = true;
+      }
+    });
+
+    try {
+      return withToolInputs(await stream.finalMessage(), inputs);
+    } catch (error) {
+      if (stalled) {
+        throw new Anthropic.APIConnectionTimeoutError({
+          message: `The answer stream sent nothing for ${idleMs} ms`,
+        });
+      }
+      if (!stopped && !signal?.aborted && !(error instanceof Anthropic.APIError)) {
+        // Neither a vendor error nor a cancellation: the stream ended, or broke off, too early.
+        throw new Anthropic.APIConnectionError({
+          message: 'The answer stream ended before the answer was complete',
+          cause: error instanceof Error ? error : undefined,
+        });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', cancel);
     }
   }
 
@@ -238,6 +312,27 @@ function defaultMaxTokens(model: string): number {
   if (!version) return 4_096;
   if (version.family === 'opus' && version.major === 4 && version.minor <= 1) return 8_192;
   return 16_000;
+}
+
+/**
+ * The message with each tool input parsed from the JSON the vendor streamed, as the
+ * non-streaming API gives it: the vendor client's parser for partial JSON reads `1e-7` as 17.
+ * A tool called without input keeps the `{}` of its first event.
+ */
+function withToolInputs(
+  message: Anthropic.Message,
+  inputs: ReadonlyMap<number, string>
+): Anthropic.Message {
+  if (inputs.size === 0) return message;
+  return {
+    ...message,
+    content: message.content.map((block, index) => {
+      const json = inputs.get(index);
+      return json && (block.type === 'tool_use' || block.type === 'server_tool_use')
+        ? { ...block, input: JSON.parse(json) as unknown }
+        : block;
+    }),
+  };
 }
 
 /** An assistant turn: as this vendor returned it when available, else rebuilt from its parts. */

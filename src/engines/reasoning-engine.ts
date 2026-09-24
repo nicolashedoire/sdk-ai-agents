@@ -44,6 +44,10 @@ export interface ReasoningContext {
    * `LLMRequest.onDiscardedAnswer`). Governed agents count their budgets through it.
    */
   onModelUsage?: (call: AnsweredModelCall) => void | Promise<void>;
+  /** Receives the text the model writes, as it is written (see `RunInput.onText`). */
+  onText?: (delta: string) => void;
+  /** Hears that text given to `onText` is void (see `RunInput.onTextRestart`). */
+  onTextRestart?: (discarded: string) => void;
 }
 
 /** A model call as budgets count it: the model that answered, the one asked for, the tokens. */
@@ -132,6 +136,14 @@ export class ReasoningEngine {
     if (abortSignal?.aborted) {
       throw new Error('Run cancelled');
     }
+    const text = context.onText
+      ? new CallText(
+          context.onText,
+          context.onTextRestart,
+          followsText(context.conversationHistory)
+        )
+      : undefined;
+    const streaming = text?.callbacks ?? {};
 
     try {
       const messages = this.buildMessages(context);
@@ -152,6 +164,7 @@ export class ReasoningEngine {
           onDiscardedAnswer: (discardedAnswer) => {
             discarded.push(discardedAnswer);
           },
+          ...streaming,
         });
       } catch (error) {
         // The provider's failure is what the caller needs to see: a store that cannot record
@@ -167,6 +180,7 @@ export class ReasoningEngine {
         throw error;
       }
       const { response, requestedModel, answeredBy } = answer;
+      text?.end(response.content);
 
       // Every answer the vendor billed is counted before anything is recorded, and before the
       // answer is read: a store that fails, or a step failing on the answer, still counts it.
@@ -230,6 +244,8 @@ export class ReasoningEngine {
         error instanceof Error ? error : new Error(String(error)),
         true
       );
+    } finally {
+      text?.close();
     }
   }
 
@@ -482,6 +498,79 @@ export class ReasoningEngine {
 
   private zodSchemaToJsonSchema(schema: unknown): Record<string, unknown> {
     return zodSchemaToJsonSchema(schema as z.ZodSchema);
+  }
+}
+
+/** Separates the text of a model call from the text of the calls before it. */
+const CALL_SEPARATOR = '\n\n';
+
+/** Whether an earlier model call of the conversation wrote text (its turn has some). */
+function followsText(history: LLMMessage[]): boolean {
+  return history.some((message) => message.role === 'assistant' && message.content !== '');
+}
+
+/**
+ * The text of one model call, passed to the run's callbacks as the model writes it. A provider
+ * that does not stream gives its whole text when the call ends. When an earlier call wrote
+ * text, a blank line comes first; it belongs to this call's text, so a restart discards it
+ * with the rest and the next attempt sends it again. Nothing is passed on once the call is
+ * over, and what the callbacks throw is ignored: they watch the answer, they take no part in it.
+ */
+class CallText {
+  /** Text given to `onText` since the call began or since its last restart. */
+  private written = '';
+  private open = true;
+
+  constructor(
+    private readonly onText: (delta: string) => void,
+    private readonly onRestart: ((discarded: string) => void) | undefined,
+    private readonly separated: boolean
+  ) {}
+
+  /** The request's callbacks (`LLMRequest.onTextDelta` and `onTextRestart`). */
+  readonly callbacks = {
+    onTextDelta: (delta: string): void => {
+      if (this.open && delta !== '') this.write(delta);
+    },
+    onTextRestart: (): void => {
+      if (!this.open || this.written === '') return;
+      const discarded = this.written;
+      this.written = '';
+      notify(this.onRestart, discarded);
+    },
+  };
+
+  /** The call answered: a provider that did not stream gives its text now. */
+  end(content: string | null): void {
+    if (this.open && this.written === '' && content) {
+      this.write(content);
+    }
+    this.open = false;
+  }
+
+  private write(text: string): void {
+    if (this.written === '' && this.separated) {
+      this.written = CALL_SEPARATOR;
+      notify(this.onText, CALL_SEPARATOR);
+    }
+    this.written += text;
+    notify(this.onText, text);
+  }
+
+  close(): void {
+    this.open = false;
+  }
+}
+
+/** Calls a callback of the caller, ignoring what it throws, or rejects if it is async. */
+function notify<T>(callback: ((value: T) => void) | undefined, value: T): void {
+  try {
+    const result: unknown = callback?.(value);
+    if (typeof (result as PromiseLike<unknown> | undefined)?.then === 'function') {
+      Promise.resolve(result).catch(() => undefined);
+    }
+  } catch {
+    // The run goes on: abort its signal to stop it.
   }
 }
 

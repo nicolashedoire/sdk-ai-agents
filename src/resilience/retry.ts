@@ -1,3 +1,5 @@
+import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { LLMProviderError } from '../errors/index.js';
 import { parseRetryAfter } from '../utils/http.js';
 
@@ -54,6 +56,8 @@ const TRANSIENT_CODES = new Set([
   'EAI_AGAIN',
   'EPIPE',
   'UND_ERR_SOCKET',
+  // The connection closed in the middle of a streamed answer (Node streams, node-fetch).
+  'ERR_STREAM_PREMATURE_CLOSE',
 ]);
 
 /** Codes of an exhausted account: waiting does not bring credit back. */
@@ -62,6 +66,20 @@ const EXHAUSTED_ACCOUNT_CODES = new Set([
   'credit_balance_exhausted',
   'billing_hard_limit_reached',
   'billing_not_active',
+]);
+
+/**
+ * Types of the errors a vendor sends in the middle of a streamed answer, once the HTTP status
+ * (200) is gone: those whose HTTP counterpart is transient. OpenAI `server_error` (500);
+ * Anthropic `rate_limit_error` (429), `api_error` (500), `timeout_error` (504) and
+ * `overloaded_error` (529).
+ */
+const TRANSIENT_STREAM_ERROR_TYPES = new Set([
+  'server_error',
+  'rate_limit_error',
+  'api_error',
+  'timeout_error',
+  'overloaded_error',
 ]);
 
 const CONNECTION_ERROR_CLASSES = new Set([
@@ -76,7 +94,8 @@ const CONNECTION_ERROR_CLASSES = new Set([
  * an account out of credit or quota (a 429 that waiting cannot fix).
  *
  * Vendor SDK errors are recognized by class name (their `name` property is a plain
- * `Error`) and by the network code carried on `cause`.
+ * `Error`), by the network code carried on `cause`, and, for an OpenAI or Anthropic API error
+ * sent in the middle of a stream (it has no status), by the vendor's error type.
  */
 export function isTransientError(error: unknown): boolean {
   if (error instanceof LLMProviderError && error.connectionFailure) {
@@ -96,6 +115,12 @@ export function isTransientError(error: unknown): boolean {
       return TRANSIENT_STATUSES.has(status);
     }
     if (code && TRANSIENT_CODES.has(code)) {
+      return true;
+    }
+    if (
+      (candidate instanceof OpenAI.APIError || candidate instanceof Anthropic.APIError) &&
+      vendorErrorTypes(candidate).some((kind) => TRANSIENT_STREAM_ERROR_TYPES.has(kind))
+    ) {
       return true;
     }
     const className = candidate.constructor?.name;
@@ -148,6 +173,21 @@ function errorChain(error: unknown): object[] {
     );
   }
   return chain;
+}
+
+/**
+ * The error types a vendor error carries: its own `type` (OpenAI), and those of the body it
+ * holds in `error` (OpenAI `{ type }`, Anthropic `{ type: 'error', error: { type } }`).
+ */
+function vendorErrorTypes(candidate: object): string[] {
+  const types: string[] = [];
+  let current: unknown = candidate;
+  for (let depth = 0; depth < 3 && current && typeof current === 'object'; depth++) {
+    const type = readString(current, 'type');
+    if (type) types.push(type);
+    current = Reflect.get(current, 'error');
+  }
+  return types;
 }
 
 function readHeader(headers: object, name: string): string | undefined {

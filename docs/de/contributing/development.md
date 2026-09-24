@@ -224,6 +224,19 @@ export class MyProvider implements LLMProvider {
 }
 ```
 
+Um den Text zu streamen (ein Lauf mit `onText`), rufen Sie `request.onTextDelta` mit jedem Stück auf, sobald Ihr Modell es schreibt, und geben Sie trotzdem die ganze Antwort zurück. Ein Anbieter, der nicht streamen kann, ignoriert es: Das SDK gibt den Text dann in einem Stück weiter.
+
+```typescript
+async generateCompletion(request: LLMRequest): Promise<LLMResponse> {
+  let content = '';
+  for await (const piece of myModel.stream(request.messages, { signal: request.abortSignal })) {
+    content += piece;
+    request.onTextDelta?.(piece);
+  }
+  return { content, model: 'my-model' };
+}
+```
+
 2. Fügen Sie ihn der `ProviderFactory` hinzu:
 
 ```typescript
