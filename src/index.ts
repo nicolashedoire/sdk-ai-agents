@@ -243,13 +243,13 @@ export type { OpenApiFetch, OpenApiSpecSource } from './tools/openapi-spec.js';
 export type { OpenApiResult } from './tools/openapi-call.js';
 export { folderResources, folderTools } from './tools/folder-tools.js';
 export type { FolderToolsOptions } from './tools/folder-tools.js';
-export { DEFAULT_TEXT_EXTENSIONS } from './tools/folder-access.js';
+export { DEFAULT_TEXT_EXTENSIONS } from './tools/folder-options.js';
 export type {
   FileContent,
   FolderEntry,
   FolderOptions,
   SearchMatch,
-} from './tools/folder-access.js';
+} from './tools/folder-options.js';
 export { databaseTools } from './tools/database-tools.js';
 export type {
   ColumnSummary,

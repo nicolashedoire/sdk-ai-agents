@@ -1,5 +1,8 @@
 import { clip } from './bounded-text.js';
 
+/** Items kept from an array value; the rest is counted. */
+export const MAX_ARRAY_ITEMS = 100;
+
 /**
  * Turns a value read from a database into plain JSON a model can read: big integers become
  * numbers when exact (strings otherwise), dates ISO strings, binary data a short note, and
@@ -17,7 +20,13 @@ export function toJsonValue(value: unknown, maxTextLength: number): unknown {
     return Number.isNaN(value.getTime()) ? null : value.toISOString();
   }
   if (value instanceof Uint8Array) return `<binary data, ${value.byteLength} bytes>`;
-  if (Array.isArray(value)) return value.map((item) => toJsonValue(item, maxTextLength));
+  if (Array.isArray(value)) {
+    // Arrays (PostgreSQL `array_agg`, JSON arrays) could hold a whole table in one value.
+    const kept = value.slice(0, MAX_ARRAY_ITEMS).map((item) => toJsonValue(item, maxTextLength));
+    return value.length > MAX_ARRAY_ITEMS
+      ? [...kept, `… ${value.length - MAX_ARRAY_ITEMS} more items`]
+      : kept;
+  }
   if (typeof value === 'object') {
     // JSON columns: kept as objects, unless their text form is too long.
     const text = JSON.stringify(value, (_key, item: unknown) =>

@@ -35,4 +35,17 @@ describe('FileEventStore concurrent flushes', () => {
     expect(stored.map((stored) => stored.id)).toEqual(Array.from({ length: 25 }, (_, index) => `evt_${index + 1}`));
     expect(readdirSync(join(directory, 'events')).filter((file) => file.endsWith('.tmp'))).toEqual([]);
   });
+
+  it('writes the first run only once its folder exists, however deep', async () => {
+    directory = mkdtempSync(join(tmpdir(), 'file-store-'));
+    // Created level by level in the background, while the first events are written.
+    const deep = join(directory, ...Array.from({ length: 40 }, (_, index) => `level-${index}`));
+    store = new FileEventStore(deep);
+
+    for (let index = 1; index <= 10; index++) {
+      await store.append('run_a', event('run_a', index));
+    }
+
+    expect((await store.getEvents('run_a')).map((stored) => stored.id)).toHaveLength(10);
+  });
 });

@@ -25,7 +25,8 @@ describe('AgentImpl', () => {
     const provider = new OpenAIProvider('test-key', 'gpt-4')
     reasoningEngine = new ReasoningEngine(provider, 'gpt-4')
 
-    toolRegistry.registerTool({
+    // The agent is given this tool: a governed agent may only run its own tools.
+    const testTool = toolRegistry.registerTool({
       name: 'test-tool',
       description: 'Test tool',
       schema: z.object({
@@ -40,7 +41,7 @@ describe('AgentImpl', () => {
       id: 'agent-1',
       name: 'test-agent',
       model: 'gpt-4',
-      tools: [],
+      tools: [testTool],
       policies: [],
       config: {
         name: 'test-agent',

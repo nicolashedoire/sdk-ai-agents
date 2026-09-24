@@ -49,4 +49,19 @@ describe('assertSingleQuery', () => {
     // The lexical check cannot tell; the adapters' read-only mode refuses it (see their tests).
     expect(assertSingleQuery('WITH gone AS (DELETE FROM t RETURNING *) SELECT * FROM gone', 'postgres')).toContain('DELETE');
   });
+
+  it('reads PostgreSQL escape strings and carriage-return comments the way the server does', () => {
+    // In E'…', \' does not end the string: this is one statement.
+    expect(() => assertSingleQuery("SELECT E'it\\'s; fine'", 'postgres')).not.toThrow();
+    // PostgreSQL ends a -- comment at a carriage return: what follows is a second statement.
+    expect(() => assertSingleQuery('SELECT 1 --\r; DROP TABLE t', 'postgres')).toThrow('only one statement');
+    // SQLite does not: the whole rest is a comment.
+    expect(() => assertSingleQuery('SELECT 1 --\r; DROP TABLE t', 'sqlite')).not.toThrow();
+  });
+
+  it('refuses unbalanced parentheses, which could step out of a wrapping sub-query', () => {
+    expect(() => assertSingleQuery('SELECT 1 AS a) AS x, (SELECT 2 AS b', 'postgres')).toThrow('a ")" closes nothing');
+    expect(() => assertSingleQuery('SELECT (1', 'sqlite')).toThrow('a "(" is never closed');
+    expect(() => assertSingleQuery("SELECT ')' AS closing, (1) AS one", 'postgres')).not.toThrow();
+  });
 });

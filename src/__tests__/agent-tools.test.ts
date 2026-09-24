@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { cognitiveAgentTool, governedAgentTool } from '../tools/agent-tools.js';
 import { ScriptedLLMProvider } from './support/scripted-llm-provider.js';
 import { createTestSDK, lookupMetricDefinition, scriptBuildOrBuy, type TestSDK } from './support/test-sdk.js';
@@ -69,10 +70,15 @@ describe('agents as tools', () => {
     const caller = new AbortController();
 
     const pending = tool.handler({ problem: PROBLEM }, { runId: 'r', agentId: 'mcp:test', signal: caller.signal });
-    setTimeout(() => caller.abort(), 10);
+    while (env.provider.requests.length === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    const requestsWhenCancelled = env.provider.requests.length;
+    caller.abort();
 
     await expect(pending).resolves.toMatchObject({ status: 'cancelled' });
-    expect(env.provider.requests.length).toBeLessThan(3);
+    // No model call starts after the caller gave up.
+    expect(env.provider.requests).toHaveLength(requestsWhenCancelled);
   });
 
   it('reports a failed reasoning with its reason', async () => {
@@ -80,8 +86,12 @@ describe('agents as tools', () => {
     const agent = env.sdk.createCognitiveAgent({ name: 'fragile', model: 'test-model', limits: { maxConsecutiveFailures: 1 } });
 
     const result = await cognitiveAgentTool(agent).handler({ problem: PROBLEM });
+    const detailed = await cognitiveAgentTool(agent, { exposeErrors: true }).handler({ problem: PROBLEM });
 
-    expect(result).toMatchObject({ status: 'failed', error: expect.stringContaining('model unavailable') });
+    // The cause (here a provider failure) stays in the event log unless you opt in.
+    expect(result).toMatchObject({ status: 'failed', error: expect.stringContaining('the reason is in the event log') });
+    expect(JSON.stringify(result)).not.toContain('model unavailable');
+    expect(detailed).toMatchObject({ status: 'failed', error: expect.stringContaining('model unavailable') });
   });
 
   it('runs a governed agent on a message', async () => {
@@ -94,5 +104,49 @@ describe('agents as tools', () => {
 
     expect(tool.description).toBe('Answers customer questions');
     expect(result).toEqual({ runId: expect.stringMatching(/^run_/), status: 'completed', output: 'Refunds take 5 days.' });
+  });
+
+  it('stops a governed agent when the caller gives up, so a late approval runs nothing', async () => {
+    const env = environment(
+      new ScriptedLLMProvider().always('tool-selection', { toolCall: { name: 'refund', arguments: { orderId: 'o-1' } } })
+    );
+    const refunded: string[] = [];
+    const refund = env.sdk.defineTool({
+      name: 'refund',
+      description: 'Refunds an order',
+      schema: z.object({ orderId: z.string() }),
+      metadata: { requiresApproval: true },
+      handler: async ({ orderId }) => {
+        refunded.push(orderId);
+        return 'refunded';
+      },
+    });
+    const support = env.sdk.createAgent({ name: 'support', model: 'test-model', tools: [refund] });
+    const caller = new AbortController();
+
+    const pending = governedAgentTool(support).handler({ message: 'Refund o-1' }, { runId: 'r', agentId: 'mcp:test', signal: caller.signal });
+    let approval: { id: string } | undefined;
+    for (let attempt = 0; attempt < 100 && !approval; attempt++) {
+      [approval] = env.sdk.getPendingApprovals();
+      if (!approval) await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    caller.abort();
+
+    await expect(pending).resolves.toMatchObject({ status: 'cancelled' });
+    expect(() => env.sdk.approveAction(approval?.id ?? '', 'late-approver')).toThrow('already rejected');
+    expect(refunded).toEqual([]);
+  });
+
+  it('bounds the context and merges metadata with its defaults', async () => {
+    const env = environment();
+    const agent = env.sdk.createCognitiveAgent({ name: 'bounded', model: 'test-model' });
+    const tool = cognitiveAgentTool(agent, { maxContextLength: 50, metadata: { requiresApproval: true } });
+    env.sdk.defineTool(tool);
+
+    expect(tool.metadata).toEqual({ category: 'agent', riskLevel: 'medium', requiresApproval: true });
+    await expect(env.sdk.executeTool(tool.name, { problem: 'Hi', context: { notes: 'x'.repeat(100) } })).rejects.toMatchObject({
+      originalError: { name: 'ValidationError' },
+    });
+    expect(env.provider.requests).toHaveLength(0);
   });
 });

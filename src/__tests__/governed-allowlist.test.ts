@@ -36,7 +36,8 @@ describe('governed agent with an allowlist policy', () => {
       schema,
       handler: async ({ customerId }) => ({ customerId }),
     });
-    env.sdk.defineTool({
+    // Given to the agent, so the allowlist policy is what refuses it.
+    const deleteCustomer = env.sdk.defineTool({
       name: 'delete_customer',
       description: 'Deletes a customer',
       schema,
@@ -48,7 +49,7 @@ describe('governed agent with an allowlist policy', () => {
     const agent = env.sdk.createAgent({
       name: 'support',
       model: 'test-model',
-      tools: [lookup],
+      tools: [lookup, deleteCustomer],
       policies: [
         {
           id: 'support-tools',
@@ -68,5 +69,35 @@ describe('governed agent with an allowlist policy', () => {
     expect(events.find((event) => event.type === 'policy.violated')?.data.reason).toBe(
       'Tool "delete_customer" not in allowlist'
     );
+  });
+
+  it('never runs a tool registered in the SDK but not given to the agent', async () => {
+    env = createTestSDK({ llmProvider: new AsksForDeletion() });
+    let deleted = false;
+    const schema = z.object({ customerId: z.string() });
+    const lookup = env.sdk.defineTool({
+      name: 'lookup_customer',
+      description: 'Reads a customer',
+      schema,
+      handler: async ({ customerId }) => ({ customerId }),
+    });
+    // Registered for someone else (an MCP server, another agent), not for this agent.
+    env.sdk.defineTool({
+      name: 'delete_customer',
+      description: 'Deletes a customer',
+      schema,
+      handler: async () => {
+        deleted = true;
+        return 'deleted';
+      },
+    });
+    const agent = env.sdk.createAgent({ name: 'support', model: 'test-model', tools: [lookup] });
+
+    const result = await agent.run({ message: 'Delete customer c-42' });
+
+    expect(deleted).toBe(false);
+    expect(result.status).toBe('failed');
+    const events = await env.sdk.getEvents(result.runId);
+    expect(events.find((event) => event.type === 'policy.violated')?.data.violatedPolicies).toEqual(['allowed-tools']);
   });
 });

@@ -8,6 +8,8 @@ import { zodSchemaToJsonSchema } from '../utils/zod-to-json-schema.js';
 import type { GovernedToolHost } from './governed-tool-host.js';
 import { serveResources } from './mcp-resources.js';
 
+const DEFAULT_APPROVAL_TIMEOUT_MS = 50_000;
+
 export interface McpServerOptions {
   name: string;
   version?: string;
@@ -25,6 +27,12 @@ export interface McpServerOptions {
   agentId?: string;
   /** Guidance shown to MCP clients about how to use this server. */
   instructions?: string;
+  /**
+   * Longest wait for a human approval during an MCP call, in milliseconds. Default 50 000:
+   * below the time most clients wait (about a minute), so an approval nobody is waiting for
+   * any more is cancelled — the tool then never runs. Raise it if your client waits longer.
+   */
+  approvalTimeoutMs?: number;
   /**
    * Include the underlying causes of tool errors in the text sent to clients. Off by default:
    * causes can contain internal details (SQL errors, file paths). The full error is always in
@@ -74,8 +82,10 @@ export function createMcpServer(host: GovernedToolHost, options: McpServerOption
       const result = await host.executeTool(name, args ?? {}, {
         agentId,
         allowedTools: allowed,
-        // Cancels a pending approval and reaches the tool when the client gives up.
+        // Cancels a pending approval and reaches the tool when the client gives up, or when
+        // the connection closes.
         signal: extra.signal,
+        approvalTimeoutMs: options.approvalTimeoutMs ?? DEFAULT_APPROVAL_TIMEOUT_MS,
       });
       return { content: [{ type: 'text' as const, text: formatResult(result) }] };
     } catch (error) {
@@ -100,6 +110,13 @@ export async function serveMcpOverStdio(
 ): Promise<Server> {
   const server = createMcpServer(host, options);
   await server.connect(new StdioServerTransport());
+  // When the client goes away, stdin ends: closing the server aborts the calls still in
+  // progress (a pending approval is cancelled, the tool never runs) and lets the process exit.
+  const closeWhenClientLeaves = () => {
+    server.close().catch(() => undefined);
+  };
+  process.stdin.once('end', closeWhenClientLeaves);
+  process.stdin.once('close', closeWhenClientLeaves);
   // stdout carries the protocol: human messages go to stderr.
   console.error(`MCP server "${options.name}" ready on stdio, waiting for a client`);
   return server;

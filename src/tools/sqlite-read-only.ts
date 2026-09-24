@@ -1,6 +1,7 @@
 import { ValidationError } from '../errors/index.js';
 import type { ColumnSummary, ReadOnlyDatabase, TableSummary } from './database-tools.js';
 import { assertSingleQuery } from './sql-statement-guard.js';
+import { toJsonRow } from './sql-values.js';
 
 /** A prepared statement of `node:sqlite` (`StatementSync`) or `better-sqlite3`. */
 export interface SqliteStatementLike {
@@ -74,7 +75,7 @@ export function sqliteReadOnly(db: SqliteConnectionLike): ReadOnlyDatabase {
               : []
           );
       }),
-    query: async (sql, { maxRows }) => {
+    query: async (sql, { maxRows, maxTextLength }) => {
       const statementText = assertSingleQuery(sql, 'sqlite');
       return withQueryOnly(db, () => {
         try {
@@ -84,11 +85,12 @@ export function sqliteReadOnly(db: SqliteConnectionLike): ReadOnlyDatabase {
           }
           statement.setReadBigInts?.(true);
           statement.safeIntegers?.(true);
-          const rows = firstRows(statement, maxRows + 1);
+          // Values are cut as each row arrives: at most one raw row is held at a time.
+          const rows = firstRows(statement, maxRows + 1, (row) => toJsonRow(row, maxTextLength));
           const firstRow = rows[0];
           const columns =
             statement.columns?.().map((column) => column.name) ??
-            (isRecord(firstRow) ? Object.keys(firstRow) : []);
+            (firstRow ? Object.keys(firstRow) : []);
           return { columns, rows: rows.slice(0, maxRows), truncated: rows.length > maxRows };
         } catch (error) {
           throw refusal(error);
@@ -98,18 +100,25 @@ export function sqliteReadOnly(db: SqliteConnectionLike): ReadOnlyDatabase {
   };
 }
 
-/** Reads at most `count` rows, without materializing the rest when the driver can iterate. */
-function firstRows(statement: SqliteStatementLike, count: number): unknown[] {
+/**
+ * Reads at most `count` rows, one at a time when the driver can iterate (both supported
+ * drivers can), so the rest of the result is never read.
+ */
+function firstRows<Row>(
+  statement: SqliteStatementLike,
+  count: number,
+  keep: (row: unknown) => Row
+): Row[] {
   if (!statement.iterate) {
-    return statement.all().slice(0, count);
+    return statement.all().slice(0, count).map(keep);
   }
   const iterator = statement.iterate();
-  const rows: unknown[] = [];
+  const rows: Row[] = [];
   try {
     while (rows.length < count) {
       const next = iterator.next();
       if (next.done) break;
-      rows.push(next.value);
+      rows.push(keep(next.value));
     }
   } finally {
     iterator.return?.();

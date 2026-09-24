@@ -6,6 +6,10 @@ import type { IEventStore } from './event-store.js';
 import { deriveRunStatus } from '../utils/run-status.js';
 
 export class FileEventStore implements IEventStore {
+  /** Stores whose pending events are written before the process exits. */
+  private static readonly open = new Set<FileEventStore>();
+  private static exitFlushInstalled = false;
+
   private eventsDir: string;
   private pendingEvents: Map<string, Event[]> = new Map();
   private flushChains: Map<string, Promise<void>> = new Map();
@@ -34,6 +38,23 @@ export class FileEventStore implements IEventStore {
     this.flushInterval = setInterval(() => {
       this.flush().catch((error) => this.handleError('Failed to flush events', error));
     }, this.FLUSH_INTERVAL_MS);
+    // The timer alone does not keep the process alive (a stdio MCP server must be able to
+    // exit when its client leaves): what is still pending is written just before exit.
+    this.flushInterval.unref();
+    FileEventStore.open.add(this);
+    FileEventStore.installExitFlush();
+  }
+
+  private static installExitFlush(): void {
+    if (FileEventStore.exitFlushInstalled) return;
+    FileEventStore.exitFlushInstalled = true;
+    // 'beforeExit' fires when nothing is left to do; the writes started here run before the
+    // process exits, and it fires again once they are done (with nothing left to write).
+    process.on('beforeExit', () => {
+      for (const store of FileEventStore.open) {
+        store.flush().catch((error) => store.handleError('Failed to flush events', error));
+      }
+    });
   }
 
   private handleError(message: string, error: unknown): void {
@@ -260,6 +281,7 @@ export class FileEventStore implements IEventStore {
 
   /** Stops the periodic flush and writes pending events. Await it before deleting the directory. */
   async destroy(): Promise<void> {
+    FileEventStore.open.delete(this);
     if (this.flushInterval) {
       clearInterval(this.flushInterval);
       this.flushInterval = null;

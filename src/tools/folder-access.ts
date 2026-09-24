@@ -2,63 +2,21 @@ import { open, readdir, realpath, stat } from 'node:fs/promises';
 import { basename, extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { ValidationError } from '../errors/index.js';
 import { clip, decodeUtf8Prefix } from './bounded-text.js';
+import {
+  DEFAULT_TEXT_EXTENSIONS,
+  type FileContent,
+  type FolderEntry,
+  type FolderLimits,
+  type FolderOptions,
+  type SearchMatch,
+  folderLimits,
+} from './folder-options.js';
 import { globToRegExp, matchesAny } from './glob-pattern.js';
 
-/** Extensions read by default: text formats only. */
-// biome-ignore format: a compact table is easier to review than one extension per line
-export const DEFAULT_TEXT_EXTENSIONS: readonly string[] = [
-  'md', 'markdown', 'mdx', 'txt', 'text', 'rst', 'adoc', 'org', 'csv', 'tsv', 'json', 'jsonl',
-  'yaml', 'yml', 'toml', 'ini', 'xml', 'html', 'htm', 'css', 'js', 'mjs', 'cjs', 'jsx', 'ts',
-  'tsx', 'py', 'rb', 'go', 'rs', 'java', 'kt', 'swift', 'c', 'h', 'cpp', 'hpp', 'cs', 'php',
-  'sh', 'sql', 'graphql', 'proto', 'tex', 'log',
-];
-
-export interface FolderOptions {
-  /** The folder to share. Nothing outside it can be listed or read, symbolic links included. */
-  root: string;
-  /** Name used in tool descriptions and resource URIs. Defaults to the folder's name. */
-  name?: string;
-  /** Extensions of the files offered (without the dot). `''` allows files without one. */
-  extensions?: readonly string[];
-  /** Globs of files to offer (`**∕*.md`); by default every file with an allowed extension. */
-  include?: readonly string[];
-  /** Globs of files and folders to hide (`drafts/**`). */
-  exclude?: readonly string[];
-  /** Offer files and folders whose name starts with a dot (`.env`, `.git`). Default false. */
-  includeHidden?: boolean;
-  /** Bytes read from one file; longer files are cut. Default 200 000. */
-  maxFileBytes?: number;
-  /** Entries returned by one listing. Default 500. */
-  maxEntries?: number;
-  /** Folder depth explored. Default 8. */
-  maxDepth?: number;
-  /** Matches returned by one search. Default 50. */
-  maxMatches?: number;
-  /** Bytes scanned by one search, all files together. Default 20 000 000. */
-  maxSearchBytes?: number;
+/** Set when a walk stopped at `maxExaminedEntries` before the end of the tree. */
+interface WalkState {
+  exhausted: boolean;
 }
-
-export interface FolderEntry {
-  path: string;
-  type: 'file' | 'directory';
-  size?: number;
-}
-
-export interface FileContent {
-  path: string;
-  size: number;
-  content: string;
-  truncated: boolean;
-}
-
-export interface SearchMatch {
-  path: string;
-  line: number;
-  text: string;
-}
-
-/** Names looked at by one walk, offered or not. */
-const MAX_EXAMINED_ENTRIES = 50_000;
 
 interface WalkedFile {
   path: string;
@@ -78,12 +36,7 @@ export class FolderAccess {
   private readonly extensions: Set<string>;
   private readonly include: RegExp[];
   private readonly exclude: RegExp[];
-  readonly limits: Required<
-    Pick<
-      FolderOptions,
-      'maxFileBytes' | 'maxEntries' | 'maxDepth' | 'maxMatches' | 'maxSearchBytes'
-    >
-  >;
+  readonly limits: FolderLimits;
 
   constructor(private readonly options: FolderOptions) {
     this.root = resolve(options.root);
@@ -95,13 +48,7 @@ export class FolderAccess {
     );
     this.include = (options.include ?? []).map(globToRegExp);
     this.exclude = (options.exclude ?? []).map(globToRegExp);
-    this.limits = {
-      maxFileBytes: options.maxFileBytes ?? 200_000,
-      maxEntries: options.maxEntries ?? 500,
-      maxDepth: options.maxDepth ?? 8,
-      maxMatches: options.maxMatches ?? 50,
-      maxSearchBytes: options.maxSearchBytes ?? 20_000_000,
-    };
+    this.limits = folderLimits(options);
   }
 
   /** Lists a folder (the root by default), bounded by `maxEntries`. */
@@ -111,11 +58,11 @@ export class FolderAccess {
   ): Promise<{ entries: FolderEntry[]; truncated: boolean }> {
     const start = await this.locate(path, 'directory');
     const entries: FolderEntry[] = [];
-    let truncated = false;
-    for await (const entry of this.walk(start.path, recursive ? this.limits.maxDepth : 0, true)) {
+    const walk: WalkState = { exhausted: false };
+    const depth = recursive ? this.limits.maxDepth : 0;
+    for await (const entry of this.walk(start.path, depth, true, walk)) {
       if (entries.length >= this.limits.maxEntries) {
-        truncated = true;
-        break;
+        return { entries, truncated: true };
       }
       entries.push(
         entry.type === 'file'
@@ -123,18 +70,19 @@ export class FolderAccess {
           : { path: entry.path, type: 'directory' }
       );
     }
-    return { entries, truncated };
+    return { entries, truncated: walk.exhausted };
   }
 
   /** Every offered file, bounded by `maxEntries` (used to list resources). */
   async files(): Promise<{ files: WalkedFile[]; truncated: boolean }> {
     const files: WalkedFile[] = [];
-    for await (const entry of this.walk('', this.limits.maxDepth, false)) {
+    const walk: WalkState = { exhausted: false };
+    for await (const entry of this.walk('', this.limits.maxDepth, false, walk)) {
       if (entry.type !== 'file') continue;
       if (files.length >= this.limits.maxEntries) return { files, truncated: true };
       files.push(entry);
     }
-    return { files, truncated: false };
+    return { files, truncated: walk.exhausted };
   }
 
   /** Reads a text file, cut at `maxFileBytes`. Binary files are refused. */
@@ -154,7 +102,8 @@ export class FolderAccess {
     const matches: SearchMatch[] = [];
     let budget = this.limits.maxSearchBytes;
     let filesScanned = 0;
-    for await (const entry of this.walk(start.path, this.limits.maxDepth, false)) {
+    const walk: WalkState = { exhausted: false };
+    for await (const entry of this.walk(start.path, this.limits.maxDepth, false, walk)) {
       if (entry.type !== 'file') continue;
       if (budget <= 0) return { matches, filesScanned, truncated: true };
       const { text } = await this.readText(entry.real, entry.size).catch(() => ({ text: '' }));
@@ -170,7 +119,7 @@ export class FolderAccess {
         matches.push({ path: entry.path, line: index + 1, text: clip(line.trim(), 200) });
       }
     }
-    return { matches, filesScanned, truncated: false };
+    return { matches, filesScanned, truncated: walk.exhausted };
   }
 
   /** Resolves a relative path to an offered file or folder, or throws as if it did not exist. */
@@ -213,7 +162,8 @@ export class FolderAccess {
   private async *walk(
     start: string,
     depth: number,
-    withDirectories: boolean
+    withDirectories: boolean,
+    state: WalkState
   ): AsyncGenerator<({ type: 'file' } & WalkedFile) | { type: 'directory'; path: string }> {
     const rootReal = await this.realRoot();
     const visited = new Set<string>();
@@ -223,10 +173,18 @@ export class FolderAccess {
       const folderReal = await realpath(resolve(this.root, next.path)).catch(() => undefined);
       if (!folderReal || visited.has(folderReal) || !inside(rootReal, folderReal)) continue;
       visited.add(folderReal);
-      const names = (await readdir(folderReal)).sort();
-      for (const name of names) {
+      const names = await readdir(folderReal).catch(() => undefined);
+      if (!names) {
+        // An unreadable sub-folder is skipped; the folder asked for must be readable.
+        if (next.path === start) throw new ValidationError('path', `"${start}" cannot be read`);
+        continue;
+      }
+      for (const name of names.sort()) {
         // A hard stop for huge trees, whatever the other limits.
-        if (++examined > MAX_EXAMINED_ENTRIES) return;
+        if (++examined > this.limits.maxExaminedEntries) {
+          state.exhausted = true;
+          return;
+        }
         const path = next.path ? `${next.path}/${name}` : name;
         const real = await realpath(resolve(folderReal, name)).catch(() => undefined);
         if (!real || !inside(rootReal, real)) continue;
@@ -253,7 +211,10 @@ export class FolderAccess {
     if (!this.options.includeHidden && segments.some((segment) => segment.startsWith('.'))) {
       return false;
     }
-    if (matchesAny(path, this.exclude)) return false;
+    // Excluding a folder hides everything inside it, whatever way it is reached.
+    for (let length = 1; length <= segments.length; length++) {
+      if (matchesAny(segments.slice(0, length).join('/'), this.exclude)) return false;
+    }
     if (type === 'directory') return true;
     const extension = extname(path).replace(/^\./, '').toLowerCase();
     if (!this.extensions.has(extension)) return false;
@@ -280,8 +241,11 @@ export class FolderAccess {
   }
 
   private realRoot(): Promise<string> {
+    // A failure is not kept (the folder may be created later), and the message does not
+    // show the absolute path, which clients would otherwise learn.
     this.rootReal ??= realpath(this.root).catch(() => {
-      throw new ValidationError('root', `the shared folder ${this.root} does not exist`);
+      this.rootReal = undefined;
+      throw new ValidationError('root', `the shared folder "${this.name}" does not exist`);
     });
     return this.rootReal;
   }

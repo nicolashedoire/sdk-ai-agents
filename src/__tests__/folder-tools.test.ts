@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -162,6 +162,56 @@ describe('folderTools', () => {
   it('fails clearly when the folder does not exist', async () => {
     const missing = folderTools({ root: join(sandbox, 'nope') });
     await expect(missing[0]?.handler({})).rejects.toThrow('does not exist');
+  });
+});
+
+describe('folder exclusions and failures', () => {
+  it('hides everything under an excluded folder, on every path: list, read, search, resources', async () => {
+    write('handbook/private/hr/salaries.md', 'laptop allowance 2000');
+    write('handbook/private/notes.md', 'laptop notes');
+    write('handbook/app/node_modules/pkg/readme.md', 'laptop package');
+    const shapes: string[][] = [['private'], ['private/*', 'private/*.md'], ['**/node_modules', 'private']];
+    for (const exclude of shapes) {
+      const options = { exclude: [...exclude, 'drafts/**'] };
+      await expect(call(options, 'read_file', { path: 'private/hr/salaries.md' }), exclude.join()).rejects.toThrow('was not found');
+      const listed = await call(options, 'list_files', { recursive: true });
+      const search = await call(options, 'search_files', { query: 'allowance' });
+      const resources = await folderResources({ root, ...options }).list();
+      expect(JSON.stringify(listed), exclude.join()).not.toContain('salaries');
+      expect(search, exclude.join()).toMatchObject({ matches: [] });
+      expect(resources.map((resource) => resource.uri).join(), exclude.join()).not.toContain('salaries');
+      await expect(folderResources({ root, ...options }).read('folder://handbook/private/hr/salaries.md')).rejects.toThrow('was not found');
+    }
+    await expect(call({ exclude: ['**/node_modules'] }, 'read_file', { path: 'app/node_modules/pkg/readme.md' })).rejects.toThrow('was not found');
+  });
+
+  it('skips a sub-folder it cannot read instead of failing', async () => {
+    write('handbook/locked/secret.md', 'laptop');
+    chmodSync(join(root, 'locked'), 0o000);
+    try {
+      await expect(call({}, 'list_files', { recursive: true })).resolves.toMatchObject({ truncated: false });
+      await expect(call({}, 'search_files', { query: 'laptop' })).resolves.toMatchObject({ filesScanned: 6 });
+      await expect(folderResources({ root, exclude: ['drafts/**'] }).list()).resolves.toHaveLength(6);
+    } finally {
+      chmodSync(join(root, 'locked'), 0o755);
+    }
+  });
+
+  it('says a listing is incomplete when it stopped at maxExaminedEntries', async () => {
+    await expect(call({ maxExaminedEntries: 3 }, 'list_files', { recursive: true })).resolves.toMatchObject({ truncated: true });
+    await expect(call({ maxExaminedEntries: 3 }, 'search_files', { query: 'laptop' })).resolves.toMatchObject({ truncated: true });
+  });
+
+  it('works once a missing folder appears, and never shows its absolute path', async () => {
+    const later = join(sandbox, 'later');
+    const list = folderTools({ root: later })[0];
+    const failure = await list?.handler({}).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(Error);
+    expect(String(failure)).toContain('the shared folder "later" does not exist');
+    expect(String(failure)).not.toContain(sandbox);
+
+    write('later/note.md', 'hello');
+    await expect(list?.handler({})).resolves.toMatchObject({ entries: [{ path: 'note.md' }] });
   });
 });
 

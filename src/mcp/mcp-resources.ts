@@ -20,9 +20,22 @@ export function serveResources(
   providers: ResourceProvider[],
   options: { agentId: string; exposeErrorDetails: boolean }
 ): void {
-  server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-    resources: (await Promise.all(providers.map((provider) => provider.list()))).flat(),
-  }));
+  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    try {
+      return {
+        resources: (await Promise.all(providers.map((provider) => provider.list()))).flat(),
+      };
+    } catch (error) {
+      // Causes (a folder's absolute path, a permission error) stay on the server.
+      const message =
+        options.exposeErrorDetails || error instanceof ValidationError
+          ? error instanceof Error
+            ? error.message
+            : String(error)
+          : 'Resources could not be listed';
+      throw new McpError(ErrorCode.InternalError, message);
+    }
+  });
   // Some clients ask for templates even when a server has none.
   server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
     resourceTemplates: [],

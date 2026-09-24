@@ -21,6 +21,7 @@
     "src/__tests__/jev-client.test.ts",
     "src/__tests__/mcp.test.ts",
     "src/__tests__/mcp-sources.test.ts",
+    "src/__tests__/mcp-stdio.test.ts",
     "src/__tests__/openapi-tools.test.ts",
     "src/__tests__/folder-tools.test.ts",
     "src/__tests__/sql-statement-guard.test.ts",
@@ -28,6 +29,7 @@
     "src/__tests__/postgres-read-only.test.ts",
     "src/__tests__/agent-tools.test.ts",
     "src/__tests__/tool-approval.test.ts",
+    "src/__tests__/tool-budgets.test.ts",
     "src/__tests__/resilience.test.ts",
     "src/__tests__/rule-discovery.test.ts",
     "src/__tests__/sdk-cognition.test.ts",
@@ -40,6 +42,7 @@
     "examples/mcp-postgres.ts",
     "examples/mcp-agent.ts",
     "examples/mcp-http.ts",
+    "examples/mcp-approvals.ts",
     "examples/rule-discovery.ts"
   ],
   "exclude": ["node_modules", "dist"]

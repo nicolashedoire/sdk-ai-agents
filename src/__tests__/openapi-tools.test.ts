@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { openApiTools } from '../tools/openapi-tools.js';
 import type { ToolDefinition } from '../types/tool.js';
 import { LocalHttpServer } from './support/local-http-server.js';
+import { createTestSDK } from './support/test-sdk.js';
 
 const petStore = {
   openapi: '3.0.3',
@@ -132,12 +133,12 @@ describe('openApiTools', () => {
     });
 
     const listed = await tool(tools, 'listPets').handler({ limit: 2, tag: ['cat', 'dog'], 'X-Api-Key': 'forged-by-model' });
-    await tool(tools, 'show_pet').handler({ petId: 'a b/c', query_petId: 'x' });
+    await tool(tools, 'show_pet').handler({ petId: 'a b', query_petId: 'x' });
 
     expect(listed).toEqual({ status: 200, data: { ok: true } });
     expect(server.requests[0]?.url).toBe('/v1/pets?limit=2&tag=cat&tag=dog');
     expect(server.requests[0]?.headers['x-api-key']).toBe('server-secret');
-    expect(server.requests[1]?.url).toBe('/v1/pets/a%20b%2Fc?petId=x');
+    expect(server.requests[1]?.url).toBe('/v1/pets/a%20b?petId=x');
   });
 
   it('exposes other methods only when listed, as high-risk tools that require approval', async () => {
@@ -168,7 +169,10 @@ describe('openApiTools', () => {
     const tools = await openApiTools({ spec: petStore, baseUrl: `${url}/v1`, include: ['createPet', 'show pet!', 'listPets'] });
 
     await expect(tool(tools, 'show_pet').handler({})).rejects.toThrow('petId - missing required argument');
-    await expect(tool(tools, 'show_pet').handler({ petId: '..' })).rejects.toThrow('".." is not a valid path parameter');
+    // No value can walk up the path, even percent-encoded for a server that decodes it.
+    for (const petId of ['..', '.', 'a/b', 'a\\b', '%2e%2e', '..%2Fadmin', 'a%252Fb', '%252e%252e']) {
+      await expect(tool(tools, 'show_pet').handler({ petId }), petId).rejects.toThrow('is not a valid path parameter');
+    }
     await expect(tool(tools, 'listPets').handler({ limit: 1, offset: 3 })).rejects.toThrow('offset - unknown argument (expected: limit, tag, X-Api-Key)');
     await expect(tool(tools, 'listPets').handler({ tag: { name: 'cat' } })).rejects.toThrow('expected a string, a number or a boolean');
     await expect(tool(tools, 'listPets').handler({ 'X-Api-Key': 'a\r\nHost: evil' })).rejects.toThrow('line breaks');
@@ -241,5 +245,135 @@ describe('openApiTools', () => {
     await expect(openApiTools({ spec: { swagger: '2.0', paths: {} } })).rejects.toThrow('Swagger 2.0 is not supported');
     await expect(openApiTools({ spec: { openapi: '3.1.0', info: {}, paths: {} } })).rejects.toThrow('declares no servers');
     await expect(openApiTools({ spec: petStore })).rejects.toThrow('cannot resolve the server URL "/v1"');
+  });
+
+  it('sends credentials only where you decided, and never in clear text over the network', async () => {
+    const headers = { Authorization: 'Bearer secret' };
+    const directory = mkdtempSync(join(tmpdir(), 'openapi-'));
+    directories.push(directory);
+    const file = join(directory, 'spec.json');
+    writeFileSync(file, JSON.stringify({ ...petStore, servers: [{ url: 'https://attacker.example' }] }));
+
+    // A spec file names a server: with credentials, the base URL must be yours.
+    await expect(openApiTools({ spec: file, headers })).rejects.toThrow('pass `baseUrl` with `headers`');
+    await expect(openApiTools({ spec: petStore, baseUrl: 'http://api.example.com', headers })).rejects.toThrow('credentials would travel unencrypted');
+    await expect(openApiTools({ spec: file, baseUrl: 'https://api.example.com', headers })).resolves.toHaveLength(4);
+    await expect(openApiTools({ spec: file, baseUrl: 'http://127.0.0.1:9', headers })).resolves.toHaveLength(4);
+    // A spec downloaded from the API itself may name its own origin.
+    const { url } = await api({ status: 200, body: petStore });
+    await expect(openApiTools({ spec: `${url}/openapi.json`, headers })).resolves.toHaveLength(4);
+  });
+
+  it('keeps the approval of write operations unless you set it explicitly', async () => {
+    const options = { spec: petStore, baseUrl: 'https://api.example.com', include: ['deletePet'] };
+    const unset = await openApiTools({ ...options, metadata: () => ({ requiresApproval: undefined, riskLevel: 'medium' }) });
+    expect(tool(unset, 'deletePet').metadata).toMatchObject({ requiresApproval: true, riskLevel: 'medium' });
+  });
+
+  it('refuses an operation whose parameters would share one argument name', async () => {
+    const spec = {
+      ...petStore,
+      paths: {
+        '/items/{id}': {
+          get: {
+            operationId: 'getItem',
+            parameters: [
+              { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+              { name: 'query_id', in: 'query', schema: { type: 'string' } },
+              { name: 'id', in: 'query', schema: { type: 'string' } },
+            ],
+          },
+        },
+      },
+    };
+    await expect(openApiTools({ spec, baseUrl: 'https://api.example.com' })).rejects.toThrow(
+      'getItem: two parameters would share the argument name "query_id"'
+    );
+  });
+
+  it('stays small when references multiply, and never reads the object prototype', async () => {
+    // Each level refers to the next twice: fully expanded, one schema would hold 2^30 nodes.
+    const schemas: Record<string, unknown> = { L30: { type: 'string' } };
+    for (let level = 0; level < 30; level++) {
+      schemas[`L${level}`] = { type: 'object', properties: { a: { $ref: `#/components/schemas/L${level + 1}` }, b: { $ref: `#/components/schemas/L${level + 1}` } } };
+    }
+    const paths: Record<string, unknown> = {};
+    for (let index = 0; index < 200; index++) {
+      paths[`/op${index}`] = {
+        get: {
+          operationId: `op${index}`,
+          parameters: [
+            { name: 'filter', in: 'query', content: { 'application/json': { schema: { $ref: '#/components/schemas/L0' } } } },
+          ],
+        },
+      };
+    }
+
+    const tools = await openApiTools({ spec: { openapi: '3.0.3', info: {}, paths, components: { schemas } }, baseUrl: 'https://api.example.com' });
+
+    expect(tools).toHaveLength(200);
+    const sizes = tools.map((definition) => JSON.stringify(definition.inputJsonSchema).length);
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(70_000);
+    expect(sizes.reduce((total, size) => total + size, 0)).toBeLessThan(5_000_000);
+    // Once the budget of the whole spec is spent, later operations stop expanding at once.
+    expect(JSON.stringify(tools[199]?.inputJsonSchema)).toContain('not expanded (schema too large)');
+
+    const proto = await openApiTools({
+      spec: { openapi: '3.0.3', info: {}, paths: { '/p': { get: { operationId: 'p', parameters: [{ name: 'x', in: 'query', schema: { $ref: '#/constructor' } }] } } } },
+      baseUrl: 'https://api.example.com',
+    });
+    expect(JSON.stringify(proto[0]?.inputJsonSchema)).toContain('Unresolved reference #/constructor');
+  });
+
+  it('refuses a redirect followed by a custom fetch', async () => {
+    const tools = await openApiTools({
+      spec: petStore,
+      baseUrl: 'https://api.example.com',
+      fetch: async () => ({ status: 200, redirected: true, headers: { get: () => 'application/json' }, text: async () => '{}' }),
+    });
+    await expect(tool(tools, 'listPets').handler({})).rejects.toThrow('redirects are not followed');
+  });
+
+  it('checks arguments in the governed pipeline before any approval', async () => {
+    const env = createTestSDK();
+    try {
+      for (const definition of await openApiTools({ spec: petStore, baseUrl: 'https://api.example.com', include: ['createPet', 'show pet!'] })) {
+        env.sdk.defineTool(definition);
+      }
+
+      await expect(env.sdk.executeTool('createPet', {})).rejects.toMatchObject({ originalError: { name: 'ValidationError' } });
+      await expect(env.sdk.executeTool('show_pet', { petId: '..%2Fadmin' })).rejects.toMatchObject({
+        originalError: { reason: expect.stringContaining('is not a valid path parameter') },
+      });
+      expect(env.sdk.getPendingApprovals()).toEqual([]);
+    } finally {
+      await env.dispose();
+    }
+  });
+
+  it('retries read-only calls on server errors only', async () => {
+    const env = createTestSDK();
+    try {
+      const flaky = await api({ status: 503, body: {} }, { status: 200, body: ['Rex'] });
+      const options = { spec: petStore, baseUrl: `${flaky.url}/v1`, include: ['listPets', 'createPet'], retry: { maxRetries: 2, initialDelayMs: 1 } };
+      const tools = await openApiTools(options);
+      expect(tool(tools, 'createPet').retry).toBeUndefined();
+      for (const definition of tools) env.sdk.defineTool(definition);
+
+      await expect(env.sdk.executeTool('listPets', {})).resolves.toEqual({ status: 200, data: ['Rex'] });
+      expect(flaky.server.requests).toHaveLength(2);
+
+      const missing = await api({ status: 404, body: { message: 'no' } });
+      const env404 = createTestSDK();
+      try {
+        for (const definition of await openApiTools({ ...options, baseUrl: `${missing.url}/v1` })) env404.sdk.defineTool(definition);
+        await expect(env404.sdk.executeTool('listPets', {})).rejects.toThrow('Tool execution failed');
+        expect(missing.server.requests).toHaveLength(1);
+      } finally {
+        await env404.dispose();
+      }
+    } finally {
+      await env.dispose();
+    }
   });
 });

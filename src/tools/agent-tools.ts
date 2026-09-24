@@ -9,10 +9,20 @@ export interface AgentToolOptions {
   name?: string;
   /** What the agent is good at, shown to the model or client that picks tools. */
   description?: string;
-  /** Default: medium risk (the agent calls a language model, which costs money). */
+  /**
+   * Governance metadata, merged field by field over the default: medium risk (the agent
+   * calls a language model, which costs money).
+   */
   metadata?: ToolMetadata;
   /** Longest problem or message accepted. Default 4 000 characters. */
   maxInputLength?: number;
+  /** Longest `context`, as JSON text. Default 20 000 characters. */
+  maxContextLength?: number;
+  /**
+   * Put the error message of a failed run in the result. Off by default: messages can hold
+   * internal details (provider errors); they are always in the event log.
+   */
+  exposeErrors?: boolean;
 }
 
 /** What the tool of a cognitive agent returns: the decision, without the whole mental state. */
@@ -52,10 +62,9 @@ export function cognitiveAgentTool(
       .min(1)
       .max(options.maxInputLength ?? 4_000)
       .describe('The question, problem or decision to reason about, with what matters'),
-    context: z
-      .record(z.unknown())
-      .optional()
-      .describe('Facts and constraints the agent should take into account'),
+    context: boundedContext(options).describe(
+      'Facts and constraints the agent should take into account'
+    ),
   });
   return {
     name: options.name ?? toToolName(`ask_${agent.name}`),
@@ -64,7 +73,7 @@ export function cognitiveAgentTool(
       `Asks the "${agent.name}" agent to reason about a problem. It answers with a decision (committed, provisional or abstain), its rationale, confidence and what is missing.`,
     schema,
     capability: `agent:${agent.name}`,
-    metadata: options.metadata ?? DEFAULT_METADATA,
+    metadata: mergedMetadata(options),
     handler: async ({ problem, context }: z.infer<typeof schema>, call) => {
       const result = await agent.think({
         problem,
@@ -81,7 +90,7 @@ export function cognitiveAgentTool(
         if (decision.status) summary.decisionStatus = decision.status;
         if (decision.missing && decision.missing.length > 0) summary.missing = decision.missing;
       }
-      if (result.error) summary.error = result.error.message;
+      if (result.error) summary.error = errorText(result.runId, result.error, options);
       return summary;
     },
   };
@@ -113,7 +122,7 @@ export function governedAgentTool(
       .min(1)
       .max(options.maxInputLength ?? 4_000)
       .describe('What to ask the agent'),
-    context: z.record(z.unknown()).optional().describe('Extra data for the agent'),
+    context: boundedContext(options).describe('Extra data for the agent'),
   });
   return {
     name: options.name ?? toToolName(`ask_${agent.name}`),
@@ -121,13 +130,45 @@ export function governedAgentTool(
       options.description ?? `Runs the "${agent.name}" agent on a message and returns its answer.`,
     schema,
     capability: `agent:${agent.name}`,
-    metadata: options.metadata ?? DEFAULT_METADATA,
-    handler: async ({ message, context }: z.infer<typeof schema>) => {
-      const result = await agent.run({ message, ...(context ? { context } : {}) });
+    metadata: mergedMetadata(options),
+    handler: async ({ message, context }: z.infer<typeof schema>, call) => {
+      const result = await agent.run({
+        message,
+        ...(context ? { context } : {}),
+        // When the caller gives up, the run stops and a pending approval is cancelled.
+        ...(call?.signal ? { signal: call.signal } : {}),
+      });
       const summary: GovernedAgentToolResult = { runId: result.runId, status: result.status };
       if (result.output !== undefined) summary.output = result.output;
-      if (result.error) summary.error = result.error.message;
+      if (result.error) summary.error = errorText(result.runId, result.error, options);
       return summary;
     },
   };
+}
+
+/** An optional object argument whose JSON text stays under `maxContextLength`. */
+function boundedContext(options: AgentToolOptions) {
+  const max = options.maxContextLength ?? 20_000;
+  return z
+    .record(z.unknown())
+    .refine((value) => JSON.stringify(value).length <= max, {
+      message: `context is longer than ${max} characters (as JSON)`,
+    })
+    .optional();
+}
+
+function mergedMetadata(options: AgentToolOptions): ToolMetadata {
+  const given = options.metadata ?? {};
+  return {
+    category: given.category ?? DEFAULT_METADATA.category,
+    riskLevel: given.riskLevel ?? DEFAULT_METADATA.riskLevel,
+    ...(given.requiresApproval !== undefined ? { requiresApproval: given.requiresApproval } : {}),
+    ...(given.readOnly !== undefined ? { readOnly: given.readOnly } : {}),
+  };
+}
+
+function errorText(runId: string, error: Error, options: AgentToolOptions): string {
+  return options.exposeErrors
+    ? error.message
+    : `the run did not complete; the reason is in the event log (run ${runId})`;
 }

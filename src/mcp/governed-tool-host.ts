@@ -12,7 +12,13 @@ export interface GovernedToolHost {
   executeTool(
     name: string,
     parameters: Record<string, unknown>,
-    options?: { agentId?: string; runId?: string; allowedTools?: string[]; signal?: AbortSignal }
+    options?: {
+      agentId?: string;
+      runId?: string;
+      allowedTools?: string[];
+      signal?: AbortSignal;
+      approvalTimeoutMs?: number;
+    }
   ): Promise<unknown>;
   /** Reads a resource as its own run in the event log. */
   traceResourceRead(

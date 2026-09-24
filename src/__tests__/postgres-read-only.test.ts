@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ValidationError } from '../errors/index.js';
 import { databaseTools } from '../tools/database-tools.js';
 import { postgresReadOnly } from '../tools/postgres-read-only.js';
 import type { ReadOnlyDatabase } from '../tools/database-tools.js';
@@ -7,13 +8,22 @@ import { RecordingPgClient, RecordingPgPool, type PgReply, type PgStatement } fr
 
 const TRANSACTION_START = [
   { text: 'BEGIN READ ONLY' },
+  { text: 'SHOW transaction_read_only' },
   { text: 'SET LOCAL statement_timeout = 5000' },
   { text: 'SET LOCAL standard_conforming_strings = on' },
 ];
-const ROLLBACK = { text: 'ROLLBACK' };
+const TRANSACTION_END = [{ text: 'ROLLBACK' }, { text: 'SELECT pg_advisory_unlock_all()' }];
+
+/** An error as `pg` reports it, with its SQLSTATE code. */
+function pgError(message: string, code: string): Error {
+  return Object.assign(new Error(message), { code });
+}
 
 /** Answers like a small PostgreSQL: 3 customers, catalog queries, and read-only refusals. */
 function shop(statement: PgStatement): PgReply {
+  if (statement.text === 'SHOW transaction_read_only') {
+    return { rows: [{ transaction_read_only: 'on' }] };
+  }
   if (statement.text.includes('information_schema.tables')) {
     return { rows: [{ table_schema: 'public', table_name: 'customers', table_type: 'BASE TABLE' }] };
   }
@@ -28,7 +38,7 @@ function shop(statement: PgStatement): PgReply {
       : { rows: [] };
   }
   if (statement.text.includes('DELETE')) {
-    return new Error('cannot execute DELETE in a read-only transaction');
+    return pgError('cannot execute DELETE in a read-only transaction', '25006');
   }
   if (statement.text.includes('sdk_read_only_query')) {
     const limit = Number(statement.values?.[0]);
@@ -66,7 +76,7 @@ describe('postgresReadOnly', () => {
       ...TRANSACTION_START,
       // Wrapped to cap the rows; the bind parameter makes the server accept one statement only.
       { text: 'SELECT * FROM (\nSELECT id, name FROM customers ORDER BY id\n) AS sdk_read_only_query LIMIT $1', values: [3] },
-      ROLLBACK,
+      ...TRANSACTION_END,
     ]);
     expect(pool.releases).toEqual([false]);
   });
@@ -79,7 +89,7 @@ describe('postgresReadOnly', () => {
       call(database, 'shop_query', { sql: 'WITH gone AS (DELETE FROM customers RETURNING *) SELECT * FROM gone' })
     ).rejects.toThrow('cannot execute DELETE in a read-only transaction');
 
-    expect(pool.clients[0]?.journal.at(-1)).toEqual(ROLLBACK);
+    expect(pool.clients[0]?.journal.slice(-2)).toEqual(TRANSACTION_END);
     expect(pool.releases).toEqual([false]);
   });
 
@@ -115,13 +125,15 @@ describe('postgresReadOnly', () => {
 
     const texts = client.journal.map((statement) => statement.text);
     expect(texts.filter((text) => text === 'BEGIN READ ONLY')).toHaveLength(3);
-    for (let start = 0; start < texts.length; start += 5) {
-      expect(texts.slice(start, start + 5)).toEqual([
+    for (let start = 0; start < texts.length; start += 7) {
+      expect(texts.slice(start, start + 7)).toEqual([
         'BEGIN READ ONLY',
+        'SHOW transaction_read_only',
         'SET LOCAL statement_timeout = 5000',
         'SET LOCAL standard_conforming_strings = on',
         expect.stringContaining('SELECT'),
         'ROLLBACK',
+        'SELECT pg_advisory_unlock_all()',
       ]);
     }
   });
@@ -143,11 +155,81 @@ describe('postgresReadOnly', () => {
     });
     await expect(call(database, 'shop_describe_table', { table: 'invoices' })).rejects.toThrow('no table or view named "invoices"');
 
-    expect(pool.clients[0]?.journal[3]?.values).toEqual([501, ['public']]);
-    expect(pool.clients[1]?.journal[3]?.values).toEqual(['customers', 'public', ['public']]);
+    expect(pool.clients[0]?.journal[4]?.values).toEqual([501, ['public']]);
+    expect(pool.clients[1]?.journal[4]?.values).toEqual(['customers', 'public', ['public']]);
   });
 
   it('rejects an invalid timeout', () => {
     expect(() => postgresReadOnly({ client: new RecordingPgClient() }, { statementTimeoutMs: -1 })).toThrow('statementTimeoutMs');
+  });
+
+  it('releases advisory locks after each query, and drops a connection that cannot', async () => {
+    const pool = new RecordingPgPool((statement) =>
+      statement.text === 'SELECT pg_advisory_unlock_all()' ? pgError('connection lost', '08006') : shop(statement)
+    );
+    const database = postgresReadOnly({ pool });
+
+    await expect(call(database, 'shop_query', { sql: 'SELECT pg_advisory_lock(42)' })).rejects.toThrow('connection lost');
+    expect(pool.releases).toEqual([true]);
+  });
+
+  it('refuses a shared client already inside a transaction, without ending that transaction', async () => {
+    const client = new RecordingPgClient((statement) =>
+      statement.text === 'SHOW transaction_read_only' ? { rows: [{ transaction_read_only: 'off' }] } : shop(statement)
+    );
+    const database = postgresReadOnly({ client });
+
+    await expect(call(database, 'shop_query', { sql: 'SELECT 1' })).rejects.toThrow('already inside a transaction');
+    expect(client.journal.map((statement) => statement.text)).toEqual(['BEGIN READ ONLY', 'SHOW transaction_read_only']);
+  });
+
+  it('refuses a pool passed as a single client', () => {
+    const pool = Object.assign(new RecordingPgClient(shop), { totalCount: 0, idleCount: 0 });
+    expect(() => postgresReadOnly({ client: pool })).toThrow('this is a pool');
+  });
+
+  it('never lets a query step out of the sub-query that caps its rows', async () => {
+    const pool = new RecordingPgPool(shop);
+    const database = postgresReadOnly({ pool });
+
+    await expect(call(database, 'shop_query', { sql: 'SELECT 1 AS a) AS x, (SELECT 2 AS b' })).rejects.toThrow('unbalanced parentheses');
+    expect(pool.clients).toHaveLength(0);
+  });
+
+  it('explains SQL refusals to the model but keeps connection failures to itself', async () => {
+    const failing = (code: string) =>
+      postgresReadOnly({
+        pool: new RecordingPgPool((statement) =>
+          statement.text.includes('sdk_read_only_query') ? pgError(`failure ${code}`, code) : shop(statement)
+        ),
+      });
+
+    await expect(call(failing('42703'), 'shop_query', { sql: 'SELECT nope FROM customers' })).rejects.toBeInstanceOf(ValidationError);
+    await expect(call(failing('57014'), 'shop_query', { sql: 'SELECT pg_sleep(60)' })).rejects.toBeInstanceOf(ValidationError);
+    const hidden = await call(failing('08006'), 'shop_query', { sql: 'SELECT 1' }).catch((error: unknown) => error);
+    expect(hidden).toBeInstanceOf(Error);
+    expect(hidden).not.toBeInstanceOf(ValidationError);
+  });
+
+  it('refuses a bad query asynchronously, like any other failure', async () => {
+    const database = postgresReadOnly({ pool: new RecordingPgPool(shop) });
+    let pending: Promise<unknown> | undefined;
+    expect(() => {
+      pending = database.query('DROP TABLE customers', { maxRows: 1, maxTextLength: 10 });
+    }).not.toThrow();
+    await expect(pending).rejects.toThrow('only read queries');
+  });
+
+  it('keeps at most 100 items of an array value', async () => {
+    const pool = new RecordingPgPool((statement) =>
+      statement.text.includes('sdk_read_only_query')
+        ? { rows: [{ ids: Array.from({ length: 500 }, (_, index) => index) }], fields: [{ name: 'ids' }] }
+        : shop(statement)
+    );
+
+    const result = await call(postgresReadOnly({ pool }), 'shop_query', { sql: 'SELECT array_agg(id) AS ids FROM customers' });
+
+    expect(result).toHaveProperty('rows.0.ids.length', 101);
+    expect(result).toHaveProperty('rows.0.ids.100', '… 400 more items');
   });
 });

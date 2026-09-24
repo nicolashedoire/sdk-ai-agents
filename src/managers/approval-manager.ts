@@ -15,8 +15,13 @@ export interface ApprovalRequest {
   reason?: string;
 }
 
+/** Decided approvals kept for `getApproval` and "already decided" errors; the oldest go first. */
+const DECIDED_HISTORY = 1_000;
+
 export class ApprovalManager {
   private pendingApprovals: Map<string, ApprovalRequest> = new Map();
+  /** Decided and cancelled requests leave `pendingApprovals`: a long-running server stays bounded. */
+  private decidedApprovals: Map<string, ApprovalRequest> = new Map();
   private approvalPromises: Map<
     string,
     {
@@ -73,19 +78,13 @@ export class ApprovalManager {
    * Approves a pending approval request.
    */
   approve(approvalId: string, approvedBy: string, reason?: string): void {
-    const approval = this.pendingApprovals.get(approvalId);
-    if (!approval) {
-      throw new Error(`Approval request ${approvalId} not found`);
-    }
-
-    if (approval.status !== 'pending') {
-      throw new Error(`Approval request ${approvalId} is already ${approval.status}`);
-    }
+    const approval = this.pendingOrThrow(approvalId);
 
     approval.status = 'approved';
     approval.approvedBy = approvedBy;
     approval.approvedAt = Date.now();
     approval.reason = reason;
+    this.archive(approval);
 
     const promiseHandlers = this.approvalPromises.get(approvalId);
     if (promiseHandlers) {
@@ -98,19 +97,13 @@ export class ApprovalManager {
    * Rejects a pending approval request.
    */
   reject(approvalId: string, rejectedBy: string, reason?: string): void {
-    const approval = this.pendingApprovals.get(approvalId);
-    if (!approval) {
-      throw new Error(`Approval request ${approvalId} not found`);
-    }
-
-    if (approval.status !== 'pending') {
-      throw new Error(`Approval request ${approvalId} is already ${approval.status}`);
-    }
+    const approval = this.pendingOrThrow(approvalId);
 
     approval.status = 'rejected';
     approval.rejectedBy = rejectedBy;
     approval.rejectedAt = Date.now();
     approval.reason = reason;
+    this.archive(approval);
 
     const promiseHandlers = this.approvalPromises.get(approvalId);
     if (promiseHandlers) {
@@ -123,7 +116,7 @@ export class ApprovalManager {
    * Gets a pending approval request by ID.
    */
   getApproval(approvalId: string): ApprovalRequest | undefined {
-    return this.pendingApprovals.get(approvalId);
+    return this.pendingApprovals.get(approvalId) ?? this.decidedApprovals.get(approvalId);
   }
 
   /**
@@ -153,6 +146,7 @@ export class ApprovalManager {
       approval.status = 'rejected';
       approval.rejectedAt = Date.now();
       approval.reason = 'Cancelled';
+      this.archive(approval);
 
       const promiseHandlers = this.approvalPromises.get(approvalId);
       if (promiseHandlers) {
@@ -169,6 +163,27 @@ export class ApprovalManager {
     const approvals = this.getPendingApprovalsForRun(runId);
     for (const approval of approvals) {
       this.cancel(approval.id);
+    }
+  }
+
+  private pendingOrThrow(approvalId: string): ApprovalRequest {
+    const pending = this.pendingApprovals.get(approvalId);
+    if (pending) {
+      return pending;
+    }
+    const decided = this.decidedApprovals.get(approvalId);
+    if (decided) {
+      throw new Error(`Approval request ${approvalId} is already ${decided.status}`);
+    }
+    throw new Error(`Approval request ${approvalId} not found`);
+  }
+
+  private archive(approval: ApprovalRequest): void {
+    this.pendingApprovals.delete(approval.id);
+    this.decidedApprovals.set(approval.id, approval);
+    for (const id of this.decidedApprovals.keys()) {
+      if (this.decidedApprovals.size <= DECIDED_HISTORY) break;
+      this.decidedApprovals.delete(id);
     }
   }
 }

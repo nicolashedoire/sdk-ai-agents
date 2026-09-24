@@ -2,7 +2,8 @@ import { extname } from 'node:path';
 import { z } from 'zod';
 import type { ResourceProvider } from '../types/resource.js';
 import type { ToolDefinition, ToolMetadata } from '../types/tool.js';
-import { FolderAccess, type FolderOptions } from './folder-access.js';
+import { FolderAccess } from './folder-access.js';
+import type { FolderOptions } from './folder-options.js';
 import { prefixed } from './tool-names.js';
 
 export interface FolderToolsOptions extends FolderOptions {

@@ -1,4 +1,4 @@
-import { PolicyViolationError, ToolExecutionError } from '../errors/index.js';
+import { PolicyViolationError, ToolExecutionError, ValidationError } from '../errors/index.js';
 import type { ApprovalManager } from '../managers/approval-manager.js';
 import type { BudgetTracker } from '../managers/budget-tracker.js';
 import type { ToolRegistry } from '../registry/tool-registry.js';
@@ -8,6 +8,7 @@ import type { Event } from '../types/events.js';
 import type { ToolResult } from '../types/tool.js';
 import { withRetry } from '../resilience/retry.js';
 import { generateEventId } from '../utils/id.js';
+import { type ApprovalGateDependencies, awaitApproval } from './approval-gate.js';
 import type { PolicyEngine } from './policy-engine.js';
 
 /** Policy id recorded for approvals required by a tool's own `metadata.requiresApproval`. */
@@ -54,7 +55,12 @@ export class ActionEngine {
     context: ActionContext
   ): Promise<ActionResult> {
     await this.enforceAllowedTools(intention, context);
+    // Arguments first: an invalid call is refused before any policy, approval or budget.
+    await this.validateArguments(intention, context);
     await this.validatePolicy(intention, context);
+    // The caller may have given up while a policy or an approval was pending.
+    await this.refuseIfAborted(intention, context);
+    await this.admitToBudget(intention, context);
 
     const startTime = Date.now();
 
@@ -73,11 +79,6 @@ export class ActionEngine {
         intention.parameters || {},
         context
       );
-
-      // Record tool call usage in budget tracker
-      if (this.budgetTracker && intention.toolName) {
-        await this.budgetTracker.recordToolCall(context.agentId, intention.toolName, Date.now());
-      }
 
       const duration = Date.now() - startTime;
       const executed = await this.logEvent(context, 'action.executed', {
@@ -111,6 +112,56 @@ export class ActionEngine {
         intention.parameters
       );
     }
+  }
+
+  /** Refuses arguments that do not match the tool's schema, before anything else runs. */
+  private async validateArguments(intention: Intention, context: ActionContext): Promise<void> {
+    const name = intention.toolName ?? '';
+    const invalid = this.toolRegistry.validateParameters(name, intention.parameters ?? {});
+    if (!invalid) return;
+    await this.logEvent(context, 'action.failed', {
+      toolName: name,
+      parameters: intention.parameters,
+      error: invalid.message,
+      duration: 0,
+    });
+    throw new ToolExecutionError(name, invalid, intention.parameters);
+  }
+
+  private async refuseIfAborted(intention: Intention, context: ActionContext): Promise<void> {
+    if (!context.abortSignal?.aborted) return;
+    const reason = 'the caller gave up before the tool ran';
+    await this.logEvent(context, 'action.failed', {
+      toolName: intention.toolName,
+      parameters: intention.parameters,
+      error: reason,
+      duration: 0,
+    });
+    throw new ToolExecutionError(
+      intention.toolName ?? 'unknown',
+      new Error(reason),
+      intention.parameters
+    );
+  }
+
+  /**
+   * Counts the call against every applicable call budget, and refuses it if one is spent —
+   * checked and counted in one synchronous step, so concurrent calls cannot all get through.
+   */
+  private async admitToBudget(intention: Intention, context: ActionContext): Promise<void> {
+    if (!this.budgetTracker || !intention.toolName) return;
+    const refusal = this.budgetTracker.admitToolCall(
+      context.agentId,
+      intention.toolName,
+      this.policyEngine.toolCallLimits(context.agentId, intention.toolName)
+    );
+    if (!refusal) return;
+    await this.logEvent(context, 'policy.violated', {
+      intention,
+      reason: refusal.reason,
+      violatedPolicies: [refusal.policyId],
+    });
+    throw new PolicyViolationError(refusal.policyId, intention, refusal.reason);
   }
 
   /** Denies tools outside the caller's allowlist, before any policy or execution. */
@@ -149,7 +200,11 @@ export class ActionEngine {
         maxRetries: retry.maxRetries,
         initialDelayMs: retry.initialDelayMs ?? 200,
         maxDelayMs: retry.maxDelayMs ?? 5_000,
-        retryOn: (error) => error instanceof ToolExecutionError,
+        // Invalid arguments never succeed on a second try; the tool may narrow the rest.
+        retryOn: (error) =>
+          error instanceof ToolExecutionError &&
+          !(error.originalError instanceof ValidationError) &&
+          (retry.retryOn ? retry.retryOn(error.originalError) : true),
       },
       {
         ...(context.abortSignal ? { signal: context.abortSignal } : {}),
@@ -189,7 +244,8 @@ export class ActionEngine {
     if (!validation.allowed) {
       // Check if approval is required
       if (validation.requiresApproval && this.approvalManager) {
-        await this.awaitApproval(
+        await awaitApproval(
+          this.approvalGate(context),
           intention,
           context,
           validation.violatedPolicies?.[0] || 'unknown',
@@ -213,9 +269,11 @@ export class ActionEngine {
     }
 
     // A tool marked `requiresApproval` waits for a human even when every policy allows it.
+    // A replay does not ask again: whoever starts a replay decides to re-run its actions.
     const tool = intention.toolName ? this.toolRegistry.getTool(intention.toolName) : null;
-    if (tool?.metadata?.requiresApproval) {
-      await this.awaitApproval(
+    if (tool?.metadata?.requiresApproval && context.mode !== 'replay') {
+      await awaitApproval(
+        this.approvalGate(context),
         intention,
         context,
         TOOL_APPROVAL_POLICY,
@@ -224,70 +282,11 @@ export class ActionEngine {
     }
   }
 
-  /**
-   * Waits for a human decision on an intention. Fails closed: without an approval manager,
-   * on rejection, or when the caller gives up (abort signal), the action is refused.
-   */
-  private async awaitApproval(
-    intention: Intention,
-    context: ActionContext,
-    policyId: string,
-    reason: string | undefined
-  ): Promise<void> {
-    if (!this.approvalManager) {
-      await this.logEvent(context, 'policy.violated', {
-        intention,
-        reason: 'approval required but no approval manager is configured',
-        violatedPolicies: [policyId],
-      });
-      throw new PolicyViolationError(policyId, intention, 'approval required');
-    }
-    const manager = this.approvalManager;
-    const { approvalId, waitForApproval } = await manager.requestApproval(
-      context.runId,
-      context.agentId,
-      intention,
-      policyId
-    );
-    await this.logEvent(context, 'approval.requested', {
-      approvalId,
-      intention,
-      policyId,
-      reason,
-    });
-
-    const signal = context.abortSignal;
-    const cancelOnAbort = () => manager.cancel(approvalId);
-    signal?.addEventListener('abort', cancelOnAbort, { once: true });
-    if (signal?.aborted) {
-      cancelOnAbort();
-    }
-    let approved: boolean;
-    try {
-      approved = await waitForApproval;
-    } catch {
-      // Cancelled: the run was stopped or the caller (e.g. an MCP client) gave up waiting.
-      approved = false;
-    } finally {
-      signal?.removeEventListener('abort', cancelOnAbort);
-    }
-
-    if (approved) {
-      await this.logEvent(context, 'approval.approved', { approvalId, intention, policyId });
-      return;
-    }
-    const cancelled = manager.getApproval(approvalId)?.reason === 'Cancelled';
-    await this.logEvent(context, 'approval.rejected', {
-      approvalId,
-      intention,
-      policyId,
-      ...(cancelled ? { reason: 'cancelled before a decision' } : {}),
-    });
-    throw new PolicyViolationError(
-      policyId,
-      intention,
-      cancelled ? 'Approval cancelled before a decision' : reason || 'Approval rejected'
-    );
+  private approvalGate(context: ActionContext): ApprovalGateDependencies {
+    return {
+      ...(this.approvalManager ? { manager: this.approvalManager } : {}),
+      log: (type, data) => this.logEvent(context, type, data),
+    };
   }
 
   /** Appends an event and returns it, so callers can reference what was recorded. */

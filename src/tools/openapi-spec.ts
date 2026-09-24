@@ -6,8 +6,12 @@ export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 export type JsonSchema = Record<string, unknown>;
 
 const METHODS: readonly HttpMethod[] = ['get', 'post', 'put', 'patch', 'delete'];
-/** Beyond this many schema nodes, a `$ref` is left unexpanded (protects against blow-ups). */
-const MAX_SCHEMA_NODES = 20_000;
+/**
+ * Beyond these many schema nodes, a `$ref` is left unexpanded: per operation, and for the
+ * whole spec (a small spec whose references multiply must not fill the memory).
+ */
+const MAX_OPERATION_NODES = 20_000;
+const MAX_SPEC_NODES = 200_000;
 
 /** A spec given as a URL, a file path, or an object you already parsed (JSON or YAML). */
 export type OpenApiSpecSource = string | URL | Record<string, unknown>;
@@ -27,6 +31,8 @@ export type OpenApiFetch = (
   statusText?: string;
   headers: { get(name: string): string | null };
   body?: ByteStream | null;
+  /** Set by `fetch` when it followed a redirect. */
+  redirected?: boolean;
   text(): Promise<string>;
 }>;
 
@@ -140,15 +146,17 @@ function assertOpenApi3(document: Record<string, unknown>): void {
 export function extractOperations(document: Record<string, unknown>): OpenApiOperation[] {
   const paths = isRecord(document.paths) ? document.paths : {};
   const operations: OpenApiOperation[] = [];
+  const budget = { nodes: 0 };
   for (const [path, rawItem] of Object.entries(paths)) {
-    const item = new RefResolver(document).follow(rawItem);
+    const item = new RefResolver(document, budget).follow(rawItem);
     if (!isRecord(item)) continue;
     const shared = arrayOf(item.parameters);
     for (const method of METHODS) {
       const operation = item[method];
       if (isRecord(operation)) {
-        // A fresh resolver per operation: the size budget applies to each tool separately.
-        operations.push(readOperation(new RefResolver(document), path, method, operation, shared));
+        // A resolver per operation (its own budget), sharing the budget of the whole spec.
+        const resolver = new RefResolver(document, budget);
+        operations.push(readOperation(resolver, path, method, operation, shared));
       }
     }
   }
@@ -229,7 +237,10 @@ function schemaOrAny(value: unknown): JsonSchema {
 class RefResolver {
   private nodes = 0;
 
-  constructor(private readonly root: Record<string, unknown>) {}
+  constructor(
+    private readonly root: Record<string, unknown>,
+    private readonly spec: { nodes: number }
+  ) {}
 
   /** Follows a chain of `$ref`s at the top level only. */
   follow(value: unknown): unknown {
@@ -243,6 +254,7 @@ class RefResolver {
 
   resolve(value: unknown, stack: readonly string[] = []): unknown {
     this.nodes++;
+    this.spec.nodes++;
     if (Array.isArray(value)) {
       return value.map((item) => this.resolve(item, stack));
     }
@@ -257,7 +269,7 @@ class RefResolver {
       if (stack.includes(ref)) {
         return { description: `Recursive reference to ${ref}` };
       }
-      if (this.nodes > MAX_SCHEMA_NODES) {
+      if (this.nodes > MAX_OPERATION_NODES || this.spec.nodes > MAX_SPEC_NODES) {
         return { description: `Reference ${ref} not expanded (schema too large)` };
       }
       const target = this.resolve(this.lookup(ref), [...stack, ref]);
@@ -275,7 +287,8 @@ class RefResolver {
     let current: unknown = this.root;
     for (const raw of ref.slice(2).split('/')) {
       const key = decodeURIComponent(raw).replace(/~1/g, '/').replace(/~0/g, '~');
-      if (!isRecord(current) || !(key in current)) {
+      // Own properties only: `#/constructor` must not reach into the object prototype.
+      if (!isRecord(current) || !Object.hasOwn(current, key)) {
         return { description: `Unresolved reference ${ref}` };
       }
       current = current[key];

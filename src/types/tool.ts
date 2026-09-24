@@ -28,6 +28,11 @@ export interface ToolRetryPolicy {
   maxRetries: number;
   initialDelayMs?: number;
   maxDelayMs?: number;
+  /**
+   * Which failures of the tool are worth retrying (default: all). Invalid arguments are
+   * never retried.
+   */
+  retryOn?: (error: Error) => boolean;
 }
 
 export interface ToolDefinition<Schema extends z.ZodSchema = z.ZodSchema> {

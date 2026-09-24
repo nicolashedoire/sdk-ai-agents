@@ -221,6 +221,8 @@ export interface ExecuteToolOptions {
   allowedTools?: string[];
   /** Aborted when the caller gives up: cancels a pending approval, reaches the handler. */
   signal?: AbortSignal;
+  /** Longest wait for a human approval; past it the approval is cancelled and the call refused. */
+  approvalTimeoutMs?: number;
 }
 
 export class SDKImpl implements SDK {
@@ -417,6 +419,9 @@ export class SDKImpl implements SDK {
           agentId,
           ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}),
           ...(options.signal ? { abortSignal: options.signal } : {}),
+          ...(options.approvalTimeoutMs !== undefined
+            ? { approvalTimeoutMs: options.approvalTimeoutMs }
+            : {}),
         }
       );
       if (!options.runId) {

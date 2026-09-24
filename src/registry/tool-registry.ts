@@ -91,6 +91,19 @@ export class ToolRegistry {
     }
   }
 
+  /**
+   * Checks parameters against the tool's schema without running it. Returns the refusal, or
+   * nothing when they are valid or the tool is unknown (reported when it is executed).
+   */
+  validateParameters(name: string, parameters: unknown): ValidationError | undefined {
+    const tool = this.tools.get(name);
+    if (!tool) return undefined;
+    const parsed = tool.schema.safeParse(parameters);
+    return parsed.success
+      ? undefined
+      : new ValidationError(name, this.formatZodErrors(parsed.error), tool.schema);
+  }
+
   private validateToolAccess(name: string, allowlist?: string[]): void {
     if (!this.isToolAllowed(name, allowlist)) {
       throw new ToolNotFoundError(`Tool "${name}" is not declared or not in allowlist`);

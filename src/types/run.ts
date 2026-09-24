@@ -4,6 +4,8 @@ import type { ProviderSettings } from './agent.js';
 export interface RunInput {
   message: string;
   context?: Record<string, unknown>;
+  /** Cancels the run when aborted (e.g. the MCP client that asked gave up). Not recorded. */
+  signal?: AbortSignal;
   metadata?: Record<string, unknown>;
   providerSettings?: {
     openai?: ProviderSettings;
@@ -54,6 +56,11 @@ export interface ActionContext {
    * if it is registered in the SDK. Cognitive agents and the MCP server always set it.
    */
   allowedTools?: string[];
+  /**
+   * Longest wait for a human approval, in milliseconds. Past it, the approval is cancelled
+   * and the action refused. Without it, an approval waits until decided or aborted.
+   */
+  approvalTimeoutMs?: number;
 }
 
 export interface ActionResult {

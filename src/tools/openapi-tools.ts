@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { ValidationError } from '../errors/index.js';
 import type { ToolDefinition, ToolMetadata, ToolRetryPolicy } from '../types/tool.js';
 import { clip } from './bounded-text.js';
-import { bindArguments, callOperation, type OperationCall } from './openapi-call.js';
+import { bindArguments, prepareRequest } from './openapi-arguments.js';
+import { isRetryableCallError, sendRequest } from './openapi-call.js';
 import {
   extractOperations,
   isRecord,
@@ -19,7 +20,11 @@ export interface OpenApiToolsOptions {
   spec: OpenApiSpecSource;
   /** Where requests go. Defaults to the spec's first `servers` entry. */
   baseUrl?: string;
-  /** Sent with every request, e.g. `{ Authorization: `Bearer ${token}` }`. Never shown to the model. */
+  /**
+   * Sent with every request, e.g. `{ Authorization: `Bearer ${token}` }`. Never shown to the
+   * model. With headers, pass `baseUrl` too (unless the spec is downloaded from the API's own
+   * origin), and use https (http only on this machine).
+   */
   headers?: Record<string, string>;
   /**
    * Operations to turn into tools, by `operationId`. Without it, only `GET` operations are
@@ -34,10 +39,14 @@ export interface OpenApiToolsOptions {
   prefix?: string;
   /**
    * Governance metadata per operation. Defaults: `GET` → low risk, read-only; any other
-   * method → high risk and `requiresApproval: true`. What you return is merged over that.
+   * method → high risk and `requiresApproval: true`. Each field you return replaces the
+   * default one; a field you leave out (or set to `undefined`) keeps the default.
    */
   metadata?: (operation: OpenApiOperationInfo) => ToolMetadata | undefined;
-  /** Retries for failed calls. Only set it for idempotent operations. */
+  /**
+   * Retries for failed calls of read-only operations (by default the GETs): server errors,
+   * 429, timeouts and network failures — never 4xx answers or invalid arguments.
+   */
   retry?: ToolRetryPolicy;
   /** HTTP port; defaults to the global `fetch`. */
   fetch?: OpenApiFetch;
@@ -78,32 +87,47 @@ export async function openApiTools(options: OpenApiToolsOptions): Promise<ToolDe
     maxSpecBytes: options.maxSpecBytes ?? DEFAULT_MAX_SPEC_BYTES,
   });
   const baseUrl = resolveBaseUrl(options.baseUrl, loaded.document, loaded.sourceUrl);
+  if (options.headers && Object.keys(options.headers).length > 0) {
+    assertSafeForCredentials(baseUrl, options.baseUrl !== undefined, loaded.sourceUrl);
+  }
   const operations = selectOperations(extractOperations(loaded.document), options);
   const names = new ToolNameAllocator();
   const title = specTitle(loaded.document);
 
+  const headers = options.headers ?? {};
+  const maxResponseBytes = options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES;
   return operations.map((operation) => {
     const { bindings, inputSchema } = bindArguments(operation);
-    const call: OperationCall = {
-      operation,
-      bindings,
-      baseUrl,
-      headers: options.headers ?? {},
-      fetch,
-      timeoutMs,
-      maxResponseBytes: options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES,
-    };
+    // The arguments are checked with the same code before policies and approvals (by the
+    // schema) and when the request is built: an invalid call never waits for anyone.
+    const schema = z.record(z.unknown()).superRefine((args, context) => {
+      try {
+        prepareRequest(operation, bindings, baseUrl, headers, args);
+      } catch (error) {
+        const field = error instanceof ValidationError ? error.field : 'arguments';
+        const message = error instanceof ValidationError ? error.reason : String(error);
+        context.addIssue({ code: z.ZodIssueCode.custom, path: [field], message });
+      }
+    });
+    const metadata = metadataFor(operation, options);
     const label = operation.operationId ?? `${operation.method}_${operation.path}`;
     return {
       name: names.allocate(prefixed(options.prefix, label)),
       description: describe(operation),
-      schema: z.record(z.unknown()),
+      schema,
       inputJsonSchema: inputSchema,
       capability: `openapi:${title}`,
-      metadata: metadataFor(operation, options),
-      ...(options.retry ? { retry: options.retry } : {}),
-      handler: (args: Record<string, unknown>, context) =>
-        callOperation(call, args, context?.signal),
+      metadata,
+      ...(options.retry && metadata.readOnly
+        ? { retry: { retryOn: isRetryableCallError, ...options.retry } }
+        : {}),
+      handler: async (args: Record<string, unknown>, context) =>
+        sendRequest(operation, prepareRequest(operation, bindings, baseUrl, headers, args), {
+          fetch,
+          timeoutMs,
+          maxResponseBytes,
+          ...(context?.signal ? { signal: context.signal } : {}),
+        }),
     };
   });
 }
@@ -149,7 +173,14 @@ function metadataFor(operation: OpenApiOperation, options: OpenApiToolsOptions):
     tags: operation.tags,
     ...(operation.operationId ? { operationId: operation.operationId } : {}),
   });
-  return { ...defaults, ...override };
+  // Field by field: only an explicit value replaces a default (`undefined` cannot switch
+  // the approval of a write operation off).
+  return {
+    category: override?.category ?? defaults.category,
+    riskLevel: override?.riskLevel ?? defaults.riskLevel,
+    requiresApproval: override?.requiresApproval ?? defaults.requiresApproval,
+    readOnly: override?.readOnly ?? defaults.readOnly,
+  };
 }
 
 function describe(operation: OpenApiOperation): string {
@@ -183,6 +214,34 @@ function resolveBaseUrl(
     throw new ValidationError('baseUrl', `unsupported protocol ${url.protocol}`);
   }
   return url;
+}
+
+/**
+ * Credentials go only where you decided: to a `baseUrl` you passed, or to the origin the spec
+ * itself came from — never to a server named by a spec file — and never in clear text over
+ * the network (http is accepted on this machine only).
+ */
+function assertSafeForCredentials(
+  baseUrl: URL,
+  explicit: boolean,
+  sourceUrl: string | undefined
+): void {
+  const sameOrigin = sourceUrl !== undefined && new URL(sourceUrl).origin === baseUrl.origin;
+  if (!explicit && !sameOrigin) {
+    throw new ValidationError(
+      'baseUrl',
+      `pass \`baseUrl\` with \`headers\`: the spec alone would decide where your credentials go (${baseUrl.origin})`
+    );
+  }
+  if (
+    baseUrl.protocol === 'http:' &&
+    !['localhost', '127.0.0.1', '[::1]'].includes(baseUrl.hostname)
+  ) {
+    throw new ValidationError(
+      'baseUrl',
+      `${baseUrl.origin} uses http: credentials would travel unencrypted; use https`
+    );
+  }
 }
 
 /** First server URL, with its variables replaced by their default values. */

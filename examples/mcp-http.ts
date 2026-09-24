@@ -46,6 +46,9 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
   if (request.method !== 'POST') {
     return reply(response, 405, 'Method not allowed');
   }
+  // Stateless: a client's cancellation arrives as a new request, which this fresh server
+  // cannot tie to a call still in progress. A pending approval then ends when the client
+  // closes the connection, or after `approvalTimeoutMs` (50 s by default) at the latest.
   const server = createMcpServer(sdk, { name: 'docs', tools, resources });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   response.on('close', () => {

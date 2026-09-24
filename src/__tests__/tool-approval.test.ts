@@ -2,7 +2,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { PolicyViolationError } from '../errors/index.js';
 import type { SDK } from '../sdk.js';
+import { ScriptedLLMProvider } from './support/scripted-llm-provider.js';
 import { createTestSDK, type TestSDK } from './support/test-sdk.js';
+
+/** Settles with the promise's outcome, or 'still waiting' after `ms`. */
+function within<T>(promise: Promise<T>, ms: number): Promise<T | 'still waiting'> {
+  return Promise.race([promise, new Promise<'still waiting'>((resolve) => setTimeout(() => resolve('still waiting'), ms))]);
+}
 
 /** Defines a tool marked `requiresApproval` and returns the journal of its real executions. */
 function defineRefundTool(sdk: SDK): string[] {
@@ -106,4 +112,60 @@ describe('tools marked requiresApproval', () => {
     env.sdk.approveAction(approval.id, 'alice');
     await expect(call).resolves.toBe('refunded');
   });
+
+  it('are cancelled when nobody decides within approvalTimeoutMs', async () => {
+    env = createTestSDK();
+    const executed = defineRefundTool(env.sdk);
+
+    const call = env.sdk.executeTool('refund', { orderId: 'o-4' }, { approvalTimeoutMs: 50 });
+    const approval = await pendingApproval(env.sdk);
+
+    await expect(call).rejects.toThrow('Approval no decision within 50 ms');
+    expect(() => env.sdk.approveAction(approval.id, 'late-approver')).toThrow('already rejected');
+    expect(executed).toEqual([]);
+  });
+
+  it('never run when the caller gives up right after the approval', async () => {
+    env = createTestSDK();
+    const executed = defineRefundTool(env.sdk);
+    const caller = new AbortController();
+
+    const call = env.sdk.executeTool('refund', { orderId: 'o-5' }, { signal: caller.signal });
+    env.sdk.approveAction((await pendingApproval(env.sdk)).id, 'alice');
+    caller.abort();
+
+    await expect(call).rejects.toMatchObject({ originalError: { message: 'the caller gave up before the tool ran' } });
+    expect(executed).toEqual([]);
+  });
+
+  it('refuse invalid arguments before asking anyone', async () => {
+    env = createTestSDK();
+    const executed = defineRefundTool(env.sdk);
+
+    const outcome = await within(env.sdk.executeTool('refund', { orderId: 42 }).catch((error: unknown) => error), 500);
+
+    expect(outcome).toMatchObject({ originalError: { name: 'ValidationError' } });
+    expect(env.sdk.getPendingApprovals()).toEqual([]);
+    expect(executed).toEqual([]);
+  });
+
+  it('are not asked again when a run is replayed', async () => {
+    const provider = new ScriptedLLMProvider()
+      .enqueue('tool-selection', { toolCall: { name: 'refund', arguments: { orderId: 'o-6' } } })
+      .always('tool-selection', { content: 'Refunded.' });
+    env = createTestSDK({}, provider);
+    const executed = defineRefundTool(env.sdk);
+    const refund = env.sdk.listTools().filter((tool) => tool.name === 'refund');
+    const agent = env.sdk.createAgent({ name: 'support', model: 'test-model', tools: refund, maxSteps: 3 });
+
+    const run = agent.run({ message: 'Refund o-6' });
+    env.sdk.approveAction((await pendingApproval(env.sdk)).id, 'alice');
+    const original = await run;
+    expect(original.status).toBe('completed');
+
+    // Whoever replays decides to run the actions again: no approval waits forever.
+    const replayed = await within(env.sdk.replay(original.runId), 4_000);
+    expect(replayed).toMatchObject({ status: 'completed' });
+    expect(executed).toEqual(['o-6', 'o-6']);
+  }, 15_000);
 });

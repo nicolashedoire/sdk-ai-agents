@@ -50,6 +50,9 @@ export function scanStatements(sql: string, dialect: SqlDialect): Scan {
   let start = 0;
   let meaningful = false;
   let index = 0;
+  // Parentheses must balance: the PostgreSQL adapter wraps the query in a sub-query, and a
+  // `)` closing below depth 0 would step out of it.
+  let depth = 0;
   const flush = (end: number) => {
     if (meaningful) statements.push(sql.slice(start, end).trim());
     start = end + 1;
@@ -59,9 +62,13 @@ export function scanStatements(sql: string, dialect: SqlDialect): Scan {
     const char = sql[index] ?? '';
     const next = sql[index + 1] ?? '';
     if (char === '-' && next === '-') {
-      index = endOfLine(sql, index);
+      index = endOfLine(sql, index, dialect);
     } else if (char === '/' && next === '*') {
       index = endOfBlockComment(sql, index, dialect === 'postgres');
+    } else if (char === "'" && dialect === 'postgres' && isEscapeStringPrefix(sql, index)) {
+      // E'…': backslash escapes, so \' does not end the string.
+      index = endOfEscapeString(sql, index);
+      meaningful = true;
     } else if (char === "'" || char === '"' || (dialect === 'sqlite' && char === '`')) {
       index = endOfQuoted(sql, index, char);
       meaningful = true;
@@ -85,12 +92,22 @@ export function scanStatements(sql: string, dialect: SqlDialect): Scan {
     } else if (char === ';') {
       flush(index);
       index++;
+    } else if (char === '(' || char === ')') {
+      depth += char === '(' ? 1 : -1;
+      if (depth < 0) {
+        throw new ValidationError('sql', 'unbalanced parentheses: a ")" closes nothing');
+      }
+      meaningful = true;
+      index++;
     } else {
       if (!/\s/.test(char)) meaningful = true;
       index++;
     }
   }
   flush(sql.length);
+  if (depth !== 0) {
+    throw new ValidationError('sql', 'unbalanced parentheses: a "(" is never closed');
+  }
   return { statements, placeholders };
 }
 
@@ -103,7 +120,7 @@ function firstKeyword(statement: string, dialect: SqlDialect): string {
     if (skipped) {
       index += skipped[0].length;
     } else if (rest.startsWith('--')) {
-      index = endOfLine(statement, index);
+      index = endOfLine(statement, index, dialect);
     } else if (rest.startsWith('/*')) {
       index = endOfBlockComment(statement, index, dialect === 'postgres');
     } else {
@@ -113,9 +130,33 @@ function firstKeyword(statement: string, dialect: SqlDialect): string {
   return (/^[A-Za-z_]+/.exec(statement.slice(index))?.[0] ?? '').toLowerCase();
 }
 
-function endOfLine(sql: string, index: number): number {
-  const end = sql.indexOf('\n', index);
-  return end === -1 ? sql.length : end + 1;
+/** A `--` comment ends at a line feed; PostgreSQL also ends it at a carriage return. */
+function endOfLine(sql: string, index: number, dialect: SqlDialect): number {
+  const end =
+    dialect === 'postgres' ? sql.slice(index).search(/[\n\r]/) : sql.indexOf('\n', index) - index;
+  return end < 0 ? sql.length : index + end + 1;
+}
+
+/** `E'…'` (or `e'…'`) not preceded by an identifier character: a PostgreSQL escape string. */
+function isEscapeStringPrefix(sql: string, index: number): boolean {
+  return /[eE]/.test(sql[index - 1] ?? '') && !/[A-Za-z0-9_$]/.test(sql[index - 2] ?? '');
+}
+
+function endOfEscapeString(sql: string, index: number): number {
+  let position = index + 1;
+  while (position < sql.length) {
+    const char = sql[position];
+    if (char === '\\') {
+      position += 2;
+    } else if (char === "'" && sql[position + 1] === "'") {
+      position += 2;
+    } else if (char === "'") {
+      return position + 1;
+    } else {
+      position++;
+    }
+  }
+  throw new ValidationError('sql', 'unterminated string or quoted identifier');
 }
 
 /** PostgreSQL block comments nest; SQLite ones do not. An unclosed comment is an error. */

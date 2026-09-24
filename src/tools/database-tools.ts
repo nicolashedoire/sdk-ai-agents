@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import type { ToolDefinition, ToolMetadata } from '../types/tool.js';
-import { toJsonRow } from './sql-values.js';
 import { prefixed } from './tool-names.js';
 
 export interface TableSummary {
@@ -21,8 +20,8 @@ export interface ColumnSummary {
 
 export interface ReadOnlyQueryResult {
   columns: string[];
-  /** Raw rows as returned by the driver (at most `maxRows`). */
-  rows: unknown[];
+  /** At most `maxRows` rows, made JSON-safe with `toJsonRow(row, maxTextLength)`. */
+  rows: Array<Record<string, unknown>>;
   /** More rows were available than `maxRows`. */
   truncated: boolean;
 }
@@ -37,8 +36,14 @@ export interface ReadOnlyDatabase {
   listTables(options: { maxTables: number }): Promise<TableSummary[]>;
   /** Columns of a table or view; throws when it does not exist. */
   describeTable(name: string): Promise<ColumnSummary[]>;
-  /** Runs one read-only query and returns at most `maxRows` rows. */
-  query(sql: string, options: { maxRows: number }): Promise<ReadOnlyQueryResult>;
+  /**
+   * Runs one read-only query and returns at most `maxRows` rows, each converted with
+   * `toJsonRow(row, maxTextLength)` as it arrives, so large values are not kept.
+   */
+  query(
+    sql: string,
+    options: { maxRows: number; maxTextLength: number }
+  ): Promise<ReadOnlyQueryResult>;
 }
 
 export interface DatabaseToolsOptions {
@@ -125,9 +130,9 @@ export function databaseTools(options: DatabaseToolsOptions): ToolDefinition[] {
       capability,
       metadata: READ_ONLY,
       handler: async ({ sql }: z.infer<typeof querySchema>) => {
-        const result = await database.query(sql, { maxRows });
+        const result = await database.query(sql, { maxRows, maxTextLength });
         // The limit holds even if a custom adapter returns more.
-        const rows = result.rows.slice(0, maxRows).map((row) => toJsonRow(row, maxTextLength));
+        const rows = result.rows.slice(0, maxRows);
         return {
           columns: result.columns,
           rows,
