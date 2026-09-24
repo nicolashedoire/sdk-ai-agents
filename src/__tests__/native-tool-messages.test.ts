@@ -101,6 +101,64 @@ describe('tool results sent back to the model', () => {
     ]);
   });
 
+  it('answers every call of a turn, running only the first (OpenAI)', async () => {
+    server.reply(
+      openAIChat({
+        content: null,
+        toolCalls: [
+          { name: 'add', arguments: '{"a":2,"b":3}' },
+          { name: 'add', arguments: '{"a":4,"b":5}' },
+        ],
+      }),
+      openAIChat({ content: 'Done.' })
+    );
+    const sdk = sdkWith({ apiKey: 'k', providerConfig: { openai: { baseURL: `${address}/v1` } } });
+
+    const result = await agentOf(sdk, 'gpt-4o').run({ message: 'Two sums' });
+
+    expect(result).toMatchObject({ status: 'completed', output: 'Done.' });
+    const [, assistant, first, second] = body(1).messages as Array<Record<string, unknown>>;
+    expect((assistant?.tool_calls as unknown[]).length).toBe(2);
+    expect(first).toEqual({ role: 'tool', tool_call_id: 'call_1', content: '{"sum":5}' });
+    expect(second).toMatchObject({ role: 'tool', tool_call_id: 'call_2' });
+    expect(second?.content).toMatch(/^Not run/);
+  });
+
+  it("answers every tool_use of Claude's turn, so the turn can go back unchanged", async () => {
+    // A gateway may ignore disable_parallel_tool_use: each tool_use still needs a tool_result.
+    server.reply(
+      anthropicMessage({
+        toolUses: [
+          { name: 'add', input: { a: 2, b: 3 } },
+          { name: 'add', input: { a: 4, b: 5 } },
+        ],
+      }),
+      anthropicMessage({ text: ['Done.'] })
+    );
+    const sdk = sdkWith({
+      provider: 'anthropic',
+      providerConfig: { anthropic: { apiKey: 'k', baseURL: address } },
+    });
+
+    const result = await agentOf(sdk, 'claude-opus-5').run({ message: 'Two sums' });
+
+    expect(result).toMatchObject({ status: 'completed', output: 'Done.' });
+    const messages = body(1).messages as Array<{ role: string; content: unknown }>;
+    expect((messages[1]?.content as unknown[]).length).toBe(2);
+    expect(messages[2]).toEqual({
+      role: 'user',
+      content: [
+        { type: 'tool_result', tool_use_id: 'toolu_1', content: '{"sum":5}' },
+        {
+          type: 'tool_result',
+          tool_use_id: 'toolu_2',
+          content: expect.stringMatching(/^Not run/),
+          is_error: true,
+        },
+      ],
+    });
+  });
+
   it('keeps the plain-text lines for a provider without native tool messages', async () => {
     const provider = new ScriptedLLMProvider().enqueue(
       'tool-selection',

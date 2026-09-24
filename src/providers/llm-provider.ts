@@ -32,7 +32,14 @@ export type LLMMessage =
        */
       vendorContent?: { provider: string; content: unknown };
     }
-  | { role: 'tool'; toolCallId: string; toolName: string; content: string };
+  | {
+      role: 'tool';
+      toolCallId: string;
+      toolName: string;
+      content: string;
+      /** The tool did not run (or failed): `content` says why. */
+      isError?: boolean;
+    };
 
 /**
  * Normalized request to generate an LLM completion

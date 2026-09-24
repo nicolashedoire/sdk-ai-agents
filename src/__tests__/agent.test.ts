@@ -84,6 +84,16 @@ describe('AgentImpl', () => {
       expect(types.at(-1)).toBe('run.completed');
     });
 
+    it('should send an empty first message as it is', async () => {
+      const provider = new ScriptedLLMProvider().enqueue(CHANNEL, { content: 'Hello' });
+
+      const result = await agentWith(provider).run({ message: '' });
+
+      expect(result.status).toBe('completed');
+      // A request without any message would be refused by the vendor.
+      expect(provider.requests[0]?.messages).toEqual([{ role: 'user', content: '' }]);
+    });
+
     it('should respect maxSteps', async () => {
       agentData.config.maxSteps = 2;
       // An empty answer is a `continue` intention: the agent asks the model again.

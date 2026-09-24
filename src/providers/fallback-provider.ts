@@ -47,6 +47,10 @@ export class FallbackProvider implements LLMProvider {
     const failures: Array<{ provider: string; error: Error }> = [];
 
     for (const [index, provider] of this.providers.entries()) {
+      if (request.abortSignal?.aborted) {
+        // A cancelled call stops the chain: no fallback is tried for it.
+        throw new Error('Request aborted');
+      }
       const providerName = provider.getProviderName();
       attemptedProviders.push(providerName);
       const providerRequest = this.requestFor(provider, index, request);

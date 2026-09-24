@@ -267,6 +267,9 @@ describe('AnthropicProvider', () => {
         'claude-sonnet-4-5-20250929',
         'claude-sonnet-4-6',
         'claude-haiku-4-5',
+        // Platform ids (Vertex, Bedrock) of models that take sampling parameters.
+        'claude-opus-4-5@20251101',
+        'anthropic.claude-3-5-sonnet-20241022-v2:0',
       ];
       const refuses = [
         'claude-opus-4-7',
@@ -276,6 +279,10 @@ describe('AnthropicProvider', () => {
         'claude-sonnet-5',
         'claude-fable-5-1',
         'claude-mythos-5-1',
+        // The same models behind a platform prefix or version suffix.
+        'anthropic.claude-opus-4-7-v1:0',
+        'us.anthropic.claude-sonnet-5',
+        'claude-opus-5@20260101',
       ];
       expect(takes.filter((model) => !acceptsSampling(model))).toEqual([]);
       expect(refuses.filter((model) => acceptsSampling(model))).toEqual([]);

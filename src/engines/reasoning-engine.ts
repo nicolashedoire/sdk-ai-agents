@@ -40,7 +40,13 @@ export interface ReasoningStep {
    * Set exactly when the model called a tool: the call's id and name (the tool's result refers
    * to the id), and the model's turn to add to the conversation before that result.
    */
-  toolCall?: { id: string; name: string; turn: Extract<LLMMessage, { role: 'assistant' }> };
+  toolCall?: {
+    id: string;
+    name: string;
+    turn: Extract<LLMMessage, { role: 'assistant' }>;
+    /** Other calls of the same turn: the SDK runs one per step, yet each needs an answer. */
+    notRun: Array<{ id: string; name: string }>;
+  };
 }
 
 export class ReasoningEngine {
@@ -173,19 +179,31 @@ export class ReasoningEngine {
       );
 
       const intention = this.parseIntention(response);
-      const call = response.toolCalls?.[0];
-      if (intention.type !== 'tool_call' || !call) {
+      // Every call gets an id: its result, or its "not run" answer, refers to it.
+      const calls = (response.toolCalls ?? []).map((call) => ({
+        ...call,
+        id: call.id ?? `call_${randomUUID().replaceAll('-', '')}`,
+      }));
+      const [first, ...others] = calls;
+      if (intention.type !== 'tool_call' || !first) {
         return { intention, usage: response.usage };
       }
-      const id = call.id ?? `call_${randomUUID().replaceAll('-', '')}`;
       const turn = {
         role: 'assistant' as const,
         content: response.content ?? '',
-        // Only the call the SDK runs: each call of a turn needs its result.
-        toolCalls: [{ ...call, id }],
+        toolCalls: calls,
         ...(response.vendorContent ? { vendorContent: response.vendorContent } : {}),
       };
-      return { intention, usage: response.usage, toolCall: { id, name: call.function.name, turn } };
+      return {
+        intention,
+        usage: response.usage,
+        toolCall: {
+          id: first.id,
+          name: first.function.name,
+          turn,
+          notRun: others.map((call) => ({ id: call.id, name: call.function.name })),
+        },
+      };
     } catch (error) {
       if (abortSignal?.aborted) {
         throw new Error('Run cancelled');
@@ -331,7 +349,8 @@ export class ReasoningEngine {
         ? context.conversationHistory
         : asPlainText(context.conversationHistory))
     );
-    if (context.input) {
+    // The user's message; empty only when the step continues after tool results.
+    if (context.input || context.conversationHistory.length === 0) {
       messages.push({ role: 'user', content: context.input });
     }
     return messages;
@@ -367,6 +386,10 @@ export class ReasoningEngine {
  */
 function asPlainText(history: LLMMessage[]): LLMMessage[] {
   return history.flatMap((message): LLMMessage[] => {
+    // Answers to calls that did not run only matter in the native format.
+    if (message.role === 'tool' && message.isError) {
+      return [];
+    }
     if (message.role === 'tool') {
       return [
         {

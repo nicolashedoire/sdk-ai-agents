@@ -118,6 +118,7 @@ export class AnthropicProvider implements LLMProvider {
             type: 'tool_result',
             tool_use_id: message.toolCallId,
             content: message.content,
+            ...(message.isError ? { is_error: true } : {}),
           };
           // Results of the same turn go together in one user message.
           const previous = converted.at(-1);
@@ -198,9 +199,16 @@ export class AnthropicProvider implements LLMProvider {
   }
 }
 
-/** A model named `claude-<family>-<major>[-<minor>]`, the naming of Claude 4 and later. */
+/**
+ * A model named `claude-<family>-<major>[-<minor>]`, the naming of Claude 4 and later, also
+ * behind a platform prefix (`anthropic.`, `us.anthropic.`) or with a version suffix
+ * (`-20250805`, `@20251101`, `-v1:0`).
+ */
 function modelVersion(model: string): { family: string; major: number; minor: number } | undefined {
-  const match = /^claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d{1,2}))?(?:-|$)/.exec(model);
+  const match =
+    /^(?:[\w-]+\.)*claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d{1,2}))?(?:[-@:]|$)/.exec(
+      model
+    );
   if (!match?.[1] || !match[2]) return undefined;
   return { family: match[1], major: Number(match[2]), minor: Number(match[3] ?? 0) };
 }
@@ -219,11 +227,11 @@ export function acceptsSampling(model: string): boolean {
 }
 
 /**
- * Output budget when the request sets none. Claude 4 and later think before answering, and
- * their thinking counts in `max_tokens`: 4 096 would cut answers short, so they get 16 000
- * (the vendor client refuses a non-streaming call above about 21 000). Opus 4 and 4.1 are
- * capped at 8 192 without streaming by that client, and Claude 3 models accept at most 4 096
- * to 8 192 output tokens, so they keep lower budgets.
+ * Output budget when the request sets none. Claude 4 and later may think before answering
+ * (Opus 5, Sonnet 5 and Fable by default, the others when thinking is on), and thinking counts
+ * in `max_tokens`: 4 096 would cut answers short, so they get 16 000 (the vendor client refuses
+ * a non-streaming call above about 21 000). Opus 4 and 4.1 are capped at 8 192 without
+ * streaming by that client, and Claude 3 models accept at most 4 096 to 8 192 output tokens.
  */
 function defaultMaxTokens(model: string): number {
   const version = modelVersion(model);

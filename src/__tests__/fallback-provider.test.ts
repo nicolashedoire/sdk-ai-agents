@@ -282,6 +282,19 @@ describe('FallbackProvider', () => {
   });
 
   describe('generateCompletionWithFallback', () => {
+    it('should stop the chain, without trying a fallback, when the call is cancelled', async () => {
+      const controller = new AbortController();
+      controller.abort();
+      const provider = new FallbackProvider(succeeding('openai', 'never', 'gpt-4'), [
+        succeeding('anthropic', 'never', 'claude-x'),
+      ]);
+
+      await expect(
+        provider.generateCompletion({ ...request, abortSignal: controller.signal })
+      ).rejects.toThrow('Request aborted');
+      expect(journal).toEqual([]);
+    });
+
     it('should send a fallback its own default model when it does not serve the requested one', async () => {
       const primary = failing('openai', new Error('Primary failed'));
       const claudeOnly = (model: string) => model.startsWith('claude-');

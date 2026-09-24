@@ -11,6 +11,9 @@ import type { Tool } from './types/tool.js';
 import { DEFAULT_MAX_STEPS, DEFAULT_TIMEOUT_MS } from './utils/constants.js';
 import { generateEventId, generateRunId } from './utils/id.js';
 
+/** Answer to a call the model made alongside the one that ran. */
+const NOT_RUN = 'Not run: one tool runs per step. Call it again if it is still needed.';
+
 interface RunState {
   conversationHistory: LLMMessage[];
   /** The user's message still to send; empty once it is in the history. */
@@ -264,8 +267,18 @@ export class AgentImpl {
       role: 'tool',
       toolCallId: toolCall.id,
       toolName: toolCall.name,
-      content: JSON.stringify(result.result) ?? 'null',
+      // As in the plain-text lines of earlier versions ("undefined" for a tool returning nothing).
+      content: String(JSON.stringify(result.result)),
     });
+    for (const other of toolCall.notRun) {
+      state.conversationHistory.push({
+        role: 'tool',
+        toolCallId: other.id,
+        toolName: other.name,
+        content: NOT_RUN,
+        isError: true,
+      });
+    }
     state.currentInput = '';
   }
 
