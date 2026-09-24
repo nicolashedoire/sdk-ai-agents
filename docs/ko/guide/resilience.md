@@ -39,7 +39,7 @@ const sdk = createSDK({
 
 SDK 정책이 활성화되어 있으면 OpenAI와 Anthropic 클라이언트 자체의 재시도는 꺼집니다. **재시도는 절대 중첩되지 않습니다.** 각 재시도는 프로바이더, 모델, 시도 횟수, 지연 시간, 오류와 함께 `provider.retry` 이벤트로 기록됩니다. 대신 공급사 기본값을 유지하려면 `retry: false`를 넘기세요.
 
-텍스트를 스트리밍하는 실행(`onText`)에서는 답변의 일부가 도착한 뒤에 모델 호출이 실패할 수 있습니다. 공급사가 스트림 도중에 보내는 오류는 그에 해당하는 HTTP 오류로 취급됩니다. OpenAI의 `server_error`(500)와 Anthropic의 `rate_limit_error`(429), `api_error`(500), `timeout_error`(504), `overloaded_error`(529)는 재시도하고, 다른 유형은 재시도하지 않습니다. 스트림 도중에 끊긴 연결, 답변이 완성되기 전에 끝난 스트림, 클라이언트 타임아웃(기본값 10분, `OpenAIProvider`와 `AnthropicProvider`의 `timeout` 옵션) 동안 아무것도 보내지 않은 스트림은 연결 실패로 봅니다. 재시도 전에, 또는 폴백 프로바이더로 넘어가기 전에, `onTextRestart`가 실패한 시도가 스트리밍한 텍스트를 지우라고 호출한 쪽에 알립니다. 다음 시도가 답변을 다시 씁니다([답변 스트리밍하기](./governed-agents#_7-streaming-the-answer) 참고).
+텍스트를 스트리밍하는 실행(`onText`)에서는 답변의 일부가 도착한 뒤에 모델 호출이 실패할 수 있습니다. 공급사가 스트림 도중에 보내는 오류는 그에 해당하는 HTTP 오류로 취급됩니다. OpenAI의 `server_error`(500)와 Anthropic의 `rate_limit_error`(429), `api_error`(500), `timeout_error`(504), `overloaded_error`(529)는 재시도하고, 다른 유형은 재시도하지 않습니다. 스트림 도중에 끊긴 연결, 답변이 완성되기 전에 끝난 스트림, 클라이언트 타임아웃(기본값 10분이며, `providerConfig`나 폴백의 `config`, 또는 `OpenAIProvider`와 `AnthropicProvider`의 옵션에서 `timeout`으로 정합니다) 동안 아무것도 보내지 않은 스트림은 연결 실패로 봅니다. 재시도 전에, 또는 폴백 프로바이더로 넘어가기 전에, `onTextRestart`가 실패한 시도가 스트리밍한 텍스트를 지우라고 호출한 쪽에 알립니다. 다음 시도가 답변을 다시 씁니다([답변 스트리밍하기](./governed-agents#_7-streaming-the-answer) 참고).
 
 `llmProvider`로 주입한 프로바이더는 `retry`를 명시적으로 설정하지 않는 한 주어진 그대로 쓰이며, `FallbackProvider`는 절대 감싸지 않으므로 그 페일오버가 트레이스에 계속 보입니다. 그 안의 프로바이더도 감싸지 않으므로 `retry`가 적용되지 않습니다. 페일오버 전에 재시도하려면 해당 프로바이더를 `RetryingLLMProvider`로 감싸고 그 클라이언트에 `maxRetries: 0`을 지정하세요. 폴백이 넘겨받을 수 있을 때 SDK가 하듯이 정책의 `maxRetryAfterMs`를 `maxDelayMs`로 설정하면, 긴 대기를 요구하는 프로바이더는 폴백에 맡겨집니다. 이 재시도는 `provider.retry` 이벤트로 기록되지 않습니다.
 
