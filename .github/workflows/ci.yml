@@ -46,4 +46,19 @@ jobs:
       - name: Generate coverage
         run: npm run test:coverage
 
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+      - run: npm ci
+      # Every translation must match the English pages: same files, code, anchors and links.
+      - name: Check translations
+        run: npm run docs:check
+      - name: Build the documentation
+        run: npm run docs:build
+
 

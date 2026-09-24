@@ -27,6 +27,7 @@ jobs:
           node-version: 20.x
           cache: npm
       - run: npm ci
+      - run: npm run docs:check
       - run: npm run docs:build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
