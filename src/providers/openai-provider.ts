@@ -201,7 +201,7 @@ export class OpenAIProvider implements LLMProvider {
 
 /**
  * Whether a model name is an OpenAI reasoning model: the o-series (`o1`, `o3`, `o4-mini`…) and
- * GPT-5 and later (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`, `gpt-10`…), in any case, also dated
+ * GPT-5 and later (`gpt-5`, `gpt-5.4-mini`, `gpt-6-sol`, `gpt-10`…), whatever the letter case, also dated
  * (`o3-2025-04-16`) or fine-tuned (`ft:o4-mini-2025-04-16:org::id`). Earlier GPT models
  * (`gpt-4o`, `gpt-4.1`, Azure's `gpt-35-turbo`, whose 35 is GPT-3.5) and open-weight ones served
  * by compatible servers (`gpt-oss-20b`) are not. A name that says nothing, such as an Azure
