@@ -2,6 +2,10 @@
 
 A cognitive agent should believe what it can justify, test what it predicts, and change its rules when the world disagrees. The cognitive loop therefore tracks **where every piece of evidence comes from**, keeps **evidence and preferences apart**, confronts predictions with **real tests**, and only **commits** to an answer that passes a readiness check written in code.
 
+::: tip In plain words
+Think of a careful investigator. They note **where each clue comes from** and do not count the same rumour twice. From several cases they draw a **rule**, then say in advance **what they should see** if the rule is right, and **what would prove it wrong**. Then they check, with a real measurement rather than their own opinion. When the check fails, they do not pretend: they **correct the rule** and say what changed. And they only give a **firm answer** when it holds up; otherwise they say "not sure yet, here is what is missing", or "I cannot conclude". Every term used below is explained in [Key terms in plain words](./glossary#evidence-and-conclusions).
+:::
+
 ![Observe, compare, deduce, test, revise — then the conclusion guard](/images/evidence-loop.svg){.illustration style="max-width:860px"}
 
 ## Give it what you observed
@@ -66,7 +70,7 @@ A hypothesis states what kind of claim it is, how it was inferred and what it re
 }
 ```
 
-`kind` is `proposal` (an answer or an action — the default), `rule` (a regularity) or `explanation` (a cause). `inference` is `induction`, `abduction` or `deduction`; the label never makes the claim true.
+`kind` is `proposal` (an action or a choice to make, the default), `rule` (a regularity) or `explanation` (a cause). A statement about what is or was true is never a proposal: the model is told so, because the [conclusion guard](#the-conclusion-guard) lets the thinker's preferences help a choice, never a claim. `inference` is `induction`, `abduction` or `deduction`; the label never makes the claim true.
 
 ## Predictions and the outcome evaluator
 
@@ -118,7 +122,7 @@ When evidence contradicts a hypothesis, `revise` asks for a **variant**: a new h
 | `support` | How well do observations, facts, predictions and critiques support it? | Jev: nobody — the evidence questions are sent without the profile. LLM: the model is instructed to ignore preferences |
 | `preferenceFit` | How well does this proposal suit the thinker? (proposals only) | Yes, that is its purpose |
 
-The code never mixes the two scores. Hypotheses are ranked by `support` alone for rules and explanations; proposals are ranked by `(1 − w) · support + w · preferenceFit`, with `w = limits.preferenceWeight` (0.4 by default). Changing the profile can therefore change **which action is chosen**; with Jev it cannot change **how credible a claim is**, and with an LLM judge that separation rests on its instructions. The state's `confidence` follows the evidence support of the best-ranked hypothesis: the `confidence` a model writes in a thought is ignored.
+The code never mixes the two scores. Hypotheses are ranked by `support` alone for rules and explanations; proposals are ranked by `(1 − w) · support + w · preferenceFit`, with `w = limits.preferenceWeight` (0.4 by default). Changing the profile can therefore change **which action is chosen**, and whether a choice the thinker clearly prefers can be committed on plausible evidence (see [the conclusion guard](#the-conclusion-guard)); with Jev it cannot change **how credible a claim is**, and with an LLM judge that separation rests on its instructions. The state's `confidence` follows the evidence support of the best-ranked hypothesis: the `confidence` a model writes in a thought is ignored.
 
 `support` is a judgement by a model, not a calibrated probability. What is measured is the track record: which predictions were confirmed or refuted.
 
@@ -138,7 +142,9 @@ An answer may be **committed** only when its hypothesis:
 - was assessed since the evidence last changed;
 - is not concerned by an unresolved contradiction (one naming nothing concerns everything);
 - has no untested prediction while the test budget allows testing it;
-- has an evidence `support` of at least `limits.decisionThreshold`.
+- has an evidence `support` of at least `limits.decisionThreshold` — or, for a **proposal** (a choice of action), is clearly the thinker's choice (`preferenceFit` of at least `limits.decisionThreshold`) while its evidence support reaches `limits.minProposalSupport` (0.35 by default).
+
+The second path exists because a question like *"would you take this job?"* has little evidence to weigh: a person decides it with their priorities, provided the facts do not speak against the choice, that is, provided its evidence support stays at or above the floor. Rules and explanations never take it: preferences never make a claim true. [Reason like a given person](./thinker-profiles#how-a-choice-is-ranked-and-committed) works through an example with numbers. `minProposalSupport` may not exceed `decisionThreshold`; set it equal to `decisionThreshold` to switch this path off.
 
 `decide` is offered only when a hypothesis passes. A decision that selects another hypothesis, or none, is **deferred** while the budget lasts; a deferral counts as a failed attempt, and `decide` is not offered after two in a row. On the last step, or when nothing else is possible, the engine still asks for a decision, and settles it:
 
@@ -178,4 +184,6 @@ Runs record the version of these rules (`schemaVersion: 2` in `cognition.started
 - **Choosing what to explore.** Controllers choose an operation; the target (which unknown, which prediction) is the first eligible one.
 - **Calibration.** There is no calibrated predictive confidence yet: `support` is a judgement, and the track record of predictions is what is measured.
 - **Verified inference.** The inference label (induction, abduction, deduction) is declared, not checked by a formal verifier.
+- **Declared kinds.** Whether a hypothesis is a claim or a choice of action is declared by the model when it proposes it, and a hypothesis without a kind is a proposal. The prompt forbids calling a statement about the world a proposal, but nothing verifies it: a mislabelled claim could be committed on the thinker's preference.
+- **Testing the causes behind a choice.** When the goal asks what to do, hypotheses are courses of action and only rules and explanations get predictions, so the outcome evaluator is not used on such goals.
 - **Structured checks.** Constraints are free text and are not checked by the conclusion guard; conflicts are not detected by rules on structured data; a resolution action does not change facts or hypotheses by itself.

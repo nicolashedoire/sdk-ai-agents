@@ -200,12 +200,21 @@ export interface TrailEntry {
 
 /** Rules the conclusion guard applies. Recorded with the run so a rebuild applies the same ones. */
 export interface CommitRules {
-  /** Minimum evidence support of a committed answer. */
+  /**
+   * Minimum evidence support of a committed answer, except a proposal the thinker clearly
+   * prefers (see `minProposalSupport`); also the fit that makes a proposal clearly preferred.
+   */
   decisionThreshold: number;
   /** Predictions that may be tested in the run; 0 when no evaluator is configured. */
   maxPredictionTests: number;
   /** Weight of the thinker's preferences when ranking proposals (never for rules or explanations). */
   preferenceWeight: number;
+  /**
+   * When set, a proposal (a choice of action) the thinker clearly prefers — `preferenceFit` at
+   * least `decisionThreshold` — may be committed with evidence support down to this floor.
+   * Absent from runs recorded before the rule existed, which keep the evidence-only rule.
+   */
+  minProposalSupport?: number;
 }
 
 export const DEFAULT_COMMIT_RULES: CommitRules = {

@@ -43,7 +43,7 @@ const sdk = createSDK(config);
 | `profile` | `DEFAULT_THINKER_PROFILE` | How the agent reasons |
 | `tools`, `policies` | `[]` | Governed like everywhere else |
 | `systemPrompt` | — | Extra instructions for every prompt |
-| `limits` | see [Cognitive agents](../guide/cognitive-agents#limits) | `maxSteps`, `timeoutMs`, `maxHypotheses`, `maxToolCalls`, `decisionThreshold`, `maxConsecutiveFailures`, `maxPredictionTests`, `preferenceWeight` |
+| `limits` | see [Cognitive agents](../guide/cognitive-agents#limits) | `maxSteps`, `timeoutMs`, `maxHypotheses`, `maxToolCalls`, `decisionThreshold`, `maxConsecutiveFailures`, `maxPredictionTests`, `preferenceWeight`, `minProposalSupport` |
 | `controller` | `'auto'` | `'heuristic'`, `'typed'` or a `CognitiveController` |
 | `controllerOptions` | — | `minConfidence` (0.35), `readinessThreshold` (0.8), `fallback`, `model` |
 | `assessment` | `'auto'` | `'llm'`, `'typed'` or your own `HypothesisAssessor` for the `compare` operation |

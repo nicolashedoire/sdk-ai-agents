@@ -37,14 +37,15 @@ export default withMermaid(
             { text: 'Introduction', link: '/guide/introduction' },
             { text: 'Getting started', link: '/guide/getting-started' },
             { text: 'Core concepts', link: '/guide/concepts' },
+            { text: 'Key terms in plain words', link: '/guide/glossary' },
           ],
         },
         {
           text: 'Agents that think',
           items: [
             { text: 'Cognitive agents', link: '/guide/cognitive-agents' },
-          { text: 'Evidence & verification', link: '/guide/evidence-and-verification' },
-            { text: 'Thinker profiles', link: '/guide/thinker-profiles' },
+            { text: 'Evidence & verification', link: '/guide/evidence-and-verification' },
+            { text: 'Reason like a given person', link: '/guide/thinker-profiles' },
             { text: 'Governed agents', link: '/guide/governed-agents' },
           ],
         },

@@ -19,6 +19,7 @@ const startedDataSchema = z.object({
       decisionThreshold: z.number().min(0).max(1),
       maxPredictionTests: z.number().int().min(0),
       preferenceWeight: z.number().min(0).max(1),
+      minProposalSupport: z.number().min(0).max(1),
     })
     .partial()
     .optional(),

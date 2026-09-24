@@ -87,10 +87,19 @@ export function assembleCognitiveAgent(
   environment: CognitiveAgentEnvironment
 ): CognitiveAgent {
   const tools = config.tools ?? [];
-  const parsedLimits = cognitiveLimitsSchema.safeParse({
-    ...DEFAULT_COGNITIVE_LIMITS,
-    ...config.limits,
-  });
+  const requested = { ...DEFAULT_COGNITIVE_LIMITS, ...config.limits };
+  // Lowering the decision threshold lowers the default proposal floor with it.
+  const parsedLimits = cognitiveLimitsSchema.safeParse(
+    config.limits?.minProposalSupport === undefined
+      ? {
+          ...requested,
+          minProposalSupport: Math.min(
+            DEFAULT_COGNITIVE_LIMITS.minProposalSupport,
+            requested.decisionThreshold
+          ),
+        }
+      : requested
+  );
   if (!parsedLimits.success) {
     const issue = parsedLimits.error.issues[0];
     throw new ValidationError(

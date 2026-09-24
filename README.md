@@ -62,13 +62,13 @@ A **controller** picks the next operation — a deterministic heuristic, or **Je
 
 <p align="center"><img src="docs/public/images/evidence-loop.svg" alt="Observe, compare, deduce, test, revise, then conclude" width="100%" /></p>
 
-Give the agent what you observed; tool results and test results are observations too, each with its **provenance** (source, event, time, context, origin). It **compares** observations, induces **rules** with the premises they rest on, deduces **predictions** with the observation that would refute them, and your own **outcome evaluator** — a simulator, a measurement, a test suite — says `confirmed`, `refuted` or `inconclusive`. A refuted rule is **revised** into a scoped variant, never silently revived. Evidence and the thinker's **preferences are scored apart**: preferences may reorder actions, never make a claim more credible. And an answer is **committed** only when the evidence holds; otherwise the agent says it is **provisional** and what is missing — or **abstains**. [Evidence & verification →](https://nicolashedoire.github.io/sdk-ai-agents/guide/evidence-and-verification)
+Give the agent what you observed; tool results and test results are observations too, each with its **provenance** (source, event, time, context, origin). It **compares** observations, induces **rules** with the premises they rest on, deduces **predictions** with the observation that would refute them, and your own **outcome evaluator** — a simulator, a measurement, a test suite — says `confirmed`, `refuted` or `inconclusive`. A refuted rule is **revised** into a scoped variant, never silently revived. Evidence and the thinker's **preferences are scored apart**: preferences may reorder actions, and let a choice the thinker clearly prefers be committed on plausible evidence, but they never make a claim more credible. An answer is **committed** only when it passes that guard; otherwise the agent says it is **provisional** and what is missing, or **abstains**. [Evidence & verification →](https://nicolashedoire.github.io/sdk-ai-agents/guide/evidence-and-verification)
 
-## Teach it how you think
+## Reason like a given person
 
 <p align="center"><img src="docs/public/images/learning-loop.svg" alt="Profile learning loop" width="100%" /></p>
 
-Explain a few topics in your own words, **distill** your reasoning into a thinker profile (order of attention, priorities, heuristics, rejection criteria), then **correct** the agent after each run. Matches become calibration examples, mismatches become lessons with the highest priority. Export the runs as a dataset to train your own controller.
+**Yes, the SDK can imitate the way a given person reasons.** Explain a few topics in your own words, **distill** your reasoning into a thinker profile (order of attention, priorities, reflexes, rejection criteria, appetite for risk), written into the instructions of each reasoning step. Then **correct** it after each run, with a percentage of agreement and where it went wrong: matches become calibration examples, disagreements become lessons with the highest priority. It imitates a way of reasoning, not what you know, and the SDK does not grade itself: your agreement, run after run on new problems, measures how close it gets. Export the runs as a dataset to train your own controller.
 
 ```ts
 const profile = await sdk.distillThinkerProfile({ id: 'me', name: 'Me', model: 'gpt-4o', samples });
@@ -153,9 +153,10 @@ Node.js 20+, TypeScript 5+ and zod 3 (≥ 3.25.28; zod 4 is not supported yet).
 | --- | --- |
 | [Introduction](https://nicolashedoire.github.io/sdk-ai-agents/guide/introduction) | Why and what |
 | [Getting started](https://nicolashedoire.github.io/sdk-ai-agents/guide/getting-started) | First agent in five minutes |
+| [Key terms in plain words](https://nicolashedoire.github.io/sdk-ai-agents/guide/glossary) | Every term explained without jargon |
 | [Cognitive agents](https://nicolashedoire.github.io/sdk-ai-agents/guide/cognitive-agents) | Mental state, operations, controllers |
 | [Evidence & verification](https://nicolashedoire.github.io/sdk-ai-agents/guide/evidence-and-verification) | Provenance, predictions, tests, revisions, conclusion guard |
-| [Thinker profiles](https://nicolashedoire.github.io/sdk-ai-agents/guide/thinker-profiles) | Distill, correct, export a dataset |
+| [Reason like a given person](https://nicolashedoire.github.io/sdk-ai-agents/guide/thinker-profiles) | Distill a profile, correct it, measure how close it gets |
 | [Typed decisions](https://nicolashedoire.github.io/sdk-ai-agents/guide/typed-decisions) | Jev, context injection, choices |
 | [MCP connectors](https://nicolashedoire.github.io/sdk-ai-agents/guide/mcp) | Expose and import tools |
 | [Operations](https://nicolashedoire.github.io/sdk-ai-agents/guide/costs) | Costs, retries, incidents |

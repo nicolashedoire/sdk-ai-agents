@@ -52,8 +52,9 @@ function operationInstructions(
       ].join(' ');
     case 'hypothesize':
       return [
+        'First read the goal. If it asks what to do, how to react or which action to take, the hypotheses are the candidate courses of action, stated as actions the thinker could take, and together they must cover the answer the thinker would give (for example "Decline the offer and keep building" and "Accept the offer"): a decision can only commit to one of them. In that case, what you notice about the situation goes into assumptions and unknowns, not into hypotheses. If the goal asks what is true, why something happens or whether something depends on something else, propose rules and explanations instead.',
         `Propose between 1 and ${maxNewHypotheses} NEW hypotheses that differ from the existing and rejected ones.`,
-        'Set "kind": "proposal" for an answer or action, "rule" for a regularity generalized from cases, "explanation" for a cause.',
+        'Set "kind": "proposal" only for an action or a choice to make; a statement about what is or was true is never a proposal: "rule" for a regularity generalized from cases, "explanation" for a cause.',
         'Set "inference" (induction from several cases, abduction for the best explanation, deduction from a rule and premises), cite the premiseRefs it rests on and state its scope.',
         'A few cases never justify a universal law: keep the scope to what was observed.',
       ].join(' ');

@@ -21,7 +21,8 @@ export type DecisionBlocker =
   | { kind: 'stale_assessment'; hypothesisId: string }
   | { kind: 'contradiction'; contradictionId: string; description: string }
   | { kind: 'untested_prediction'; predictionId: string; expected: string }
-  | { kind: 'low_support'; hypothesisId: string; support: number; threshold: number };
+  | { kind: 'low_support'; hypothesisId: string; support: number; threshold: number }
+  | { kind: 'low_fit'; hypothesisId: string; fit: number; threshold: number; supportFloor: number };
 
 export interface DecisionReadiness {
   hypothesisId?: string;
@@ -113,9 +114,25 @@ export function assessReadiness(state: MentalState, hypothesisId: string): Decis
       }
     }
   }
-  const threshold = state.commitRules.decisionThreshold;
-  if (hypothesis.support < threshold) {
-    blockers.push({ kind: 'low_support', hypothesisId, support: hypothesis.support, threshold });
+  // A claim about the world needs strong evidence. A choice of action may also be committed
+  // when the thinker clearly prefers it and its evidence support reaches a lower floor.
+  const { decisionThreshold: threshold, minProposalSupport: floor } = state.commitRules;
+  const fit = hypothesis.kind === 'proposal' ? hypothesis.preferenceFit : undefined;
+  const preferred = floor !== undefined && fit !== undefined && fit >= threshold;
+  const byEvidence = hypothesis.support >= threshold;
+  const byPreference = preferred && hypothesis.support >= floor;
+  if (!byEvidence && !byPreference) {
+    // The thinker's clear choice only lacks the floor; anything else lacks the full threshold.
+    blockers.push({
+      kind: 'low_support',
+      hypothesisId,
+      support: hypothesis.support,
+      threshold: preferred ? floor : threshold,
+    });
+    // Where the floor equals the threshold, a clear preference could not help: no fit to report.
+    if (floor !== undefined && fit !== undefined && !preferred && floor < threshold) {
+      blockers.push({ kind: 'low_fit', hypothesisId, fit, threshold, supportFloor: floor });
+    }
   }
   return { hypothesisId, ready: blockers.length === 0, blockers };
 }
@@ -167,6 +184,8 @@ export function describeBlocker(blocker: DecisionBlocker): string {
       return `contradiction ${blocker.contradictionId} is unresolved: ${blocker.description}`;
     case 'untested_prediction':
       return `prediction ${blocker.predictionId} is untested: ${blocker.expected}`;
+    case 'low_fit':
+      return `${blocker.hypothesisId} is not clearly the thinker's choice either: its fit with the thinker is ${blocker.fit}, below ${blocker.threshold} (a clear choice would need evidence support of ${blocker.supportFloor} only)`;
     case 'low_support':
       return `${blocker.hypothesisId} has evidence support ${blocker.support}, below ${blocker.threshold}`;
   }

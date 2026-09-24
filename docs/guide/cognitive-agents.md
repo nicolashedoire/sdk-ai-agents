@@ -2,6 +2,10 @@
 
 A cognitive agent does not answer in one pass. It keeps an **explicit mental state** and improves it one **cognitive operation** at a time, until it can commit to a decision it can justify.
 
+::: tip In plain words
+A usual AI answers in one go, and its reasoning disappears. A cognitive agent works like someone with a notebook: it writes down what it knows, what it assumes and what it does not know yet, lists several options, imagines their consequences, looks for what could go wrong, checks facts with the tools you allowed, compares the options, and only then decides. Each of these moves is one **operation**, and each one is written in the notebook, so you can reread the whole reasoning afterwards. If it cannot reach a solid conclusion, it says so. Every term on this page is explained in [Key terms in plain words](./glossary#how-a-cognitive-agent-reasons).
+:::
+
 ![The cognitive loop](/images/reasoning-loop.svg){.illustration style="max-width:460px"}
 
 ```ts
@@ -136,16 +140,17 @@ sdk.createCognitiveAgent({
     timeoutMs: 180_000,
     maxHypotheses: 3,          // in play at the same time
     maxToolCalls: 5,
-    decisionThreshold: 0.75,   // minimum evidence support of a committed answer
+    decisionThreshold: 0.75,   // evidence support a committed answer needs (see minProposalSupport)
     maxConsecutiveFailures: 3, // then the run fails (and alerts you, if incidents are on)
     maxPredictionTests: 4,     // calls to the outcome evaluator per run
     preferenceWeight: 0.4,     // weight of the thinker's preferences when ranking proposals
+    minProposalSupport: 0.35,  // evidence support enough for a choice of action the thinker clearly prefers
   },
   evaluator: myBench,          // optional OutcomeEvaluator, enables test_prediction
 });
 ```
 
-Limits are validated when the agent is created: `maxSteps: 0` or a timeout beyond what a timer supports throws a `ValidationError` instead of silently disabling a safeguard.
+Limits are validated when the agent is created: `maxSteps: 0` or a timeout beyond what a timer supports throws a `ValidationError` instead of silently disabling a safeguard. `minProposalSupport` may not exceed `decisionThreshold`; set it equal to `decisionThreshold` to let only the evidence commit an answer. If you lower `decisionThreshold` without setting `minProposalSupport`, the floor follows it down.
 
 ## Invalid model output
 

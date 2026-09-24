@@ -12,6 +12,7 @@ import { admitProposal, assembleThought } from '../cognition/patch-admission.js'
 import { DEFAULT_THINKER_PROFILE } from '../cognition/thinker-profile.js';
 import { thoughtPatchSchema, type ThoughtPatchInput } from '../cognition/thought-patch.js';
 import type { Event } from '../types/events.js';
+import { InMemoryDecisionClient, level } from './support/in-memory-decision-client.js';
 import { json, ScriptedLLMProvider } from './support/scripted-llm-provider.js';
 import { createTestSDK, scriptBuildOrBuy, type TestSDK } from './support/test-sdk.js';
 
@@ -199,6 +200,31 @@ describe('cognitive agent guards', () => {
     expect(result.decision).toMatchObject({ status: 'abstain', confidence: 0, missing: ['no hypothesis was selected (H2 could be)'] });
     const failures = (await env.sdk.getEvents(result.runId)).filter((event) => event.type === 'cognition.operation_failed');
     expect(failures.map((event) => event.data.error)).toEqual(['decision deferred: it selects no hypothesis (H2 is ready to commit)']);
+  });
+
+  it('commits the choice the thinker clearly prefers when the evidence is only plausible', async () => {
+    // Evidence judged "plausible" (0.5) for both options; the thinker's fit is ideal for both.
+    const client = new InMemoryDecisionClient((id, question) => level(question, id.startsWith('evidence_') ? 2 : 4));
+    env = createTestSDK({ decisionClient: client });
+    scriptBuildOrBuy(env.provider);
+    const agent = env.sdk.createCognitiveAgent({ name: 'a', model: 'test-model', controller: 'heuristic', assessment: 'typed' });
+
+    const result = await agent.think({ problem: 'Build or buy?' });
+
+    expect(result.decision).toMatchObject({ hypothesisId: 'H2', status: 'committed', confidence: 0.5 });
+    const started = (await env.sdk.getEvents(result.runId)).find((event) => event.type === 'cognition.started');
+    expect(started?.data.commitRules).toMatchObject({ minProposalSupport: 0.35 });
+  });
+
+  it('records a default proposal floor lowered with the decision threshold', async () => {
+    env = createTestSDK();
+    scriptBuildOrBuy(env.provider);
+    const agent = env.sdk.createCognitiveAgent({ name: 'a', model: 'test-model', limits: { decisionThreshold: 0.3 } });
+
+    const result = await agent.think({ problem: 'Build or buy?' });
+
+    const started = (await env.sdk.getEvents(result.runId)).find((event) => event.type === 'cognition.started');
+    expect(started?.data.commitRules).toMatchObject({ decisionThreshold: 0.3, minProposalSupport: 0.3 });
   });
 
   it('abstains instead of failing when the forced decision cannot be produced', async () => {
