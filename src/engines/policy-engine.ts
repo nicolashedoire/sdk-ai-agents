@@ -531,7 +531,7 @@ export class PolicyEngine {
     ) {
       return {
         allowed: false,
-        reason: `Cost budget cannot be checked: maxCost must be an amount in USD, not ${typeof maxCost} ${String(maxCost)}`,
+        reason: `Cost budget cannot be checked: maxCost must be a finite number >= 0 (USD), got ${shownValue(maxCost)}`,
         violatedPolicies: [policyId],
       };
     }
@@ -701,6 +701,15 @@ export class PolicyEngine {
 const PERIODS = new Set(['hour', 'day', 'week', 'month', 'all']);
 
 /** A budget limit with a call count, read from policy metadata (plain data from the caller). */
+/** A value from plain policy data, as a reason can show it ("0.5" for a string, not 0.5). */
+function shownValue(value: unknown): string {
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (typeof value === 'bigint') return `${value}n`;
+  if (typeof value === 'object' && value !== null)
+    return Array.isArray(value) ? 'an array' : 'an object';
+  return String(value);
+}
+
 function isToolCallLimit(value: unknown): value is BudgetLimit & { maxToolCalls: number } {
   if (typeof value !== 'object' || value === null) return false;
   const period: unknown = Reflect.get(value, 'period');

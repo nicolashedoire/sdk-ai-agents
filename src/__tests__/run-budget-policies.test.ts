@@ -229,6 +229,18 @@ describe('run budget policies', () => {
       expect(lookups).toBe(1);
     });
 
+    it('accepts a $0 cap as a cap', async () => {
+      const provider = new ScriptedLLMProvider().enqueue(CHANNEL, toolCall);
+      const [agent] = pricedAgents(provider, ['priced']);
+      costBudget({ maxCost: 0 });
+
+      const result = await agent?.run({ message: 'Go' });
+
+      // Checked as an amount, not refused as an invalid cap.
+      expect(result?.error?.message).toContain('Cost budget exceeded: $0.6 > $0');
+      expect(lookups).toBe(0);
+    });
+
     it("caps one agent's spend without refusing another agent", async () => {
       const provider = new ScriptedLLMProvider().always(CHANNEL, toolCall);
       const [capped, other] = pricedAgents(provider, ['capped', 'other']);
@@ -287,7 +299,14 @@ describe('run budget policies', () => {
 
     it('refuses rather than guess when maxCost is not an amount', async () => {
       // Policy metadata is plain data: a cap read from a config file may be a string.
-      for (const maxCost of ['0.5', Number.NaN, -1]) {
+      const invalid: [unknown, string][] = [
+        ['0.5', '"0.5"'],
+        [Number.NaN, 'NaN'],
+        [-1, '-1'],
+        [Number.POSITIVE_INFINITY, 'Infinity'],
+        [null, 'null'],
+      ];
+      for (const [maxCost, shown] of invalid) {
         const provider = new ScriptedLLMProvider().always(CHANNEL, toolCall);
         const [agent] = pricedAgents(provider, ['priced']);
         env.sdk.defineGlobalPolicy({
@@ -308,7 +327,7 @@ describe('run budget policies', () => {
 
         expect(result?.status).toBe('failed');
         expect(result?.error?.message).toContain(
-          `Cost budget cannot be checked: maxCost must be an amount in USD, not ${typeof maxCost} ${maxCost}`
+          `Cost budget cannot be checked: maxCost must be a finite number >= 0 (USD), got ${shown}`
         );
         expect(lookups).toBe(0);
         await env.dispose();

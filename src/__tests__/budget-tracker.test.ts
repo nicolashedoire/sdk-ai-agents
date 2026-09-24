@@ -172,8 +172,13 @@ describe('BudgetTracker', () => {
 
     it('never shows a refused spend as equal to its cost cap', async () => {
       const cases = [
-        { spend: 0.00000025, cap: 0, reason: 'Cost budget exceeded: $2.5e-7 > $0' },
-        { spend: 0.000000102, cap: 0.0000001, reason: 'Cost budget exceeded: $1.02e-7 > $1e-7' },
+        { spend: 0.00000025, cap: 0, reason: 'Cost budget exceeded: $0.00000025 > $0' },
+        {
+          spend: 0.000000102,
+          cap: 0.0000001,
+          reason: 'Cost budget exceeded: $0.000000102 > $0.0000001',
+        },
+        { spend: 0.000002, cap: 0.0000004, reason: 'Cost budget exceeded: $0.000002 > $0.0000004' },
         { spend: 0.0100004, cap: 0.01, reason: 'Cost budget exceeded: $0.0100004 > $0.01' },
         { spend: 2.4, cap: 2, reason: 'Cost budget exceeded: $2.4 > $2' },
       ];

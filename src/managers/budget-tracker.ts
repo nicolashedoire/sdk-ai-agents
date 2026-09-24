@@ -349,14 +349,22 @@ export class BudgetTracker {
 const COST_TOLERANCE_USD = 1e-9;
 
 /**
- * A spend and its cap in dollars, without float noise or needless zeros ($2.4 > $2). When six
- * decimals would show them equal, nine are used: a refused spend is over its cap by more than
- * COST_TOLERANCE_USD, so they then differ ($2.5e-7 > $0, $1.0000002 > $1).
+ * A spend and its cap in dollars, without float noise, needless zeros or exponent ($2.4 > $2).
+ * When six decimals would show them equal, or show a non-zero amount as 0, nine are used: a
+ * refused spend is over its cap by more than COST_TOLERANCE_USD, so they then differ
+ * ($0.00000025 > $0, $1.0000002 > $1).
  */
 function usdOverCap(spend: number, cap: number): [string, string] {
-  const shown = (amount: number, digits: number) => String(Number(amount.toFixed(digits)));
+  const shown = (amount: number, digits: number) =>
+    amount
+      .toFixed(digits)
+      .replace(/(\.\d*?)0+$/, '$1')
+      .replace(/\.$/, '');
   const short: [string, string] = [shown(spend, 6), shown(cap, 6)];
-  return short[0] === short[1] ? [shown(spend, 9), shown(cap, 9)] : short;
+  const hidden = (text: string, amount: number) => text === '0' && amount !== 0;
+  return short[0] === short[1] || hidden(short[0], spend) || hidden(short[1], cap)
+    ? [shown(spend, 9), shown(cap, 9)]
+    : short;
 }
 
 function withoutTool(limit: BudgetLimit): BudgetLimit {
