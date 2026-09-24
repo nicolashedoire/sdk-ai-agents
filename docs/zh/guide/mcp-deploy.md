@@ -204,6 +204,30 @@ createServer((request, response) => {
 
 大多数 MCP 应用也会在每次工具调用之前询问用户（Claude Desktop 默认如此）。那种确认发生在应用中；SDK 的审批则发生在你的服务器上，遵循你的规则，并被记录下来。对于任何会改动数据的操作，两者都要用上。
 
+## 进度通知 {#progress-notifications}
+
+客户端可以要求获知一次调用的进展：它随调用一起发送一个 `progressToken`（当你传入 `onprogress` 时，官方 TypeScript SDK 就会这样做）。随后，服务器会为这次调用的每一个事件——以及 `cognitiveAgentTool` 或 `governedAgentTool` 所启动的那次智能体运行的每一个事件——发送一条 `notifications/progress`，其中带有一个每次加一的 `progress` 和一条简短的 `message`：
+
+```text
+call started
+tool ask_support called
+agent started
+step 1: model chose lookup_customer
+step 1: tool lookup_customer called
+step 1: tool lookup_customer done
+step 2: model answered
+agent completed
+call completed
+```
+
+消息会写出步骤、工具和认知操作的名称；它们从不携带参数、结果或错误文本。没有 `total`：没有人能预先知道一次运行需要多少步。每一条通知都在结果之前发送，从不在结果之后。通过 Streamable HTTP 时，它们在响应的流上传输（SSE）；用 `enableJsonResponse: true` 创建的传输以普通 JSON 作答，并会丢弃它们。不发送 `progressToken` 的客户端不会收到任何通知。
+
+进度通知会改变什么，又不会改变什么：
+
+- **只有在收到进度时重置超时的客户端才会等待得更久。** 使用 TypeScript SDK 时：`client.callTool(params, undefined, { onprogress, resetTimeoutOnProgress: true, maxTotalTimeout })`。一个显示进度但保持固定超时的客户端，会在与以前相同的时刻放弃。在依赖它之前，请先确认你的应用是怎么做的。
+- **对于这样的客户端，起决定作用的是最长的一段静默**，而不是调用的时长：一次模型调用、一个缓慢的工具，或者一次审批。在工具运行期间或审批等待期间不会发送任何东西，所以 `approvalTimeoutMs` 的 50 秒仍然适用，而且每一次单独的模型调用或工具调用都必须在客户端的超时之内完成。
+- **这样一来，智能体就可以运行得更久**：认知智能体的 `limits.timeoutMs` 可以超过客户端的超时，因为每一步都会发送通知。对于其他客户端，请保留[智能体配方](./mcp-recipes#an-agent-your-reasoning-twin)中那些较小的限制。
+
 ## 安全检查清单 {#security-checklist}
 
 在共享一个服务器之前：
@@ -231,7 +255,7 @@ MCP 项目维护着一份关于攻击与防御的详细指南：[Security Best P
 | 列表中缺少某个工具 | 它不在 `tools` 中 | 把它的名称或定义加入 `tools`：否则什么都不会被暴露。 |
 | 启动时出现 `Another tool named "x" is already defined` | 两个来源产生了同一个工具名称 | 给每个来源设置一个 `prefix`。 |
 | 只有 `Tool execution failed: <name>`，没有更多信息 | 原因可能包含内部细节，所以被隐藏了 | 在事件日志中阅读这次运行，或者在开发时设置 `exposeErrorDetails: true`。 |
-| 调用超时 | 工具很慢（通常是智能体） | 把智能体的 `limits` 调小；调高客户端的超时（Claude Code：`MCP_TOOL_TIMEOUT`）。 |
+| 调用超时 | 工具很慢（通常是智能体） | 把智能体的 `limits` 调小；调高客户端的超时（Claude Code：`MCP_TOOL_TIMEOUT`）；或者使用一个在收到[进度通知](#progress-notifications)时重置超时的客户端。 |
 | 结果被截断 | 大小限制（`truncated: true`）或客户端自己的限制 | 调高 `maxResponseBytes`、`maxRows`、`maxFileBytes`；Claude Code：`MAX_MCP_OUTPUT_TOKENS`。 |
 | 写工具回复“Approval no decision within 50000 ms” | 没有人及时批准它 | 更快地批准（参见[审批](#approvals-a-human-says-yes-first)），调高 `approvalTimeoutMs`，或者有意设置 `requiresApproval: false`。 |
 | `events/` 或 `golden-traces/` 这样的文件夹出现在意料之外的地方 | 事件日志没有使用绝对路径（或者 SDK 版本较旧） | 传入 `eventStore: new FileEventStore(<absolute path>)`。当前版本只在用到时才创建其他文件夹。 |

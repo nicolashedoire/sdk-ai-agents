@@ -68,7 +68,7 @@ const analyst = sdk.createAgent({
 | `defineTool(definition)` | `Tool` | ツールを登録する。ハンドラーの型は、その Zod スキーマから決まる |
 | `defineCapability(definition)` | `Capability` | ツールをグループにまとめる |
 | `listTools()` | `Tool[]` | 登録されているすべてのツール |
-| `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs? })` | `Promise<unknown>` | エージェントの外でのガバナンス付き実行（MCP サーバーが使う）：引数、ポリシー、承認、予算（呼び出しの開始時に数えられる）の順にチェックし、それからツールを実行する。`signal` は承認待ちをキャンセルし、ハンドラーにも届く。`approvalTimeoutMs` は、誰も判断しなかった承認をキャンセルする |
+| `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs?, onEvent? })` | `Promise<unknown>` | エージェントの外でのガバナンス付き実行（MCP サーバーが使う）：引数、ポリシー、承認、予算（呼び出しの開始時に数えられる）の順にチェックし、それからツールを実行する。`signal` は承認待ちをキャンセルし、ハンドラーにも届く。`approvalTimeoutMs` は、誰も判断しなかった承認をキャンセルする |
 | `traceResourceRead(uri, read, { agentId? })` | `Promise<ResourceContent>` | `read()` を独立した 1 つの実行として行う：`run.started`、`resource.read`（URI、サイズ、SHA-256）、`run.completed` または `run.failed` |
 | `stopRun(runId)` | `Promise<void>` | ガバナンス付きエージェントまたは認知エージェントの実行を停止する |
 
@@ -187,9 +187,22 @@ interface ModelCostLine {
 | メソッド | |
 | --- | --- |
 | `getTrace(runId)`、`exportTrace(runId, 'json' \| 'text')`、`getEvents(runId, filters?)` | 実行を読む |
-| `replay(runId, modifications?)` | LLM を使わずに再実行する |
+| `replay(runId, modifications?, { onEvent? })` | LLM を使わずに再実行する |
 | `getReasoningGraph`、`exportReasoningGraph`、`getAlternatives`、`getDecisionPatterns`、`getTraceVisualization` | 決定を理解する |
 | `createGoldenTrace`、`getGoldenTraces`、`validateAgainstGoldenTrace`、`replayAndValidate`、`detectRegressions` | エージェントをコードのようにテストする |
+
+## リアルタイムのイベント {#live-events}
+
+リスナーは `(event: Event) => void | Promise<void>` です。リスナーはイベントを、ストアが受け付けた後で、1 つずつ、各実行の順番どおりに受け取ります。リスナーが Promise を返すと、次のイベントの前にその Promise が待たれます。実行がリスナーを待つことは決してなく、リスナーのエラーは報告されるだけで、実行の中に投げられることはありません。[リアルタイムの進捗](../guide/observability#live-progress) を参照してください。
+
+| API | |
+| --- | --- |
+| `RunInput.onEvent`：`agent.run({ message, onEvent })` | 実行のすべてのイベント。`run()` は、リスナーがそのそれぞれの処理を終えた後に解決される。リスナーは記録されない |
+| `ThinkInput.onEvent`：`agent.think({ problem, onEvent })` | 認知エージェントの実行について同じ |
+| `replay(runId, modifications?, { onEvent })` | リプレイについて同じ |
+| `executeTool(name, params, { onEvent })` | 呼び出しのイベントと、そのツールが開始する実行のイベント。ハンドラーはリスナーを `context.onEvent` として受け取り、`governedAgentTool` と `cognitiveAgentTool` はそれを自分のエージェントに渡す |
+| `subscribe(listener, { runId?, agentId?, types? })` | `() => void`：フィルターに一致するすべての実行のすべてのイベント（`agentId` は `metadata.agentId`）。返された関数を呼び出すまで続き、その関数を呼び出すと、まだ配信されていないイベントは破棄される |
+| `new ObservedEventStore(store, { onListenerError? })` | イベントを配信する層。SDK は自分のストアをこれでラップするか、`eventStore` として渡されたものを使う。その `subscribe(listener, filter?)` は `{ unsubscribe(), close() }` を返す。`close()` は、リスナーがすでに受け取ったイベントの処理を終えるまで待つ |
 
 ## ツール：`ToolDefinition` {#tools-tooldefinition}
 
@@ -197,7 +210,7 @@ interface ModelCostLine {
 | --- | --- |
 | `name`、`description` | モデルが目にするもの |
 | `schema` | 引数の Zod スキーマ。一致しない呼び出しは拒否される |
-| `handler(params, context?)` | 検証済みの引数と `{ runId, agentId, signal? }` を受け取る。呼び出し元が待つのをやめると `signal` が中断される |
+| `handler(params, context?)` | 検証済みの引数と `{ runId, agentId, signal?, onEvent? }` を受け取る。呼び出し元が待つのをやめると `signal` が中断される。呼び出し元がその呼び出しをリアルタイムで見ている場合は `onEvent` が設定される。ツールが開始する実行には、それを `onEvent` として渡す |
 | `retry` | `{ maxRetries, initialDelayMs?, maxDelayMs?, retryOn?(error) }` — 冪等なツールに限る。不正な引数がリトライされることはない |
 | `metadata` | `{ category?, riskLevel?, requiresApproval?, readOnly? }` — `requiresApproval: true` にすると、すべての呼び出しが `approveAction` を待つ。`readOnly` は MCP クライアントに `readOnlyHint` として示される |
 | `inputJsonSchema` | `schema` から導かれる JSON Schema の代わりに示す JSON Schema |
@@ -239,7 +252,7 @@ interface ResourceProvider {
 
 | 関数 | |
 | --- | --- |
-| `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | `tools` に列挙したものだけを公開する MCP の `Server`。`tools` には、定義済みツールの名前と `ToolDefinition` のどちらか、または両方を指定する（`ToolDefinition` は自動的に SDK 上で定義される。同じ定義をもう一度渡すのはかまわないが、すでに使われている名前を持つ別のツールは拒否される）。`resources`：1 つまたは複数の `ResourceProvider`。すべての読み取りがトレースされる。呼び出しは `mcp:<name>`（または `agentId`）として実行される。`approvalTimeoutMs`（デフォルトは 50 000 ms）以内に誰も判断しない承認はキャンセルされる。入力の拒否はクライアントに説明され、それ以外の原因は `exposeErrorDetails` を指定した場合にだけ伝えられる |
+| `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | `tools` に列挙したものだけを公開する MCP の `Server`。`tools` には、定義済みツールの名前と `ToolDefinition` のどちらか、または両方を指定する（`ToolDefinition` は自動的に SDK 上で定義される。同じ定義をもう一度渡すのはかまわないが、すでに使われている名前を持つ別のツールは拒否される）。`resources`：1 つまたは複数の `ResourceProvider`。すべての読み取りがトレースされる。呼び出しは `mcp:<name>`（または `agentId`）として実行される。`approvalTimeoutMs`（デフォルトは 50 000 ms）以内に誰も判断しない承認はキャンセルされる。入力の拒否はクライアントに説明され、それ以外の原因は `exposeErrorDetails` を指定した場合にだけ伝えられる。`progressToken` 付きの呼び出しは、イベントごとに `notifications/progress` を 1 つ受け取り、それらはすべて結果より前に送られる（[進捗通知](../guide/mcp-deploy#progress-notifications)） |
 | `serveMcpOverStdio(sdk, options)` | 同じサーバーを stdin/stdout に接続したもの。stderr に「ready」の行を 1 行書き込み、stdin が終わると閉じる（進行中の呼び出しは中断され、承認待ちはキャンセルされる）。`approvalTimeoutMs` のデフォルトは、`createMcpServer` と同じく 50 000 |
 | `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry? })` | `{ tools, client, close() }` — 任意の MCP サーバーのツールを、`ToolDefinition` として返す |
 
@@ -247,4 +260,4 @@ interface ResourceProvider {
 
 ## 構成要素 {#building-blocks}
 
-SDK の構成要素は、独自のセットアップ向けにエクスポートされています。`JevClient`、`DecisionService`、`LLMThoughtGenerator`、`HeuristicController`、`TypedDecisionController`、`TypedHypothesisAssessor`、`PredictionTester`、`applyThought`、`assembleThought`、`assessReadiness`、`rankHypotheses`、`rebuildMentalState`、`describeMentalState`、`fingerprint`、`defineThinkerProfile`、`refineProfile`、`withRetry`、`RetryingLLMProvider`、`OpenAIProvider`、`AnthropicProvider`、`FallbackProvider`、`MonitoredEventStore`、`EmailIncidentNotifier`、`WebhookIncidentNotifier`、`ResendEmailTransport`、`computeRunCost`、`FileEventStore`、`SQLiteEventStore`、`PostgreSQLEventStore`、そしてそれらの主な型です。
+SDK の構成要素は、独自のセットアップ向けにエクスポートされています。`JevClient`、`DecisionService`、`LLMThoughtGenerator`、`HeuristicController`、`TypedDecisionController`、`TypedHypothesisAssessor`、`PredictionTester`、`applyThought`、`assembleThought`、`assessReadiness`、`rankHypotheses`、`rebuildMentalState`、`describeMentalState`、`fingerprint`、`defineThinkerProfile`、`refineProfile`、`withRetry`、`RetryingLLMProvider`、`OpenAIProvider`、`AnthropicProvider`、`FallbackProvider`、`MonitoredEventStore`、`ObservedEventStore`、`EmailIncidentNotifier`、`WebhookIncidentNotifier`、`ResendEmailTransport`、`computeRunCost`、`FileEventStore`、`SQLiteEventStore`、`PostgreSQLEventStore`、そしてそれらの主な型です。

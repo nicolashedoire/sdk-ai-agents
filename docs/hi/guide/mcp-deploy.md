@@ -204,6 +204,30 @@ createServer((request, response) => {
 
 ज़्यादातर MCP एप्लिकेशन भी हर टूल कॉल से पहले उपयोगकर्ता से पूछते हैं (Claude Desktop डिफ़ॉल्ट रूप से ऐसा करता है)। वह पुष्टि एप्लिकेशन में होती है; SDK की मंज़ूरियाँ आपके सर्वर पर, आपके नियमों के तहत होती हैं, और दर्ज की जाती हैं। डेटा बदलने वाली हर चीज़ के लिए दोनों इस्तेमाल करें।
 
+## प्रगति सूचनाएँ {#progress-notifications}
+
+कोई क्लाइंट माँग सकता है कि उसे बताया जाए कि कॉल कैसी चल रही है: वह कॉल के साथ एक `progressToken` भेजता है (जब आप `onprogress` देते हैं, तो आधिकारिक TypeScript SDK ऐसा करता है)। तब सर्वर कॉल के हर इवेंट के लिए, और उस एजेंट के run के हर इवेंट के लिए जिसे कोई `cognitiveAgentTool` या `governedAgentTool` शुरू करता है, एक `notifications/progress` भेजता है, जिसमें एक `progress` होता है जो हर बार एक से बढ़ता है, और एक छोटा `message`:
+
+```text
+call started
+tool ask_support called
+agent started
+step 1: model chose lookup_customer
+step 1: tool lookup_customer called
+step 1: tool lookup_customer done
+step 2: model answered
+agent completed
+call completed
+```
+
+संदेश चरणों, टूल और संज्ञानात्मक ऑपरेशनों के नाम बताते हैं; उनमें कभी arguments, परिणाम या error के टेक्स्ट नहीं होते। कोई `total` नहीं है: किसी को पहले से पता नहीं होता कि एक run में कितने चरण लगेंगे। हर सूचना परिणाम से पहले भेजी जाती है, उसके बाद कभी नहीं। Streamable HTTP पर वे response की स्ट्रीम (SSE) पर जाती हैं; `enableJsonResponse: true` के साथ बनाया गया transport सादे JSON में जवाब देता है और उन्हें छोड़ देता है। जो क्लाइंट कोई `progressToken` नहीं भेजता, उसे कोई सूचना नहीं मिलती।
+
+प्रगति क्या बदलती है, और क्या नहीं:
+
+- **सिर्फ़ वे क्लाइंट ज़्यादा देर इंतज़ार करते हैं जो प्रगति मिलने पर अपना timeout फिर से शुरू (reset) करते हैं।** TypeScript SDK के साथ: `client.callTool(params, undefined, { onprogress, resetTimeoutOnProgress: true, maxTotalTimeout })`। जो क्लाइंट प्रगति दिखाता है पर तय timeout रखता है, वह पहले जितने ही समय पर हार मान लेता है। इस पर भरोसा करने से पहले जाँचें कि आपका एप्लिकेशन क्या करता है।
+- **ऐसे क्लाइंट के साथ, मायने रखती है सबसे लंबी चुप्पी**, कॉल की लंबाई नहीं: मॉडल की एक कॉल, एक धीमा टूल, या एक मंज़ूरी। जब कोई टूल चल रहा हो या कोई मंज़ूरी इंतज़ार कर रही हो, तब कुछ नहीं भेजा जाता, इसलिए `approvalTimeoutMs` के 50 s फिर भी लागू होते हैं, और मॉडल या टूल की हर एक कॉल क्लाइंट के timeout के भीतर पूरी होनी चाहिए।
+- **तब एजेंट ज़्यादा समय ले सकते हैं**: किसी संज्ञानात्मक एजेंट का `limits.timeoutMs` क्लाइंट के timeout से ज़्यादा हो सकता है, क्योंकि हर चरण सूचनाएँ भेजता है। दूसरे क्लाइंट के लिए, [एजेंट वाली रेसिपी](./mcp-recipes#an-agent-your-reasoning-twin) की छोटी सीमाएँ रखें।
+
 ## सुरक्षा जाँच-सूची {#security-checklist}
 
 सर्वर साझा करने से पहले:
@@ -231,7 +255,7 @@ MCP प्रोजेक्ट हमलों और बचाव की ए�
 | सूची में कोई टूल नहीं है | वह `tools` में नहीं है | उसका नाम या परिभाषा `tools` में जोड़ें: वरना कुछ भी उपलब्ध नहीं होता। |
 | शुरू होते समय `Another tool named "x" is already defined` | दो स्रोत एक ही टूल नाम बनाते हैं | हर स्रोत को एक `prefix` दें। |
 | `Tool execution failed: <name>` और इससे ज़्यादा कुछ नहीं | कारण में आंतरिक विवरण हो सकते हैं, इसलिए वह छिपा है | इवेंट लॉग में run पढ़ें, या डेवलपमेंट के दौरान `exposeErrorDetails: true` सेट करें। |
-| कॉल का timeout हो जाता है | टूल धीमा है (अक्सर एक एजेंट) | एजेंट के `limits` छोटे करें; क्लाइंट का timeout बढ़ाएँ (Claude Code: `MCP_TOOL_TIMEOUT`)। |
+| कॉल का timeout हो जाता है | टूल धीमा है (अक्सर एक एजेंट) | एजेंट के `limits` छोटे करें; क्लाइंट का timeout बढ़ाएँ (Claude Code: `MCP_TOOL_TIMEOUT`); या ऐसा क्लाइंट इस्तेमाल करें जो [प्रगति सूचनाएँ](#progress-notifications) मिलने पर अपना timeout फिर से शुरू करता हो। |
 | परिणाम कटे हुए हैं | आकार की सीमाएँ (`truncated: true`) या क्लाइंट की अपनी सीमा | `maxResponseBytes`, `maxRows`, `maxFileBytes` बढ़ाएँ; Claude Code: `MAX_MCP_OUTPUT_TOKENS`। |
 | कोई लिखने वाला टूल "Approval no decision within 50000 ms" जवाब देता है | किसी ने समय पर मंज़ूरी नहीं दी | जल्दी मंज़ूरी दें (देखें [मंज़ूरियाँ](#approvals-a-human-says-yes-first)), `approvalTimeoutMs` बढ़ाएँ, या सोच-समझकर `requiresApproval: false` सेट करें। |
 | `events/` या `golden-traces/` जैसे फ़ोल्डर अनपेक्षित जगहों पर दिखते हैं | इवेंट लॉग के लिए absolute पाथ नहीं (या SDK का पुराना वर्ज़न) | `eventStore: new FileEventStore(<absolute path>)` दें। मौजूदा वर्ज़न अपने दूसरे फ़ोल्डर सिर्फ़ इस्तेमाल होने पर बनाते हैं। |

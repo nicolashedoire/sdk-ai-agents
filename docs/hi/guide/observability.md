@@ -68,6 +68,42 @@ const state = await sdk.getMentalState(runId);    // cognitive runs
 
 किसी run की स्थिति उसका **आखिरी जीवनचक्र इवेंट** (`run.completed`, `run.failed`, `run.cancelled`) होती है। इसके बाद जोड़े गए इवेंट — फ़ीडबैक, घटना रिपोर्ट — उसे कभी दोबारा नहीं खोलते।
 
+## लाइव प्रगति {#live-progress}
+
+इवेंट आपके कोड तक **run के चलते-चलते** भी पहुँचते हैं, जैसे ही स्टोर उन्हें स्वीकार कर लेता है: किसी इंटरफ़ेस में प्रगति दिखाने, उसे किसी क्लाइंट तक स्ट्रीम करने या किसी डैशबोर्ड को डेटा देने के लिए। MCP क्लाइंट उन्हें [प्रगति सूचनाओं](./mcp-deploy#progress-notifications) के रूप में पाते हैं।
+
+```ts
+const result = await agent.run({
+  message: 'Refund order 1234',
+  onEvent: (event) => console.log(event.type),
+});
+
+const answer = await cognitiveAgent.think({ problem, onEvent: (event) => socket.send(JSON.stringify(event)) });
+const replay = await sdk.replay(runId, undefined, { onEvent: (event) => console.log(event.type) });
+
+// Every run of the SDK, for as long as you listen
+const unsubscribe = sdk.subscribe((event) => dashboard.push(event), { types: ['run.failed', 'approval.requested'] });
+unsubscribe();
+```
+
+| कहाँ | listener को क्या मिलता है |
+| --- | --- |
+| `run({ onEvent })`, `think({ onEvent })` | उस run का हर इवेंट |
+| `replay(runId, modifications, { onEvent })` | रीप्ले का हर इवेंट |
+| `executeTool(name, params, { onEvent })` | कॉल के इवेंट, और उसके टूल द्वारा शुरू किए गए एजेंट runs के इवेंट (`governedAgentTool`, `cognitiveAgentTool`) |
+| `sdk.subscribe(listener, { runId?, agentId?, types? })` | फ़िल्टर से मेल खाने वाले हर run का हर इवेंट, जब तक आप उसके द्वारा लौटाया गया फ़ंक्शन कॉल नहीं करते |
+
+किन बातों की गारंटी है:
+
+- **सिर्फ़ वही जो स्टोर ने स्वीकार किया।** कोई listener तभी कॉल होता है जब स्टोर का `append` सफल हो जाए, किसी ऐसे इवेंट के लिए कभी नहीं जिसे स्टोर ने ठुकरा दिया। SQL स्टोर के साथ पंक्ति commit हो चुकी होती है; फ़ाइल स्टोर के साथ इवेंट उसके बफ़र में होता है: `getEvents` उसे तुरंत लौटाता है, और वह 100 ms के भीतर डिस्क तक पहुँचता है (बीच में crash हो जाए तो वह खो जाता है)।
+- **क्रम में।** किसी run के इवेंट उसी क्रम में आते हैं जिसमें वे दर्ज किए गए; अलग-अलग runs के इवेंट आपस में मिल-जुलकर आते हैं।
+- **एक बार में एक इवेंट, और run कभी इंतज़ार नहीं करता।** जब आपका listener एक promise लौटाता है, तो उसका अगला इवेंट तब तक इंतज़ार करता है जब तक वह promise पूरा (settle) न हो जाए, इसलिए कोई async listener इवेंट्स का क्रम नहीं बदल सकता। इस बीच run चलता रहता है: धीमा listener पीछे छूट जाता है, वह एजेंट को धीमा नहीं करता। `run()`, `think()`, `replay()` और `executeTool()` तभी resolve होते हैं जब उनका `onEvent` run के हर इवेंट को निपटा चुका हो, इसलिए जब वे लौटते हैं तो आप सब कुछ देख चुके होते हैं। कभी पूरा न होने वाला promise उन्हें लौटने से रोकता है: "चलाओ और भूल जाओ" वाले काम के लिए, promise न लौटाएँ (`onEvent: (event) => { void save(event); }`)। synchronous listener इवेंट का `append` लौटने से पहले कॉल होता है: उसे तेज़ रखें।
+- **Error run से बाहर रहते हैं।** जो listener कोई error फेंके या reject करे, उसकी सूचना standard error (`console.error`) पर दी जाती है, और उसे अगले इवेंट फिर भी मिलते हैं। उन्हें खुद संभालने के लिए, उन्हें listener में ही पकड़ें, या SDK को `eventStore: new ObservedEventStore(store, { onListenerError })` के साथ बनाएँ।
+- **एक प्रति।** हर listener को इवेंट की अपनी प्रति मिलती है, वैसी ही जैसी स्टोर उसे वापस पढ़ता है: उसे बदलने से लॉग में कुछ नहीं बदलता।
+- **सदस्यता तुरंत खत्म होती है।** `sdk.subscribe` द्वारा लौटाया गया फ़ंक्शन कॉल होने के बाद, listener दोबारा कॉल नहीं होता, पहले से इंतज़ार कर रहे इवेंट्स के लिए भी नहीं; यह फ़ंक्शन listener के अंदर से भी कॉल किया जा सकता है।
+
+`agentId` फ़िल्टर हर इवेंट के `metadata.agentId` से मिलान करता है: कुछ इवेंट किसी एजेंट से नहीं जुड़े होते (`provider.retry`, रीप्ले का अंत), उन्हें पाने के लिए run के हिसाब से फ़िल्टर करें। बैकअप से restore किए गए इवेंट listeners तक नहीं पहुँचाए जाते। अपने ही स्टोर पर हाथ से बनाए गए एजेंट (`new AgentImpl(…)`) के साथ `onEvent` इस्तेमाल करने के लिए, स्टोर को एक `ObservedEventStore` में लपेटें; `createSDK` यह आपके लिए करता है।
+
 ## LLM के बिना रीप्ले {#replay-without-the-llm}
 
 ```ts

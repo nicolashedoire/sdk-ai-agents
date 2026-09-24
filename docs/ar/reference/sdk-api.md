@@ -68,7 +68,7 @@ const analyst = sdk.createAgent({
 | `defineTool(definition)` | `Tool` | يسجّل أداة؛ ويُستنتَج نوع المعالج من مخطط Zod الخاص بها |
 | `defineCapability(definition)` | `Capability` | يجمّع الأدوات |
 | `listTools()` | `Tool[]` | كل أداة مسجَّلة |
-| `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs? })` | `Promise<unknown>` | تنفيذ خاضع للحوكمة خارج وكيل (يستخدمه خادم MCP): المعاملات، والسياسات، والموافقة، والميزانية (تُحتسَب حين يبدأ الاستدعاء)، ثم الأداة. يلغي `signal` موافقة معلّقة ويصل إلى المعالج؛ وتلغي `approvalTimeoutMs` موافقة لم يقرّر فيها أحد |
+| `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs?, onEvent? })` | `Promise<unknown>` | تنفيذ خاضع للحوكمة خارج وكيل (يستخدمه خادم MCP): المعاملات، والسياسات، والموافقة، والميزانية (تُحتسَب حين يبدأ الاستدعاء)، ثم الأداة. يلغي `signal` موافقة معلّقة ويصل إلى المعالج؛ وتلغي `approvalTimeoutMs` موافقة لم يقرّر فيها أحد |
 | `traceResourceRead(uri, read, { agentId? })` | `Promise<ResourceContent>` | يشغّل `read()` تشغيلًا مستقلًا: `run.started`، و`resource.read` (معرّف URI، والحجم، وSHA-256)، و`run.completed` أو `run.failed` |
 | `stopRun(runId)` | `Promise<void>` | يوقف تشغيلًا خاضعًا للحوكمة أو معرفيًا |
 
@@ -187,9 +187,22 @@ interface ModelCostLine {
 | الدالة | |
 | --- | --- |
 | `getTrace(runId)`، `exportTrace(runId, 'json' \| 'text')`، `getEvents(runId, filters?)` | قراءة عمليات التشغيل |
-| `replay(runId, modifications?)` | إعادة التنفيذ دون النموذج اللغوي |
+| `replay(runId, modifications?, { onEvent? })` | إعادة التنفيذ دون النموذج اللغوي |
 | `getReasoningGraph`، `exportReasoningGraph`، `getAlternatives`، `getDecisionPatterns`، `getTraceVisualization` | فهم القرارات |
 | `createGoldenTrace`، `getGoldenTraces`، `validateAgainstGoldenTrace`، `replayAndValidate`، `detectRegressions` | اختبار الوكلاء كما تُختبَر الشيفرة |
+
+## الأحداث المباشرة {#live-events}
+
+المستمِع (listener) هو `(event: Event) => void | Promise<void>`. يتلقّى حدثًا واحدًا في كل مرة، بترتيب كل تشغيل، بمجرّد أن يقبله المخزن؛ ويُنتظَر الوعد الذي يعيده قبل حدثه التالي. لا تنتظره عمليات التشغيل أبدًا، ويُبلَّغ عن أخطائه، ولا تُرمى أبدًا داخل التشغيل. انظر [التقدّم المباشر](../guide/observability#live-progress).
+
+| الواجهة | |
+| --- | --- |
+| `RunInput.onEvent`: `agent.run({ message, onEvent })` | كل حدث من أحداث التشغيل؛ ولا تعيد `run()` نتيجتها إلا بعد أن يفرغ المستمِع من كل واحد منها. والمستمِع نفسه لا يُسجَّل |
+| `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | الشيء نفسه لتشغيل معرفي |
+| `replay(runId, modifications?, { onEvent })` | الشيء نفسه لإعادة تشغيل |
+| `executeTool(name, params, { onEvent })` | أحداث الاستدعاء، وأحداث عمليات التشغيل التي تبدؤها أداته: يتلقّى المعالج المستمِع بوصفه `context.onEvent`، وتمرّره `governedAgentTool` و`cognitiveAgentTool` إلى وكيلهما |
+| `subscribe(listener, { runId?, agentId?, types? })` | `() => void`: كل حدث من كل تشغيل يطابق المرشِّح (`agentId` هو `metadata.agentId`)، إلى أن تستدعي الدالة المُعادة، التي تُسقِط الأحداث التي لم تُسلَّم بعد |
+| `new ObservedEventStore(store, { onListenerError? })` | الطبقة التي تسلّم الأحداث؛ تغلّف حزمة SDK مخزنها بواحدة منها، أو تستخدم تلك التي تعطيها بوصفها `eventStore`. وتعيد `subscribe(listener, filter?)` الخاصة بها `{ unsubscribe(), close() }`: تنتظر `close()` إلى أن يفرغ المستمِع من الأحداث التي أخذها بالفعل |
 
 ## الأدوات: `ToolDefinition` {#tools-tooldefinition}
 
@@ -197,7 +210,7 @@ interface ModelCostLine {
 | --- | --- |
 | `name`، `description` | ما يراه النموذج |
 | `schema` | مخطط Zod للمعاملات؛ وتُرفَض الاستدعاءات التي لا تطابقه |
-| `handler(params, context?)` | يتلقّى المعاملات المُتحقَّق منها و`{ runId, agentId, signal? }` — ويُلغى `signal` حين يتخلّى المستدعي |
+| `handler(params, context?)` | يتلقّى المعاملات المُتحقَّق منها و`{ runId, agentId, signal?, onEvent? }` — ويُلغى `signal` حين يتخلّى المستدعي؛ ويُعيَّن `onEvent` حين يتابع المستدعي الاستدعاء مباشرةً: مرّره بوصفه `onEvent` لعمليات التشغيل التي تبدؤها الأداة |
 | `retry` | `{ maxRetries, initialDelayMs?, maxDelayMs?, retryOn?(error) }` — للأدوات المتساوية القوة (idempotent) فقط؛ ولا تُعاد محاولة المعاملات غير الصالحة أبدًا |
 | `metadata` | `{ category?, riskLevel?, requiresApproval?, readOnly? }` — تجعل `requiresApproval: true` كل استدعاء ينتظر `approveAction`؛ وتُعرَض `readOnly` على عملاء MCP بوصفها `readOnlyHint` |
 | `inputJsonSchema` | JSON Schema تُعرَض بدل تلك المشتقة من `schema` |
@@ -239,7 +252,7 @@ interface ResourceProvider {
 
 | الدالة | |
 | --- | --- |
-| `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | `Server` لـ MCP يعرض بالضبط ما تسرده `tools`: أسماء الأدوات المعرَّفة و/أو تعريفات `ToolDefinition` (تُعرَّف على حزمة SDK نيابةً عنك؛ ويجوز تمرير التعريف نفسه مرة أخرى، وتُرفَض أداة أخرى باسم محجوز). `resources`: مزوّد `ResourceProvider` واحد أو أكثر؛ وكل قراءة مُتتبَّعة. تعمل الاستدعاءات بوصفها `mcp:<name>` (أو `agentId`)؛ وتُلغى الموافقة التي لا يقرّر فيها أحد خلال `approvalTimeoutMs` (الافتراضي 50 000 ملّي ثانية)؛ ويُشرَح رفض المُدخَلات للعميل، أما الأسباب الأخرى فلا تُشرَح إلا مع `exposeErrorDetails` |
+| `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | `Server` لـ MCP يعرض بالضبط ما تسرده `tools`: أسماء الأدوات المعرَّفة و/أو تعريفات `ToolDefinition` (تُعرَّف على حزمة SDK نيابةً عنك؛ ويجوز تمرير التعريف نفسه مرة أخرى، وتُرفَض أداة أخرى باسم محجوز). `resources`: مزوّد `ResourceProvider` واحد أو أكثر؛ وكل قراءة مُتتبَّعة. تعمل الاستدعاءات بوصفها `mcp:<name>` (أو `agentId`)؛ وتُلغى الموافقة التي لا يقرّر فيها أحد خلال `approvalTimeoutMs` (الافتراضي 50 000 ملّي ثانية)؛ ويُشرَح رفض المُدخَلات للعميل، أما الأسباب الأخرى فلا تُشرَح إلا مع `exposeErrorDetails`. والاستدعاء الذي يحمل `progressToken` يتلقّى `notifications/progress` لكل حدث، تُرسَل كلها قبل النتيجة ([إشعارات التقدّم](../guide/mcp-deploy#progress-notifications)) |
 | `serveMcpOverStdio(sdk, options)` | الشيء نفسه، موصولًا بـ stdin/stdout؛ يكتب سطر «جاهز» واحدًا إلى stderr، ويُغلَق حين ينتهي stdin (تُجهَض الاستدعاءات الجارية، وتُلغى الموافقات المعلّقة). القيمة الافتراضية لـ `approvalTimeoutMs` هي 50 000، كما في `createMcpServer` |
 | `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry? })` | `{ tools, client, close() }` — أدوات أي خادم MCP، في صورة تعريفات `ToolDefinition` |
 
@@ -247,4 +260,4 @@ interface ResourceProvider {
 
 ## اللبنات الأساسية {#building-blocks}
 
-مكوّنات حزمة SDK مُصدَّرة لأجل الإعدادات المخصّصة: `JevClient`، و`DecisionService`، و`LLMThoughtGenerator`، و`HeuristicController`، و`TypedDecisionController`، و`TypedHypothesisAssessor`، و`PredictionTester`، و`applyThought`، و`assembleThought`، و`assessReadiness`، و`rankHypotheses`، و`rebuildMentalState`، و`describeMentalState`، و`fingerprint`، و`defineThinkerProfile`، و`refineProfile`، و`withRetry`، و`RetryingLLMProvider`، و`OpenAIProvider`، و`AnthropicProvider`، و`FallbackProvider`، و`MonitoredEventStore`، و`EmailIncidentNotifier`، و`WebhookIncidentNotifier`، و`ResendEmailTransport`، و`computeRunCost`، و`FileEventStore`، و`SQLiteEventStore`، و`PostgreSQLEventStore`، وأنواعها الرئيسية.
+مكوّنات حزمة SDK مُصدَّرة لأجل الإعدادات المخصّصة: `JevClient`، و`DecisionService`، و`LLMThoughtGenerator`، و`HeuristicController`، و`TypedDecisionController`، و`TypedHypothesisAssessor`، و`PredictionTester`، و`applyThought`، و`assembleThought`، و`assessReadiness`، و`rankHypotheses`، و`rebuildMentalState`، و`describeMentalState`، و`fingerprint`، و`defineThinkerProfile`، و`refineProfile`، و`withRetry`، و`RetryingLLMProvider`، و`OpenAIProvider`، و`AnthropicProvider`، و`FallbackProvider`، و`MonitoredEventStore`، و`ObservedEventStore`، و`EmailIncidentNotifier`، و`WebhookIncidentNotifier`، و`ResendEmailTransport`، و`computeRunCost`، و`FileEventStore`، و`SQLiteEventStore`، و`PostgreSQLEventStore`، وأنواعها الرئيسية.

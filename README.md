@@ -157,7 +157,7 @@ await serveMcpOverStdio(sdk, { name: 'twin', tools: [cognitiveAgentTool(twin, { 
 | | |
 | --- | --- |
 | **Governance** | The LLM only proposes. Policies, allowlists, budgets and human approvals are checked before every action. |
-| **Traceability** | Append-only event log (file, SQLite, PostgreSQL), replay without the LLM, reasoning graphs, golden traces, regression detection. |
+| **Traceability** | Append-only event log (file, SQLite, PostgreSQL), followed live while a run happens (`onEvent`, `sdk.subscribe`, MCP progress notifications), replay without the LLM, reasoning graphs, golden traces, regression detection. |
 | **API costs** | Token usage of every LLM call and typed decision, priced per run and per model. |
 | **Retries** | One policy per provider before failover, vendor retries disabled so they never stack, retries for idempotent tools, all traced. |
 | **Incidents** | Failed runs, blocked actions and failovers become incidents with their timeline, sent by email (Resend, SMTP…) or webhook (Slack…). |

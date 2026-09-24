@@ -164,6 +164,7 @@ interface Agent {
 - `src/stores/sql-event-store.ts`：通用 SQL 实现
 - `src/stores/sqlite-event-store.ts`：SQLite 实现
 - `src/stores/postgresql-event-store.ts`：PostgreSQL 实现
+- `src/stores/observed-event-store.ts`：将每个追加的事件实时交给它的监听器（`onEvent`、`sdk.subscribe`）
 
 **接口：**
 ```typescript
@@ -174,6 +175,7 @@ interface IEventStore {
   queryEvents?(filters?: EventFilters): Promise<EventQueryResult>
   backup?(): Promise<BackupData>
   restore?(backupData: BackupData): Promise<void>
+  subscribe?(listener: LiveEventListener, filter?: LiveEventFilter): EventSubscription
 }
 ```
 

@@ -204,6 +204,30 @@ Une fois l'approbation annulée, un « oui » tardif échoue avec « already 
 
 La plupart des applications MCP demandent aussi à l'utilisateur son accord avant chaque appel d'outil (Claude Desktop le fait par défaut). Cette confirmation a lieu dans l'application ; les approbations du SDK ont lieu sur votre serveur, selon vos règles, et sont enregistrées. Utilisez les deux pour tout ce qui modifie des données.
 
+## Notifications de progression {#progress-notifications}
+
+Un client peut demander à être tenu informé de l'avancement d'un appel : il envoie un `progressToken` avec l'appel (c'est ce que fait le SDK TypeScript officiel quand vous passez `onprogress`). Le serveur envoie alors une `notifications/progress` pour chaque événement de l'appel, ainsi que de l'exécution de l'agent que lance un `cognitiveAgentTool` ou un `governedAgentTool`, avec un `progress` qui augmente d'une unité à chaque fois et un court `message` :
+
+```text
+call started
+tool ask_support called
+agent started
+step 1: model chose lookup_customer
+step 1: tool lookup_customer called
+step 1: tool lookup_customer done
+step 2: model answered
+agent completed
+call completed
+```
+
+Les messages nomment les étapes, les outils et les opérations cognitives ; ils ne contiennent jamais d'arguments, de résultats ni de textes d'erreur. Il n'y a pas de `total` : personne ne sait à l'avance combien d'étapes prendra une exécution. Chaque notification est envoyée avant le résultat, jamais après. En Streamable HTTP, elles circulent sur le flux de la réponse (SSE) ; un transport créé avec `enableJsonResponse: true` répond en JSON simple et ne les envoie pas. Un client qui n'envoie pas de `progressToken` n'en reçoit aucune.
+
+Ce que la progression change, et ce qu'elle ne change pas :
+
+- **Seuls les clients qui réinitialisent leur délai à chaque notification de progression attendent plus longtemps.** Avec le SDK TypeScript : `client.callTool(params, undefined, { onprogress, resetTimeoutOnProgress: true, maxTotalTimeout })`. Un client qui affiche la progression mais garde un délai fixe abandonne au même moment qu'avant. Vérifiez ce que fait votre application avant de compter dessus.
+- **Avec un tel client, ce qui compte est le plus long silence**, pas la durée de l'appel : un appel au modèle, un outil lent ou une approbation. Rien n'est envoyé pendant qu'un outil s'exécute ni pendant qu'une approbation attend, si bien que les 50 s du délai `approvalTimeoutMs` s'appliquent toujours, et que chaque appel au modèle ou à un outil, pris isolément, doit tenir dans le délai du client.
+- **Les agents peuvent alors prendre plus de temps** : le `limits.timeoutMs` d'un agent cognitif peut dépasser le délai du client, puisque chaque étape envoie des notifications. Pour les autres clients, gardez les limites modestes de la [recette d'agent](./mcp-recipes#an-agent-your-reasoning-twin).
+
 ## Liste de contrôle de sécurité {#security-checklist}
 
 Avant de partager un serveur :
@@ -231,7 +255,7 @@ Le projet MCP tient à jour un guide détaillé des attaques et des défenses :
 | Un outil manque dans la liste | Il ne figure pas dans `tools` | Ajoutez son nom ou sa définition à `tools` : rien n'est exposé autrement. |
 | `Another tool named "x" is already defined` au démarrage | Deux sources produisent le même nom d'outil | Donnez un `prefix` à chaque source. |
 | `Tool execution failed: <name>` et rien de plus | La cause peut contenir des détails internes, elle est donc masquée | Lisez l'exécution dans le journal d'événements, ou définissez `exposeErrorDetails: true` pendant le développement. |
-| Les appels dépassent le délai | L'outil est lent (souvent un agent) | Des `limits` d'agent plus petites ; augmentez le délai du client (Claude Code : `MCP_TOOL_TIMEOUT`). |
+| Les appels dépassent le délai | L'outil est lent (souvent un agent) | Des `limits` d'agent plus petites ; augmentez le délai du client (Claude Code : `MCP_TOOL_TIMEOUT`) ; ou utilisez un client qui réinitialise son délai à chaque [notification de progression](#progress-notifications). |
 | Les résultats sont coupés | Limites de taille (`truncated: true`) ou limite propre au client | Augmentez `maxResponseBytes`, `maxRows`, `maxFileBytes` ; Claude Code : `MAX_MCP_OUTPUT_TOKENS`. |
 | Un outil d'écriture répond « Approval no decision within 50000 ms » | Personne ne l'a approuvé à temps | Approuvez-le plus vite (voir [approbations](#approvals-a-human-says-yes-first)), augmentez `approvalTimeoutMs`, ou définissez délibérément `requiresApproval: false`. |
 | Des dossiers comme `events/` ou `golden-traces/` apparaissent à des endroits inattendus | Pas de chemin absolu pour le journal d'événements (ou une ancienne version du SDK) | Passez `eventStore: new FileEventStore(<absolute path>)`. Les versions actuelles ne créent leurs autres dossiers qu'au moment de leur utilisation. |

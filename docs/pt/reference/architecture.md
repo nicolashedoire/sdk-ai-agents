@@ -164,6 +164,7 @@ interface Agent {
 - `src/stores/sql-event-store.ts`: implementação SQL genérica
 - `src/stores/sqlite-event-store.ts`: implementação SQLite
 - `src/stores/postgresql-event-store.ts`: implementação PostgreSQL
+- `src/stores/observed-event-store.ts`: entrega em tempo real cada evento adicionado aos seus listeners (`onEvent`, `sdk.subscribe`)
 
 **Interface:**
 ```typescript
@@ -174,6 +175,7 @@ interface IEventStore {
   queryEvents?(filters?: EventFilters): Promise<EventQueryResult>
   backup?(): Promise<BackupData>
   restore?(backupData: BackupData): Promise<void>
+  subscribe?(listener: LiveEventListener, filter?: LiveEventFilter): EventSubscription
 }
 ```
 

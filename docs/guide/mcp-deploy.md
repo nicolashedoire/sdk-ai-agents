@@ -204,6 +204,30 @@ Once cancelled, a late "yes" fails with "already rejected", and the call is chec
 
 Most MCP applications also ask the user before each tool call (Claude Desktop does by default). That confirmation happens in the application; SDK approvals happen on your server, under your rules, and are recorded. Use both for anything that changes data.
 
+## Progress notifications
+
+A client can ask to be told how a call is going: it sends a `progressToken` with the call (the official TypeScript SDK does when you pass `onprogress`). The server then sends a `notifications/progress` for every event of the call, and of the run of the agent that a `cognitiveAgentTool` or `governedAgentTool` starts, with a `progress` that goes up by one each time and a short `message`:
+
+```text
+call started
+tool ask_support called
+agent started
+step 1: model chose lookup_customer
+step 1: tool lookup_customer called
+step 1: tool lookup_customer done
+step 2: model answered
+agent completed
+call completed
+```
+
+Messages name the steps, the tools and the cognitive operations; they never carry arguments, results or error texts. There is no `total`: nobody knows in advance how many steps a run takes. Every notification is sent before the result, never after it. Over Streamable HTTP they travel on the stream of the response (SSE); a transport created with `enableJsonResponse: true` answers in plain JSON and drops them. A client that sends no `progressToken` gets none.
+
+What progress changes, and what it does not:
+
+- **Only clients that reset their timeout on progress wait longer.** With the TypeScript SDK: `client.callTool(params, undefined, { onprogress, resetTimeoutOnProgress: true, maxTotalTimeout })`. A client that displays progress but keeps a fixed timeout gives up at the same moment as before. Check what your application does before counting on it.
+- **With such a client, what counts is the longest silence**, not the length of the call: one model call, one slow tool, or an approval. Nothing is sent while a tool runs or while an approval waits, so the 50 s of `approvalTimeoutMs` still apply, and every single model or tool call must fit within the client's timeout.
+- **Agents can then take longer**: a cognitive agent's `limits.timeoutMs` can exceed the client's timeout, since each step sends notifications. For other clients, keep the small limits of the [agent recipe](./mcp-recipes#an-agent-your-reasoning-twin).
+
 ## Security checklist
 
 Before you share a server:
@@ -231,7 +255,7 @@ The MCP project maintains a detailed guide of attacks and defences: [Security Be
 | A tool is missing from the list | It is not in `tools` | Add its name or definition to `tools`: nothing is exposed otherwise. |
 | `Another tool named "x" is already defined` at start-up | Two sources produce the same tool name | Give each source a `prefix`. |
 | `Tool execution failed: <name>` and nothing more | The cause may contain internal details, so it is hidden | Read the run in the event log, or set `exposeErrorDetails: true` while developing. |
-| Calls time out | The tool is slow (often an agent) | Smaller agent `limits`; raise the client's timeout (Claude Code: `MCP_TOOL_TIMEOUT`). |
+| Calls time out | The tool is slow (often an agent) | Smaller agent `limits`; raise the client's timeout (Claude Code: `MCP_TOOL_TIMEOUT`); or use a client that resets its timeout on [progress notifications](#progress-notifications). |
 | Results are cut | Size limits (`truncated: true`) or the client's own limit | Raise `maxResponseBytes`, `maxRows`, `maxFileBytes`; Claude Code: `MAX_MCP_OUTPUT_TOKENS`. |
 | A write tool answers "Approval no decision within 50000 ms" | Nobody approved it in time | Approve it quicker (see [approvals](#approvals-a-human-says-yes-first)), raise `approvalTimeoutMs`, or set `requiresApproval: false` deliberately. |
 | Folders such as `events/` or `golden-traces/` appear in unexpected places | No absolute path for the event log (or an older SDK version) | Pass `eventStore: new FileEventStore(<absolute path>)`. Current versions create their other folders only when used. |

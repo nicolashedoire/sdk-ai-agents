@@ -204,6 +204,30 @@ Una vez cancelada, un "sí" tardío falla con "already rejected", y la llamada s
 
 La mayoría de las aplicaciones MCP también preguntan al usuario antes de cada llamada a una herramienta (Claude Desktop lo hace por defecto). Esa confirmación ocurre en la aplicación; las aprobaciones del SDK ocurren en tu servidor, según tus reglas, y quedan registradas. Usa ambas para todo lo que cambie datos.
 
+## Notificaciones de progreso {#progress-notifications}
+
+Un cliente puede pedir que se le informe de cómo va una llamada: envía un `progressToken` con la llamada (el SDK oficial de TypeScript lo hace cuando pasas `onprogress`). El servidor envía entonces una notificación `notifications/progress` por cada evento de la llamada, y de la ejecución del agente que inicia un `cognitiveAgentTool` o un `governedAgentTool`, con un `progress` que aumenta en uno cada vez y un `message` corto:
+
+```text
+call started
+tool ask_support called
+agent started
+step 1: model chose lookup_customer
+step 1: tool lookup_customer called
+step 1: tool lookup_customer done
+step 2: model answered
+agent completed
+call completed
+```
+
+Los mensajes nombran los pasos, las herramientas y las operaciones cognitivas; nunca llevan argumentos, resultados ni textos de error. No hay `total`: nadie sabe de antemano cuántos pasos dará una ejecución. Cada notificación se envía antes del resultado, nunca después. Con Streamable HTTP viajan en el flujo de la respuesta (SSE); un transporte creado con `enableJsonResponse: true` responde en JSON simple y las descarta. Un cliente que no envía ningún `progressToken` no recibe ninguna.
+
+Qué cambia el progreso, y qué no:
+
+- **Solo esperan más los clientes que reinician su tiempo límite con las notificaciones de progreso.** Con el SDK de TypeScript: `client.callTool(params, undefined, { onprogress, resetTimeoutOnProgress: true, maxTotalTimeout })`. Un cliente que muestra el progreso pero mantiene un tiempo límite fijo se rinde en el mismo momento que antes. Comprueba lo que hace tu aplicación antes de contar con ello.
+- **Con un cliente así, lo que cuenta es el silencio más largo**, no la duración de la llamada: una llamada al modelo, una herramienta lenta o una aprobación. No se envía nada mientras se ejecuta una herramienta ni mientras espera una aprobación, así que los 50 s de `approvalTimeoutMs` se siguen aplicando, y cada llamada al modelo o a una herramienta, por sí sola, debe caber dentro del tiempo límite del cliente.
+- **Los agentes pueden entonces tardar más**: el `limits.timeoutMs` de un agente cognitivo puede superar el tiempo límite del cliente, ya que cada paso envía notificaciones. Para los demás clientes, mantén los límites pequeños de la [receta del agente](./mcp-recipes#an-agent-your-reasoning-twin).
+
 ## Lista de comprobación de seguridad {#security-checklist}
 
 Antes de compartir un servidor:
@@ -231,7 +255,7 @@ El proyecto MCP mantiene una guía detallada de ataques y defensas: [Security Be
 | Falta una herramienta en la lista | No está en `tools` | Añade su nombre o su definición a `tools`: si no, no se expone nada. |
 | `Another tool named "x" is already defined` al arrancar | Dos fuentes producen el mismo nombre de herramienta | Da a cada fuente un `prefix`. |
 | `Tool execution failed: <name>` y nada más | La causa puede contener detalles internos, así que se oculta | Lee la ejecución en el registro de eventos, o fija `exposeErrorDetails: true` mientras desarrollas. |
-| Las llamadas agotan el tiempo límite | La herramienta es lenta (a menudo un agente) | `limits` del agente más pequeños; aumenta el tiempo límite del cliente (Claude Code: `MCP_TOOL_TIMEOUT`). |
+| Las llamadas agotan el tiempo límite | La herramienta es lenta (a menudo un agente) | `limits` del agente más pequeños; aumenta el tiempo límite del cliente (Claude Code: `MCP_TOOL_TIMEOUT`); o usa un cliente que reinicie su tiempo límite con las [notificaciones de progreso](#progress-notifications). |
 | Los resultados aparecen cortados | Límites de tamaño (`truncated: true`) o el límite propio del cliente | Aumenta `maxResponseBytes`, `maxRows`, `maxFileBytes`; Claude Code: `MAX_MCP_OUTPUT_TOKENS`. |
 | Una herramienta de escritura responde "Approval no decision within 50000 ms" | Nadie la aprobó a tiempo | Apruébala más rápido (consulta [aprobaciones](#approvals-a-human-says-yes-first)), aumenta `approvalTimeoutMs`, o fija `requiresApproval: false` de forma deliberada. |
 | Aparecen carpetas como `events/` o `golden-traces/` en lugares inesperados | No hay una ruta absoluta para el registro de eventos (o una versión antigua del SDK) | Pasa `eventStore: new FileEventStore(<absolute path>)`. Las versiones actuales solo crean sus otras carpetas cuando se usan. |

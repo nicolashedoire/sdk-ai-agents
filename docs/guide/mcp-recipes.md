@@ -476,7 +476,7 @@ The tool takes `problem` (the question, up to 4,000 characters) and an optional 
 
 ### Good to know
 
-- **It takes time.** A cognitive run makes several model calls: count tens of seconds, sometimes minutes. Many clients cancel a call after about a minute (the default of the official TypeScript SDK is 60 seconds; Claude Code lets you raise it with `MCP_TOOL_TIMEOUT`). Keep `limits` small for interactive use. **When the client gives up, the run is stopped** (cognitive and governed agents alike) and recorded as cancelled: no further model calls are made, and an approval the agent was waiting for is cancelled.
+- **It takes time.** A cognitive run makes several model calls: count tens of seconds, sometimes minutes. Many clients cancel a call after about a minute (the default of the official TypeScript SDK is 60 seconds; Claude Code lets you raise it with `MCP_TOOL_TIMEOUT`). Keep `limits` small for interactive use, unless your client resets its timeout on [progress notifications](./mcp-deploy#progress-notifications): every step of the agent sends one. **When the client gives up, the run is stopped** (cognitive and governed agents alike) and recorded as cancelled: no further model calls are made, and an approval the agent was waiting for is cancelled.
 - **It costs money**: each consultation is several model calls. Put a [budget](./mcp-deploy#governance-policies-budgets-approvals) on it and check `sdk.getRunCost(runId)`.
 - **It imitates a way of reasoning, not what the person knows.** The twin knows what is in the profile, the question and the context — not the person's memory. Treat its answers as "how would they approach this", and let the real person correct it with `learnFromFeedback`.
 

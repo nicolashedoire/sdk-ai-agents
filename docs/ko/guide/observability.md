@@ -68,6 +68,42 @@ const state = await sdk.getMentalState(runId);    // cognitive runs
 
 실행의 상태는 **마지막 생명 주기 이벤트**(`run.completed`, `run.failed`, `run.cancelled`)입니다. 그 뒤에 덧붙여진 이벤트(피드백, 인시던트 보고)는 실행을 절대 다시 열지 않습니다.
 
+## 실시간 진행 상황 {#live-progress}
+
+이벤트는 저장소가 받아들이는 대로, **실행이 진행되는 동안에도** 여러분의 코드에 도달합니다. 인터페이스에 진행 상황을 보여 주거나, 클라이언트로 스트리밍하거나, 대시보드에 넘기는 데 쓰세요. MCP 클라이언트는 이를 [진행 알림](./mcp-deploy#progress-notifications)으로 받습니다.
+
+```ts
+const result = await agent.run({
+  message: 'Refund order 1234',
+  onEvent: (event) => console.log(event.type),
+});
+
+const answer = await cognitiveAgent.think({ problem, onEvent: (event) => socket.send(JSON.stringify(event)) });
+const replay = await sdk.replay(runId, undefined, { onEvent: (event) => console.log(event.type) });
+
+// Every run of the SDK, for as long as you listen
+const unsubscribe = sdk.subscribe((event) => dashboard.push(event), { types: ['run.failed', 'approval.requested'] });
+unsubscribe();
+```
+
+| 어디서 | 리스너가 받는 것 |
+| --- | --- |
+| `run({ onEvent })`, `think({ onEvent })` | 그 실행의 모든 이벤트 |
+| `replay(runId, modifications, { onEvent })` | 리플레이의 모든 이벤트 |
+| `executeTool(name, params, { onEvent })` | 호출의 이벤트, 그리고 그 도구가 시작하는 에이전트 실행(`governedAgentTool`, `cognitiveAgentTool`)의 이벤트 |
+| `sdk.subscribe(listener, { runId?, agentId?, types? })` | 필터에 맞는 모든 실행의 모든 이벤트. 반환된 함수를 호출할 때까지 받습니다 |
+
+보장되는 것은 다음과 같습니다.
+
+- **저장소가 받아들인 것만.** 리스너는 저장소의 `append`가 성공한 뒤에 호출되며, 저장소가 거부한 이벤트에 대해서는 절대 호출되지 않습니다. SQL 저장소에서는 행이 커밋된 상태이고, 파일 저장소에서는 이벤트가 버퍼에 있습니다. `getEvents`는 이를 바로 반환하고, 이벤트는 100 ms 안에 디스크에 도달합니다(그 사이에 프로세스가 비정상 종료되면 사라집니다).
+- **순서대로.** 한 실행의 이벤트는 기록된 순서대로 도착합니다. 서로 다른 실행의 이벤트는 뒤섞여 도착합니다.
+- **한 번에 이벤트 하나, 그리고 실행은 절대 기다리지 않습니다.** 리스너가 프로미스를 반환하면, 다음 이벤트는 그 프로미스가 이행되거나 거부될 때까지 기다립니다. 그래서 비동기 리스너도 이벤트의 순서를 바꿀 수 없습니다. 그동안 실행은 계속됩니다. 느린 리스너는 뒤처질 뿐, 에이전트를 느리게 만들지 않습니다. `run()`, `think()`, `replay()`, `executeTool()`은 각자의 `onEvent`가 실행의 모든 이벤트에 대해 처리를 마친 뒤에야 완료되므로, 이들이 반환될 때는 모든 이벤트를 본 상태입니다. 이행도 거부도 되지 않는 프로미스는 이들이 반환되지 못하게 막습니다. 결과를 기다릴 필요가 없는 작업이라면 프로미스를 반환하지 마세요(`onEvent: (event) => { void save(event); }`). 동기 리스너는 이벤트의 `append`가 반환되기 전에 호출됩니다. 빠르게 끝나도록 하세요.
+- **오류는 실행에 끼어들지 않습니다.** 예외를 던지거나 거부된 프로미스를 반환하는 리스너는 표준 오류(`console.error`)로 보고되며, 그 뒤의 이벤트도 계속 받습니다. 직접 처리하려면 리스너 안에서 잡거나, `eventStore: new ObservedEventStore(store, { onListenerError })`로 SDK를 만드세요.
+- **복사본.** 각 리스너는 저장소가 다시 읽어 낸 그대로의 이벤트 복사본을 따로 받습니다. 이를 바꿔도 로그는 전혀 바뀌지 않습니다.
+- **구독 해제는 즉시 적용됩니다.** `sdk.subscribe`가 반환한 함수를 호출하고 나면, 이미 기다리고 있던 이벤트에 대해서도 리스너는 다시 호출되지 않습니다. 이 함수는 리스너 안에서 호출해도 됩니다.
+
+`agentId` 필터는 각 이벤트의 `metadata.agentId`와 대조합니다. 에이전트가 없는 이벤트도 몇 가지 있으므로(`provider.retry`, 리플레이의 끝), 이를 받으려면 실행으로 필터링하세요. 복원된 백업은 전달되지 않습니다. 여러분의 저장소 위에 직접 조립한 에이전트(`new AgentImpl(…)`)에서 `onEvent`를 쓰려면, 저장소를 `ObservedEventStore`로 감싸세요. `createSDK`는 이를 대신 해 줍니다.
+
 ## LLM 없이 리플레이하기 {#replay-without-the-llm}
 
 ```ts

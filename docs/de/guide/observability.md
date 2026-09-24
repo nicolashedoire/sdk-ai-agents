@@ -68,6 +68,42 @@ const state = await sdk.getMentalState(runId);    // cognitive runs
 
 Der Status eines Laufs ist das **letzte Lebenszyklusereignis** (`run.completed`, `run.failed`, `run.cancelled`). Danach angehängte Ereignisse – Feedback, Incident-Meldungen – öffnen ihn nie wieder.
 
+## Live-Fortschritt {#live-progress}
+
+Ereignisse erreichen Ihren Code auch **während der Lauf noch im Gange ist**, sobald der Speicher sie angenommen hat: um den Fortschritt in einer Benutzeroberfläche anzuzeigen, ihn an einen Client zu streamen oder ein Dashboard zu speisen. MCP-Clients erhalten sie als [Fortschrittsbenachrichtigungen](./mcp-deploy#progress-notifications).
+
+```ts
+const result = await agent.run({
+  message: 'Refund order 1234',
+  onEvent: (event) => console.log(event.type),
+});
+
+const answer = await cognitiveAgent.think({ problem, onEvent: (event) => socket.send(JSON.stringify(event)) });
+const replay = await sdk.replay(runId, undefined, { onEvent: (event) => console.log(event.type) });
+
+// Every run of the SDK, for as long as you listen
+const unsubscribe = sdk.subscribe((event) => dashboard.push(event), { types: ['run.failed', 'approval.requested'] });
+unsubscribe();
+```
+
+| Wo | Was der Listener erhält |
+| --- | --- |
+| `run({ onEvent })`, `think({ onEvent })` | Jedes Ereignis dieses Laufs |
+| `replay(runId, modifications, { onEvent })` | Jedes Ereignis des Replays |
+| `executeTool(name, params, { onEvent })` | Die Ereignisse des Aufrufs und der Agentenläufe, die sein Tool startet (`governedAgentTool`, `cognitiveAgentTool`) |
+| `sdk.subscribe(listener, { runId?, agentId?, types? })` | Jedes Ereignis jedes Laufs, der zum Filter passt, bis Sie die zurückgegebene Funktion aufrufen |
+
+Was garantiert ist:
+
+- **Nur, was der Speicher angenommen hat.** Ein Listener wird aufgerufen, sobald das `append` des Speichers erfolgreich war, nie für ein Ereignis, das der Speicher abgelehnt hat. Bei den SQL-Speichern ist die Zeile festgeschrieben; beim Dateispeicher liegt das Ereignis in seinem Puffer: `getEvents` gibt es sofort zurück, und es erreicht die Festplatte innerhalb von 100 ms (bei einem Absturz dazwischen geht es verloren).
+- **In Reihenfolge.** Die Ereignisse eines Laufs kommen in der Reihenfolge an, in der sie aufgezeichnet wurden; die Ereignisse verschiedener Läufe wechseln sich ab.
+- **Ein Ereignis nach dem anderen, und der Lauf wartet nie.** Gibt Ihr Listener ein Promise zurück, wartet sein nächstes Ereignis, bis dieses Promise erfüllt oder abgelehnt ist, sodass ein asynchroner Listener die Ereignisse nicht umordnen kann. Der Lauf geht währenddessen weiter: Ein langsamer Listener fällt zurück, er bremst den Agenten nicht. `run()`, `think()`, `replay()` und `executeTool()` werden erst aufgelöst, wenn ihr `onEvent` jedes Ereignis des Laufs fertig verarbeitet hat; wenn sie zurückkehren, haben Sie also alles gesehen. Ein Promise, das nie erfüllt oder abgelehnt wird, hindert sie an der Rückkehr: Für Arbeit nach dem Prinzip „Fire and Forget“ geben Sie das Promise nicht zurück (`onEvent: (event) => { void save(event); }`). Ein synchroner Listener wird aufgerufen, bevor das `append` des Ereignisses zurückkehrt: Halten Sie ihn kurz.
+- **Fehler bleiben außerhalb des Laufs.** Ein Listener, der einen Fehler wirft oder dessen Promise abgelehnt wird, wird auf der Standardfehlerausgabe (`console.error`) gemeldet und erhält trotzdem die nächsten Ereignisse. Um diese Fehler selbst zu behandeln, fangen Sie sie im Listener ab oder erstellen Sie das SDK mit `eventStore: new ObservedEventStore(store, { onListenerError })`.
+- **Eine Kopie.** Jeder Listener erhält seine eigene Kopie des Ereignisses, so wie der Speicher es zurückliest: Wer sie ändert, ändert nichts im Protokoll.
+- **Abmelden wirkt sofort.** Nachdem die von `sdk.subscribe` zurückgegebene Funktion aufgerufen wurde, wird der Listener nicht mehr aufgerufen, auch nicht für bereits wartende Ereignisse; sie kann aus dem Listener selbst heraus aufgerufen werden.
+
+Der Filter `agentId` vergleicht mit dem `metadata.agentId` jedes Ereignisses: Einige Ereignisse tragen keinen Agenten (`provider.retry`, das Ende eines Replays); filtern Sie nach Lauf, um sie zu erhalten. Wiederhergestellte Sicherungen werden nicht zugestellt. Für einen Agenten, den Sie von Hand auf Ihrem eigenen Speicher zusammenbauen (`new AgentImpl(…)`), wickeln Sie den Speicher in einen `ObservedEventStore`, um `onEvent` zu nutzen; `createSDK` erledigt das für Sie.
+
 ## Replay ohne das LLM {#replay-without-the-llm}
 
 ```ts

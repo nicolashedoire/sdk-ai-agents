@@ -63,6 +63,7 @@ sdk-ai-agents/
 - `sql-event-store.ts`：汎用の SQL 実装
 - `sqlite-event-store.ts`：SQLite の実装
 - `postgresql-event-store.ts`：JSONB を使う PostgreSQL の実装
+- `observed-event-store.ts`：追加された各イベントをリアルタイムでリスナーに届ける（`onEvent`、`sdk.subscribe`）
 
 **エントリーポイント：** `SDKImpl` と `ReplayEngine` から使われます
 

@@ -204,6 +204,30 @@ createServer((request, response) => {
 
 تسأل معظم تطبيقات MCP المستخدمَ أيضًا قبل كل استدعاء أداة (يفعل Claude Desktop ذلك افتراضيًا). يحدث ذلك التأكيد في التطبيق؛ أما موافقات حزمة SDK فتحدث على خادمك، وفق قواعدك، وتُسجَّل. استخدم الاثنين لكل ما يغيّر البيانات.
 
+## إشعارات التقدّم {#progress-notifications}
+
+يستطيع العميل أن يطلب إطلاعه على سير الاستدعاء: فيرسل `progressToken` مع الاستدعاء (تفعل ذلك حزمة TypeScript SDK الرسمية حين تمرّر `onprogress`). فيرسل الخادم عندئذٍ `notifications/progress` لكل حدث من أحداث الاستدعاء، ومن أحداث تشغيل الوكيل الذي تبدؤه `cognitiveAgentTool` أو `governedAgentTool`، مع `progress` يزيد بواحد في كل مرة و`message` قصيرة:
+
+```text
+call started
+tool ask_support called
+agent started
+step 1: model chose lookup_customer
+step 1: tool lookup_customer called
+step 1: tool lookup_customer done
+step 2: model answered
+agent completed
+call completed
+```
+
+تسمّي الرسائل الخطوات، والأدوات، والعمليات المعرفية؛ ولا تحمل أبدًا معاملات أو نتائج أو نصوص أخطاء. لا يوجد `total`: فلا أحد يعرف مسبقًا كم خطوة سيستغرقها التشغيل. يُرسَل كل إشعار قبل النتيجة، ولا يُرسَل بعدها أبدًا. وعبر Streamable HTTP تنتقل الإشعارات على بث الاستجابة (SSE)؛ أما وسيلة النقل المُنشأة بـ `enableJsonResponse: true` فتجيب بـ JSON عادي وتُسقطها. والعميل الذي لا يرسل `progressToken` لا يتلقّى أيًّا منها.
+
+ما تغيّره إشعارات التقدّم، وما لا تغيّره:
+
+- **لا تنتظر مدة أطول إلا العملاء التي تعيد ضبط مهلتها عند إشعارات التقدّم.** مع حزمة TypeScript SDK: `client.callTool(params, undefined, { onprogress, resetTimeoutOnProgress: true, maxTotalTimeout })`. أما العميل الذي يعرض التقدّم لكنه يحتفظ بمهلة ثابتة فيتخلّى في اللحظة نفسها كما من قبل. تحقّق مما يفعله تطبيقك قبل أن تعتمد على ذلك.
+- **مع عميل كهذا، ما يهمّ هو أطول فترة صمت**، لا مدة الاستدعاء: استدعاء واحد للنموذج، أو أداة بطيئة واحدة، أو موافقة. لا يُرسَل شيء أثناء عمل أداة أو أثناء انتظار موافقة، لذا تظل مهلة `approvalTimeoutMs` البالغة 50 ثانية سارية، ويجب أن يتّسع كل استدعاء منفرد للنموذج أو لأداة ضمن مهلة العميل.
+- **يستطيع الوكلاء عندئذٍ أن يستغرقوا وقتًا أطول**: يمكن أن تتجاوز `limits.timeoutMs` لوكيل معرفي مهلةَ العميل، لأن كل خطوة ترسل إشعارات. أما للعملاء الأخرى، فأبقِ الحدود الصغيرة في [وصفة الوكيل](./mcp-recipes#an-agent-your-reasoning-twin).
+
 ## قائمة التحقّق الأمنية {#security-checklist}
 
 قبل أن تشارك خادمًا:
@@ -231,7 +255,7 @@ createServer((request, response) => {
 | أداة غائبة عن القائمة | ليست في `tools` | أضف اسمها أو تعريفها إلى `tools`: فلا شيء يُعرَض بخلاف ذلك. |
 | `Another tool named "x" is already defined` عند بدء التشغيل | مصدران ينتجان اسم الأداة نفسه | أعطِ كل مصدر `prefix`. |
 | `Tool execution failed: <name>` ولا شيء أكثر | قد يحتوي السبب على تفاصيل داخلية، لذا فهو مخفي | اقرأ التشغيل في سجل الأحداث، أو عيّن `exposeErrorDetails: true` أثناء التطوير. |
-| تنتهي مهلة الاستدعاءات | الأداة بطيئة (غالبًا وكيل) | `limits` أصغر للوكيل؛ وارفع مهلة العميل (Claude Code: `MCP_TOOL_TIMEOUT`). |
+| تنتهي مهلة الاستدعاءات | الأداة بطيئة (غالبًا وكيل) | `limits` أصغر للوكيل؛ وارفع مهلة العميل (Claude Code: `MCP_TOOL_TIMEOUT`)؛ أو استخدم عميلًا يعيد ضبط مهلته عند [إشعارات التقدّم](#progress-notifications). |
 | النتائج مقطوعة | حدود الحجم (`truncated: true`) أو حدّ العميل الخاص | ارفع `maxResponseBytes`، و`maxRows`، و`maxFileBytes`؛ وفي Claude Code: `MAX_MCP_OUTPUT_TOKENS`. |
 | أداة كتابة تجيب «Approval no decision within 50000 ms» | لم يوافق عليها أحد في الوقت المحدّد | وافق عليها أسرع (انظر [الموافقات](#approvals-a-human-says-yes-first))، أو ارفع `approvalTimeoutMs`، أو عيّن `requiresApproval: false` عن قصد. |
 | تظهر مجلدات مثل `events/` أو `golden-traces/` في أماكن غير متوقّعة | لا مسار مطلق لسجل الأحداث (أو إصدار أقدم من حزمة SDK) | مرّر `eventStore: new FileEventStore(<absolute path>)`. والإصدارات الحالية لا تنشئ مجلداتها الأخرى إلا عند استخدامها. |

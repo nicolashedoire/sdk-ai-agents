@@ -63,6 +63,7 @@ sdk-ai-agents/
 - `sql-event-store.ts`: implementación SQL genérica
 - `sqlite-event-store.ts`: implementación para SQLite
 - `postgresql-event-store.ts`: implementación para PostgreSQL con JSONB
+- `observed-event-store.ts`: entrega en tiempo real cada evento añadido a sus listeners (`onEvent`, `sdk.subscribe`)
 
 **Puntos de entrada:** los usan `SDKImpl` y `ReplayEngine`
 

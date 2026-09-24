@@ -68,6 +68,42 @@ const state = await sdk.getMentalState(runId);    // cognitive runs
 
 実行のステータスは、**最後のライフサイクルイベント**（`run.completed`、`run.failed`、`run.cancelled`）で決まります。その後に追記されたイベント（フィードバックやインシデントの報告）によって、実行が再び開かれることはありません。
 
+## リアルタイムの進捗 {#live-progress}
+
+イベントは、ストアに受け付けられた時点で、**実行の進行中にも** あなたのコードに届きます。UI に進捗を表示したり、クライアントにストリーミングしたり、ダッシュボードに送り込んだりするのに使えます。MCP クライアントは、これを [進捗通知](./mcp-deploy#progress-notifications) として受け取ります。
+
+```ts
+const result = await agent.run({
+  message: 'Refund order 1234',
+  onEvent: (event) => console.log(event.type),
+});
+
+const answer = await cognitiveAgent.think({ problem, onEvent: (event) => socket.send(JSON.stringify(event)) });
+const replay = await sdk.replay(runId, undefined, { onEvent: (event) => console.log(event.type) });
+
+// Every run of the SDK, for as long as you listen
+const unsubscribe = sdk.subscribe((event) => dashboard.push(event), { types: ['run.failed', 'approval.requested'] });
+unsubscribe();
+```
+
+| 場所 | リスナーが受け取るもの |
+| --- | --- |
+| `run({ onEvent })`、`think({ onEvent })` | その実行のすべてのイベント |
+| `replay(runId, modifications, { onEvent })` | リプレイのすべてのイベント |
+| `executeTool(name, params, { onEvent })` | 呼び出しのイベントと、そのツールが開始するエージェントの実行（`governedAgentTool`、`cognitiveAgentTool`）のイベント |
+| `sdk.subscribe(listener, { runId?, agentId?, types? })` | フィルターに一致するすべての実行のすべてのイベント。返された関数を呼び出すまで続く |
+
+保証されるのは次のことです。
+
+- **ストアが受け付けたものだけ。** リスナーは、ストアの `append` が成功した後に呼び出されます。ストアが拒否したイベントについて呼び出されることは決してありません。SQL のストアでは、行はコミット済みです。ファイルストアでは、イベントはそのバッファーの中にあります。`getEvents` はそれをすぐに返し、100 ms 以内にディスクに書き込まれます（その間にクラッシュすると失われます）。
+- **順番どおり。** 1 つの実行のイベントは、記録された順に届きます。異なる実行のイベントは入り混じります。
+- **一度に 1 つのイベント、そして実行は決して待たない。** リスナーが Promise を返すと、次のイベントはその Promise が確定するまで待つので、非同期のリスナーがイベントの順番を入れ替えることはありません。その間も実行は進みます。遅いリスナーは後れを取るだけで、エージェントを遅くすることはありません。`run()`、`think()`、`replay()`、`executeTool()` は、その `onEvent` が実行のすべてのイベントの処理を終えた後に解決されるので、これらが戻った時点で、あなたはすべてを見ています。決して確定しない Promise があると、これらは戻りません。結果を待たない処理（fire-and-forget）では、Promise を返さないでください（`onEvent: (event) => { void save(event); }`）。同期のリスナーは、イベントの `append` が戻る前に呼び出されます。すばやく終わるようにしてください。
+- **エラーは実行に入り込まない。** 例外を投げたリスナーや、返した Promise が拒否されたリスナーは、標準エラー出力（`console.error`）に報告され、その後のイベントも引き続き受け取ります。エラーを自分で処理するには、リスナーの中で捕捉するか、`eventStore: new ObservedEventStore(store, { onListenerError })` を指定して SDK を作成してください。
+- **コピー。** 各リスナーは、ストアが読み戻したとおりのイベントを、自分専用のコピーとして受け取ります。それを変更しても、ログは何も変わりません。
+- **購読の解除はすぐに効く。** `sdk.subscribe` が返した関数を呼び出した後は、すでに待っているイベントについても、リスナーが再び呼び出されることはありません。この関数は、リスナーの中から呼び出すこともできます。
+
+`agentId` のフィルターは、各イベントの `metadata.agentId` と照合されます。エージェントを持たないイベントもいくつかあります（`provider.retry`、リプレイの終わり）。それらを受け取るには、実行で絞り込んでください。復元されたバックアップは配信されません。自分のストアの上に手作業で組み立てたエージェント（`new AgentImpl(…)`）で `onEvent` を使うには、そのストアを `ObservedEventStore` でラップしてください。`createSDK` はこれを自動で行います。
+
 ## LLM を使わないリプレイ {#replay-without-the-llm}
 
 ```ts

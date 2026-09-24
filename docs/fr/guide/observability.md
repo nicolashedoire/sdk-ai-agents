@@ -68,6 +68,42 @@ const state = await sdk.getMentalState(runId);    // cognitive runs
 
 Le statut d'une exécution est celui du **dernier événement de cycle de vie** (`run.completed`, `run.failed`, `run.cancelled`). Les événements ajoutés ensuite — retours, rapports d'incident — ne la rouvrent jamais.
 
+## Progression en direct {#live-progress}
+
+Les événements parviennent aussi à votre code **pendant que l'exécution est en cours**, dès que le magasin les a acceptés : pour afficher la progression dans une interface, la diffuser à un client ou alimenter un tableau de bord. Les clients MCP les reçoivent sous forme de [notifications de progression](./mcp-deploy#progress-notifications).
+
+```ts
+const result = await agent.run({
+  message: 'Refund order 1234',
+  onEvent: (event) => console.log(event.type),
+});
+
+const answer = await cognitiveAgent.think({ problem, onEvent: (event) => socket.send(JSON.stringify(event)) });
+const replay = await sdk.replay(runId, undefined, { onEvent: (event) => console.log(event.type) });
+
+// Every run of the SDK, for as long as you listen
+const unsubscribe = sdk.subscribe((event) => dashboard.push(event), { types: ['run.failed', 'approval.requested'] });
+unsubscribe();
+```
+
+| Où | Ce que reçoit l'écouteur |
+| --- | --- |
+| `run({ onEvent })`, `think({ onEvent })` | Tous les événements de cette exécution |
+| `replay(runId, modifications, { onEvent })` | Tous les événements du rejeu |
+| `executeTool(name, params, { onEvent })` | Les événements de l'appel, et ceux des exécutions d'agent que lance son outil (`governedAgentTool`, `cognitiveAgentTool`) |
+| `sdk.subscribe(listener, { runId?, agentId?, types? })` | Tous les événements de toutes les exécutions qui correspondent au filtre, jusqu'à ce que vous appeliez la fonction qu'il renvoie |
+
+Ce qui est garanti :
+
+- **Uniquement ce que le magasin a accepté.** Un écouteur est appelé une fois que l'`append` du magasin a réussi, jamais pour un événement que le magasin a refusé. Avec les magasins SQL, la ligne est validée en base ; avec le magasin de fichiers, l'événement est dans sa mémoire tampon : `getEvents` le renvoie aussitôt, et il atteint le disque dans les 100 ms (en cas de plantage entre-temps, il est perdu).
+- **Dans l'ordre.** Les événements d'une exécution arrivent dans l'ordre où ils ont été enregistrés ; ceux d'exécutions différentes s'entremêlent.
+- **Un événement à la fois, et l'exécution n'attend jamais.** Quand votre écouteur renvoie une promesse, son événement suivant attend que cette promesse soit résolue ou rejetée, si bien qu'un écouteur asynchrone ne peut pas changer l'ordre des événements. L'exécution continue pendant ce temps : un écouteur lent prend du retard, il ne ralentit pas l'agent. `run()`, `think()`, `replay()` et `executeTool()` se résolvent une fois que leur `onEvent` a fini de traiter chaque événement de l'exécution, si bien que lorsqu'ils rendent la main, vous avez tout vu. Une promesse qui n'est jamais résolue ni rejetée les empêche de rendre la main : pour un traitement dont vous n'attendez pas la fin (*fire-and-forget*), ne renvoyez pas la promesse (`onEvent: (event) => { void save(event); }`). Un écouteur synchrone est appelé avant que l'`append` de l'événement ne rende la main : gardez-le rapide.
+- **Les erreurs restent hors de l'exécution.** L'erreur d'un écouteur qui lève une exception ou renvoie une promesse rejetée est signalée sur la sortie d'erreur standard (`console.error`), et l'écouteur reçoit tout de même les événements suivants. Pour traiter ces erreurs vous-même, interceptez-les dans l'écouteur, ou créez le SDK avec `eventStore: new ObservedEventStore(store, { onListenerError })`.
+- **Une copie.** Chaque écouteur reçoit sa propre copie de l'événement, telle que le magasin la relit : la modifier ne change rien dans le journal.
+- **Le désabonnement est immédiat.** Une fois appelée la fonction renvoyée par `sdk.subscribe`, l'écouteur n'est plus appelé, pas même pour des événements déjà en attente ; cette fonction peut être appelée depuis l'écouteur lui-même.
+
+Le filtre `agentId` porte sur le `metadata.agentId` de chaque événement : quelques événements ne sont liés à aucun agent (`provider.retry`, la fin d'un rejeu) ; filtrez par exécution pour les obtenir. Les sauvegardes restaurées ne sont pas transmises. Pour un agent assemblé à la main sur votre propre magasin (`new AgentImpl(…)`), enveloppez le magasin dans un `ObservedEventStore` pour utiliser `onEvent` ; `createSDK` le fait pour vous.
+
 ## Rejouer sans le LLM {#replay-without-the-llm}
 
 ```ts
