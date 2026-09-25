@@ -88,7 +88,8 @@
     "examples/mcp-agent.ts",
     "examples/mcp-http.ts",
     "examples/mcp-approvals.ts",
-    "examples/rule-discovery.ts"
+    "examples/rule-discovery.ts",
+    "examples/study.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }
