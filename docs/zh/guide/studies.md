@@ -13,7 +13,7 @@ const study = sdk.createStudy({
   objective: 'A browser design whose every choice follows from the investigation',
   leads: ['vectorisation', 'weights', 'ReLU'], // your leads: examples to verify, not truths
   analogues: ['Bitcoin'],                      // breakthroughs by assembly to deconstruct
-  sources: ['brave_web_search'],               // SDK tools the study searches with
+  sources: ['web_search', 'arxiv_search'],     // SDK tools the study searches with (webTools())
 });
 
 const result = await study.run();
@@ -161,7 +161,20 @@ await study.recordResult('M1', {
 
 ## 通过你的来源开展研究 {#research-through-your-sources}
 
-SDK 没有内置的 Web 搜索。研究使用**你交给它的工具**作为 `sources` 来搜索：SDK 工具的名称，通常是用 [`connectMcpServer`](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) 导入、再用 `sdk.defineTool` 定义的某个 MCP 服务器的搜索工具：
+研究使用**你交给它的工具**作为 `sources` 来搜索：也就是 SDK 工具的名称。SDK 的 [Web 工具](./web-research)无需任何配置即可使用——`web_search`（在你配置另一个提供商之前使用 DuckDuckGo）、`arxiv_search`、`wikipedia_search` 和 `github_search`——它们的结果附带一个 URL，如果已知，还附带一个日期：
+
+```ts
+import { webTools } from '@sdk-ai-agents/core';
+
+// Define the tools first: the study checks its sources when it is created.
+const sources = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] }).map(
+  (tool) => sdk.defineTool(tool).name
+);
+
+const study = sdk.createStudy({ name: 'browser', object, objective, sources });
+```
+
+其他任何搜索工具也都可以使用，例如用 [`connectMcpServer`](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) 导入、再用 `sdk.defineTool` 定义的某个 MCP 服务器的搜索工具：
 
 ```ts
 import { connectMcpServer } from '@sdk-ai-agents/core/mcp';
@@ -354,12 +367,11 @@ const unsubscribe = sdk.subscribe(listener, { agentId: study.id });
 
 ## 一个完整的示例 {#a-complete-example}
 
-`examples/study.ts` 用法语研究 1990 年到 2026 年的 Web 浏览器。它给出三条有待核实的线索——向量化、权重（`poids`）和 ReLU，没有任何依据表明这些例子适用于浏览器——没有指明任何能力，因此由研究提出候选能力；它还要求研究把比特币作为组装式突破来拆解。它的核心部分如下，以 Brave 搜索服务器作为来源：
+`examples/study.ts` 用法语研究 1990 年到 2026 年的 Web 浏览器。它给出三条有待核实的线索——向量化、权重（`poids`）和 ReLU，没有任何依据表明这些例子适用于浏览器——没有指明任何能力，因此由研究提出候选能力；它还要求研究把比特币作为组装式突破来拆解。它的核心部分如下，用 SDK 的 Web 工具搜索 Web：
 
 ```ts
 import { writeFileSync } from 'node:fs';
-import { FileEventStore, createSDK } from '@sdk-ai-agents/core';
-import { connectMcpServer } from '@sdk-ai-agents/core/mcp';
+import { FileEventStore, createSDK, webTools } from '@sdk-ai-agents/core';
 
 const eventStore = new FileEventStore('./events');
 const sdk = createSDK({
@@ -370,17 +382,9 @@ const sdk = createSDK({
 });
 
 // The study searches only with the tools you give it, run through the governed pipeline.
-const search = await connectMcpServer({
-  name: 'search',
-  transport: {
-    type: 'stdio',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-brave-search'],
-    env: { BRAVE_API_KEY: process.env.BRAVE_API_KEY ?? '' },
-  },
-  metadata: { readOnly: true },
-});
-const sources = search.tools.map((tool) => sdk.defineTool(tool).name);
+// DuckDuckGo, arXiv and Wikipedia need no key.
+const web = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] });
+const sources = web.map((tool) => sdk.defineTool(tool).name);
 
 const study = sdk.createStudy({
   name: 'navigateur',
@@ -412,11 +416,10 @@ for (const { id, kind, name, capability } of result.report.architectures) {
 }
 console.log(await sdk.getRunCost(result.runId));
 
-await search.close();
 await eventStore.destroy();
 ```
 
-这个示例本身接受任何 MCP 搜索服务器的命令：用 `OPENAI_API_KEY=… SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=… npm run example:study` 运行它。`SEARCH_ENV` 指定服务器需要的环境变量：服务器只会得到这些变量和一个最小的环境，绝不会得到你的模型密钥。`SEARCH_TOOLS` 选择服务器的部分工具，`MODEL` 选择模型。它把档案写入 `examples/study-navigateur.md`；如果运行没有完成，它会打印原因，然后以退出码 1 退出。没有 `SEARCH_MCP` 时，它在没有来源的情况下运行：一切都仍然是假设，档案会首先说明这一点。
+用 `OPENAI_API_KEY=… npm run example:study` 运行这个示例：它不需要其他任何密钥。它也可以用一个 MCP 搜索服务器来搜索，只需给出这个服务器的命令：`SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=…` 会把该服务器的工具加入来源。`SEARCH_ENV` 指定服务器需要的环境变量：服务器只会得到这些变量和一个最小的环境，绝不会得到你的模型密钥。`SEARCH_TOOLS` 选择服务器的部分工具，`MODEL` 选择模型。它把档案写入 `examples/study-navigateur.md`；如果运行没有完成，它会打印原因，然后以退出码 1 退出。
 
 档案中可以看到：
 
@@ -478,7 +481,7 @@ report.stats;         // model calls, searches, items by status, rejections, red
 ## 研究不做什么 {#what-a-study-does-not-do}
 
 - **它不构建、不运行、也不测量任何东西。** 在你运行实验之前，它的预测都只是预测。
-- **它只知道它的来源返回的东西。** SDK 自己没有 Web 搜索；没有来源时，每条论断都是假设。
+- **它只知道它的来源返回的东西。** 没有来源时，每条论断都是假设；[Web 工具](./web-research)只读取公开的内容，并且不运行网页的 JavaScript。
 - **检查的是引用，而不是引用的内容。** 代码检查的是 `established` 论断所引用的结果确实列在写出它的那个 prompt 中，而不是这个结果说的就是论断所说的内容。档案列出了每个来源及其链接：请去阅读它们。
 - **守护者和现有技术检查都是模型的判断。** 偏离日志和现有技术说明会展示这些判断，所以你可以不同意。
 - **它读取的内容是不可信的。** 搜索结果中可能包含针对模型的指令（prompt 注入）。它们被标记为数据后才到达模型；研究只能调用它的来源，而且要经过策略；模型和来源的文本在档案中都会被转义；状态和偏离规则由代码强制执行，而不是靠 prompt。标记降低了风险，但并不能消除它。

@@ -13,7 +13,7 @@ const study = sdk.createStudy({
   objective: 'A browser design whose every choice follows from the investigation',
   leads: ['vectorisation', 'weights', 'ReLU'], // your leads: examples to verify, not truths
   analogues: ['Bitcoin'],                      // breakthroughs by assembly to deconstruct
-  sources: ['brave_web_search'],               // SDK tools the study searches with
+  sources: ['web_search', 'arxiv_search'],     // SDK tools the study searches with (webTools())
 });
 
 const result = await study.run();
@@ -161,7 +161,20 @@ await study.recordResult('M1', {
 
 ## अपने स्रोतों के ज़रिए शोध {#research-through-your-sources}
 
-SDK में कोई बिल्ट-इन वेब खोज नहीं है। अध्ययन **आपके दिए गए टूल** से खोजता है, जिन्हें आप `sources` के रूप में देते हैं: SDK टूल के नाम, आम तौर पर किसी MCP सर्वर के खोज टूल, जिन्हें [`connectMcpServer`](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) से इम्पोर्ट किया गया और `sdk.defineTool` से परिभाषित किया गया हो:
+अध्ययन **आपके दिए गए टूल** से खोजता है, जिन्हें आप `sources` के रूप में देते हैं: SDK टूल के नाम। SDK के [वेब टूल](./web-research) बिना किसी सेटअप के काम करते हैं — `web_search` (जब तक आप कोई दूसरा प्रदाता कॉन्फ़िगर न करें, DuckDuckGo), `arxiv_search`, `wikipedia_search` और `github_search` — और उनके परिणाम एक URL के साथ आते हैं, और तारीख़ पता हो तो उसके साथ भी:
+
+```ts
+import { webTools } from '@sdk-ai-agents/core';
+
+// Define the tools first: the study checks its sources when it is created.
+const sources = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] }).map(
+  (tool) => sdk.defineTool(tool).name
+);
+
+const study = sdk.createStudy({ name: 'browser', object, objective, sources });
+```
+
+कोई भी दूसरा खोज टूल भी काम करता है, उदाहरण के लिए किसी MCP सर्वर के खोज टूल, जिन्हें [`connectMcpServer`](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) से इम्पोर्ट किया गया और `sdk.defineTool` से परिभाषित किया गया हो:
 
 ```ts
 import { connectMcpServer } from '@sdk-ai-agents/core/mcp';
@@ -354,12 +367,11 @@ const unsubscribe = sdk.subscribe(listener, { agentId: study.id });
 
 ## एक पूरा उदाहरण {#a-complete-example}
 
-`examples/study.ts` 1990 से 2026 तक के वेब ब्राउज़र का अध्ययन करता है, फ़्रेंच में। यह जाँचने के लिए तीन सुराग देता है — vectorisation, weights (`poids`) और ReLU, ऐसे उदाहरण जिनके बारे में कुछ भी नहीं कहता कि वे ब्राउज़र पर लागू होते हैं — कोई क्षमता नहीं बताता, इसलिए अध्ययन संभावित क्षमताएँ प्रस्तावित करता है, और उससे Bitcoin को संयोजन से बनी सफलता के रूप में विखंडित करने को कहता है। इसका मुख्य हिस्सा, स्रोत के रूप में Brave खोज सर्वर के साथ:
+`examples/study.ts` 1990 से 2026 तक के वेब ब्राउज़र का अध्ययन करता है, फ़्रेंच में। यह जाँचने के लिए तीन सुराग देता है — vectorisation, weights (`poids`) और ReLU, ऐसे उदाहरण जिनके बारे में कुछ भी नहीं कहता कि वे ब्राउज़र पर लागू होते हैं — कोई क्षमता नहीं बताता, इसलिए अध्ययन संभावित क्षमताएँ प्रस्तावित करता है, और उससे Bitcoin को संयोजन से बनी सफलता के रूप में विखंडित करने को कहता है। इसका मुख्य हिस्सा, जो SDK के वेब टूल से वेब पर खोजता है:
 
 ```ts
 import { writeFileSync } from 'node:fs';
-import { FileEventStore, createSDK } from '@sdk-ai-agents/core';
-import { connectMcpServer } from '@sdk-ai-agents/core/mcp';
+import { FileEventStore, createSDK, webTools } from '@sdk-ai-agents/core';
 
 const eventStore = new FileEventStore('./events');
 const sdk = createSDK({
@@ -370,17 +382,9 @@ const sdk = createSDK({
 });
 
 // The study searches only with the tools you give it, run through the governed pipeline.
-const search = await connectMcpServer({
-  name: 'search',
-  transport: {
-    type: 'stdio',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-brave-search'],
-    env: { BRAVE_API_KEY: process.env.BRAVE_API_KEY ?? '' },
-  },
-  metadata: { readOnly: true },
-});
-const sources = search.tools.map((tool) => sdk.defineTool(tool).name);
+// DuckDuckGo, arXiv and Wikipedia need no key.
+const web = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] });
+const sources = web.map((tool) => sdk.defineTool(tool).name);
 
 const study = sdk.createStudy({
   name: 'navigateur',
@@ -412,11 +416,10 @@ for (const { id, kind, name, capability } of result.report.architectures) {
 }
 console.log(await sdk.getRunCost(result.runId));
 
-await search.close();
 await eventStore.destroy();
 ```
 
-उदाहरण खुद किसी भी MCP खोज सर्वर का कमांड लेता है: इसे `OPENAI_API_KEY=… SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=… npm run example:study` से चलाएँ। `SEARCH_ENV` उन variables के नाम बताता है जिनकी सर्वर को ज़रूरत है: सर्वर को वे और एक न्यूनतम environment मिलता है, आपकी मॉडल key कभी नहीं। `SEARCH_TOOLS` सर्वर के कुछ टूल चुनता है, `MODEL` मॉडल। यह डोज़ियर को `examples/study-navigateur.md` में लिखता है; जो run पूरा न हो, उसका कारण दिखाता है, और फिर कोड 1 के साथ बाहर निकलता है। `SEARCH_MCP` के बिना, यह स्रोतों के बिना चलता है: सब कुछ परिकल्पना रहता है, और डोज़ियर सबसे पहले यही बताता है।
+उदाहरण को `OPENAI_API_KEY=… npm run example:study` से चलाएँ: इसे कोई दूसरी key नहीं चाहिए। यह किसी MCP खोज सर्वर से भी खोज सकता है, जिसका कमांड आप देते हैं: `SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=…` सर्वर के टूल को स्रोतों में जोड़ता है। `SEARCH_ENV` उन variables के नाम बताता है जिनकी सर्वर को ज़रूरत है: सर्वर को वे और एक न्यूनतम environment मिलता है, आपकी मॉडल key कभी नहीं। `SEARCH_TOOLS` सर्वर के कुछ टूल चुनता है, `MODEL` मॉडल। यह डोज़ियर को `examples/study-navigateur.md` में लिखता है; जो run पूरा न हो, उसका कारण दिखाता है, और फिर कोड 1 के साथ बाहर निकलता है।
 
 डोज़ियर में क्या मिलने की उम्मीद करें:
 
@@ -478,7 +481,7 @@ report.stats;         // model calls, searches, items by status, rejections, red
 ## अध्ययन क्या नहीं करता {#what-a-study-does-not-do}
 
 - **यह कुछ नहीं बनाता, कुछ नहीं चलाता और कुछ नहीं मापता।** इसके पूर्वानुमान तब तक पूर्वानुमान ही हैं जब तक आप प्रयोग नहीं चलाते।
-- **यह सिर्फ़ वही जानता है जो इसके स्रोत लौटाते हैं।** SDK की अपनी कोई वेब खोज नहीं है; स्रोतों के बिना, हर दावा एक परिकल्पना है।
+- **यह सिर्फ़ वही जानता है जो इसके स्रोत लौटाते हैं।** स्रोतों के बिना, हर दावा एक परिकल्पना है; [वेब टूल](./web-research) सिर्फ़ वही पढ़ते हैं जो सार्वजनिक है, किसी पेज का JavaScript चलाए बिना।
 - **हवाले की जाँच होती है, उसकी सामग्री की नहीं।** कोड जाँचता है कि किसी `established` दावे का उद्धृत परिणाम उसे लिखने वाले prompt में सूचीबद्ध था, यह नहीं कि परिणाम वही कहता है जो दावा कहता है। डोज़ियर हर स्रोत को उसके link के साथ सूचीबद्ध करता है: उन्हें पढ़ें।
 - **संरक्षक और पूर्व कार्य की जाँच मॉडल के आकलन हैं।** भटकाव लॉग और पूर्व कार्य के नोट उन्हें दिखाते हैं, ताकि आप असहमत हो सकें।
 - **यह जो पढ़ता है, वह अविश्वसनीय है।** खोज के परिणामों में मॉडल को निशाना बनाने वाले निर्देश हो सकते हैं (prompt injection)। वे मॉडल तक डेटा के रूप में चिह्नित होकर पहुँचते हैं, अध्ययन सिर्फ़ अपने स्रोतों को ही, नीतियों से होकर, कॉल कर सकता है, और डोज़ियर में मॉडल और स्रोतों का टेक्स्ट escape करके लिखा जाता है; स्थितियाँ और भटकाव के नियम कोड में लागू होते हैं, prompt से नहीं। चिह्नित करना जोखिम घटाता है; उसे मिटाता नहीं।

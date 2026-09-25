@@ -502,6 +502,12 @@ Id агентов новые в каждом процессе, поэтому н
 | `cognitiveAgentTool(agent, { name?, description?, metadata?, maxInputLength?, maxContextLength?, exposeErrors? })` | `ToolDefinition` | `ask_<agent>`: `{ problem, context? }` → `{ runId, status, decisionStatus?, answer?, rationale?, confidence?, missing?, nextActions?, error? }`; отменяется вместе с вызывающей стороной; `error` — общее сообщение, если не задан `exposeErrors` |
 | `governedAgentTool(agent, options)` | `ToolDefinition` | `{ message, context? }` → `{ runId, status, output?, error? }` |
 | `assertSingleQuery(sql, 'sqlite' \| 'postgres')` | `string` | Проверка оператора, используемая адаптерами баз данных (только синтаксис SQLite и PostgreSQL) |
+| `webTools({ include?, prefix?, search?, circuitBreaker?, language?, userAgent?, timeoutMs?, maxResponseBytes?, maxRedirects?, hostIntervalMs?, robots?, allowPrivateNetwork?, lookup?, maxPdfBytes?, maxPdfPages?, cache?, retry?, arxiv?, wikipedia?, github? })` | `ToolDefinition[]` | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search`, только для чтения (`web_fetch` — средний риск, остальные — низкий). Результаты поиска `{ id, title, url, date?, excerpt, source }`; страница `{ url, finalUrl, title?, date?, language?, contentType, content, truncated, untrusted: true, hint? }`. Никаких адресов вне публичного интернета, если не задан `allowPrivateNetwork`; robots.txt соблюдается. См. [Поиск в интернете](../guide/web-research) |
+| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | `SearchProvider` | Провайдер `web_search` по умолчанию, без ключа: HTML-страница DuckDuckGo, 1,5 с между поисками |
+| `searxng({ baseUrl, engines?, categories?, minIntervalMs? })` | `SearchProvider` | JSON API экземпляра SearXNG; результаты называются `searxng:<engine>` и датируются по `publishedDate` |
+| `brave({ apiKey, baseUrl?, minIntervalMs? })`, `tavily(…)`, `serper(…)` | `SearchProvider` | API Brave Search, Tavily и Serper, с их ключом |
+| `normalizeUrl(url)` | `string \| undefined` | URL, по которому узнаётся результат поиска: без параметров отслеживания, фрагмента и завершающей косой черты; `undefined` для всего, кроме http(s) |
+| `isPublicAddress(address)` | `boolean` | Находится ли IP-адрес в публичном интернете (проверка, стоящая за `allowPrivateNetwork`) |
 
 ```ts
 interface ReadOnlyDatabase {
@@ -516,6 +522,40 @@ interface ResourceProvider {
   handles(uri: string): boolean;
   list(): Promise<Array<{ uri: string; name: string; description?: string; mimeType?: string; size?: number }>>;
   read(uri: string): Promise<{ uri: string; mimeType?: string; text: string }>;
+}
+```
+
+`web_search` опрашивает своих провайдеров по порядку; провайдер, выбросивший ошибку, передаёт очередь следующему, а тот, что выбросил `SearchThrottledError` (или дал сбой три раза подряд), пропускается на `circuitBreaker.cooldownMs` (2 минуты). Веб-инструменты выбрасывают `WebRequestRefusedError` для того, что они отклоняют намеренно (`reason`: `private-address`, `scheme`, `downgrade`, `redirects`, `robots`, `content-type`, `too-large`, `pacing`), `WebHttpError` для ответа не из 2xx (`status`) и `WebTimeoutError`; `retry` никогда не повторяет отклонённый запрос.
+
+```ts
+interface SearchProvider {
+  readonly name: string;
+  /** Send every request through `web`: timeouts, byte caps, pacing and address checks. */
+  search(request: SearchRequest, web: WebClient): Promise<SearchHit[]>;
+}
+
+interface SearchRequest {
+  query: string;
+  maxResults: number;
+  site?: string;
+  freshness?: 'day' | 'week' | 'month' | 'year';
+  language?: string;
+  signal?: AbortSignal;
+}
+
+interface SearchHit { title: string; url: string; excerpt: string; date?: string; source?: string }
+
+interface WebClient {
+  request(url: string, init?: {
+    method?: 'GET' | 'POST';
+    headers?: Record<string, string>;
+    body?: string;
+    minIntervalMs?: number;
+    signal?: AbortSignal;
+    /** The origin comes from your code (a baseUrl): it may be on this machine or the local network. */
+    configuredEndpoint?: boolean;
+    maxBytes?: number;
+  }): Promise<{ status: number; url: string; headers: Record<string, string>; body: Buffer; truncated: boolean }>;
 }
 ```
 

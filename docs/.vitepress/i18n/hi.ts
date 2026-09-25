@@ -26,6 +26,7 @@ export const text: LocaleText = {
     'guide/governed-agents': 'नियंत्रित एजेंट',
     'guide/studies': 'अध्ययन',
     'guide/typed-decisions': 'टाइप्ड निर्णय (Jev)',
+    'guide/web-research': 'वेब पर शोध',
     'guide/mcp': 'MCP आसान भाषा में',
     'guide/mcp-first-server': 'आपका पहला MCP सर्वर',
     'guide/mcp-recipes': 'किसी भी चीज़ के लिए MCP सर्वर',

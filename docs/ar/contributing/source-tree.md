@@ -25,7 +25,7 @@ sdk-ai-agents/
 │   ├── resilience/             # Retry policy and retrying provider
 │   ├── incidents/              # Incident detection and notifiers
 │   ├── mcp/                    # MCP server (tools and resources) and client
-│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents
+│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents, the Web
 │   ├── evaluators/             # Policy condition evaluation
 │   ├── errors/                 # Error classes
 │   ├── types/                  # Shared type definitions
@@ -167,7 +167,7 @@ sdk-ai-agents/
 
 ### `src/tools/` {#src-tools}
 
-**الغرض:** مصادر أدوات تبني تعريفات `ToolDefinition` من نظام ما، دون أي اعتماد على MCP: `openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts` (واجهات API على الويب)، و`folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts` (المجلدات والموارد)، و`sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts` (قواعد البيانات التي للقراءة فقط)، و`agent-tools.ts` (الوكلاء بوصفهم أدوات)، إضافة إلى `tool-names.ts` و`bounded-text.ts`.
+**الغرض:** مصادر أدوات تبني تعريفات `ToolDefinition` من نظام ما، دون أي اعتماد على MCP: `openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts` (واجهات API على الويب)، و`folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts` (المجلدات والموارد)، و`sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts` (قواعد البيانات التي للقراءة فقط)، و`agent-tools.ts` (الوكلاء بوصفهم أدوات)، إضافة إلى `tool-names.ts` و`bounded-text.ts`. ويضمّ `web/` أدوات البحث على الويب: `web-tools.ts` (`webTools`)، و`guarded-http.ts` و`ip-ranges.ts` (عميل HTTP وفحوصه للعناوين وعمليات إعادة التوجيه والحجم والوقت)، و`robots.ts` و`politeness.ts` (ملف robots.txt، وتباعد الطلبات لكل مضيف)، و`web-cache.ts`، و`results.ts` (النتائج القابلة للاستشهاد)، و`html-parser.ts` / `html-to-markdown.ts` / `html-entities.ts` (تحويل الصفحات إلى Markdown)، و`pdf-text.ts` (ملفات PDF بالحزمة الاختيارية `unpdf`)، و`web-fetch.ts`، و`search-chain.ts` و`providers/` (DuckDuckGo، وSearXNG، وBrave، وTavily، وSerper)، و`sources/` (arXiv، وWikipedia، وGitHub).
 
 ### `src/__tests__/support/` {#src-tests-support}
 

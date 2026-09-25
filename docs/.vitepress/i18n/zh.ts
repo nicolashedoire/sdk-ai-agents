@@ -26,6 +26,7 @@ export const text: LocaleText = {
     'guide/governed-agents': '受治理智能体',
     'guide/studies': '研究',
     'guide/typed-decisions': '类型化决策（Jev）',
+    'guide/web-research': 'Web 调研',
     'guide/mcp': 'MCP 通俗解释',
     'guide/mcp-first-server': '你的第一个 MCP 服务器',
     'guide/mcp-recipes': '把任何系统变成 MCP 服务器',

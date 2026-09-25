@@ -25,7 +25,7 @@ sdk-ai-agents/
 │   ├── resilience/             # Retry policy and retrying provider
 │   ├── incidents/              # Incident detection and notifiers
 │   ├── mcp/                    # MCP server (tools and resources) and client
-│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents
+│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents, the Web
 │   ├── evaluators/             # Policy condition evaluation
 │   ├── errors/                 # Error classes
 │   ├── types/                  # Shared type definitions
@@ -167,7 +167,7 @@ sdk-ai-agents/
 
 ### `src/tools/` {#src-tools}
 
-**उद्देश्य:** टूल स्रोत जो किसी सिस्टम से `ToolDefinition` बनाते हैं, MCP पर किसी निर्भरता के बिना: `openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts` (वेब API), `folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts` (फ़ोल्डर और रिसोर्स), `sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts` (केवल-पढ़ने-योग्य डेटाबेस), `agent-tools.ts` (टूल के रूप में एजेंट), और साथ में `tool-names.ts` और `bounded-text.ts`।
+**उद्देश्य:** टूल स्रोत जो किसी सिस्टम से `ToolDefinition` बनाते हैं, MCP पर किसी निर्भरता के बिना: `openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts` (वेब API), `folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts` (फ़ोल्डर और रिसोर्स), `sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts` (केवल-पढ़ने-योग्य डेटाबेस), `agent-tools.ts` (टूल के रूप में एजेंट), और साथ में `tool-names.ts` और `bounded-text.ts`। `web/` में वेब पर शोध के टूल हैं: `web-tools.ts` (`webTools`), `guarded-http.ts` और `ip-ranges.ts` (HTTP क्लाइंट और उसकी पते, redirect, आकार और समय की जाँचें), `robots.ts` और `politeness.ts` (robots.txt, हर host के लिए अनुरोधों के बीच अंतराल), `web-cache.ts`, `results.ts` (हवाला दिए जा सकने वाले परिणाम), `html-parser.ts` / `html-to-markdown.ts` / `html-entities.ts` (पेजों से Markdown), `pdf-text.ts` (वैकल्पिक `unpdf` के साथ PDF), `web-fetch.ts`, `search-chain.ts` और `providers/` (DuckDuckGo, SearXNG, Brave, Tavily, Serper), `sources/` (arXiv, Wikipedia, GitHub)।
 
 ### `src/__tests__/support/` {#src-tests-support}
 

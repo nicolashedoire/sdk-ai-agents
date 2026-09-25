@@ -9,6 +9,7 @@
 | [문서 폴더](#a-folder-of-documents) | `folderTools({ root: './handbook' })` | `list_files`, `read_file`, `search_files` (+ 리소스) |
 | [읽기 전용 데이터베이스](#a-read-only-database) | `databaseTools({ database: sqliteReadOnly(db) })` | `list_tables`, `describe_table`, `query` |
 | [에이전트](#an-agent-your-reasoning-twin) | `cognitiveAgentTool(agent)` | `ask_<agent>` |
+| [웹](./web-research) | `webTools()` | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` |
 
 MCP가 처음인가요? [5분 만에 만드는 첫 번째 MCP 서버](./mcp-first-server)부터 시작하세요. 서버를 실행하고, Inspector로 테스트하고, Claude Desktop이나 Claude Code에 연결하는 방법을 보여 줍니다. 아래의 모든 파일은 같은 방식으로 실행하고 연결합니다.
 

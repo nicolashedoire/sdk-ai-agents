@@ -9,6 +9,7 @@ Jedes Rezept macht aus einer Art von System **mit einer Zeile** einen MCP-Server
 | [Einen Dokumentenordner](#a-folder-of-documents) | `folderTools({ root: './handbook' })` | `list_files`, `read_file`, `search_files` (+ Ressourcen) |
 | [Eine Datenbank, schreibgeschützt](#a-read-only-database) | `databaseTools({ database: sqliteReadOnly(db) })` | `list_tables`, `describe_table`, `query` |
 | [Einen Agenten](#an-agent-your-reasoning-twin) | `cognitiveAgentTool(agent)` | `ask_<agent>` |
+| [Das Web](./web-research) | `webTools()` | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` |
 
 Neu bei MCP? Beginnen Sie mit [Ihr erster MCP-Server in 5 Minuten](./mcp-first-server): Dort sehen Sie, wie Sie einen Server ausführen, ihn mit dem Inspector testen und mit Claude Desktop oder Claude Code verbinden. Jede der folgenden Dateien wird auf die gleiche Weise ausgeführt und verbunden.
 

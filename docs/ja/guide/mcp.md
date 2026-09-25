@@ -161,7 +161,7 @@ await crm.close();
 
 ## 知っておくとよいこと {#good-to-know}
 
-- MCP のサポートは別のエントリーポイント `@sdk-ai-agents/core/mcp` にあるので、使わない限り、コアパッケージが `@modelcontextprotocol/sdk` を必要とすることはありません。ツールソース（`openApiTools`、`folderTools`、`databaseTools`、`cognitiveAgentTool` など）はコアパッケージにあるので、エージェントは MCP なしでもそれらを使えます。
+- MCP のサポートは別のエントリーポイント `@sdk-ai-agents/core/mcp` にあるので、使わない限り、コアパッケージが `@modelcontextprotocol/sdk` を必要とすることはありません。ツールソース（`openApiTools`、`folderTools`、`databaseTools`、`cognitiveAgentTool`、`webTools` など）はコアパッケージにあるので、エージェントは MCP なしでもそれらを使えます。
 - サーバーは公式の MCP TypeScript SDK 1.30 の上に作られており、プロトコルのリビジョン 2024-10-07、2024-11-05、2025-03-26、2025-06-18、2025-11-25 を受け付けます（その `SUPPORTED_PROTOCOL_VERSIONS`、2026-09-24 に確認）。MCP のサイトには 2026-07-28 のリビジョンも記載されています（[アーキテクチャ](https://modelcontextprotocol.io/docs/learn/architecture)、2026-09-24 に確認）が、この SDK はまだそれに対応していません。
 - この SDK が提供するのは **ツール** と **リソース** です。プロンプト、サンプリング、エリシテーションは提供していません。
 

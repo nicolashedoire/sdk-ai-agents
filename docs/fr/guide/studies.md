@@ -13,7 +13,7 @@ const study = sdk.createStudy({
   objective: 'A browser design whose every choice follows from the investigation',
   leads: ['vectorisation', 'weights', 'ReLU'], // your leads: examples to verify, not truths
   analogues: ['Bitcoin'],                      // breakthroughs by assembly to deconstruct
-  sources: ['brave_web_search'],               // SDK tools the study searches with
+  sources: ['web_search', 'arxiv_search'],     // SDK tools the study searches with (webTools())
 });
 
 const result = await study.run();
@@ -161,7 +161,20 @@ Une affirmation dont l'existant n'a pas pu être cherché ou évalué reste à v
 
 ## Chercher avec vos sources {#research-through-your-sources}
 
-Le SDK n'a pas de recherche Web intégrée. Une étude cherche avec **les outils que vous lui donnez** comme `sources` : des noms d'outils du SDK, en général les outils de recherche d'un serveur MCP importés avec [`connectMcpServer`](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) et définis avec `sdk.defineTool` :
+Une étude cherche avec **les outils que vous lui donnez** comme `sources` : des noms d'outils du SDK. Les [outils Web](./web-research) du SDK fonctionnent sans mise en place — `web_search` (DuckDuckGo tant que vous ne configurez pas un autre fournisseur), `arxiv_search`, `wikipedia_search` et `github_search` — et leurs résultats sont accompagnés d'une URL et, quand elle est connue, d'une date :
+
+```ts
+import { webTools } from '@sdk-ai-agents/core';
+
+// Define the tools first: the study checks its sources when it is created.
+const sources = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] }).map(
+  (tool) => sdk.defineTool(tool).name
+);
+
+const study = sdk.createStudy({ name: 'browser', object, objective, sources });
+```
+
+Tout autre outil de recherche convient aussi, par exemple les outils de recherche d'un serveur MCP importés avec [`connectMcpServer`](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) et définis avec `sdk.defineTool` :
 
 ```ts
 import { connectMcpServer } from '@sdk-ai-agents/core/mcp';
@@ -354,12 +367,11 @@ Une étude enregistre douze types d'événements : `study.started`, `study.pass
 
 ## Un exemple complet {#a-complete-example}
 
-`examples/study.ts` étudie le navigateur Web de 1990 à 2026, en français. Il donne trois pistes à vérifier — la vectorisation, les poids (`poids`) et ReLU, des exemples dont rien ne dit qu'ils s'appliquent à un navigateur —, ne nomme aucune capacité, si bien que l'étude propose des candidates, et lui demande de déconstruire Bitcoin comme rupture par assemblage. Son cœur, avec le serveur de recherche Brave comme source :
+`examples/study.ts` étudie le navigateur Web de 1990 à 2026, en français. Il donne trois pistes à vérifier — la vectorisation, les poids (`poids`) et ReLU, des exemples dont rien ne dit qu'ils s'appliquent à un navigateur —, ne nomme aucune capacité, si bien que l'étude propose des candidates, et lui demande de déconstruire Bitcoin comme rupture par assemblage. Son cœur, qui cherche sur le Web avec les outils Web du SDK :
 
 ```ts
 import { writeFileSync } from 'node:fs';
-import { FileEventStore, createSDK } from '@sdk-ai-agents/core';
-import { connectMcpServer } from '@sdk-ai-agents/core/mcp';
+import { FileEventStore, createSDK, webTools } from '@sdk-ai-agents/core';
 
 const eventStore = new FileEventStore('./events');
 const sdk = createSDK({
@@ -370,17 +382,9 @@ const sdk = createSDK({
 });
 
 // The study searches only with the tools you give it, run through the governed pipeline.
-const search = await connectMcpServer({
-  name: 'search',
-  transport: {
-    type: 'stdio',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-brave-search'],
-    env: { BRAVE_API_KEY: process.env.BRAVE_API_KEY ?? '' },
-  },
-  metadata: { readOnly: true },
-});
-const sources = search.tools.map((tool) => sdk.defineTool(tool).name);
+// DuckDuckGo, arXiv and Wikipedia need no key.
+const web = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] });
+const sources = web.map((tool) => sdk.defineTool(tool).name);
 
 const study = sdk.createStudy({
   name: 'navigateur',
@@ -412,11 +416,10 @@ for (const { id, kind, name, capability } of result.report.architectures) {
 }
 console.log(await sdk.getRunCost(result.runId));
 
-await search.close();
 await eventStore.destroy();
 ```
 
-L'exemple lui-même accepte la commande de n'importe quel serveur de recherche MCP : exécutez-le avec `OPENAI_API_KEY=… SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=… npm run example:study`. `SEARCH_ENV` nomme les variables dont le serveur a besoin : il reçoit celles-là et un environnement minimal, jamais votre clé de modèle. `SEARCH_TOOLS` choisit certains des outils du serveur, `MODEL` le modèle. Il écrit le dossier dans `examples/study-navigateur.md`, affiche pourquoi une exécution n'est pas allée à son terme, puis quitte avec le code 1. Sans `SEARCH_MCP`, il s'exécute sans sources : tout reste une hypothèse, et le dossier le dit en premier.
+Exécutez l'exemple avec `OPENAI_API_KEY=… npm run example:study` : il n'a besoin d'aucune autre clé. Il peut aussi chercher avec un serveur de recherche MCP, dont vous donnez la commande : `SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=…` ajoute les outils du serveur aux sources. `SEARCH_ENV` nomme les variables dont le serveur a besoin : il reçoit celles-là et un environnement minimal, jamais votre clé de modèle. `SEARCH_TOOLS` choisit certains des outils du serveur, `MODEL` le modèle. Il écrit le dossier dans `examples/study-navigateur.md`, affiche pourquoi une exécution n'est pas allée à son terme, puis quitte avec le code 1.
 
 Ce que vous trouverez dans le dossier :
 
@@ -478,7 +481,7 @@ Chaque affirmation affiche son statut et les résultats qu'elle cite (`S1, S3`),
 ## Ce qu'une étude ne fait pas {#what-a-study-does-not-do}
 
 - **Elle ne construit, n'exécute et ne mesure rien.** Ses prédictions restent des prédictions tant que vous n'avez pas mené les expériences.
-- **Elle ne sait que ce que ses sources renvoient.** Le SDK n'a pas de recherche Web propre ; sans sources, chaque affirmation est une hypothèse.
+- **Elle ne sait que ce que ses sources renvoient.** Sans sources, chaque affirmation est une hypothèse ; les [outils Web](./web-research) ne lisent que ce qui est public, sans exécuter le JavaScript d'une page.
 - **Une citation est vérifiée, pas son contenu.** Le code vérifie qu'un résultat cité par une affirmation `established` était listé dans le prompt qui l'a écrite, pas que le résultat dit ce que dit l'affirmation. Le dossier liste chaque source avec son lien : lisez-les.
 - **Le gardien et l'évaluation de l'existant sont des jugements de modèle.** Le journal de dérive et les notes sur l'existant les montrent, pour que vous puissiez les contester.
 - **Ce qu'elle lit n'est pas fiable.** Les résultats de recherche peuvent contenir des instructions destinées au modèle (injection de prompt). Ils parviennent au modèle marqués comme des données, une étude ne peut appeler que ses sources, en passant par les politiques, et le texte du modèle et celui des sources sont échappés dans le dossier ; les statuts et les règles de dérive sont imposés par le code, pas par le prompt. Le marquage réduit le risque ; il ne le supprime pas.

@@ -123,7 +123,7 @@
 | **OpenAPI** | Web API を機械が読める形で記述する標準で、アドレス、パラメーター、応答を記述します。`openapi.json` として公開されていることがよくあります。SDK はこの記述から、オペレーションごとに 1 つのツールを作ります。[Web API](./mcp-recipes#a-web-api-from-its-openapi-description) を参照してください。 |
 | **JSON Schema** | データの形（ここではツールの引数の形）を記述したもので、モデルや MCP アプリケーションはこれを読んでツールを正しく呼び出します。SDK は、あなたの Zod スキーマや OpenAPI の記述からこれを書き出します。 |
 | **読み取り専用（Read-only）** | 見ることはできても、変更はできないことです。フォルダーとデータベースのソースは、構造上、読み取り専用です。Web API はデフォルトで読み取り専用です（`GET` オペレーションのみ）。 |
-| **ツールソース（Tool source）** | あるシステムから、すぐに使えるツールを組み立てる関数です。`openApiTools`、`folderTools`、`databaseTools`、`cognitiveAgentTool` があります。1 行で MCP 経由で提供することも、自分のエージェントに渡すこともできます。[なんでも MCP サーバーにする](./mcp-recipes) を参照してください。 |
+| **ツールソース（Tool source）** | あるシステムから、すぐに使えるツールを組み立てる関数です。`openApiTools`、`folderTools`、`databaseTools`、`cognitiveAgentTool`、`webTools` があります。1 行で MCP 経由で提供することも、自分のエージェントに渡すこともできます。[なんでも MCP サーバーにする](./mcp-recipes) と [Web で調べる](./web-research) を参照してください。 |
 
 ## 本番環境での運用 {#operating-in-production}
 

@@ -161,7 +161,7 @@ await crm.close();
 
 ## 알아 두면 좋은 것 {#good-to-know}
 
-- MCP 지원은 별도 진입점인 `@sdk-ai-agents/core/mcp`에 있으므로, 이를 쓰지 않는 한 코어 패키지는 `@modelcontextprotocol/sdk`를 필요로 하지 않습니다. 도구 소스(`openApiTools`, `folderTools`, `databaseTools`, `cognitiveAgentTool`…)는 코어 패키지에 있습니다. 여러분의 에이전트는 MCP 없이도 이를 쓸 수 있습니다.
+- MCP 지원은 별도 진입점인 `@sdk-ai-agents/core/mcp`에 있으므로, 이를 쓰지 않는 한 코어 패키지는 `@modelcontextprotocol/sdk`를 필요로 하지 않습니다. 도구 소스(`openApiTools`, `folderTools`, `databaseTools`, `cognitiveAgentTool`, `webTools`…)는 코어 패키지에 있습니다. 여러분의 에이전트는 MCP 없이도 이를 쓸 수 있습니다.
 - 서버는 공식 MCP TypeScript SDK 1.30 위에 만들어졌으며, 이 SDK는 프로토콜 개정판 2024-10-07, 2024-11-05, 2025-03-26, 2025-06-18, 2025-11-25를 받아들입니다(그 `SUPPORTED_PROTOCOL_VERSIONS`, 2026-09-24 확인). MCP 사이트는 2026-07-28 개정판도 문서화하고 있지만([아키텍처](https://modelcontextprotocol.io/docs/learn/architecture), 2026-09-24 확인), 이 SDK는 아직 이를 지원하지 않습니다.
 - 이 SDK는 **도구**와 **리소스**를 제공합니다. 프롬프트, 샘플링, 엘리시테이션(elicitation)은 제공하지 않습니다.
 

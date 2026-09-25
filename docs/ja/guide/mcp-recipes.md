@@ -9,6 +9,7 @@
 | [ドキュメントのフォルダー](#a-folder-of-documents) | `folderTools({ root: './handbook' })` | `list_files`、`read_file`、`search_files`（+ リソース） |
 | [読み取り専用のデータベース](#a-read-only-database) | `databaseTools({ database: sqliteReadOnly(db) })` | `list_tables`、`describe_table`、`query` |
 | [エージェント](#an-agent-your-reasoning-twin) | `cognitiveAgentTool(agent)` | `ask_<agent>` |
+| [Web](./web-research) | `webTools()` | `web_search`、`web_fetch`、`arxiv_search`、`wikipedia_search`、`github_search` |
 
 MCP ははじめてですか？ まず [5 分ではじめての MCP サーバー](./mcp-first-server) から始めてください。サーバーを実行し、Inspector でテストし、Claude Desktop や Claude Code に接続する方法を説明しています。以下のファイルはすべて、同じ方法で実行し、接続します。
 
