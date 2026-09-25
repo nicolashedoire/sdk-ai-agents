@@ -1,6 +1,7 @@
 import { ensureOk, jsonBody } from '../guarded-http.js';
 import { siteHost } from '../results.js';
 import {
+  configuredOrigin,
   languageRegion,
   primaryLanguage,
   type SearchHit,
@@ -20,6 +21,7 @@ export function serper(options: KeyedProviderOptions): SearchProvider {
   requireKey(options.apiKey, 'serper');
   return {
     name: 'serper',
+    ...configuredOrigin(options.baseUrl),
     async search(request, web) {
       const language = primaryLanguage(request.language);
       const region = languageRegion(request.language);
@@ -39,7 +41,6 @@ export function serper(options: KeyedProviderOptions): SearchProvider {
         },
         body: JSON.stringify(body),
         minIntervalMs: options.minIntervalMs ?? 0,
-        configuredEndpoint: true,
         ...(request.signal ? { signal: request.signal } : {}),
       });
       if (response.status === 429)

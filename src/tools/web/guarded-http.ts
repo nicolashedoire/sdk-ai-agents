@@ -35,14 +35,8 @@ export interface WebRequestInit {
   body?: string;
   /** Least time between the start of two requests to this host. Default 0. */
   minIntervalMs?: number;
-  /** Aborts the request (the tool call was cancelled). */
+  /** Aborts the request (the tool call was cancelled or ran out of time). */
   signal?: AbortSignal;
-  /**
-   * The URL's origin comes from your configuration (a provider's `baseUrl`), not from the
-   * model: it may be on this machine or the local network. Redirects elsewhere are checked
-   * as usual.
-   */
-  configuredEndpoint?: boolean;
   /** Largest decoded body read, or a cap chosen from the content type. */
   maxBytes?: number | ((contentType: string) => number);
   /** Sees the answer before its body is read; throw to refuse it (nothing more is read). */
@@ -54,7 +48,10 @@ export interface WebRequestInit {
   admit?: (url: URL) => Promise<{ minIntervalMs?: number } | undefined>;
 }
 
-/** The HTTP port the providers and sources use. */
+/**
+ * The HTTP port the providers and sources use. Its checks are fixed when it is made: a
+ * request cannot lift them.
+ */
 export interface WebClient {
   request(url: string, init?: WebRequestInit): Promise<WebResponse>;
 }
@@ -92,8 +89,8 @@ const CROSS_ORIGIN_HEADERS = new Set(['accept', 'accept-language', 'user-agent']
  *   CGNAT, multicast, IPv4 inside IPv6…): IP literals are checked before connecting, and host
  *   names by the `lookup` the connection itself uses, so every address a name resolves to is
  *   checked when the connection opens (a DNS answer that changes in between cannot slip
- *   through). `allowPrivateNetwork` lifts this; a provider's configured endpoint is exempt on
- *   its own origin only;
+ *   through). `allowPrivateNetwork` lifts this; the endpoint you configured for a provider or
+ *   a source is exempt on its own origin only, for that provider's requests (`forOrigin`);
  * - a timeout per request, a byte cap on the decoded body (the rest is never downloaded),
  *   pacing per host, TLS certificates always verified.
  */
@@ -106,7 +103,20 @@ export class GuardedHttpClient implements WebClient {
   }
 
   request(rawUrl: string, init: WebRequestInit = {}): Promise<WebResponse> {
-    return this.perform(rawUrl, init, true);
+    return this.perform(rawUrl, init, { paced: true });
+  }
+
+  /**
+   * A client for a provider or a source whose endpoint you configured: requests to that
+   * origin may reach this machine or a private network (a SearXNG on `localhost`); every
+   * other origin, redirects included, is checked as usual. Without an origin, a plain client.
+   */
+  forOrigin(exemptOrigin: string | undefined): WebClient {
+    if (exemptOrigin === undefined) return this;
+    const origin = httpUrl(exemptOrigin).origin;
+    return {
+      request: (url, init) => this.perform(url, init ?? {}, { paced: true, exemptOrigin: origin }),
+    };
   }
 
   /**
@@ -114,25 +124,24 @@ export class GuardedHttpClient implements WebClient {
    * for robots.txt, which must not delay the page it is read for.
    */
   unpaced(): WebClient {
-    return { request: (url, init) => this.perform(url, init ?? {}, false) };
+    return { request: (url, init) => this.perform(url, init ?? {}, { paced: false }) };
   }
 
   private async perform(
     rawUrl: string,
     init: WebRequestInit,
-    paced: boolean
+    scope: { paced: boolean; exemptOrigin?: string }
   ): Promise<WebResponse> {
     let url = httpUrl(rawUrl);
-    const configuredOrigin = init.configuredEndpoint ? url.origin : undefined;
     let method = init.method ?? 'GET';
     let body = init.body;
     let headers: Record<string, string> = lowerKeys(init.headers ?? {});
     for (let hop = 0; ; hop++) {
-      const privateAllowed = url.origin === configuredOrigin || this.allowsPrivate(url);
+      const privateAllowed = url.origin === scope.exemptOrigin || this.allowsPrivate(url);
       checkLiteralAddress(url, privateAllowed);
       const admitted = await init.admit?.(url);
       const interval = Math.max(init.minIntervalMs ?? 0, admitted?.minIntervalMs ?? 0);
-      if (paced) await this.options.pacer.wait(url.host, interval, init.signal);
+      if (scope.paced) await this.options.pacer.wait(url.host, interval, init.signal);
       const answer = await this.send(url, method, headers, body, init, privateAllowed);
       if (answer.location === undefined) return answer.response;
       if (hop >= this.options.maxRedirects) {

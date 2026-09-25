@@ -59,7 +59,6 @@ export async function searchWikipedia(
   const response = await web.request(url.toString(), {
     headers: { accept: 'application/json' },
     minIntervalMs: options.minIntervalMs ?? 0,
-    configuredEndpoint: true,
     ...(request.signal ? { signal: request.signal } : {}),
   });
   ensureOk(response, 'Wikipedia');

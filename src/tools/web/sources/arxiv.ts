@@ -59,7 +59,6 @@ export async function searchArxiv(
   const response = await web.request(url.toString(), {
     headers: { accept: 'application/atom+xml' },
     minIntervalMs: options.minIntervalMs ?? 3_000,
-    configuredEndpoint: true,
     ...(request.signal ? { signal: request.signal } : {}),
   });
   if ([403, 406, 429, 503].includes(response.status)) {

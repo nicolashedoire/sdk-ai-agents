@@ -236,6 +236,11 @@ export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
         : [options.search]
       : [duckDuckGo()];
     const chain = new SearchChain(providers, options.circuitBreaker);
+    // Each provider's exemption is fixed here, from what it declared when it was made.
+    const clients = new Map(
+      providers.map((provider) => [provider, runtime.http.forOrigin(provider.configuredOrigin)])
+    );
+    const clientFor = (provider: SearchProvider) => clients.get(provider) ?? runtime.http;
     tools.push({
       name: prefixed(options.prefix, 'web_search'),
       description:
@@ -268,7 +273,7 @@ export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
                 ...(language ? { language } : {}),
                 signal: call.signal,
               },
-              runtime.http
+              clientFor
             );
             return {
               query: args.query,
@@ -334,6 +339,10 @@ export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
       },
     });
   }
+  // A source's endpoint is exempt only when you gave its baseUrl; the public defaults never are.
+  const arxivClient = runtime.http.forOrigin(options.arxiv?.baseUrl);
+  const githubClient = runtime.http.forOrigin(options.github?.baseUrl);
+  const wikipediaClient = runtime.http.forOrigin(fixedOrigin(options.wikipedia?.baseUrl));
   const source = <Schema extends z.ZodTypeAny>(
     name: WebToolName,
     description: string,
@@ -360,7 +369,7 @@ export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
     arxivSchema,
     async (args, signal): Promise<SourceSearchOutput<ArxivResult>> => ({
       query: args.query,
-      results: await searchArxiv(runtime.http, options.arxiv ?? {}, {
+      results: await searchArxiv(arxivClient, options.arxiv ?? {}, {
         query: args.query,
         maxResults: args.maxResults ?? 10,
         ...(signal ? { signal } : {}),
@@ -375,7 +384,7 @@ export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
     async (args, signal): Promise<SourceSearchOutput<WikipediaResult> & { language: string }> => {
       const language =
         args.language ?? options.wikipedia?.language ?? primaryWikiLanguage(options.language);
-      const found = await searchWikipedia(runtime.http, options.wikipedia ?? {}, {
+      const found = await searchWikipedia(wikipediaClient, options.wikipedia ?? {}, {
         query: args.query,
         maxResults: args.maxResults ?? 5,
         ...(language ? { language } : {}),
@@ -398,7 +407,7 @@ export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
       signal
     ): Promise<SourceSearchOutput<GithubResult> & { kind: GithubSearchKind }> => {
       const kind = args.kind ?? 'repositories';
-      const results = await searchGithub(runtime.http, options.github ?? {}, {
+      const results = await searchGithub(githubClient, options.github ?? {}, {
         query: args.query,
         kind,
         maxResults: args.maxResults ?? 10,
@@ -408,6 +417,16 @@ export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
     }
   );
   return tools;
+}
+
+/**
+ * The origin of a Wikipedia `baseUrl`, when the language does not change it: a `{language}`
+ * in the host would let the model choose the host.
+ */
+function fixedOrigin(baseUrl: string | undefined): string | undefined {
+  if (baseUrl === undefined) return undefined;
+  const one = new URL(baseUrl.replace('{language}', 'en')).origin;
+  return one === new URL(baseUrl.replace('{language}', 'fr')).origin ? one : undefined;
 }
 
 /** The Wikipedia of the tools' default language (`fr-FR` → `fr`). */

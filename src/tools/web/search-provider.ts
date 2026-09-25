@@ -34,7 +34,18 @@ export interface SearchHit {
  */
 export interface SearchProvider {
   readonly name: string;
+  /**
+   * The origin of an endpoint you configured for this provider (its `baseUrl`): its requests
+   * there may reach this machine or a private network, and nowhere else. Declared once, when
+   * the provider is made; the built-in providers set it only when you give them a `baseUrl`.
+   */
+  readonly configuredOrigin?: string;
   search(request: SearchRequest, web: WebClient): Promise<SearchHit[]>;
+}
+
+/** The `configuredOrigin` of a provider or source, from the `baseUrl` you gave it, if any. */
+export function configuredOrigin(baseUrl: string | undefined): { configuredOrigin?: string } {
+  return baseUrl === undefined ? {} : { configuredOrigin: new URL(baseUrl).origin };
 }
 
 /** An API base URL without its trailing slashes. */

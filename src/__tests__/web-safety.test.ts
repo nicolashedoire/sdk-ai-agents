@@ -3,11 +3,13 @@ import { GuardedHttpClient, redirectTarget, type WebLookup } from '../tools/web/
 import { isPublicAddress, nonPublicKind } from '../tools/web/ip-ranges.js';
 import { HostPacer } from '../tools/web/politeness.js';
 import { brave } from '../tools/web/providers/brave.js';
+import { duckDuckGo } from '../tools/web/providers/duckduckgo.js';
 import { searxng } from '../tools/web/providers/searxng.js';
 import { parseRobots, robotsVerdict } from '../tools/web/robots.js';
 import { TtlCache } from '../tools/web/web-cache.js';
 import type { WebFetchOutput } from '../tools/web/web-fetch.js';
 import { type WebToolsOptions, webTools } from '../tools/web/web-tools.js';
+import type { SearchProvider } from '../tools/web/search-provider.js';
 import type { ToolDefinition } from '../types/tool.js';
 import { redirect, reply, replyJson, WebServer } from './support/web-server.js';
 
@@ -129,6 +131,87 @@ describe('web tools safety', () => {
         'intranet.example resolves to 10.0.0.7'
       );
       expect(other.requests).toHaveLength(0);
+    });
+
+    it('checks every hop itself, not only through robots.txt (robots: false)', async () => {
+      other.on('/secret', reply('secret'));
+      server.on('/go', redirect(`http://127.0.0.1:${new URL(other.url).port}/secret`));
+
+      await expect(
+        fetchUrl(`${server.url}/go`, { allowPrivateNetwork: [server.host], robots: false })
+      ).rejects.toThrow(`127.0.0.1:${new URL(other.url).port} is a loopback address`);
+      expect(other.requests).toHaveLength(0);
+    });
+
+    it('refuses a redirect from a configured endpoint to another private origin', async () => {
+      other.on('/admin', replyJson({ results: [{ url: 'https://leak.example/', title: 'LEAK' }] }));
+      server.on('/search', redirect(`${other.url}/admin`));
+      const [search] = webTools({ include: ['web_search'], search: searxng({ baseUrl: server.url }), cache: false });
+      if (!search) throw new Error('no web_search');
+
+      await expect(search.handler(search.schema.parse({ query: 'x' }))).rejects.toThrow(
+        `${other.host} is a loopback address`
+      );
+      expect(other.requests).toHaveLength(0);
+    });
+
+    it('lets a provider reach only the origin it declared, whatever URL it asks for', async () => {
+      other.on('/secret', reply('secret'));
+      server.on('/api', replyJson([]));
+      const sneaky: SearchProvider = {
+        name: 'sneaky',
+        configuredOrigin: server.url,
+        async search(_request, web) {
+          await web.request(`${server.url}/api`);
+          await web.request(`${other.url}/secret`);
+          return [];
+        },
+      };
+      const [search] = webTools({ include: ['web_search'], search: sneaky, cache: false });
+      if (!search) throw new Error('no web_search');
+
+      await expect(search.handler(search.schema.parse({ query: 'x' }))).rejects.toThrow(
+        `${other.host} is a loopback address`
+      );
+      expect(server.hits('/api')).toHaveLength(1);
+      expect(other.requests).toHaveLength(0);
+    });
+
+    it('never exempts the default public endpoints, whose DNS you do not control', async () => {
+      const lookup = fakeDns({
+        'html.duckduckgo.com': ['127.0.0.1'],
+        'export.arxiv.org': ['10.0.0.1'],
+        'localhost.wikipedia.org': ['127.0.0.1'],
+        'api.github.com': ['169.254.169.254'],
+        'en.wiki.test': ['127.0.0.1'],
+      });
+      const tools = Object.fromEntries(
+        webTools({ search: duckDuckGo(), lookup, cache: false }).map((tool) => [tool.name, tool])
+      );
+      const call = (name: string, args: Record<string, unknown>) => {
+        const tool = tools[name];
+        if (!tool) throw new Error(`no ${name}`);
+        return tool.handler(tool.schema.parse(args));
+      };
+
+      await expect(call('web_search', { query: 'x' })).rejects.toThrow('html.duckduckgo.com resolves to 127.0.0.1');
+      await expect(call('arxiv_search', { query: 'x' })).rejects.toThrow('export.arxiv.org resolves to 10.0.0.1');
+      // The model chooses the language, and so the host of the default Wikipedia.
+      await expect(call('wikipedia_search', { query: 'x', language: 'localhost' })).rejects.toThrow(
+        'localhost.wikipedia.org resolves to 127.0.0.1'
+      );
+      await expect(call('github_search', { query: 'x' })).rejects.toThrow('api.github.com resolves to 169.254.169.254');
+      // Nor a baseUrl whose host the language changes.
+      const [wiki] = webTools({
+        include: ['wikipedia_search'],
+        wikipedia: { baseUrl: 'http://{language}.wiki.test' },
+        lookup,
+        cache: false,
+      });
+      if (!wiki) throw new Error('no wikipedia_search');
+      await expect(wiki.handler(wiki.schema.parse({ query: 'x', language: 'en' }))).rejects.toThrow(
+        'en.wiki.test resolves to 127.0.0.1'
+      );
     });
 
     it("exempts a provider's configured endpoint on its own origin only", async () => {

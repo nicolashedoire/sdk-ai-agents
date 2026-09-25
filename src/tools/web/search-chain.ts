@@ -50,9 +50,10 @@ export class SearchChain {
     return this.providers.map((provider) => provider.name);
   }
 
+  /** `clientFor` gives each provider its HTTP client (with its `configuredOrigin`, if any). */
   async search(
     request: SearchRequest,
-    web: WebClient
+    clientFor: (provider: SearchProvider) => WebClient
   ): Promise<{ provider: string; hits: SearchHit[]; errors: ProviderFailure[] }> {
     const errors: ProviderFailure[] = [];
     for (const provider of this.providers) {
@@ -66,7 +67,7 @@ export class SearchChain {
         continue;
       }
       try {
-        const hits = await provider.search(request, web);
+        const hits = await provider.search(request, clientFor(provider));
         breaker.failures = 0;
         breaker.openUntil = 0;
         return { provider: provider.name, hits, errors };

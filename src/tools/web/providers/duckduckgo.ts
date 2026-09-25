@@ -2,6 +2,7 @@ import { bodyText, ensureOk } from '../guarded-http.js';
 import { htmlToLine } from '../html-entities.js';
 import { siteHost } from '../results.js';
 import {
+  configuredOrigin,
   languageRegion,
   primaryLanguage,
   type SearchHit,
@@ -49,6 +50,7 @@ export function duckDuckGo(options: DuckDuckGoOptions = {}): SearchProvider {
   const minIntervalMs = options.minIntervalMs ?? 1_500;
   return {
     name: 'duckduckgo',
+    ...configuredOrigin(options.baseUrl),
     async search(request, web) {
       const query = request.site
         ? `${request.query} site:${siteHost(request.site)}`
@@ -68,7 +70,6 @@ export function duckDuckGo(options: DuckDuckGoOptions = {}): SearchProvider {
           },
           body: form.toString(),
           minIntervalMs,
-          configuredEndpoint: true,
           ...(request.signal ? { signal: request.signal } : {}),
         });
         if (response.status === 403 || response.status === 429) {

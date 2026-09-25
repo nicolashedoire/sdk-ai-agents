@@ -1,6 +1,11 @@
 import { ensureOk, jsonBody } from '../guarded-http.js';
 import { siteHost } from '../results.js';
-import { type SearchHit, type SearchProvider, trimBase } from '../search-provider.js';
+import {
+  configuredOrigin,
+  type SearchHit,
+  type SearchProvider,
+  trimBase,
+} from '../search-provider.js';
 import { SearchThrottledError } from '../web-errors.js';
 import { type KeyedProviderOptions, requireKey } from './brave.js';
 import { listOf, text } from '../json-fields.js';
@@ -14,6 +19,7 @@ export function tavily(options: KeyedProviderOptions): SearchProvider {
   requireKey(options.apiKey, 'tavily');
   return {
     name: 'tavily',
+    ...configuredOrigin(options.baseUrl),
     async search(request, web) {
       const body = {
         query: request.query,
@@ -32,7 +38,6 @@ export function tavily(options: KeyedProviderOptions): SearchProvider {
         },
         body: JSON.stringify(body),
         minIntervalMs: options.minIntervalMs ?? 0,
-        configuredEndpoint: true,
         ...(request.signal ? { signal: request.signal } : {}),
       });
       if (response.status === 429 || response.status === 432 || response.status === 433) {

@@ -1,7 +1,12 @@
 import { ensureOk, jsonBody } from '../guarded-http.js';
 import { htmlToLine } from '../html-entities.js';
 import { siteHost } from '../results.js';
-import { type SearchHit, type SearchProvider, trimBase } from '../search-provider.js';
+import {
+  configuredOrigin,
+  type SearchHit,
+  type SearchProvider,
+  trimBase,
+} from '../search-provider.js';
 import { SearchThrottledError, WebHttpError } from '../web-errors.js';
 import { listOf, text, valuesOf } from '../json-fields.js';
 
@@ -24,6 +29,7 @@ export function searxng(options: SearxngOptions): SearchProvider {
   const base = trimBase(options.baseUrl);
   return {
     name: 'searxng',
+    ...configuredOrigin(options.baseUrl),
     async search(request, web) {
       const url = new URL(`${base}/search`);
       const query = request.site
@@ -41,7 +47,6 @@ export function searxng(options: SearxngOptions): SearchProvider {
       const response = await web.request(url.toString(), {
         headers: { accept: 'application/json' },
         minIntervalMs: options.minIntervalMs ?? 0,
-        configuredEndpoint: true,
         ...(request.signal ? { signal: request.signal } : {}),
       });
       if (response.status === 429)

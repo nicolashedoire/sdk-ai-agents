@@ -395,6 +395,7 @@ export { normalizeUrl } from './tools/web/results.js';
 export type { WebResult } from './tools/web/results.js';
 export {
   SearchThrottledError,
+  WebConfigurationError,
   WebHttpError,
   WebRequestRefusedError,
   WebTimeoutError,

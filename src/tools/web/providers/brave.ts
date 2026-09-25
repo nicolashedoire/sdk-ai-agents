@@ -2,6 +2,7 @@ import { ensureOk, jsonBody } from '../guarded-http.js';
 import { htmlToLine } from '../html-entities.js';
 import { siteHost } from '../results.js';
 import {
+  configuredOrigin,
   primaryLanguage,
   type SearchHit,
   type SearchProvider,
@@ -31,6 +32,7 @@ export function brave(options: KeyedProviderOptions): SearchProvider {
   requireKey(options.apiKey, 'brave');
   return {
     name: 'brave',
+    ...configuredOrigin(options.baseUrl),
     async search(request, web) {
       const url = new URL(`${base}/res/v1/web/search`);
       const query = request.site
@@ -44,7 +46,6 @@ export function brave(options: KeyedProviderOptions): SearchProvider {
       const response = await web.request(url.toString(), {
         headers: { accept: 'application/json', 'x-subscription-token': options.apiKey },
         minIntervalMs: options.minIntervalMs ?? 1_000,
-        configuredEndpoint: true,
         ...(request.signal ? { signal: request.signal } : {}),
       });
       if (response.status === 429)

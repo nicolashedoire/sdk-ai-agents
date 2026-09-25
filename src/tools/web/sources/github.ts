@@ -67,7 +67,6 @@ export async function searchGithub(
       ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
     },
     minIntervalMs: options.minIntervalMs ?? 0,
-    configuredEndpoint: true,
     ...(request.signal ? { signal: request.signal } : {}),
   });
   ensureGithubOk(response, Boolean(options.token));
