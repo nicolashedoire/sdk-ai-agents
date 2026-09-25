@@ -246,7 +246,7 @@ Accepted amendments (subordinate to the objective):
 
 REMINDER
 This step must produce: at least two architectures, at least one aiming at a new capability, …
-Out of scope: anything that serves neither the objective nor the needs.
+Out of scope: anything that does not serve the objective (the needs are priorities, not the only topics).
 The aim is a new capability, not only a speed-up: none named; propose candidates: what a change of principle would make possible that is difficult today, not only faster.
 Write every text value in English (en). Reply with the JSON object only.
 Objective: A browser design whose every choice follows from the investigation
@@ -260,7 +260,7 @@ Every item must carry `servesObjective`: in one sentence, which part of the obje
 
 ### The guardian
 
-After each passage, a separate call — **the guardian** — sees only the charter, the accepted amendments and the items of that passage: not the task, not the earlier records, not the searches. It runs at temperature 0 and judges each item on its own: on the objective or not, and why. For the design, it also sees each architecture's mechanism, components and assembly, and judges whether it opens a new capability (see [Capability, principle, mechanism](#capability-principle-mechanism)).
+After each passage, a separate call — **the guardian** — sees only the charter, the accepted amendments and the items of that passage: not the task, not the earlier records, not the searches. It runs at temperature 0 and judges each item on its own: on the objective or not, and why. For the design, it also sees each architecture's mechanism, components and assembly, and judges whether it opens a new capability (see [Capability, principle, mechanism](#capability-principle-mechanism)). The needs of the charter are priorities, not a closed list of topics: an aspect of the object the charter does not name — its security, its energy use — is on the objective when it serves the redesign; what serves another goal, such as a launch plan, is not.
 
 - An item off the objective is removed and logged in the **drift log** (`by: 'guardian'`), with the reason, and recorded as a `study.drift_rejected` event.
 - **It fails closed.** Only a verdict with a true or false `onObjective` counts. An item left without one stays `unchecked`: it stays in the report, flagged (notice `uncheckedItems`), but never reaches a later prompt, and the next run has the guardian judge it first. A guardian that judges none of a passage's items fails the run. When a repair cannot be used, or the provider fails on it, the first reply is read leniently instead: its valid verdicts count, and the items without one stay unchecked (`usedAttempt: 1` on `study.model_called` when the repair was answered). A stop — a limit, a cancellation — still stops the run.

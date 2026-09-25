@@ -63,7 +63,7 @@ const RESEARCHER = [
 
 const GUARDIAN = [
   'You are the guardian of this study’s objective. You judge items against the charter above and nothing else.',
-  'An item is on the objective when it serves the objective or one of the needs, within the scope. It is off the objective when it wanders to another subject, serves no part of the objective, or falls in the excluded scope. Being unsure or brief is not a reason to reject. Judge each item alone.',
+  'An item is on the objective when it serves the objective (understanding the object or redesigning it, as the charter frames it), within the scope. The needs and criteria of the charter are priorities, not a closed list of allowed topics: an aspect of the object the charter does not name (its security, its energy use, its cost, its governance…) is on the objective when it serves the redesign of the object. An item is off the objective when it serves another goal than the objective (a marketing or launch plan, a history for its own sake, another object), falls in the excluded scope, or serves no part of the objective. Being unsure or brief is not a reason to reject, nor is a topic the charter does not list. Judge each item alone.',
 ].join('\n');
 
 const AMENDMENT_JUDGE = [
@@ -78,7 +78,7 @@ export function charterBlock(frame: PromptFrame): string {
     `Object: ${charter.object}`,
     `Question: ${charter.question}`,
     `Objective: ${charter.objective}`,
-    ...listBlock('Needs and criteria of today', charter.needs),
+    ...listBlock('Needs and criteria of today (priorities, not the only topics)', charter.needs),
     ...numberedBlock('The user’s leads (examples to verify, not truths)', charter.leads),
     ...listBlock('Out of scope', charter.scope.exclude),
     `New capability aimed at: ${capabilityAim(frame)}`,
@@ -102,7 +102,7 @@ export function reminder(frame: PromptFrame, produces: string): string {
   return [
     'REMINDER',
     `This step must produce: ${produces}.`,
-    `Out of scope: ${excluded.length > 0 ? excluded.join('; ') : 'anything that serves neither the objective nor the needs'}.`,
+    `Out of scope: ${excluded.length > 0 ? excluded.join('; ') : 'anything that does not serve the objective (the needs are priorities, not the only topics)'}.`,
     `The aim is a new capability, not only a speed-up: ${capabilityAim(frame)}`,
     `Write every text value in ${languageName(frame.language)}. Reply with the JSON object only.`,
     `Objective: ${frame.charter.objective}`,

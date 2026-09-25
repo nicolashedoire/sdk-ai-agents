@@ -246,7 +246,7 @@ Accepted amendments (subordinate to the objective):
 
 REMINDER
 This step must produce: at least two architectures, at least one aiming at a new capability, …
-Out of scope: anything that serves neither the objective nor the needs.
+Out of scope: anything that does not serve the objective (the needs are priorities, not the only topics).
 The aim is a new capability, not only a speed-up: none named; propose candidates: what a change of principle would make possible that is difficult today, not only faster.
 Write every text value in English (en). Reply with the JSON object only.
 Objective: A browser design whose every choice follows from the investigation
@@ -260,7 +260,7 @@ Cada elemento debe llevar `servesObjective`: en una frase, a qué parte del obje
 
 ### El guardián {#the-guardian}
 
-Después de cada pasaje, una llamada aparte — **el guardián** — ve solo la carta, las enmiendas aceptadas y los elementos de ese pasaje: ni la tarea, ni los registros anteriores, ni las búsquedas. Se ejecuta a temperatura 0 y juzga cada elemento por separado: si está en el objetivo o no, y por qué. En el diseño, también ve el mecanismo, los componentes y el ensamblaje de cada arquitectura, y juzga si abre una nueva capacidad (consulta [Capacidad, principio, mecanismo](#capability-principle-mechanism)).
+Después de cada pasaje, una llamada aparte — **el guardián** — ve solo la carta, las enmiendas aceptadas y los elementos de ese pasaje: ni la tarea, ni los registros anteriores, ni las búsquedas. Se ejecuta a temperatura 0 y juzga cada elemento por separado: si está en el objetivo o no, y por qué. En el diseño, también ve el mecanismo, los componentes y el ensamblaje de cada arquitectura, y juzga si abre una nueva capacidad (consulta [Capacidad, principio, mecanismo](#capability-principle-mechanism)). Las necesidades de la carta son prioridades, no una lista cerrada de temas: un aspecto del objeto que la carta no nombra —su seguridad, su consumo de energía— está en el objetivo si sirve al rediseño; lo que sirve a otro fin, como un plan de lanzamiento, no lo está.
 
 - Un elemento fuera del objetivo se elimina y se anota en el **registro de desvíos** (`by: 'guardian'`), con el motivo, y se registra como un evento `study.drift_rejected`.
 - **Ante la duda, bloquea.** Solo cuenta un veredicto con un `onObjective` verdadero o falso. Un elemento que se queda sin él sigue `unchecked`: permanece en el informe, señalado (aviso `uncheckedItems`), pero nunca llega a un prompt posterior, y la siguiente ejecución hace que el guardián lo juzgue primero. Un guardián que no juzga ninguno de los elementos de un pasaje hace fallar la ejecución. Cuando no se puede usar una reparación, o el proveedor falla en ella, se lee en su lugar la primera respuesta, con tolerancia: sus veredictos válidos cuentan, y los elementos que no tienen ninguno quedan sin juzgar (`usedAttempt: 1` en `study.model_called` cuando la reparación obtuvo respuesta). Una detención (un límite, una cancelación) sigue deteniendo la ejecución.

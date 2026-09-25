@@ -246,7 +246,7 @@ Accepted amendments (subordinate to the objective):
 
 REMINDER
 This step must produce: at least two architectures, at least one aiming at a new capability, …
-Out of scope: anything that serves neither the objective nor the needs.
+Out of scope: anything that does not serve the objective (the needs are priorities, not the only topics).
 The aim is a new capability, not only a speed-up: none named; propose candidates: what a change of principle would make possible that is difficult today, not only faster.
 Write every text value in English (en). Reply with the JSON object only.
 Objective: A browser design whose every choice follows from the investigation
@@ -260,7 +260,7 @@ Objective: A browser design whose every choice follows from the investigation
 
 ### Страж {#the-guardian}
 
-После каждого этапа отдельный вызов — **страж** — видит только устав, принятые дополнения и элементы этого этапа: ни задачи, ни предыдущих записей, ни поисков. Он работает при температуре 0 и оценивает каждый элемент по отдельности: соответствует ли он цели и почему. Для проектирования он также видит механизм, компоненты и сборку каждой архитектуры и оценивает, открывает ли она новую возможность (см. [Возможность, принцип, механизм](#capability-principle-mechanism)).
+После каждого этапа отдельный вызов — **страж** — видит только устав, принятые дополнения и элементы этого этапа: ни задачи, ни предыдущих записей, ни поисков. Он работает при температуре 0 и оценивает каждый элемент по отдельности: соответствует ли он цели и почему. Для проектирования он также видит механизм, компоненты и сборку каждой архитектуры и оценивает, открывает ли она новую возможность (см. [Возможность, принцип, механизм](#capability-principle-mechanism)). Потребности устава — это приоритеты, а не закрытый список тем: аспект объекта, который устав не называет (его безопасность, энергопотребление), соответствует цели, если служит перепроектированию; то, что служит другой цели, например план запуска, — нет.
 
 - Элемент, уходящий от цели, удаляется и записывается в **журнал дрейфа** (`by: 'guardian'`) с причиной, а также как событие `study.drift_rejected`.
 - **Без вердикта он не пропускает** (fail closed). Учитывается только вердикт, в котором `onObjective` равно true или false. Элемент, оставшийся без такого вердикта, остаётся `unchecked`: он остаётся в отчёте с пометкой (предупреждение `uncheckedItems`), но никогда не попадает в последующий промпт, а следующий запуск первым делом отдаёт его на оценку стражу. Страж, который не оценил ни одного элемента этапа, приводит запуск к неудаче. Если исправление не удалось использовать или провайдер на нём дал сбой, вместо него используется первый ответ, прочитанный менее строго: его корректные вердикты учитываются, а элементы без вердикта остаются неоценёнными (`usedAttempt: 1` в `study.model_called`, если на исправление пришёл ответ). Остановка — лимит, отмена — по-прежнему останавливает запуск.

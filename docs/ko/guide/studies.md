@@ -246,7 +246,7 @@ Accepted amendments (subordinate to the objective):
 
 REMINDER
 This step must produce: at least two architectures, at least one aiming at a new capability, …
-Out of scope: anything that serves neither the objective nor the needs.
+Out of scope: anything that does not serve the objective (the needs are priorities, not the only topics).
 The aim is a new capability, not only a speed-up: none named; propose candidates: what a change of principle would make possible that is difficult today, not only faster.
 Write every text value in English (en). Reply with the JSON object only.
 Objective: A browser design whose every choice follows from the investigation
@@ -260,7 +260,7 @@ Objective: A browser design whose every choice follows from the investigation
 
 ### 감시자 {#the-guardian}
 
-각 과정이 끝나면 별도의 호출인 **감시자**가 헌장, 수락된 개정안, 그리고 그 과정의 항목만 봅니다. 과제도, 앞선 레코드도, 검색도 보지 않습니다. 감시자는 온도 0으로 실행되며, 각 항목을 따로따로 판단합니다. 목표에 맞는지 아닌지, 그리고 그 이유입니다. 설계에 대해서는 각 아키텍처의 메커니즘, 구성 요소, 결합도 보고, 그 아키텍처가 새로운 역량을 여는지 판단합니다([역량, 원리, 메커니즘](#capability-principle-mechanism) 참고).
+각 과정이 끝나면 별도의 호출인 **감시자**가 헌장, 수락된 개정안, 그리고 그 과정의 항목만 봅니다. 과제도, 앞선 레코드도, 검색도 보지 않습니다. 감시자는 온도 0으로 실행되며, 각 항목을 따로따로 판단합니다. 목표에 맞는지 아닌지, 그리고 그 이유입니다. 설계에 대해서는 각 아키텍처의 메커니즘, 구성 요소, 결합도 보고, 그 아키텍처가 새로운 역량을 여는지 판단합니다([역량, 원리, 메커니즘](#capability-principle-mechanism) 참고). 헌장의 요구 사항은 우선순위일 뿐, 다룰 수 있는 주제의 닫힌 목록이 아닙니다. 헌장이 언급하지 않은 대상의 측면(보안, 에너지 사용 등)도 재설계에 도움이 되면 목표에 맞습니다. 출시 계획처럼 다른 목적에 봉사하는 것은 목표에 맞지 않습니다.
 
 - 목표를 벗어난 항목은 제거되어 이유와 함께 **이탈 기록**에 남고(`by: 'guardian'`), `study.drift_rejected` 이벤트로 기록됩니다.
 - **실패 시 차단 방식입니다.** `onObjective`가 true 또는 false인 판정만 인정됩니다. 그런 판정을 받지 못한 항목은 `unchecked`로 남습니다. 보고서에는 표시된 채 남지만(주의 사항 `uncheckedItems`) 이후의 프롬프트에는 절대 들어가지 않으며, 다음 실행에서 감시자가 가장 먼저 그것을 판단합니다. 과정의 항목을 하나도 판단하지 못한 감시자는 실행을 실패시킵니다. 수정을 쓸 수 없거나 프로바이더가 수정에서 실패하면, 대신 첫 응답을 관대하게 읽습니다. 그 응답의 유효한 판정은 인정되고, 판정을 받지 못한 항목은 판단되지 않은 채로 남습니다(수정에 응답이 있었다면 `study.model_called`의 `usedAttempt: 1`). 중지(한도, 취소)는 여전히 실행을 멈춥니다.

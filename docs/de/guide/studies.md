@@ -246,7 +246,7 @@ Accepted amendments (subordinate to the objective):
 
 REMINDER
 This step must produce: at least two architectures, at least one aiming at a new capability, …
-Out of scope: anything that serves neither the objective nor the needs.
+Out of scope: anything that does not serve the objective (the needs are priorities, not the only topics).
 The aim is a new capability, not only a speed-up: none named; propose candidates: what a change of principle would make possible that is difficult today, not only faster.
 Write every text value in English (en). Reply with the JSON object only.
 Objective: A browser design whose every choice follows from the investigation
@@ -260,7 +260,7 @@ Jedes Element muss `servesObjective` tragen: in einem Satz, welchem Teil des Zie
 
 ### Der Wächter {#the-guardian}
 
-Nach jeder Phase sieht ein separater Aufruf – **der Wächter** – nur die Charta, die angenommenen Nachträge und die Elemente dieser Phase: nicht die Aufgabe, nicht die früheren Datensätze, nicht die Suchen. Er läuft mit Temperatur 0 und beurteilt jedes Element für sich: beim Ziel oder nicht, und warum. Beim Entwurf sieht er außerdem den Mechanismus, die Komponenten und die Zusammensetzung jeder Architektur und beurteilt, ob sie eine neue Fähigkeit eröffnet (siehe [Fähigkeit, Prinzip, Mechanismus](#capability-principle-mechanism)).
+Nach jeder Phase sieht ein separater Aufruf – **der Wächter** – nur die Charta, die angenommenen Nachträge und die Elemente dieser Phase: nicht die Aufgabe, nicht die früheren Datensätze, nicht die Suchen. Er läuft mit Temperatur 0 und beurteilt jedes Element für sich: beim Ziel oder nicht, und warum. Beim Entwurf sieht er außerdem den Mechanismus, die Komponenten und die Zusammensetzung jeder Architektur und beurteilt, ob sie eine neue Fähigkeit eröffnet (siehe [Fähigkeit, Prinzip, Mechanismus](#capability-principle-mechanism)). Die Bedürfnisse der Charta sind Prioritäten, keine abschließende Liste von Themen: Ein Aspekt des Objekts, den die Charta nicht nennt – seine Sicherheit, sein Energieverbrauch –, dient dem Ziel, wenn er der Neugestaltung dient; was einem anderen Zweck dient, etwa ein Einführungsplan, nicht.
 
 - Ein Element, das vom Ziel abweicht, wird entfernt, mit der Begründung im **Drift-Protokoll** vermerkt (`by: 'guardian'`) und als Ereignis `study.drift_rejected` aufgezeichnet.
 - **Im Zweifel blockiert er.** Nur ein Urteil, dessen `onObjective` true oder false ist, zählt. Ein Element, das keines erhalten hat, bleibt `unchecked`: Es bleibt im Bericht und wird gekennzeichnet (Hinweis `uncheckedItems`), erreicht aber nie einen späteren Prompt, und der nächste Lauf lässt es zuerst vom Wächter beurteilen. Ein Wächter, der keines der Elemente einer Phase beurteilt, lässt den Lauf fehlschlagen. Kann eine Reparatur nicht verwendet werden oder scheitert der Anbieter an ihr, wird stattdessen die erste Antwort tolerant gelesen: Ihre gültigen Urteile zählen, und die Elemente ohne Urteil bleiben unbeurteilt (`usedAttempt: 1` in `study.model_called`, wenn die Reparatur beantwortet wurde). Ein Stopp – ein Limit, ein Abbruch – beendet den Lauf weiterhin.

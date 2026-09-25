@@ -246,7 +246,7 @@ Accepted amendments (subordinate to the objective):
 
 REMINDER
 This step must produce: at least two architectures, at least one aiming at a new capability, …
-Out of scope: anything that serves neither the objective nor the needs.
+Out of scope: anything that does not serve the objective (the needs are priorities, not the only topics).
 The aim is a new capability, not only a speed-up: none named; propose candidates: what a change of principle would make possible that is difficult today, not only faster.
 Write every text value in English (en). Reply with the JSON object only.
 Objective: A browser design whose every choice follows from the investigation
@@ -260,7 +260,7 @@ Objective: A browser design whose every choice follows from the investigation
 
 ### संरक्षक {#the-guardian}
 
-हर चरण के बाद एक अलग कॉल होती है — **संरक्षक** — जो सिर्फ़ चार्टर, स्वीकार किए गए संशोधन और उस चरण के आइटम देखता है: न चरण का काम, न पहले के रिकॉर्ड, न खोजें। यह temperature 0 पर चलता है और हर आइटम को अलग से परखता है: वह उद्देश्य पर है या नहीं, और क्यों। डिज़ाइन के लिए, यह हर आर्किटेक्चर का तंत्र, घटक और संयोजन भी देखता है, और परखता है कि वह कोई नई क्षमता खोलता है या नहीं (देखें [क्षमता, सिद्धांत, तंत्र](#capability-principle-mechanism))।
+हर चरण के बाद एक अलग कॉल होती है — **संरक्षक** — जो सिर्फ़ चार्टर, स्वीकार किए गए संशोधन और उस चरण के आइटम देखता है: न चरण का काम, न पहले के रिकॉर्ड, न खोजें। यह temperature 0 पर चलता है और हर आइटम को अलग से परखता है: वह उद्देश्य पर है या नहीं, और क्यों। डिज़ाइन के लिए, यह हर आर्किटेक्चर का तंत्र, घटक और संयोजन भी देखता है, और परखता है कि वह कोई नई क्षमता खोलता है या नहीं (देखें [क्षमता, सिद्धांत, तंत्र](#capability-principle-mechanism))। चार्टर की ज़रूरतें प्राथमिकताएँ हैं, विषयों की कोई बंद सूची नहीं: वस्तु का कोई पहलू जिसे चार्टर नहीं गिनाता — उसकी सुरक्षा, उसकी ऊर्जा खपत — उद्देश्य पर है अगर वह पुनर्रचना में मदद करता है; जो किसी और लक्ष्य की सेवा करता है, जैसे लॉन्च योजना, वह नहीं।
 
 - उद्देश्य से भटका हुआ आइटम हटा दिया जाता है और कारण के साथ **भटकाव लॉग** (`by: 'guardian'`) में दर्ज होता है, और एक `study.drift_rejected` इवेंट के रूप में भी दर्ज होता है।
 - **चूक होने पर यह रास्ता बंद रखता है (fails closed)।** सिर्फ़ वही फ़ैसला गिना जाता है जिसमें `onObjective` true या false हो। जिस आइटम को ऐसा फ़ैसला न मिले, वह `unchecked` रहता है: वह रिपोर्ट में रहता है, चिह्नित (सूचना `uncheckedItems`), पर किसी बाद के prompt तक कभी नहीं पहुँचता, और अगला run सबसे पहले संरक्षक से उसे परखवाता है। जो संरक्षक किसी चरण के एक भी आइटम को नहीं परखता, वह run को विफल कर देता है। जब किसी सुधार का इस्तेमाल न हो सके, या प्रदाता उस पर विफल हो जाए, तो उसकी जगह पहला जवाब नरमी से पढ़ा जाता है: उसके वैध फ़ैसले गिने जाते हैं, और जिन आइटमों को फ़ैसला नहीं मिला वे बिना परखे रहते हैं (`study.model_called` पर `usedAttempt: 1`, जब सुधार का जवाब मिला हो)। कोई रोक — कोई सीमा या रद्द करना — तब भी run को रोक देती है।
