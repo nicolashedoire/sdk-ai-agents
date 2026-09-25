@@ -291,7 +291,7 @@ interface StudyTrace {
 | `StudyAnalogue` | `breakthrough`、`named?`（它所拆解的章程中那项突破的编号）、`domain?`、`date?`、`components`（两个或更多 `{ name, date? }`）、`liftedConstraint`、`capability`、`pattern` |
 | `StudyConstraint` | `constraint`、`state`（`remains`、`weakened`、`newRequirement`）、`piece?` |
 | `StudyRevisableDecision` | `decision`、`because`（改变了的条件）、`opens` |
-| `StudyCombination` | `a`、`b`、`enables`（A 让 B 能做什么）、`exchange`、`cost`、`changes`（`representation`、`distribution`、`responsibilities`） |
+| `StudyCombination` | `a`、`b`、`enables`（A 让 B 能做什么）、`exchange`、`cost`、`changes`（`representation`、`distribution`、`responsibilities`、`trust`、`verification`、`other`） |
 | `StudyCapability` | `capability`、`forWhom`、`hardToday`、`principle?` |
 | `StudyArchitecture` | `name`、`kind`（`capability` 或 `improvement`）、`declaredKind?` 和 `kindReason?`（守护者判定只是更快或更便宜的能力）、`capability`（`what`、`forWhom`、`liftedConstraint`）、`principleChange?`（`principle`：`representation`、`distribution`、`responsibility`、`trust`、`verification` 或 `other`；`change`）、`mechanism`、`components`（`StudyComponent[]`：`name`、`statement`、`date?`、`status`、`declaredStatus?`、`statusReason?`、`sources`、`unlistedSources?`，以及一个 `StudyTrace`）、`assembly`（`component`、`gives`、`exchanges`、`cost`，以及一个 `StudyTrace`）、`conditions`、`benefit`、`addedCost`、`counterexample`、`chain`（`stage`、`how`）、`uncoveredStages`（经研究检查，它遗漏的完整链条阶段）、`predictions` |
 | `StudyThreeState` | `piece`、`state`（`atItsTime`、`currentBest`、`proposal`）、`architecture?` |

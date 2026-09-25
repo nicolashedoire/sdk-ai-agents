@@ -198,6 +198,7 @@ export type {
   StudyChainStage,
   StudyCharter,
   StudyChoiceFactor,
+  StudyChangeKind,
   StudyClaim,
   StudyClaimStatus,
   StudyCombination,

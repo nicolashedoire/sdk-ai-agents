@@ -291,7 +291,7 @@ Every item is a `StudyClaim` with fields of its own:
 | `StudyAnalogue` | `breakthrough`, `named?` (the number of the charter breakthrough it deconstructs), `domain?`, `date?`, `components` (two or more `{ name, date? }`), `liftedConstraint`, `capability`, `pattern` |
 | `StudyConstraint` | `constraint`, `state` (`remains`, `weakened`, `newRequirement`), `piece?` |
 | `StudyRevisableDecision` | `decision`, `because` (the condition that changed), `opens` |
-| `StudyCombination` | `a`, `b`, `enables` (what A lets B do), `exchange`, `cost`, `changes` (`representation`, `distribution`, `responsibilities`) |
+| `StudyCombination` | `a`, `b`, `enables` (what A lets B do), `exchange`, `cost`, `changes` (`representation`, `distribution`, `responsibilities`, `trust`, `verification`, `other`) |
 | `StudyCapability` | `capability`, `forWhom`, `hardToday`, `principle?` |
 | `StudyArchitecture` | `name`, `kind` (`capability` or `improvement`), `declaredKind?` and `kindReason?` (a capability the guardian judged only faster or cheaper), `capability` (`what`, `forWhom`, `liftedConstraint`), `principleChange?` (`principle`: `representation`, `distribution`, `responsibility`, `trust`, `verification` or `other`; `change`), `mechanism`, `components` (`StudyComponent[]`: `name`, `statement`, `date?`, `status`, `declaredStatus?`, `statusReason?`, `sources`, `unlistedSources?`, and a `StudyTrace`), `assembly` (`component`, `gives`, `exchanges`, `cost`, and a `StudyTrace`), `conditions`, `benefit`, `addedCost`, `counterexample`, `chain` (`stage`, `how`), `uncoveredStages` (stages of the whole chain it leaves out, as the study checked), `predictions` |
 | `StudyThreeState` | `piece`, `state` (`atItsTime`, `currentBest`, `proposal`), `architecture?` |

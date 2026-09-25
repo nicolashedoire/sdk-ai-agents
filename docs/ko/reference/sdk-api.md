@@ -291,7 +291,7 @@ interface StudyTrace {
 | `StudyAnalogue` | `breakthrough`, `named?`(이 항목이 해체하는 헌장 속 혁신의 번호), `domain?`, `date?`, `components`(두 개 이상의 `{ name, date? }`), `liftedConstraint`, `capability`, `pattern` |
 | `StudyConstraint` | `constraint`, `state`(`remains`, `weakened`, `newRequirement`), `piece?` |
 | `StudyRevisableDecision` | `decision`, `because`(바뀐 조건), `opens` |
-| `StudyCombination` | `a`, `b`, `enables`(A가 B에게 가능하게 하는 것), `exchange`, `cost`, `changes`(`representation`, `distribution`, `responsibilities`) |
+| `StudyCombination` | `a`, `b`, `enables`(A가 B에게 가능하게 하는 것), `exchange`, `cost`, `changes`(`representation`, `distribution`, `responsibilities`, `trust`, `verification`, `other`) |
 | `StudyCapability` | `capability`, `forWhom`, `hardToday`, `principle?` |
 | `StudyArchitecture` | `name`, `kind`(`capability` 또는 `improvement`), `declaredKind?`와 `kindReason?`(감시자가 단지 더 빠르거나 더 싸다고 판단한 역량), `capability`(`what`, `forWhom`, `liftedConstraint`), `principleChange?`(`principle`: `representation`, `distribution`, `responsibility`, `trust`, `verification` 또는 `other`. 그리고 `change`), `mechanism`, `components`(`StudyComponent[]`: `name`, `statement`, `date?`, `status`, `declaredStatus?`, `statusReason?`, `sources`, `unlistedSources?`, 그리고 `StudyTrace`), `assembly`(`component`, `gives`, `exchanges`, `cost`, 그리고 `StudyTrace`), `conditions`, `benefit`, `addedCost`, `counterexample`, `chain`(`stage`, `how`), `uncoveredStages`(연구가 검사한 결과, 이 아키텍처가 다루지 않는 전체 사슬의 단계), `predictions` |
 | `StudyThreeState` | `piece`, `state`(`atItsTime`, `currentBest`, `proposal`), `architecture?` |
