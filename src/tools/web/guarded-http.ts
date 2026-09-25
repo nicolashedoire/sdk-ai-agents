@@ -165,7 +165,14 @@ export class GuardedHttpClient implements WebClient {
     return (hostname, options, callback) => {
       this.resolve(hostname)
         .then((found) => {
-          const family = options.family === 4 || options.family === 6 ? options.family : 0;
+          // Node gives the family as 4, 6, 0, or 'IPv4' / 'IPv6'.
+          const requested: unknown = options.family;
+          const family =
+            requested === 4 || requested === 'IPv4'
+              ? 4
+              : requested === 6 || requested === 'IPv6'
+                ? 6
+                : 0;
           const addresses = found.filter((entry) => family === 0 || entry.family === family);
           if (addresses.length === 0) {
             throw Object.assign(new Error(`${hostname} has no address`), { code: 'ENOTFOUND' });
