@@ -6,7 +6,7 @@ import {
 import type { DiscardedAnswer, LLMMessage, LLMProvider } from '../providers/llm-provider.js';
 import { truncate } from '../utils/truncate.js';
 import type { Parsed } from './study-replies.js';
-import type { StudyRun } from './study-run.js';
+import { type StudyRun, StudyStop } from './study-run.js';
 import type { StudyPassage } from './study-types.js';
 
 /** What a model call of a study is for, as `study.model_called` records it. */
@@ -55,7 +55,8 @@ export class StudyModel {
    * provider discarded as `provider.answer_discarded` events, whatever the outcome: every
    * billed call reaches the run's cost and budgets. When the repair cannot be used at all, the
    * first reply is read as a last attempt would be (what it lacked is accepted as missing):
-   * a guardian's verdicts on some items are not lost to a repair written in prose.
+   * a guardian's verdicts on some items are not lost to a repair written in prose, or to a
+   * provider that fails on the repair.
    */
   async ask<Value>(run: StudyRun, call: StudyCall<Value>): Promise<Value> {
     const attempts: AnsweredAttempt[] = [];
@@ -98,6 +99,12 @@ export class StudyModel {
       answer = answer ?? fallback;
     } catch (error) {
       failure = run.stopFor(error);
+      // A provider that fails on the repair leaves the first reply standing, as a repair that
+      // cannot be used does; a stop (a limit, a cancellation) still stops the run.
+      if (fallback && !(failure instanceof StudyStop)) {
+        answer = fallback;
+        failure = undefined;
+      }
     }
     const unusable = failure === undefined ? rejection : describe(failure);
     await this.recordCall(
