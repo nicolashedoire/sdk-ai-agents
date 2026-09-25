@@ -355,7 +355,7 @@ function sourcesSection(out: Writer, report: StudyReport, l: StudyLabels): void 
       : `${inline(result.title)} — ${inline(result.locator)}`;
     const date = result.date ? ` (${inline(result.date)})` : '';
     out.line(
-      `- **${result.id}** ${title}${date} — _${l.via} ${result.tool}${l.sep}“${inline(result.query)}”_`
+      `- **${result.id}** ${title}${date} — _${l.via} ${inline(result.tool)}${l.sep}“${inline(result.query)}”_`
     );
   }
   out.line('');

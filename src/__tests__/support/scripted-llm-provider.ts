@@ -4,12 +4,15 @@ export type ScriptedReply =
   | { content: string }
   /** `content`: text the model writes alongside the call (Claude often does). */
   | { toolCall: { name: string; arguments: Record<string, unknown> }; content?: string }
-  | { error: Error };
+  | { error: Error }
+  /** A reply computed from the request (a guardian judging the items it is shown). */
+  | { respond: (request: LLMRequest) => ScriptedReply };
 
 /**
  * In-memory LLM provider for tests. Replies are queued per "channel": the cognitive
- * operation named in the prompt (`Operation: simulate`), `tool-selection` for requests
- * that offer tools, or `default`. Every request is kept for assertions.
+ * operation named in the prompt (`Operation: simulate`), a study's call (`study:observe`,
+ * `study-check:observe`… see `studyChannel`), `tool-selection` for requests that offer
+ * tools, or `default`. Every request is kept for assertions.
  */
 export class ScriptedLLMProvider implements LLMProvider {
   readonly requests: LLMRequest[] = [];
@@ -37,10 +40,11 @@ export class ScriptedLLMProvider implements LLMProvider {
     }
     const channel = channelOf(request);
     const queued = this.queues.get(channel);
-    const reply = queued && queued.length > 0 ? queued.shift() : this.fallbacks.get(channel);
+    let reply = queued && queued.length > 0 ? queued.shift() : this.fallbacks.get(channel);
     if (!reply) {
       throw new Error(`no scripted reply for channel "${channel}"`);
     }
+    while ('respond' in reply) reply = reply.respond(request);
     if ('error' in reply) {
       throw reply.error;
     }
@@ -85,6 +89,8 @@ export function channelOf(request: LLMRequest): string {
   if (request.tools && request.tools.length > 0) {
     return 'tool-selection';
   }
+  const study = studyChannel(request);
+  if (study) return study;
   const last = request.messages.filter((message) => message.role === 'user').at(-1)?.content ?? '';
   const operation = /Operation: ([a-z_]+)/.exec(
     request.messages.map((message) => message.content).join('\n')
@@ -96,6 +102,33 @@ export function channelOf(request: LLMRequest): string {
     return operation?.[1] ? `${operation[1]}:repair` : 'repair';
   }
   return 'default';
+}
+
+const STUDY_CALLS: Record<string, string> = {
+  passage: 'study',
+  queries: 'study-queries',
+  check: 'study-check',
+  'prior-art queries': 'study-prior-art-queries',
+  'prior-art check': 'study-prior-art-check',
+  amendment: 'study-amendment',
+};
+
+/**
+ * The channel of a study's call, from the line that opens its task: `Study passage: observe`
+ * is `study:observe`, `Study check: observe` is `study-check:observe`, `Study queries: changes`
+ * is `study-queries:changes`, `Study amendment` is `study-amendment`. A repair (the prompt says
+ * why the previous reply was refused) adds `:repair`.
+ */
+export function studyChannel(request: LLMRequest): string | undefined {
+  const task = request.messages.filter((message) => message.role === 'user').at(-1)?.content ?? '';
+  const match =
+    /^Study (passage|queries|check|prior-art queries|prior-art check|amendment)(?:: ([A-Za-z]+))?$/m.exec(
+      task
+    );
+  const kind = match?.[1] ? STUDY_CALLS[match[1]] : undefined;
+  if (!kind) return undefined;
+  const channel = match?.[2] ? `${kind}:${match[2]}` : kind;
+  return task.includes('Your previous reply could not be used:') ? `${channel}:repair` : channel;
 }
 
 function waitFor(ms: number, signal?: AbortSignal): Promise<void> {

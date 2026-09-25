@@ -78,6 +78,8 @@
     "src/__tests__/junit-report.test.ts",
     "src/__tests__/postgresql-live.test.ts",
     "src/__tests__/stable-json.test.ts",
+    "src/__tests__/study.test.ts",
+    "src/__tests__/study-runs.test.ts",
     "examples/cognitive-agent.ts",
     "examples/mcp-server.ts",
     "examples/mcp-openapi.ts",
