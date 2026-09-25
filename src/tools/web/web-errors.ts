@@ -67,11 +67,29 @@ export class WebConfigurationError extends Error {
 }
 
 /**
- * Worth retrying: 429, server errors, timeouts and network failures — not refusals, 4xx or
- * a missing setup.
+ * No search provider answered: each failed, or was skipped while its circuit breaker was open.
+ * Not retried at once: the same providers would be skipped or fail again.
+ */
+export class SearchUnavailableError extends Error {
+  constructor(
+    message: string,
+    readonly failures: Array<{ provider: string; message: string }>
+  ) {
+    super(message);
+    this.name = 'SearchUnavailableError';
+  }
+}
+
+/**
+ * Worth retrying: 429, server errors, timeouts and network failures — not refusals, 4xx, a
+ * missing setup or a search no provider could answer.
  */
 export function isRetryableWebError(error: Error): boolean {
-  if (error instanceof WebRequestRefusedError || error instanceof WebConfigurationError) {
+  if (
+    error instanceof WebRequestRefusedError ||
+    error instanceof WebConfigurationError ||
+    error instanceof SearchUnavailableError
+  ) {
     return false;
   }
   if (error instanceof WebHttpError) return error.status === 429 || error.status >= 500;

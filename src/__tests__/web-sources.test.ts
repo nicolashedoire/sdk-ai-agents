@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { arxivQuery } from '../tools/web/sources/arxiv.js';
+import { isRetryableWebError, WebConfigurationError } from '../tools/web/web-errors.js';
 import { type WebToolsOptions, webTools } from '../tools/web/web-tools.js';
 import type { ToolDefinition } from '../types/tool.js';
 import { reply, replyJson, WebServer } from './support/web-server.js';
@@ -356,9 +357,10 @@ describe('arxiv_search, wikipedia_search, github_search', () => {
     });
 
     it('needs a token to search code, and says so without calling GitHub', async () => {
-      await expect(call('github_search', { query: 'x', kind: 'code' }, github())).rejects.toThrow(
-        'GitHub searches code only with a token: webTools({ github: { token } })'
-      );
+      const error = await call('github_search', { query: 'x', kind: 'code' }, github()).catch((caught: Error) => caught);
+      expect(error).toBeInstanceOf(WebConfigurationError);
+      expect((error as Error).message).toBe('GitHub searches code only with a token: webTools({ github: { token } })');
+      expect(isRetryableWebError(error as Error)).toBe(false);
       expect(server.requests).toHaveLength(0);
     });
 

@@ -3,7 +3,7 @@ import { quoteUntrusted, stripInvisible } from '../html-entities.js';
 import { isRecord, listOf, text } from '../json-fields.js';
 import { isoDate, oneLine } from '../results.js';
 import { trimBase } from '../search-provider.js';
-import { WebHttpError } from '../web-errors.js';
+import { WebConfigurationError, WebHttpError } from '../web-errors.js';
 
 export interface GithubOptions {
   /** Default `https://api.github.com` (GitHub Enterprise: `https://<host>/api/v3`). */
@@ -50,7 +50,9 @@ export async function searchGithub(
   request: { query: string; kind: GithubSearchKind; maxResults: number; signal?: AbortSignal }
 ): Promise<GithubResult[]> {
   if (request.kind === 'code' && !options.token) {
-    throw new Error('GitHub searches code only with a token: webTools({ github: { token } })');
+    throw new WebConfigurationError(
+      'GitHub searches code only with a token: webTools({ github: { token } })'
+    );
   }
   const url = new URL(
     `${trimBase(options.baseUrl ?? 'https://api.github.com')}/search/${request.kind}`

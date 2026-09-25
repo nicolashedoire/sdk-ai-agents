@@ -23,6 +23,8 @@ const RANGES: Array<{ network: string; prefix: number; family: 'ipv4' | 'ipv6'; 
   { network: '100::', prefix: 64, family: 'ipv6', kind: 'discard' },
   { network: '2001::', prefix: 23, family: 'ipv6', kind: 'IETF protocol assignments (Teredo…)' },
   { network: '2001:db8::', prefix: 32, family: 'ipv6', kind: 'documentation' },
+  { network: '3fff::', prefix: 20, family: 'ipv6', kind: 'documentation' },
+  { network: '5f00::', prefix: 16, family: 'ipv6', kind: 'segment routing (SRv6)' },
   { network: 'fc00::', prefix: 7, family: 'ipv6', kind: 'unique local (private)' },
   { network: 'fe80::', prefix: 10, family: 'ipv6', kind: 'link-local' },
   { network: 'fec0::', prefix: 10, family: 'ipv6', kind: 'site-local' },
@@ -38,7 +40,8 @@ const LISTS = RANGES.map((range) => {
 /**
  * What kind of non-public address this is (`loopback`, `private`, `link-local (cloud
  * metadata)`…), or undefined for a public one. IPv6 addresses that carry an IPv4 address —
- * IPv4-mapped (`::ffff:127.0.0.1`), IPv4-compatible, NAT64 (`64:ff9b::/96`) and 6to4
+ * IPv4-mapped (`::ffff:127.0.0.1`), IPv4-translated (`::ffff:0:127.0.0.1`), IPv4-compatible,
+ * NAT64 (`64:ff9b::/96`) and 6to4
  * (`2002::/16`) — are judged by that IPv4 address too.
  */
 export function nonPublicKind(address: string): string | undefined {
@@ -91,6 +94,8 @@ function embeddedIpv4(groups: number[]): string | undefined {
   const zeroUpTo = (count: number) => groups.slice(0, count).every((group) => group === 0);
   // ::ffff:a.b.c.d (mapped)
   if (zeroUpTo(5) && g5 === 0xffff) return v4(g6, g7);
+  // ::ffff:0:a.b.c.d (translated, RFC 2765)
+  if (zeroUpTo(4) && g4 === 0xffff && g5 === 0) return v4(g6, g7);
   // ::a.b.c.d (compatible, deprecated), but not :: and ::1
   if (zeroUpTo(6) && (g6 !== 0 || g7 > 1)) return v4(g6, g7);
   // 64:ff9b::a.b.c.d (NAT64)

@@ -1,6 +1,6 @@
 import type { WebClient } from './guarded-http.js';
 import type { SearchHit, SearchProvider, SearchRequest } from './search-provider.js';
-import { SearchThrottledError, WebHttpError } from './web-errors.js';
+import { SearchThrottledError, SearchUnavailableError, WebHttpError } from './web-errors.js';
 
 /** A provider that did not answer a search, and why. */
 export interface ProviderFailure {
@@ -86,8 +86,9 @@ export class SearchChain {
         }
       }
     }
-    throw new Error(
-      `no search provider answered: ${errors.map((failure) => `${failure.provider}: ${failure.message}`).join('; ')}`
+    throw new SearchUnavailableError(
+      `no search provider answered: ${errors.map((failure) => `${failure.provider}: ${failure.message}`).join('; ')}`,
+      errors
     );
   }
 }

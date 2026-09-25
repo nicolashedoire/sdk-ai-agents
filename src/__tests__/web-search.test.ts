@@ -5,7 +5,8 @@ import { duckDuckGo, parseDuckDuckGoPage } from '../tools/web/providers/duckduck
 import { searxng } from '../tools/web/providers/searxng.js';
 import { serper } from '../tools/web/providers/serper.js';
 import { tavily } from '../tools/web/providers/tavily.js';
-import { normalizeUrl, webResultId } from '../tools/web/results.js';
+import { citableUrl, normalizeUrl, webResultId } from '../tools/web/results.js';
+import { isRetryableWebError, SearchUnavailableError } from '../tools/web/web-errors.js';
 import { type WebSearchOutput, type WebToolsOptions, webTools } from '../tools/web/web-tools.js';
 import type { ToolDefinition } from '../types/tool.js';
 import { redirect, reply, replyJson, WebServer } from './support/web-server.js';
@@ -76,8 +77,8 @@ describe('web_search', () => {
           {
             id: expect.stringMatching(/^web:[0-9a-f]{16}$/),
             title: 'CSS Fragmentation Module Level 3',
-            // The `uddg=` redirect decoded; `utm_source` and the trailing slash removed.
-            url: 'https://www.w3.org/TR/css-break-3?lang=en',
+            // The `uddg=` redirect decoded, `utm_source` removed, the path kept as found.
+            url: 'https://www.w3.org/TR/css-break-3/?lang=en',
             excerpt:
               'This module describes the fragmentation model that partitions a flow into pages, columns, or regions.',
             source: 'duckduckgo',
@@ -117,12 +118,25 @@ describe('web_search', () => {
       });
 
       expect(output.results.map((result) => result.url)).toEqual([
-        'https://www.w3.org/TR/css-break-3?lang=en',
+        'https://www.w3.org/TR/css-break-3/?lang=en',
       ]);
       const [request] = server.hits('/html/');
       const form = new URLSearchParams(request?.body);
       expect(Object.fromEntries(form)).toEqual({ q: 'fragmentation site:w3.org', kl: 'fr-fr', df: 'w' });
       expect(request?.headers['accept-language']).toBe('fr');
+    });
+
+    it('takes a no-results page that echoes a query about captchas for no results, not a block', async () => {
+      const echo = (inside: string) =>
+        `<html><head><title>zqxj captcha solver at DuckDuckGo</title></head><body><form><input name="q" value="zqxj captcha solver"></form>${inside}</body></html>`;
+      server.on('/html/', reply(echo('<div class="no-results">No results.</div>')));
+      const tool = searchTool({ search: [ddg(), searxng({ baseUrl: backup.url })] });
+
+      const output = await search(tool, { query: 'zqxj captcha solver' });
+
+      expect(output).toMatchObject({ provider: 'duckduckgo', results: [] });
+      expect(parseDuckDuckGoPage(echo('')).blocked).toBe(false);
+      expect(backup.requests).toHaveLength(0);
     });
 
     it('is not fooled by a results page that mentions a captcha', () => {
@@ -355,7 +369,7 @@ describe('web_search', () => {
         {
           id: expect.stringMatching(/^web:/),
           title: 'Fragments',
-          url: 'https://www.w3.org/TR/css-break-3',
+          url: 'https://www.w3.org/TR/css-break-3/',
           date: '2024-01-02',
           excerpt: 'Fragmentation model',
           source: 'tavily',
@@ -424,6 +438,34 @@ describe('web_search', () => {
       ).rejects.toThrow(
         'no search provider answered: duckduckgo: DuckDuckGo returned HTTP 503 (its answer, untrusted: "Service unavailable"); searxng: SearXNG returned HTTP 500 (its answer, untrusted: "{\\"error\\":\\"boom\\"}")'
       );
+    });
+
+    it('fails with a SearchUnavailableError, which retries do not repeat', async () => {
+      server.on('/html/', reply('down', { status: 503, type: 'text/plain' }));
+
+      const error = await search(searchTool({ search: ddg() }), { query: 'x' }).catch((caught: Error) => caught);
+
+      expect(error).toBeInstanceOf(SearchUnavailableError);
+      expect((error as SearchUnavailableError).failures).toEqual([
+        { provider: 'duckduckgo', message: 'DuckDuckGo returned HTTP 503 (its answer, untrusted: "down")' },
+      ]);
+      expect(isRetryableWebError(error as Error)).toBe(false);
+    });
+
+    it('cites the URL as found, and merges by the normalised one', () => {
+      expect(citableUrl('https://A.example/Docs/?utm_source=x&page=2#part')).toBe('https://a.example/Docs/?page=2');
+      expect(normalizeUrl('https://A.example/Docs/?utm_source=x&page=2#part')).toBe('https://a.example/Docs?page=2');
+      expect(citableUrl('ftp://a.example/')).toBeUndefined();
+    });
+
+    it('does not cache an answer larger than cache.maxBytes', async () => {
+      server.on('/html/', reply(fixture('duckduckgo-results.html')));
+      const tool = searchTool({ search: ddg(), cache: { maxBytes: 100 } });
+
+      await search(tool, { query: 'layout' });
+      await search(tool, { query: 'layout' });
+
+      expect(server.hits('/html/')).toHaveLength(2);
     });
 
     it('caches a search for its time to live', async () => {

@@ -26,7 +26,17 @@ export class HostPacer {
     // The slot is taken before waiting, so the next caller queues behind it.
     this.last.set(host, start);
     this.forgetOld(now);
-    if (delay > 0) await sleep(delay, signal);
+    if (delay <= 0) return;
+    try {
+      await sleep(delay, signal);
+    } catch (error) {
+      // A caller that gives up frees its slot, unless someone has queued behind it since.
+      if (this.last.get(host) === start) {
+        if (previous === undefined) this.last.delete(host);
+        else this.last.set(host, previous);
+      }
+      throw error;
+    }
   }
 
   /** Hosts not asked for in a while are forgotten, so the map stays small. */

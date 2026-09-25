@@ -78,12 +78,13 @@ export function duckDuckGo(options: DuckDuckGoOptions = {}): SearchProvider {
         ensureOk(response, 'DuckDuckGo');
         const page = parseDuckDuckGoPage(bodyText(response));
         if (page.results.length > 0) return page.results;
+        // "No results." first: the page echoes the query, which may say "captcha".
+        if (page.noResults) return [];
         if (page.blocked) {
           throw new SearchThrottledError(
             'DuckDuckGo answered with a captcha page (unusual traffic)'
           );
         }
-        if (page.noResults) return [];
       }
       throw new SearchThrottledError('DuckDuckGo answered an empty page twice (throttled)');
     },
@@ -109,15 +110,17 @@ export interface DuckDuckGoPage {
 const RESULT_LINK = /<a\b[^>]*\bclass="[^"]*\bresult__a\b[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
 const SNIPPET = /\bclass="[^"]*\bresult__snippet\b[^"]*"[^>]*>([\s\S]*?)<\/(?:a|div|td|span)>/i;
 const DATE = /\b(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}:\d{2}/;
-/** Words of a block page. Looked for only when the page has no result (see `blocked`). */
-const BLOCK_WORDS =
-  /captcha|verify you are human|unusual traffic|bot detection|anomaly|bots use DuckDuckGo too/i;
+/**
+ * The markup of DuckDuckGo's block page (its "anomaly" challenge), never words the page could
+ * echo from the query. Looked for only when the page has no result (see `blocked`).
+ */
+const BLOCK_MARKUP = /\bclass="[^"]{0,100}\banomaly-modal|\/anomaly\.js|\bid="challenge-form"/i;
 
 /**
  * Reads the results of a DuckDuckGo HTML page: title and link (`result__a`, a direct URL or a
  * `uddg=` redirect), snippet and date. Ads and DuckDuckGo's own links are skipped. A page is
- * blocked only when it has no result and speaks of a captcha: a result page can name one in a
- * script or a snippet.
+ * blocked only when it has no result and holds the markup of DuckDuckGo's challenge: a result
+ * page, or the query it echoes, can speak of a captcha.
  */
 export function parseDuckDuckGoPage(html: string): DuckDuckGoPage {
   const links = [...html.matchAll(RESULT_LINK)];
@@ -140,7 +143,7 @@ export function parseDuckDuckGoPage(html: string): DuckDuckGoPage {
   });
   return {
     results,
-    blocked: results.length === 0 && BLOCK_WORDS.test(html),
+    blocked: results.length === 0 && BLOCK_MARKUP.test(html),
     noResults: /\bclass="[^"]*\bno-results\b/i.test(html) || />\s*No\s+results\.?\s*</i.test(html),
   };
 }

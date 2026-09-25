@@ -100,10 +100,10 @@ export interface WebToolsOptions {
   /** Pages of a PDF read by `web_fetch`. Default 30. */
   maxPdfPages?: number;
   /**
-   * Results kept in memory, per tool and arguments. Default 10 minutes, 200 entries; `false`
-   * turns it off.
+   * Results kept in memory, per tool and arguments: for `ttlMs` (10 minutes), at most
+   * `maxEntries` (200) and `maxBytes` (20 MB, measured as JSON). `false` turns it off.
    */
-  cache?: false | { ttlMs?: number; maxEntries?: number };
+  cache?: false | { ttlMs?: number; maxEntries?: number; maxBytes?: number };
   /** Retries of failed calls: 429, server errors, timeouts, network failures, never refusals. */
   retry?: ToolRetryPolicy;
   /** `arxiv_search`: the API's base URL and pacing (3 s between requests by default). */
@@ -475,7 +475,11 @@ function createRuntime(options: WebToolsOptions): WebRuntime {
   const cache =
     options.cache === false
       ? undefined
-      : new TtlCache<unknown>(options.cache?.ttlMs ?? 600_000, options.cache?.maxEntries ?? 200);
+      : new TtlCache<unknown>(
+          options.cache?.ttlMs ?? 600_000,
+          options.cache?.maxEntries ?? 200,
+          options.cache?.maxBytes ?? 20_000_000
+        );
   const callTimeoutMs = options.callTimeoutMs ?? 60_000;
   return {
     http,
@@ -511,7 +515,7 @@ function createRuntime(options: WebToolsOptions): WebRuntime {
       // A copy: a caller that changes its result must not change the cache.
       if (hit !== undefined) return structuredClone(hit) as T;
       const value = await load();
-      cache?.set(key, structuredClone(value));
+      if (cache) cache.set(key, structuredClone(value), Buffer.byteLength(JSON.stringify(value)));
       return value;
     },
   };

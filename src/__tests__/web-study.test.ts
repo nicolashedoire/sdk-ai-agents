@@ -72,7 +72,7 @@ describe('a study with webTools() as its sources', () => {
       {
         id: 'S2',
         title: 'CSS Fragmentation Module Level 3',
-        locator: 'https://www.w3.org/TR/css-break-3?lang=en',
+        locator: 'https://www.w3.org/TR/css-break-3/?lang=en',
         date: undefined,
         tool: 'web_search',
       },

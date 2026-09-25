@@ -391,10 +391,11 @@ export type {
   WebResponse,
 } from './tools/web/guarded-http.js';
 export { isPublicAddress } from './tools/web/ip-ranges.js';
-export { normalizeUrl } from './tools/web/results.js';
+export { citableUrl, normalizeUrl } from './tools/web/results.js';
 export type { WebResult } from './tools/web/results.js';
 export {
   SearchThrottledError,
+  SearchUnavailableError,
   WebConfigurationError,
   WebHttpError,
   WebRequestRefusedError,

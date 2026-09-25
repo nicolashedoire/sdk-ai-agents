@@ -6,7 +6,7 @@ export interface WebResult {
   /** Stable: the same page gets the same id, whoever found it (`web:3f2a…`, `arxiv:2401.11817`…). */
   id: string;
   title: string;
-  /** Normalised: tracking parameters, fragment and trailing slash removed. */
+  /** As found, without tracking parameters (`utm_*`, `fbclid`…) or fragment. */
   url: string;
   /** `YYYY-MM-DD` (or the full ISO time) when the provider or the page gives one. */
   date?: string;
@@ -34,11 +34,24 @@ const TRACKING_NAMES = new Set([
 ]);
 
 /**
- * The URL a page is known by: scheme and host lowercased, fragment dropped, tracking
- * parameters (`utm_*`, `fbclid`, `gclid`…) removed, trailing slash of a path removed.
- * Undefined for anything that is not an http(s) URL.
+ * The URL a result is cited by: the one found, without its fragment, credentials and tracking
+ * parameters (`utm_*`, `fbclid`, `gclid`…); its path is kept as it is, so the link still
+ * works. Undefined for anything that is not an http(s) URL.
+ */
+export function citableUrl(raw: string): string | undefined {
+  return cleaned(raw, false);
+}
+
+/**
+ * The URL a page is known by, for its id and to merge duplicates: the citable URL, scheme and
+ * host lowercased, and the trailing slash of its path removed. Undefined for anything that is
+ * not an http(s) URL.
  */
 export function normalizeUrl(raw: string): string | undefined {
+  return cleaned(raw, true);
+}
+
+function cleaned(raw: string, trimSlash: boolean): string | undefined {
   let url: URL;
   try {
     url = new URL(raw.trim());
@@ -55,7 +68,7 @@ export function normalizeUrl(raw: string): string | undefined {
       url.searchParams.delete(name);
     }
   }
-  if (url.pathname.length > 1 && url.pathname.endsWith('/')) {
+  if (trimSlash && url.pathname.length > 1 && url.pathname.endsWith('/')) {
     url.pathname = url.pathname.replace(/\/+$/, '') || '/';
   }
   const text = url.toString();
@@ -120,8 +133,9 @@ export interface FoundHit {
 }
 
 /**
- * Results ready to cite: http(s) URLs only, normalised, without duplicates (the first one
- * found wins), within `site` when given, at most `max`.
+ * Results ready to cite: http(s) URLs only, cited as found (tracking parameters and fragment
+ * removed), without duplicates within the answer (by normalised URL; the first one found
+ * wins), within `site` when given, at most `max`.
  */
 export function toWebResults(
   hits: FoundHit[],
@@ -130,13 +144,14 @@ export function toWebResults(
   const seen = new Set<string>();
   const results: WebResult[] = [];
   for (const hit of hits) {
-    const url = normalizeUrl(hit.url);
-    if (!url || seen.has(url)) continue;
+    const key = normalizeUrl(hit.url);
+    const url = citableUrl(hit.url);
+    if (!key || !url || seen.has(key)) continue;
     if (options.site && !withinSite(url, options.site)) continue;
-    seen.add(url);
+    seen.add(key);
     const date = hit.date ? isoDate(hit.date) : undefined;
     results.push({
-      id: webResultId(url),
+      id: webResultId(key),
       title: oneLine(stripInvisible(hit.title), 300) || url,
       url,
       ...(date ? { date } : {}),

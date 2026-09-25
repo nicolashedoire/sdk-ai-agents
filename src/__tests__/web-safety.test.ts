@@ -340,6 +340,31 @@ describe('web tools safety', () => {
       ).rejects.toThrow('timed out after 150 ms');
     });
 
+    it('keeps the cache within its bytes too', () => {
+      const cache = new TtlCache<string>(60_000, 100, 10);
+      cache.set('a', 'first', 6);
+      cache.set('b', 'second', 6);
+      cache.set('huge', 'too big', 11);
+
+      expect([cache.get('a'), cache.get('b'), cache.get('huge')]).toEqual([undefined, 'second', undefined]);
+      expect(cache.totalBytes).toBe(6);
+    });
+
+    it('frees the pacing slot of a caller that gives up', async () => {
+      const pacer = new HostPacer(10_000);
+      await pacer.wait('host', 1_000);
+      const giveUp = new AbortController();
+      const waiting = pacer.wait('host', 1_000, giveUp.signal);
+      setTimeout(() => giveUp.abort(new Error('gave up')), 30);
+      await expect(waiting).rejects.toThrow('gave up');
+      const started = Date.now();
+
+      // Paced after the first request, not after the slot the second one gave back.
+      await pacer.wait('host', 100);
+
+      expect(Date.now() - started).toBeLessThan(400);
+    });
+
     it('keeps a bounded cache: past maxEntries, the least recently used entry goes', () => {
       const cache = new TtlCache<number>(60_000, 2);
       cache.set('a', 1);
@@ -649,6 +674,9 @@ describe('web tools safety', () => {
         '2002:c0a8:0101::1': 'private, as 192.168.1.1 inside an IPv6 address',
         '::127.0.0.1': 'loopback, as 127.0.0.1 inside an IPv6 address',
         '2001:db8::1': 'documentation',
+        '3fff::1': 'documentation',
+        '5f00::1': 'segment routing (SRv6)',
+        '::ffff:0:127.0.0.1': 'loopback, as 127.0.0.1 inside an IPv6 address',
       };
       for (const [address, kind] of Object.entries(expected)) {
         expect(nonPublicKind(address), address).toBe(kind);
