@@ -109,15 +109,40 @@ export const resultIds = z.preprocess((value) => {
 /** An enum that accepts other spellings and cases (`partly relevant`, `behavior`). */
 function looseEnum<const Values extends readonly [string, ...string[]]>(
   values: Values,
-  aliases: Record<string, Values[number]> = {}
+  aliases: Record<string, Values[number]> = {},
+  fallback?: Values[number]
 ) {
   const byKey = new Map<string, Values[number]>();
   for (const value of values) byKey.set(enumKey(value), value);
   for (const [alias, value] of Object.entries(aliases)) byKey.set(enumKey(alias), value);
-  return z.preprocess(
-    (value) => (typeof value === 'string' ? (byKey.get(enumKey(value)) ?? value) : value),
-    z.enum(values)
-  );
+  // With a fallback, a category the list does not have (a model's "accessibility" among the
+  // factors) is read as the fallback: the item is kept, not refused for its label.
+  return z.preprocess((value) => {
+    if (typeof value !== 'string') return value;
+    const key = enumKey(value);
+    // An empty label (blank, or no Latin letter) names nothing: it never becomes the fallback.
+    return byKey.get(key) ?? (key === '' ? value : (fallback ?? value));
+  }, z.enum(values));
+}
+
+/**
+ * A list of categories: blank labels are left out, and a category named twice (two aliases,
+ * or two unknown labels read as the fallback) is kept once.
+ */
+function looseEnumList<const Values extends readonly [string, ...string[]]>(
+  values: Values,
+  aliases: Record<string, Values[number]>,
+  fallback: Values[number]
+) {
+  return z
+    .preprocess(
+      (value) =>
+        Array.isArray(value)
+          ? value.filter((entry) => typeof entry !== 'string' || enumKey(entry) !== '')
+          : value,
+      z.array(looseEnum(values, aliases, fallback))
+    )
+    .transform((list) => [...new Set(list)]);
 }
 
 function enumKey(value: string): string {
@@ -157,15 +182,11 @@ const chainFields: FieldsSchema<StudyChainStage> = z.object({ stage: text, piece
 const choiceFields: FieldsSchema<StudyHistoricalChoice> = z.object({
   choice: text,
   piece: optionalText,
-  factors: z
-    .array(
-      looseEnum(['hardware', 'tools', 'uses', 'knowledge', 'costs', 'compatibility', 'other'], {
-        cost: 'costs',
-        use: 'uses',
-        tool: 'tools',
-      })
-    )
-    .default([]),
+  factors: looseEnumList(
+    ['hardware', 'tools', 'uses', 'knowledge', 'costs', 'compatibility', 'other'],
+    { cost: 'costs', use: 'uses', tool: 'tools' },
+    'other'
+  ).default([]),
   era: optionalText,
 });
 
@@ -195,9 +216,11 @@ const leadVerdictFields: FieldsSchema<StudyLeadVerdict> = z.object({
 
 const independentLeadFields: FieldsSchema<StudyIndependentLead> = z.object({
   tool: text,
-  kind: looseEnum(['mathematical', 'technical', 'other'], { math: 'mathematical' }).default(
+  kind: looseEnum(
+    ['mathematical', 'technical', 'other'],
+    { math: 'mathematical' },
     'other'
-  ),
+  ).default('other'),
   piece: optionalText,
 });
 
@@ -228,19 +251,31 @@ const combinationFields: FieldsSchema<StudyCombination> = z.object({
   enables: text,
   exchange: text,
   cost: text,
-  changes: z
-    .array(looseEnum(['representation', 'distribution', 'responsibilities'], {}))
-    .default([]),
+  changes: looseEnumList(
+    ['representation', 'distribution', 'responsibilities', 'trust', 'verification', 'other'],
+    { responsibility: 'responsibilities', distributionOfWork: 'distribution' },
+    'other'
+  ).default([]),
 });
 
-const principle = looseEnum(
-  ['representation', 'distribution', 'responsibility', 'trust', 'verification', 'other'],
-  {
-    responsibilities: 'responsibility',
-    distributionOfWork: 'distribution',
-    verified: 'verification',
-  }
-);
+const PRINCIPLES = [
+  'representation',
+  'distribution',
+  'responsibility',
+  'trust',
+  'verification',
+  'other',
+] as const;
+const PRINCIPLE_ALIASES = {
+  responsibilities: 'responsibility',
+  distributionOfWork: 'distribution',
+  verified: 'verification',
+} as const;
+// The principle a capability architecture changes is what the capability rule checks: a label
+// the list lacks ("speed", "none") is refused, never read as "other".
+const principle = looseEnum(PRINCIPLES, PRINCIPLE_ALIASES);
+// A candidate capability's principle is a hint only: an unknown one is read as "other".
+const candidatePrinciple = looseEnum(PRINCIPLES, PRINCIPLE_ALIASES, 'other');
 
 /**
  * A prior technique of an assembly, as the model writes it: a claim of its own, and the ids of
@@ -316,7 +351,7 @@ const capabilityFields: FieldsSchema<StudyCapability> = z.object({
   capability: text,
   forWhom: text,
   hardToday: text,
-  principle: principle.optional(),
+  principle: candidatePrinciple.optional(),
 });
 
 const analogueFields: FieldsSchema<StudyAnalogue> = z.object({
@@ -482,7 +517,7 @@ export const PASSAGES: readonly PassageSpec[] = [
   {
     passage: 'cross',
     number: 5,
-    task: 'Cross past and present: which constraints remain, which have weakened, which new requirements have appeared. Derive the decisions that became revisable and the possibilities they open. Propose combinations A + B: what A lets B do, what they must exchange, and what it costs (conversions, synchronisation); two pieces fast on their own can lose their time converting or synchronising once joined. Look for crossings that change the representation, the distribution of work or the responsibilities of the object, as the breakthroughs by assembly did. Then name the new capabilities they could open: what would become possible that is difficult or impossible today, not only faster or cheaper, for whom, why it is hard today (the constraint to lift) and which principle would change. When the charter names the capability aimed at, examine that one.',
+    task: 'Cross past and present: which constraints remain, which have weakened, which new requirements have appeared. Derive the decisions that became revisable and the possibilities they open. Propose combinations A + B: what A lets B do, what they must exchange, and what it costs (conversions, synchronisation); two pieces fast on their own can lose their time converting or synchronising once joined. Look for crossings that change the representation, the distribution of work, the responsibilities, who is trusted or what is verified in the object, as the breakthroughs by assembly did. Then name the new capabilities they could open: what would become possible that is difficult or impossible today, not only faster or cheaper, for whom, why it is hard today (the constraint to lift) and which principle would change. When the charter names the capability aimed at, examine that one.',
     produces:
       'the constraints that remain, weakened or appeared, the decisions that became revisable, combinations with their exchanges and costs, and candidate new capabilities',
     collections: [
@@ -502,7 +537,7 @@ export const PASSAGES: readonly PassageSpec[] = [
       collection(
         'combinations',
         'X',
-        '"statement": string, "a": string, "b": string, "enables": string (what A lets B do), "exchange": string, "cost": string, "changes": ["representation" | "distribution" | "responsibilities"]',
+        '"statement": string, "a": string, "b": string, "enables": string (what A lets B do), "exchange": string, "cost": string, "changes": ["representation" | "distribution" | "responsibilities" | "trust" | "verification" | "other"]',
         combinationFields
       ),
       collection(

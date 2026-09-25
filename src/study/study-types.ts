@@ -218,8 +218,17 @@ export interface StudyCombination extends StudyClaim {
   /** What it costs: conversions, synchronisation. */
   cost: string;
   /** What it changes in the object, if anything. */
-  changes: Array<'representation' | 'distribution' | 'responsibilities'>;
+  changes: StudyChangeKind[];
 }
+
+/** What a combination changes in the object; `other` for what no kind names. */
+export type StudyChangeKind =
+  | 'representation'
+  | 'distribution'
+  | 'responsibilities'
+  | 'trust'
+  | 'verification'
+  | 'other';
 
 /** A principle an architecture changes: what makes a capability possible, not only faster. */
 export type StudyPrinciple =

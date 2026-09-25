@@ -291,7 +291,7 @@ interface StudyTrace {
 | `StudyAnalogue` | `breakthrough`، و`named?` (رقم اختراق الميثاق الذي يفكّكه)، و`domain?`، و`date?`، و`components` (اثنان أو أكثر من `{ name, date? }`)، و`liftedConstraint`، و`capability`، و`pattern` |
 | `StudyConstraint` | `constraint`، و`state` (`remains`، `weakened`، `newRequirement`)، و`piece?` |
 | `StudyRevisableDecision` | `decision`، و`because` (الشرط الذي تغيّر)، و`opens` |
-| `StudyCombination` | `a`، و`b`، و`enables` (ما يتيحه A لـ B)، و`exchange`، و`cost`، و`changes` (`representation`، `distribution`، `responsibilities`) |
+| `StudyCombination` | `a`، و`b`، و`enables` (ما يتيحه A لـ B)، و`exchange`، و`cost`، و`changes` (`representation`، `distribution`، `responsibilities`، `trust`، `verification`، `other`) |
 | `StudyCapability` | `capability`، و`forWhom`، و`hardToday`، و`principle?` |
 | `StudyArchitecture` | `name`، و`kind` (`capability` أو `improvement`)، و`declaredKind?` و`kindReason?` (قدرة حكم عليها الحارس بأنها مجرد أسرع أو أرخص)، و`capability` (`what`، `forWhom`، `liftedConstraint`)، و`principleChange?` (`principle`: `representation` أو `distribution` أو `responsibility` أو `trust` أو `verification` أو `other`؛ `change`)، و`mechanism`، و`components` (`StudyComponent[]`: `name`، `statement`، `date?`، `status`، `declaredStatus?`، `statusReason?`، `sources`، `unlistedSources?`، و`StudyTrace`)، و`assembly` (`component`، `gives`، `exchanges`، `cost`، و`StudyTrace`)، و`conditions`، و`benefit`، و`addedCost`، و`counterexample`، و`chain` (`stage`، `how`)، و`uncoveredStages` (حلقات السلسلة الكاملة التي تتركها البنية، كما تحقّقت منها الدراسة)، و`predictions` |
 | `StudyThreeState` | `piece`، و`state` (`atItsTime`، `currentBest`، `proposal`)، و`architecture?` |

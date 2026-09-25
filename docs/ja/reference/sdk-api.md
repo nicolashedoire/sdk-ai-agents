@@ -291,7 +291,7 @@ interface StudyTrace {
 | `StudyAnalogue` | `breakthrough`、`named?`（それが分解する、憲章のブレークスルーの番号）、`domain?`、`date?`、`components`（2 つ以上の `{ name, date? }`）、`liftedConstraint`、`capability`、`pattern` |
 | `StudyConstraint` | `constraint`、`state`（`remains`、`weakened`、`newRequirement`）、`piece?` |
 | `StudyRevisableDecision` | `decision`、`because`（変わった条件）、`opens` |
-| `StudyCombination` | `a`、`b`、`enables`（A によって B が何をできるようになるか）、`exchange`、`cost`、`changes`（`representation`、`distribution`、`responsibilities`） |
+| `StudyCombination` | `a`、`b`、`enables`（A によって B が何をできるようになるか）、`exchange`、`cost`、`changes`（`representation`、`distribution`、`responsibilities`、`trust`、`verification`、`other`） |
 | `StudyCapability` | `capability`、`forWhom`、`hardToday`、`principle?` |
 | `StudyArchitecture` | `name`、`kind`（`capability` または `improvement`）、`declaredKind?` と `kindReason?`（より速い、あるいは安いだけだと監視役が判断した能力）、`capability`（`what`、`forWhom`、`liftedConstraint`）、`principleChange?`（`principle`：`representation`、`distribution`、`responsibility`、`trust`、`verification`、`other` のいずれか。`change`）、`mechanism`、`components`（`StudyComponent[]`：`name`、`statement`、`date?`、`status`、`declaredStatus?`、`statusReason?`、`sources`、`unlistedSources?`、そして `StudyTrace`）、`assembly`（`component`、`gives`、`exchanges`、`cost`、そして `StudyTrace`）、`conditions`、`benefit`、`addedCost`、`counterexample`、`chain`（`stage`、`how`）、`uncoveredStages`（連鎖全体のうち、そのアーキテクチャが扱わない段階。研究がチェックしたもの）、`predictions` |
 | `StudyThreeState` | `piece`、`state`（`atItsTime`、`currentBest`、`proposal`）、`architecture?` |

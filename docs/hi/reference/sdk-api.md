@@ -291,7 +291,7 @@ interface StudyTrace {
 | `StudyAnalogue` | `breakthrough`, `named?` (चार्टर की उस सफलता का क्रमांक जिसे यह विखंडित करता है), `domain?`, `date?`, `components` (दो या ज़्यादा `{ name, date? }`), `liftedConstraint`, `capability`, `pattern` |
 | `StudyConstraint` | `constraint`, `state` (`remains`, `weakened`, `newRequirement`), `piece?` |
 | `StudyRevisableDecision` | `decision`, `because` (वह शर्त जो बदली), `opens` |
-| `StudyCombination` | `a`, `b`, `enables` (A, B को क्या करने देता है), `exchange`, `cost`, `changes` (`representation`, `distribution`, `responsibilities`) |
+| `StudyCombination` | `a`, `b`, `enables` (A, B को क्या करने देता है), `exchange`, `cost`, `changes` (`representation`, `distribution`, `responsibilities`, `trust`, `verification`, `other`) |
 | `StudyCapability` | `capability`, `forWhom`, `hardToday`, `principle?` |
 | `StudyArchitecture` | `name`, `kind` (`capability` या `improvement`), `declaredKind?` और `kindReason?` (ऐसी क्षमता जिसे संरक्षक ने सिर्फ़ तेज़ या सस्ता माना), `capability` (`what`, `forWhom`, `liftedConstraint`), `principleChange?` (`principle`: `representation`, `distribution`, `responsibility`, `trust`, `verification` या `other`; `change`), `mechanism`, `components` (`StudyComponent[]`: `name`, `statement`, `date?`, `status`, `declaredStatus?`, `statusReason?`, `sources`, `unlistedSources?`, और एक `StudyTrace`), `assembly` (`component`, `gives`, `exchanges`, `cost`, और एक `StudyTrace`), `conditions`, `benefit`, `addedCost`, `counterexample`, `chain` (`stage`, `how`), `uncoveredStages` (पूरी श्रृंखला की वे कड़ियाँ जिन्हें यह छोड़ देता है, जैसा अध्ययन ने जाँचा), `predictions` |
 | `StudyThreeState` | `piece`, `state` (`atItsTime`, `currentBest`, `proposal`), `architecture?` |

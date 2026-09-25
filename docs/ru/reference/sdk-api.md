@@ -291,7 +291,7 @@ interface StudyTrace {
 | `StudyAnalogue` | `breakthrough`, `named?` (номер прорыва из устава, который он разбирает), `domain?`, `date?`, `components` (два или больше `{ name, date? }`), `liftedConstraint`, `capability`, `pattern` |
 | `StudyConstraint` | `constraint`, `state` (`remains`, `weakened`, `newRequirement`), `piece?` |
 | `StudyRevisableDecision` | `decision`, `because` (условие, которое изменилось), `opens` |
-| `StudyCombination` | `a`, `b`, `enables` (что A позволяет делать B), `exchange`, `cost`, `changes` (`representation`, `distribution`, `responsibilities`) |
+| `StudyCombination` | `a`, `b`, `enables` (что A позволяет делать B), `exchange`, `cost`, `changes` (`representation`, `distribution`, `responsibilities`, `trust`, `verification`, `other`) |
 | `StudyCapability` | `capability`, `forWhom`, `hardToday`, `principle?` |
 | `StudyArchitecture` | `name`, `kind` (`capability` или `improvement`), `declaredKind?` и `kindReason?` (возможность, которую страж признал лишь более быстрой или более дешёвой), `capability` (`what`, `forWhom`, `liftedConstraint`), `principleChange?` (`principle`: `representation`, `distribution`, `responsibility`, `trust`, `verification` или `other`; `change`), `mechanism`, `components` (`StudyComponent[]`: `name`, `statement`, `date?`, `status`, `declaredStatus?`, `statusReason?`, `sources`, `unlistedSources?`, а также `StudyTrace`), `assembly` (`component`, `gives`, `exchanges`, `cost`, а также `StudyTrace`), `conditions`, `benefit`, `addedCost`, `counterexample`, `chain` (`stage`, `how`), `uncoveredStages` (звенья всей цепочки, которые она не охватывает, по проверке исследования), `predictions` |
 | `StudyThreeState` | `piece`, `state` (`atItsTime`, `currentBest`, `proposal`), `architecture?` |
