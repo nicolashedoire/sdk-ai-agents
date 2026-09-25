@@ -25,7 +25,12 @@ describe('web_fetch on a PDF', () => {
   });
 
   async function fetchPdf(url: string, options: WebToolsOptions = {}): Promise<WebFetchOutput> {
-    const [tool] = webTools({ include: ['web_fetch'], hostIntervalMs: 0, ...options });
+    const [tool] = webTools({
+      include: ['web_fetch'],
+      hostIntervalMs: 0,
+      allowPrivateNetwork: [server.host],
+      ...options,
+    });
     if (!tool) throw new Error('no web_fetch tool');
     return (await tool.handler(tool.schema.parse({ url }))) as WebFetchOutput;
   }

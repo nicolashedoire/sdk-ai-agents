@@ -1,7 +1,10 @@
+import dns from 'node:dns/promises';
 import http from 'node:http';
 import https from 'node:https';
+import { isIP, type LookupFunction } from 'node:net';
 import type { Readable } from 'node:stream';
 import zlib from 'node:zlib';
+import { nonPublicKind } from './ip-ranges.js';
 import type { HostPacer } from './politeness.js';
 import { WebHttpError, WebRequestRefusedError, WebTimeoutError } from './web-errors.js';
 
@@ -44,12 +47,20 @@ export interface WebRequestInit {
   maxBytes?: number | ((contentType: string) => number);
   /** Sees the answer before its body is read; throw to refuse it (nothing more is read). */
   inspect?: (head: ResponseHead) => void;
+  /**
+   * Called before each hop, redirects included: throw to refuse the URL (robots.txt), or
+   * return a longer pacing interval for its host (a `Crawl-delay`).
+   */
+  admit?: (url: URL) => Promise<{ minIntervalMs?: number } | undefined>;
 }
 
 /** The HTTP port the providers and sources use. */
 export interface WebClient {
   request(url: string, init?: WebRequestInit): Promise<WebResponse>;
 }
+
+/** Resolves a host name to its addresses. Default: the system resolver (`dns.lookup`). */
+export type WebLookup = (hostname: string) => Promise<Array<{ address: string; family: number }>>;
 
 export interface GuardedHttpOptions {
   userAgent: string;
@@ -59,6 +70,13 @@ export interface GuardedHttpOptions {
   /** Default byte cap of a body. */
   maxBytes: number;
   pacer: HostPacer;
+  /**
+   * Reach addresses that are not the public Internet: `true` for all of them, or a list of
+   * hosts (`intranet.example`, `127.0.0.1:8080`). Off by default.
+   */
+  allowPrivateNetwork?: boolean | string[];
+  /** DNS resolution; every address it gives is checked when the connection opens. */
+  lookup?: WebLookup;
 }
 
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
@@ -66,22 +84,40 @@ const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 const CROSS_ORIGIN_HEADERS = new Set(['accept', 'accept-language', 'user-agent']);
 
 /**
- * `node:http`/`node:https` requests with the web tools' rules: http(s) only, redirects
- * followed by hand (each hop checked again, https never downgraded to http, at most
- * `maxRedirects`), a timeout per request, a byte cap on the decoded body (the rest is never
- * downloaded) and pacing per host. TLS certificates are always verified.
+ * `node:http`/`node:https` requests with the web tools' rules:
+ *
+ * - http(s) only; redirects followed by hand, at most `maxRedirects`, each hop checked again,
+ *   https never downgraded to http, credentials never sent to another origin;
+ * - no address outside the public Internet (loopback, private, link-local and cloud metadata,
+ *   CGNAT, multicast, IPv4 inside IPv6…): IP literals are checked before connecting, and host
+ *   names by the `lookup` the connection itself uses, so every address a name resolves to is
+ *   checked when the connection opens (a DNS answer that changes in between cannot slip
+ *   through). `allowPrivateNetwork` lifts this; a provider's configured endpoint is exempt on
+ *   its own origin only;
+ * - a timeout per request, a byte cap on the decoded body (the rest is never downloaded),
+ *   pacing per host, TLS certificates always verified.
  */
 export class GuardedHttpClient implements WebClient {
-  constructor(private readonly options: GuardedHttpOptions) {}
+  private readonly resolve: WebLookup;
+
+  constructor(private readonly options: GuardedHttpOptions) {
+    this.resolve =
+      options.lookup ?? ((hostname) => dns.lookup(hostname, { all: true, verbatim: true }));
+  }
 
   async request(rawUrl: string, init: WebRequestInit = {}): Promise<WebResponse> {
     let url = httpUrl(rawUrl);
+    const configuredOrigin = init.configuredEndpoint ? url.origin : undefined;
     let method = init.method ?? 'GET';
     let body = init.body;
     let headers: Record<string, string> = lowerKeys(init.headers ?? {});
     for (let hop = 0; ; hop++) {
-      await this.options.pacer.wait(url.host, init.minIntervalMs ?? 0, init.signal);
-      const answer = await this.send(url, method, headers, body, init);
+      const privateAllowed = url.origin === configuredOrigin || this.allowsPrivate(url);
+      checkLiteralAddress(url, privateAllowed);
+      const admitted = await init.admit?.(url);
+      const interval = Math.max(init.minIntervalMs ?? 0, admitted?.minIntervalMs ?? 0);
+      await this.options.pacer.wait(url.host, interval, init.signal);
+      const answer = await this.send(url, method, headers, body, init, privateAllowed);
       if (answer.location === undefined) return answer.response;
       if (hop >= this.options.maxRedirects) {
         throw new WebRequestRefusedError(
@@ -107,13 +143,62 @@ export class GuardedHttpClient implements WebClient {
     }
   }
 
+  /** `allowPrivateNetwork` is on, or names this host (with or without its port). */
+  private allowsPrivate(url: URL): boolean {
+    const allow = this.options.allowPrivateNetwork;
+    if (allow === true) return true;
+    if (!Array.isArray(allow)) return false;
+    const host = url.host.toLowerCase();
+    const name = url.hostname.toLowerCase();
+    const bare = name.replace(/^\[|\]$/g, '');
+    return allow.some((entry) => {
+      const wanted = entry.trim().toLowerCase();
+      return wanted === host || wanted === name || wanted === bare;
+    });
+  }
+
+  /**
+   * The connection's own DNS lookup: every address the name resolves to must be public, or
+   * the connection is refused before it opens.
+   */
+  private lookupFor(privateAllowed: boolean): LookupFunction {
+    return (hostname, options, callback) => {
+      this.resolve(hostname)
+        .then((found) => {
+          const family = options.family === 4 || options.family === 6 ? options.family : 0;
+          const addresses = found.filter((entry) => family === 0 || entry.family === family);
+          if (addresses.length === 0) {
+            throw Object.assign(new Error(`${hostname} has no address`), { code: 'ENOTFOUND' });
+          }
+          if (!privateAllowed) {
+            for (const { address } of addresses) {
+              const kind = nonPublicKind(address);
+              if (kind) {
+                throw new WebRequestRefusedError(
+                  `${hostname} resolves to ${address}, a ${kind} address: refused (allowPrivateNetwork is off)`,
+                  'private-address'
+                );
+              }
+            }
+          }
+          const [first] = addresses as [{ address: string; family: number }];
+          if (options.all) callback(null, addresses);
+          else callback(null, first.address, first.family);
+        })
+        .catch((error: unknown) => {
+          callback(error as NodeJS.ErrnoException, '', 0);
+        });
+    };
+  }
+
   /** One hop: the answer, or where it redirects to. */
   private send(
     url: URL,
     method: string,
     headers: Record<string, string>,
     body: string | undefined,
-    init: WebRequestInit
+    init: WebRequestInit,
+    privateAllowed: boolean
   ): Promise<{ response: WebResponse; location?: string }> {
     const label = `${method} ${url.origin}${url.pathname}`;
     const hop = new AbortController();
@@ -145,6 +230,7 @@ export class GuardedHttpClient implements WebClient {
         // A new connection each time: a pooled socket would skip the checks made when a
         // connection opens.
         agent: false,
+        lookup: this.lookupFor(privateAllowed),
         signal: hop.signal,
       });
       request.on('error', fail);
@@ -211,8 +297,25 @@ export function httpUrl(raw: string): URL {
   return url;
 }
 
+/**
+ * An IP written in the URL is not looked up, so it is checked here, before connecting:
+ * `127.0.0.1`, `[::1]`, `169.254.169.254`, `[::ffff:10.0.0.1]`…
+ */
+function checkLiteralAddress(url: URL, privateAllowed: boolean): void {
+  if (privateAllowed) return;
+  const literal = url.hostname.replace(/^\[|\]$/g, '');
+  if (!isIP(literal)) return;
+  const kind = nonPublicKind(literal);
+  if (kind) {
+    throw new WebRequestRefusedError(
+      `${url.host} is a ${kind} address: refused (allowPrivateNetwork is off)`,
+      'private-address'
+    );
+  }
+}
+
 /** Where a redirect leads, if the web tools may follow it. */
-function redirectTarget(from: URL, location: string, status: number): URL {
+export function redirectTarget(from: URL, location: string, status: number): URL {
   let next: URL;
   try {
     next = new URL(location, from);

@@ -88,6 +88,7 @@
     "src/__tests__/web-fetch.test.ts",
     "src/__tests__/web-pdf.test.ts",
     "src/__tests__/web-sources.test.ts",
+    "src/__tests__/web-safety.test.ts",
     "examples/cognitive-agent.ts",
     "examples/mcp-server.ts",
     "examples/mcp-openapi.ts",

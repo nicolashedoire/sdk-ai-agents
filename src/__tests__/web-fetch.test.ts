@@ -59,7 +59,13 @@ describe('web_fetch', () => {
   });
 
   function fetchTool(options: WebToolsOptions = {}): ToolDefinition {
-    const [tool] = webTools({ include: ['web_fetch'], hostIntervalMs: 0, ...options });
+    // The local server is on 127.0.0.1: only its host:port is let through.
+    const [tool] = webTools({
+      include: ['web_fetch'],
+      hostIntervalMs: 0,
+      allowPrivateNetwork: [server.host],
+      ...options,
+    });
     if (!tool) throw new Error('no web_fetch tool');
     return tool;
   }

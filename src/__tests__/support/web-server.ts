@@ -1,4 +1,9 @@
-import { createServer, type IncomingHttpHeaders, type Server, type ServerResponse } from 'node:http';
+import {
+  createServer,
+  type IncomingHttpHeaders,
+  type Server,
+  type ServerResponse,
+} from 'node:http';
 
 export interface WebRequest {
   method: string;
@@ -69,7 +74,8 @@ export class WebServer {
     });
     await new Promise<void>((resolve) => this.server?.listen(0, '127.0.0.1', resolve));
     const address = this.server.address();
-    if (!address || typeof address === 'string') throw new Error('the web server has no TCP address');
+    if (!address || typeof address === 'string')
+      throw new Error('the web server has no TCP address');
     this.base = `http://127.0.0.1:${address.port}`;
     return this.base;
   }
@@ -90,7 +96,11 @@ export class WebServer {
 /** A route answering `body` with a status and headers (HTML by default). */
 export function reply(
   body: string | Buffer,
-  { status = 200, type = 'text/html; charset=utf-8', headers = {} }: { status?: number; type?: string; headers?: Record<string, string> } = {}
+  {
+    status = 200,
+    type = 'text/html; charset=utf-8',
+    headers = {},
+  }: { status?: number; type?: string; headers?: Record<string, string> } = {}
 ): Route {
   return (_request, response) => {
     response.writeHead(status, { 'content-type': type, ...headers });

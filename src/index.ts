@@ -386,9 +386,11 @@ export type { CircuitBreakerOptions, ProviderFailure } from './tools/web/search-
 export type {
   ResponseHead,
   WebClient,
+  WebLookup,
   WebRequestInit,
   WebResponse,
 } from './tools/web/guarded-http.js';
+export { isPublicAddress } from './tools/web/ip-ranges.js';
 export { normalizeUrl } from './tools/web/results.js';
 export type { WebResult } from './tools/web/results.js';
 export {

@@ -44,6 +44,8 @@ export interface FetchSettings {
   hostIntervalMs: number;
   language?: string;
   signal?: AbortSignal;
+  /** Checks each hop (robots.txt) and may lengthen its pacing (Crawl-delay). */
+  admit?: (url: URL) => Promise<{ minIntervalMs?: number } | undefined>;
 }
 
 const HTML_TYPES = new Set(['text/html', 'application/xhtml+xml']);
@@ -97,6 +99,7 @@ export async function fetchPage(
       }
     },
     ...(settings.signal ? { signal: settings.signal } : {}),
+    ...(settings.admit ? { admit: settings.admit } : {}),
   });
   ensureOk(response, `GET ${response.url}`);
   const declared = mediaType(response.headers['content-type']);
