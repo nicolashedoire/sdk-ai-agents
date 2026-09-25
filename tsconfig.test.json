@@ -92,6 +92,7 @@
     "src/__tests__/web-study.test.ts",
     "src/__tests__/web-robots.test.ts",
     "src/__tests__/web-html-limits.test.ts",
+    "src/__tests__/web-pdf-prescan.test.ts",
     "examples/cognitive-agent.ts",
     "examples/mcp-server.ts",
     "examples/mcp-openapi.ts",

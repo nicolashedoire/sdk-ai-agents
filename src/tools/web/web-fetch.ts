@@ -7,7 +7,7 @@ import {
 } from './guarded-http.js';
 import { stripInvisible } from './html-entities.js';
 import { EXTRACT_BUDGET_MS, extractPage, type PageFormat } from './html-to-markdown.js';
-import { PDF_TIMEOUT_MS, pdfText } from './pdf-text.js';
+import { pdfText } from './pdf-text.js';
 import { isoDate } from './results.js';
 import { WebRequestRefusedError } from './web-errors.js';
 
@@ -112,7 +112,7 @@ export async function fetchPage(
     if (response.truncated) throw tooLarge(response.url, settings.maxPdfBytes);
     const pdf = await pdfText(response.body, {
       maxPages: settings.maxPdfPages,
-      timeoutMs: remaining(settings.deadline, PDF_TIMEOUT_MS),
+      ...(settings.deadline !== undefined ? { deadline: settings.deadline } : {}),
       ...(settings.signal ? { signal: settings.signal } : {}),
     });
     return {
