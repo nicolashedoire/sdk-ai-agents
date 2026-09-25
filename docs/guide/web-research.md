@@ -93,7 +93,7 @@ const tools = webTools({
 
 Each provider turns `site`, `freshness` and `language` into its own parameters (`site:` in the query, `df`, `time_range`, `freshness=pw`, `tbs=qdr:w`, `kl`, `search_lang`…). Results from another site than `site` are dropped, whichever provider found them.
 
-**Throttling.** A provider that throttles a search (HTTP 429, DuckDuckGo's captcha or empty page) gets one more try, after the wait it asked for (`Retry-After`) or `throttleWaitMs` (10 s), at most 30 s, when the call's deadline leaves room for it.
+**Throttling.** A provider that throttles a search (HTTP 429, DuckDuckGo's captcha or empty page) gets one more try, after the wait it asked for (`Retry-After`) or `throttleWaitMs` (10 s), when the call's deadline leaves room for it. One that asks for more than 30 s is never tried again sooner than it asked: it is skipped for that long (at least `circuitBreaker.cooldownMs`), and when no other provider answers, the call fails at once, `throttled`, with the wait asked for (`retryAfterMs`).
 
 **Circuit breaker.** A provider still throttled after that second try is left alone at once, any other one after three failures in a row: for two minutes, it is skipped without a request (`errors` says until when). Then it gets one more try. `circuitBreaker: { cooldownMs, failureThreshold }` changes both. When no provider answered, the error (`SearchUnavailableError`) says whether they were all throttled (`throttled`) and when a skipped one will be tried again (`retryAfterMs`): a study tries such a search once more, later.
 
@@ -140,7 +140,7 @@ const intranetSearch: SearchProvider = {
 | `maxPdfBytes` | `10000000` | Largest PDF read. A longer one is refused. |
 | `maxPdfPages` | `30` | Pages of a PDF read. |
 | `cache` | `{ ttlMs: 600000, maxEntries: 200, maxBytes: 20000000 }` | Results kept in memory per tool and arguments, at most `maxBytes` measured as JSON; `false` turns it off. |
-| `retry` | — | Retries of failed calls (`{ maxRetries }`): rate limits, server errors, timeouts and network failures; never a refusal, a missing setup (`WebConfigurationError`) or a search no provider answered (`SearchUnavailableError`). |
+| `retry` | — | Retries of failed calls (`{ maxRetries }`): server errors, timeouts and network failures; never a refusal, a missing setup (`WebConfigurationError`), a search no provider answered (`SearchUnavailableError`) or a throttle (HTTP 429, `SearchThrottledError`), which the tool already gave its second try. |
 | `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | The arXiv API asks for 3 s between requests, one at a time: they are counted from the end of the previous one. A refusal (HTTP 406, 429, 503) gets one more try after a wait. |
 | `wikipedia` | `{ baseUrl: 'https://{language}.wikipedia.org', language: 'en' }` | `{language}` is replaced by the search language. A `baseUrl` of yours is exempt from the private-network check only when `{language}` is not in its host. |
 | `github` | `{ baseUrl: 'https://api.github.com' }` | `token` raises the rate limit (10 searches a minute without one) and is needed to search code. |
