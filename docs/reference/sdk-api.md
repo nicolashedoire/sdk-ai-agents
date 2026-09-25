@@ -73,7 +73,7 @@ Your own provider implements `generateCompletion(request)`, `supportsModel(model
 
 | Method | Returns | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | Governed agent: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. It can only run its own tools (`tools`, `capabilities`), even if the model names another tool registered in the SDK; `signal` cancels the run; `onText` receives the text the model writes as it is written, and `onTextRestart` the part to drop when a failed model call is tried again (see [Streaming the answer](../guide/governed-agents#_7-streaming-the-answer)) |
+| `createAgent(config)` | `AgentImpl` | Governed agent: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`, `version`, `configHash`. It can only run its own tools (`tools`, `capabilities`), even if the model names another tool registered in the SDK; `signal` cancels the run; `onText` receives the text the model writes as it is written, and `onTextRestart` the part to drop when a failed model call is tried again (see [Streaming the answer](../guide/governed-agents#_7-streaming-the-answer)) |
 | `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()`. Its thoughts are structured and not streamed |
 | `defineTool(definition)` | `Tool` | Registers a tool; the handler is typed from its Zod schema |
 | `defineCapability(definition)` | `Capability` | Groups tools |
@@ -199,7 +199,83 @@ interface ModelCostLine {
 | `getTrace(runId)`, `exportTrace(runId, 'json' \| 'text')`, `getEvents(runId, filters?)` | Read runs |
 | `replay(runId, modifications?, { onEvent? })` | Re-execute without the LLM |
 | `getReasoningGraph`, `exportReasoningGraph`, `getAlternatives`, `getDecisionPatterns`, `getTraceVisualization` | Understand decisions |
-| `createGoldenTrace`, `getGoldenTraces`, `validateAgainstGoldenTrace`, `replayAndValidate`, `detectRegressions` | Test agents like code |
+
+### Golden traces
+
+| Method | Returns | |
+| --- | --- | --- |
+| `createGoldenTrace(runId, { name, description?, metadata? })` | `Promise<GoldenTrace>` | Keeps a run as a reference, with the name of the governed agent that ran it (`agentName`) |
+| `getGoldenTraces(agent?)`, `getGoldenTrace(id)`, `deleteGoldenTrace(id)`, `exportGoldenTrace(id, 'json' \| 'yaml')` | | `agent`: an agent's id or name |
+| `validateAgainstGoldenTrace(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | `pass`, `fail` or `partial`, with each difference (`event_added`, `event_removed`, `event_modified`, `event_order_changed`) and its position |
+| `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | The same differences as regressions, each with a severity and an impact: `no_regression` or `regressions_detected` |
+| `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | Replays the run, then validates the replay. A replay calls no model: compare it with `validateAspects: ['tools', 'policies']` |
+
+Runs are compared **by what their events mean**, never by event id (every run has new ones). Events are paired in order: identical events first, then events of the same type and subject (the tool, the operation, the answer) whose data changed, then events whose type changed for the same subject. Never compared: event ids, times, metadata, `incident.reported` events (they record deliveries and throttling; the event that raised the incident is compared), and the values the SDK writes that change from one run to the next: the duration of a tool call, token usage, retry delays, approval ids, the run a replay comes from, the time and source event of an observation. The text a model writes next to a tool call is compared in `intention.generated` only. A tool's parameters, result and input are always compared, whatever their keys: a `duration` argument that went from 30 to 60 is a change. A run that does the same thing again passes; a tool called with other arguments is reported where it happened (`parameters.metric: "churn" → "revenue"`); a call inserted before an identical one is one added call; an `action.executed` that became `action.failed` is one change, not a loss plus an addition.
+
+| Option | For | |
+| --- | --- | --- |
+| `ignoreEventTypes`, `validateAspects` (`intentions`, `actions`, `tools`, `policies`) | Validation | Compare fewer events |
+| `tolerance.dataFields` | Validation | More data fields left out, at any depth |
+| `tolerance.timestampMs`, `ignoreTimestampDiff` | Validation | Timing is compared, relative to the start of each run, only with `timestampMs` |
+| `compareStructureOnly` | Validation | Data differences give `partial`, not `fail`; events added, removed, moved or of another type still fail |
+| `tolerance.ignoreEventTypes`, `tolerance.ignoreDataFields` | Regressions | Compare fewer events, leave data fields out |
+| `tolerance.criticalEventTypes` | Regressions | Types whose appearance, loss or change is critical (default: `run.failed`, `action.failed`, `tool.failed`, `policy.violated`) |
+| `tolerance.maxEventCountDiff` | Regressions | Up to this many added or removed process events (policy checks, retries, approvals) are tolerated; a change of the result never is |
+| `tolerance.maxDurationDiff`, `severityThresholds` | Regressions | Duration is checked only with one of them: a run slower by more than `maxDurationDiff` ms regresses, with the severity of the highest threshold reached; a faster run never regresses |
+
+### Regression suites
+
+| Method | Returns | |
+| --- | --- | --- |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Saved in `regressionTestSuitesDir`. `agent`: the id or the name of an agent of this SDK. Each golden trace must exist; `input` defaults to the one the golden run received; a suite does not keep the `signal` or the callbacks (`onEvent`, `onText`, `onTextRestart`) of an input |
+| `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | Newest first |
+| `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | Every suite of the agent, oldest first: each test sends its input to the agent and compares the run with its golden trace; `suites` holds one result per suite |
+| `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | One suite |
+| `runRegressionTestsForCI(agent, options?)` | `Promise<{ results, exitCode }>` | `exitCode`: 0 every test passed, 1 a test found a regression, 2 a test could not run (error or timeout); `exitCode: false` in the options gives 0 |
+| `exportTestResults(results, 'junit' \| 'json' \| 'json-summary', { outputPath?, includeDetails? })` | `Promise<string>` | JUnit XML: one `<testsuite>` per suite; a test that could not run (error or timeout) is an `<error>`; characters XML cannot hold are removed |
+
+Agent ids are new in every process: a suite also records the **name** of its agent, and another process runs it with its agent of that name (with the suite's agent id first, when that agent is in the SDK). Within one SDK, an agent's id is its own: two agents with the same name (two versions, say) each keep their suites, assertions and golden traces, and a name designates all of them. Every agent created with `createAgent` stays in its SDK, so an application that creates an agent per request makes the name ambiguous: pass ids, or create each agent once and reuse it. Suites saved by earlier versions record no name: they run only in the process that created them. Options: `parallel` (the tests of a suite at the same time), `stopOnFirstFailure` (sequential runs only: nothing runs after the first test that does not pass, next suites included), `filterTags`, `excludeTags`, `timeout` (ms per test, 60 000 by default, at most 2 147 483 647; past it the run is cancelled and the test is `timeout`) and `detection` (the regression options above).
+
+### Assertions
+
+| Method | Returns | |
+| --- | --- | --- |
+| `defineAssertion(name, condition, { description?, severity?, tags?, agentId?, agentName? })` | `Promise<Assertion>` | For every run, or for one agent's runs; an agent of this SDK given by `agentId` also records its name. A condition that could not be evaluated is refused with a `ValidationError` |
+| `getAssertions(agent?, tags?)` | `Promise<Assertion[]>` | Newest first |
+| `evaluateAssertions(runId, assertionIds?)` | `Promise<AssertionEvaluationReport>` | The assertions given (an unknown id throws), or else the ones for every run plus those of the run's agent |
+| `deleteAssertion(assertionId)` | `Promise<void>` | |
+
+| `condition.type` | Needs | Passes when |
+| --- | --- | --- |
+| `event_present`, `event_absent` | `eventType` or `eventTypes` | One of the types occurs / none does |
+| `event_count` | `eventType` or `eventTypes`, then `count`, or `minCount` and `maxCount` | The number of such events fits |
+| `event_order` | `beforeEventType`, `afterEventType` | The first of one comes before the first of the other |
+| `event_value` | `eventType`, `valuePath`, `valueMatcher` (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `contains`, `regex`) | Every event of the type matches |
+| `custom` | `customEvaluator(events) => boolean` | The function returns `true` |
+
+A `custom` assertion holds a function, which cannot be written to a file: it is **not saved** and lasts as long as the SDK instance that defined it, so define it again at start-up. The other types are saved in `assertionsDir`.
+
+### Comparisons and impact
+
+| Method | Returns | |
+| --- | --- | --- |
+| `compareRuns(runId1, runId2, { ignoreEventTypes?, focusAspects?, compareStructureOnly?, includeMetadata? })` | `Promise<RunComparison>` | Differences aligned by meaning, as above: `event_added`, `event_removed`, `event_modified` (type changed), `data_changed`, `sequence_changed` |
+| `getComparisonReport(comparison, 'text' \| 'json' \| 'html')` | `Promise<string>` | |
+| `analyzeImpact(beforeRunIds, afterRunIds, { metrics?, includeRecommendations? })` | `Promise<ImpactAnalysis>` | Before and after averages of `duration` (ms), `cost` (USD of the priced model calls, as `getRunCost`), `quality` (share of events that are not failed actions) and `success_rate`, with behavior changes; saved in `impactAnalysesDir` |
+| `getImpactAnalysis(analysisId)` | `Promise<ImpactAnalysis>` | |
+| `compareVersions(agent, version1, version2, options?)` | `Promise<ImpactAnalysis>` | `analyzeImpact` on the runs of a governed agent (its name, or the id of an agent of this SDK) recorded with each version: its `version` or its `configHash`. Every agent with that name counts. Replays are left out; the two versions must differ and select different runs; an unknown version throws, listing the recorded ones |
+
+The lifecycle events of a governed agent's runs (`run.started`, `run.completed`…) record its `agentName`, `agentVersion` and `configHash`: two agents with the same name are one agent in two versions, or in two processes. The hash covers the model, the system prompt, `maxSteps` and `timeout`, the provider settings, `version`, the capabilities, the tools (name, description, version, parameter schema, metadata, retry settings) and the agent's own policies with their rules; it changes with `setPolicy` and `addTools`, and each run records the one it started with. Runs recorded by earlier versions only have the id and the version.
+
+### Queries across runs
+
+| Method | Returns |
+| --- | --- |
+| `queryEventsAdvanced(filter)` | `Promise<{ events, total, filtered, filters, executionTime }>`: matching events in time order (at most `limit`), events in scope, matching events |
+| `countEventsAdvanced(filter)` | `Promise<number>` |
+| `getEventStatistics(filter)` | `Promise<{ total, byType, byAgent }>` |
+
+A filter has a **scope** — `runId` (without it, every run), `since`, `until` — and **conditions** — `type`, `agentId`, `userId`, `sessionId`, `dataFilters` (`{ path, operator, value?, regex? }`) and `metadataFilters` (`{ field, operator, value? }`). The conditions are combined with `logic` (`and` by default; `or`: at least one), then negated by `not`; the scope never is. Every built-in store answers: the file store reads each run file once per query, the SQL stores query the database. When every condition must hold, the database narrows the events by type and ids itself; with `or` or `not`, the store returns every event in scope and the conditions are checked in memory, which costs more on a large database. Events of the same millisecond keep the order of their run: runs by id, then in the order each run recorded them.
 
 ## Live events
 
@@ -211,7 +287,7 @@ A listener is `(event: Event) => unknown`. It gets one event at a time, in the o
 | `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | The same for a cognitive run, whose `limits.timeoutMs` also ends the wait |
 | `replay(runId, modifications?, { onEvent })` | The same for a replay, which cannot be cancelled: it always waits |
 | `executeTool(name, params, { onEvent })` | The events of the call, and of the runs its tool starts, one level deep: the handler gets the listener as `context.onEvent`, which `governedAgentTool` and `cognitiveAgentTool` pass to their agent (an agent built by hand on a store without live events runs without it). `signal` ends the wait |
-| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: every event of every run that matches the filter (`agentId` is `metadata.agentId`), until you call the returned function, which drops the events not yet delivered |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: every event of every run that matches the filter (`agentId` is `metadata.agentId`), until you call the returned function, which drops the events not yet delivered. Regression-suite runs and replays are real runs: it gets their events too (a suite does not keep the `onEvent` or `onText` of its input) |
 | `new ObservedEventStore(store, { onListenerError? })` | The layer that delivers them; the SDK wraps its store in one, or uses the one you give as `eventStore`, also inside a `MonitoredEventStore` (whose incident reports are then delivered too). Its `subscribe(listener, options?)` returns `{ unsubscribe(), close() }`: `close()` waits until the listener has settled on the events it already took. `onListenerError` gets listener errors and drops |
 
 ## Tools: `ToolDefinition`

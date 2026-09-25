@@ -136,4 +136,28 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-回归测试套件、行为断言、运行比较以及部署前的影响分析也都可用——参见 [SDK API](../reference/sdk-api)。
+运行按照事件的含义来比较，即类型、顺序、工具、参数和结果，从不按每次运行都会更新的事件 id 比较；时间、token 数量以及由 SDK 写入、每次运行都会变化的其他值也不参与比较，但工具的参数和结果总是会被比较，无论其键名是什么。再次做同样事情的运行会通过；用别的参数调用的工具会在调用发生的位置被报告。
+
+### 在 CI 中运行回归测试套件 {#regression-suites-in-ci}
+
+先把黄金追踪记录组合成一个套件，然后在 CI 中运行它：
+
+```ts
+// Once, after recording the good runs
+await sdk.createRegressionTestSuite('support-agent', {
+  name: 'refunds',
+  goldenTraces: [{ goldenTraceId: golden.id, name: 'refund flow' }],
+});
+
+// In CI: the same agent, created again
+sdk.createAgent({ name: 'support-agent', model: 'gpt-4o', tools });
+const { results, exitCode } = await sdk.runRegressionTestsForCI('support-agent', {
+  detection: { tolerance: { ignoreEventTypes: ['intention.generated'], ignoreDataFields: ['output'] } },
+});
+await sdk.exportTestResults(results, 'junit', { outputPath: 'regressions.xml' });
+process.exitCode = exitCode;
+```
+
+套件通过**名称**认出它的智能体，因为智能体的 id 在每个进程中都是新的。该智能体的所有套件都会按从旧到新的顺序运行：每个测试把参照运行的输入发给智能体，并把新的运行与黄金追踪记录比较。所有测试通过时退出码为 0，有测试发现回归时为 1，有测试无法运行时为 2。真实的模型每次运行的措辞都会不同：上面的 `detection` 排除了模型的文本和最终回答，但仍会检查每一次工具调用及其参数。
+
+针对运行事件的断言、两次运行的比较、智能体新版本的影响以及跨所有运行的查询，请参见 [SDK API](../reference/sdk-api#assertions)。

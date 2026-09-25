@@ -1,7 +1,8 @@
 import type { SQLConnection, SQLEventStoreConfig } from './sql-event-store.js';
-import type { Event, EventFilters, EventAggregation } from '../types/events.js';
+import type { Event, EventFilters, EventAggregation, EventQueryResult } from '../types/events.js';
 import type { BackupData } from './event-store.js';
 import { SQLEventStore } from './sql-event-store.js';
+import { fieldQueryPath } from '../utils/event-filters.js';
 
 export interface PostgreSQLConfig {
   host: string;
@@ -72,9 +73,23 @@ export class PostgreSQLEventStore extends SQLEventStore {
         timestamp BIGINT NOT NULL,
         data JSONB NOT NULL,
         metadata JSONB,
+        seq BIGSERIAL,
         CONSTRAINT events_run_id_fk FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
       )
     `;
+    // The order events were appended in: events of the same millisecond have random ids, and a
+    // table has no order of its own. Tables created by earlier versions get the column here.
+    const addSequenceSQL = `ALTER TABLE ${this.tableName} ADD COLUMN IF NOT EXISTS seq BIGSERIAL`;
+    // PostgreSQL 12 and earlier create the column's sequence even when IF NOT EXISTS skips the
+    // column: the column is looked up first, so a start leaves no unused sequence behind. The
+    // table name is not quoted in the SQL, so PostgreSQL folds it to lower case; without a
+    // schema, it is in the first schema of the search path (where CREATE TABLE put it).
+    const findSequenceSQL = `SELECT 1 FROM information_schema.columns
+      WHERE table_schema = COALESCE($1, current_schema()) AND table_name = $2 AND column_name = 'seq'`;
+    const tableParams = [
+      this.schemaName?.toLowerCase() ?? null,
+      this.unqualifiedTableName.toLowerCase(),
+    ];
 
     // Create indexes for common queries
     const createIndexesSQL = [
@@ -82,6 +97,7 @@ export class PostgreSQLEventStore extends SQLEventStore {
       `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_type ON ${this.tableName}(type)`,
       `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_timestamp ON ${this.tableName}(timestamp)`,
       `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_run_timestamp ON ${this.tableName}(run_id, timestamp)`,
+      `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_run_timestamp_seq ON ${this.tableName}(run_id, timestamp, seq)`,
       `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_type_timestamp ON ${this.tableName}(type, timestamp)`,
       // GIN indexes for JSONB queries (PostgreSQL-specific)
       `CREATE INDEX IF NOT EXISTS ${this.indexPrefix}_metadata_gin ON ${this.tableName} USING GIN (metadata)`,
@@ -103,6 +119,9 @@ export class PostgreSQLEventStore extends SQLEventStore {
 
     await connection.execute(createRunsTableSQL);
     await connection.execute(createTableSQL);
+    if ((await connection.query(findSequenceSQL, tableParams)).length === 0) {
+      await connection.execute(addSequenceSQL);
+    }
 
     for (const indexSQL of createIndexesSQL) {
       await connection.execute(indexSQL);
@@ -164,7 +183,8 @@ export class PostgreSQLEventStore extends SQLEventStore {
     sql = updatedSQL;
     paramIndex = updatedParamIndex;
 
-    sql += ' ORDER BY timestamp ASC';
+    // Events of the same millisecond in the order they were appended.
+    sql += ' ORDER BY timestamp ASC, seq ASC';
 
     if (filters?.limit !== undefined) {
       sql += ` LIMIT $${paramIndex}`;
@@ -172,27 +192,49 @@ export class PostgreSQLEventStore extends SQLEventStore {
       paramIndex++;
     }
 
-    const rows = await this.connection.query<{
-      id: string;
-      run_id: string;
-      type: string;
-      timestamp: number;
-      data: string | Record<string, unknown>;
-      metadata: string | Record<string, unknown> | null;
-    }>(sql, params);
+    const rows = await this.connection.query<PostgreSQLEventRow>(sql, params);
+    return rows.map(toEvent);
+  }
 
-    return rows.map((row) => ({
-      id: row.id,
-      runId: row.run_id,
-      type: row.type as Event['type'],
-      timestamp: row.timestamp,
-      data: typeof row.data === 'string' ? JSON.parse(row.data) : row.data,
-      metadata: row.metadata
-        ? typeof row.metadata === 'string'
-          ? JSON.parse(row.metadata)
-          : row.metadata
-        : undefined,
-    }));
+  /**
+   * Queries events across all runs, in time order. The base class writes `?` placeholders and
+   * parses JSON text; PostgreSQL numbers its placeholders and returns JSONB already parsed.
+   */
+  async queryEvents(
+    filters?: EventFilters,
+    aggregation?: EventAggregation
+  ): Promise<EventQueryResult> {
+    const params: unknown[] = [];
+    const { sql: filtered, paramIndex } = this.applyFiltersToSQLPostgreSQL(
+      `SELECT * FROM ${this.tableName} WHERE 1=1`,
+      params,
+      filters
+    );
+    // Events of the same millisecond by run, then in the order each run recorded them.
+    let sql = `${filtered} ORDER BY timestamp ASC, run_id ASC, seq ASC`;
+    if (filters?.limit !== undefined) {
+      sql += ` LIMIT $${paramIndex}`;
+      params.push(filters.limit);
+    }
+
+    const rows = await this.connection.query<PostgreSQLEventRow>(sql, params);
+    const events = rows.map(toEvent);
+    return {
+      events,
+      aggregation: aggregation ? await this.applyAggregation(events, aggregation) : undefined,
+    };
+  }
+
+  /** Counts events matching filters (PostgreSQL returns COUNT(*) as a string). */
+  async countEvents(filters?: EventFilters): Promise<number> {
+    const params: unknown[] = [];
+    const { sql } = this.applyFiltersToSQLPostgreSQL(
+      `SELECT COUNT(*) as count FROM ${this.tableName} WHERE 1=1`,
+      params,
+      filters
+    );
+    const rows = await this.connection.query<{ count: number | string }>(sql, params);
+    return Number(rows[0]?.count ?? 0);
   }
 
   /**
@@ -207,14 +249,15 @@ export class PostgreSQLEventStore extends SQLEventStore {
   ): { sql: string; params: unknown[] } {
     if (!filters) return { sql, params };
 
-    // Use PostgreSQL-specific filter application
+    // PostgreSQL numbers its placeholders: the ones added continue after the given parameters.
+    const allParams = [...params];
     const { sql: updatedSQL } = this.applyFiltersToSQLPostgreSQL(
       sql,
-      params,
+      allParams,
       filters,
       params.length + 1
     );
-    return { sql: updatedSQL, params };
+    return { sql: updatedSQL, params: allParams };
   }
 
   /**
@@ -271,22 +314,43 @@ export class PostgreSQLEventStore extends SQLEventStore {
       params.push(filters.sessionId);
     }
 
-    // JSON data queries - PostgreSQL JSONB syntax
-    if (filters.dataQuery) {
-      const { field, operator, value } = filters.dataQuery;
-      const jsonPath = `data->>'${field}'`;
-
-      switch (operator) {
+    // JSON data and metadata queries: the path (a text[]) and the value are bound parameters.
+    for (const [column, query, name] of [
+      ['data', filters.dataQuery, 'dataQuery'],
+      ['metadata', filters.metadataQuery, 'metadataQuery'],
+    ] as const) {
+      if (!query) continue;
+      const path = `$${paramIndex++}::text[]`;
+      params.push(fieldQueryPath(query, name));
+      const at = `(${column} #> ${path})`;
+      const text = `(${column} #>> ${path})`;
+      switch (query.operator) {
         case 'eq':
-          resultSQL += ` AND ${jsonPath} = $${paramIndex++}`;
-          params.push(JSON.stringify(value));
+          // jsonb equality: "4%" matches only the string, 5 the number 5 or 5.0.
+          resultSQL += ` AND ${at} = $${paramIndex++}::jsonb`;
+          params.push(JSON.stringify(query.value));
           break;
         case 'ne':
-          resultSQL += ` AND ${jsonPath} != $${paramIndex++}`;
-          params.push(JSON.stringify(value));
+          // A missing field is different from any value.
+          resultSQL += ` AND (${at} = $${paramIndex++}::jsonb) IS NOT TRUE`;
+          params.push(JSON.stringify(query.value));
+          break;
+        case 'gt':
+        case 'gte':
+        case 'lt':
+        case 'lte': {
+          const operator = { gt: '>', gte: '>=', lt: '<', lte: '<=' }[query.operator];
+          // CASE keeps the cast from running on values that are not numbers.
+          resultSQL += ` AND (CASE WHEN jsonb_typeof(${at}) = 'number' THEN ${text}::numeric END) ${operator} $${paramIndex++}`;
+          params.push(query.value);
+          break;
+        }
+        case 'contains':
+          resultSQL += ` AND jsonb_typeof(${at}) = 'string' AND strpos(${text}, $${paramIndex++}) > 0`;
+          params.push(query.value);
           break;
         case 'exists':
-          resultSQL += ` AND ${jsonPath} IS NOT NULL`;
+          resultSQL += ` AND COALESCE(jsonb_typeof(${at}), 'null') <> 'null'`;
           break;
       }
     }
@@ -349,6 +413,17 @@ export class PostgreSQLEventStore extends SQLEventStore {
   }
 
   /**
+   * Every event, in the order `queryEvents` returns them (see the base class), with the JSONB
+   * and BIGINT columns as node-postgres returns them.
+   */
+  protected async backupEvents(): Promise<BackupData['events']> {
+    const rows = await this.connection.query<PostgreSQLEventRow>(
+      `SELECT * FROM ${this.tableName} ORDER BY timestamp ASC, run_id ASC, seq ASC`
+    );
+    return rows.map((row) => ({ runId: row.run_id, event: toEvent(row) }));
+  }
+
+  /**
    * Override restore to handle PostgreSQL-specific syntax for runs table.
    */
   async restore(backupData: BackupData): Promise<void> {
@@ -385,4 +460,29 @@ export class PostgreSQLEventStore extends SQLEventStore {
       }
     }
   }
+}
+
+/** A row as node-postgres returns it: JSONB columns parsed, BIGINT columns as strings. */
+interface PostgreSQLEventRow {
+  id: string;
+  run_id: string;
+  type: string;
+  timestamp: number | string;
+  data: string | Record<string, unknown>;
+  metadata: string | Record<string, unknown> | null;
+}
+
+function toEvent(row: PostgreSQLEventRow): Event {
+  return {
+    id: row.id,
+    runId: row.run_id,
+    type: row.type as Event['type'],
+    timestamp: Number(row.timestamp),
+    data: typeof row.data === 'string' ? JSON.parse(row.data) : row.data,
+    metadata: row.metadata
+      ? typeof row.metadata === 'string'
+        ? JSON.parse(row.metadata)
+        : row.metadata
+      : undefined,
+  };
 }

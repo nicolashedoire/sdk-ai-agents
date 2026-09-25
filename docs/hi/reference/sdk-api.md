@@ -73,7 +73,7 @@ const analyst = sdk.createAgent({
 
 | Method | लौटाता है | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | नियंत्रित एजेंट: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`। यह सिर्फ़ अपने टूल (`tools`, `capabilities`) चला सकता है, भले ही मॉडल SDK में रजिस्टर किसी दूसरे टूल का नाम ले; `signal` run को रद्द करता है; `onText` मॉडल का लिखा text लिखे जाते समय ही पाता है, और `onTextRestart` वह हिस्सा जिसे किसी विफल मॉडल कॉल के दोबारा आज़माए जाने पर हटाना है (देखें [जवाब स्ट्रीम करना](../guide/governed-agents#_7-streaming-the-answer)) |
+| `createAgent(config)` | `AgentImpl` | नियंत्रित एजेंट: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`, `version`, `configHash`। यह सिर्फ़ अपने टूल (`tools`, `capabilities`) चला सकता है, भले ही मॉडल SDK में रजिस्टर किसी दूसरे टूल का नाम ले; `signal` run को रद्द करता है; `onText` मॉडल का लिखा text लिखे जाते समय ही पाता है, और `onTextRestart` वह हिस्सा जिसे किसी विफल मॉडल कॉल के दोबारा आज़माए जाने पर हटाना है (देखें [जवाब स्ट्रीम करना](../guide/governed-agents#_7-streaming-the-answer)) |
 | `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()`। इसके विचार संरचित होते हैं और स्ट्रीम नहीं किए जाते |
 | `defineTool(definition)` | `Tool` | एक टूल रजिस्टर करता है; handler का टाइप उसके Zod स्कीमा से निकलता है |
 | `defineCapability(definition)` | `Capability` | टूल को समूह में रखता है |
@@ -199,7 +199,83 @@ interface ModelCostLine {
 | `getTrace(runId)`, `exportTrace(runId, 'json' \| 'text')`, `getEvents(runId, filters?)` | runs पढ़ें |
 | `replay(runId, modifications?, { onEvent? })` | LLM के बिना दोबारा चलाएँ |
 | `getReasoningGraph`, `exportReasoningGraph`, `getAlternatives`, `getDecisionPatterns`, `getTraceVisualization` | निर्णयों को समझें |
-| `createGoldenTrace`, `getGoldenTraces`, `validateAgainstGoldenTrace`, `replayAndValidate`, `detectRegressions` | एजेंटों को कोड की तरह टेस्ट करें |
+
+### गोल्डन ट्रेस {#golden-traces}
+
+| Method | लौटाता है | |
+| --- | --- | --- |
+| `createGoldenTrace(runId, { name, description?, metadata? })` | `Promise<GoldenTrace>` | किसी run को संदर्भ के रूप में रखता है, उसे चलाने वाले नियंत्रित एजेंट के नाम (`agentName`) के साथ |
+| `getGoldenTraces(agent?)`, `getGoldenTrace(id)`, `deleteGoldenTrace(id)`, `exportGoldenTrace(id, 'json' \| 'yaml')` | | `agent`: किसी एजेंट का id या नाम |
+| `validateAgainstGoldenTrace(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | `pass`, `fail` या `partial`, हर अंतर (`event_added`, `event_removed`, `event_modified`, `event_order_changed`) और उसकी जगह के साथ |
+| `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | वही अंतर रिग्रेशन के रूप में, हर एक की गंभीरता और असर के साथ: `no_regression` या `regressions_detected` |
+| `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | run को रीप्ले करता है, फिर रीप्ले को सत्यापित करता है। रीप्ले कोई मॉडल कॉल नहीं करता: उसकी तुलना `validateAspects: ['tools', 'policies']` के साथ करें |
+
+runs की तुलना **उनके इवेंट्स के अर्थ से** होती है, इवेंट id से कभी नहीं (हर run में नए id होते हैं)। इवेंट्स को क्रम से जोड़ा जाता है: पहले एक जैसे इवेंट्स, फिर एक ही प्रकार और विषय (टूल, ऑपरेशन, जवाब) वाले वे इवेंट्स जिनका डेटा बदला, फिर वे इवेंट्स जिनका प्रकार उसी विषय के लिए बदला। जिनकी तुलना कभी नहीं होती: इवेंट id, समय, metadata, `incident.reported` इवेंट्स (ये सूचनाएँ भेजने और उन पर रोक को दर्ज करते हैं; घटना शुरू करने वाले इवेंट की तुलना होती है), और वे मान जो SDK लिखता है और जो हर run में बदलते हैं: किसी टूल कॉल की अवधि, tokens का इस्तेमाल, दोबारा कोशिश से पहले का इंतज़ार, मंज़ूरी के id, वह run जिससे कोई रीप्ले आया, किसी observation का समय और स्रोत इवेंट। टूल कॉल के साथ मॉडल जो टेक्स्ट लिखता है, उसकी तुलना सिर्फ़ `intention.generated` में होती है। किसी टूल के पैरामीटर, नतीजे और इनपुट की तुलना हमेशा होती है, उनकी keys के नाम चाहे जो हों: 30 से 60 हुआ `duration` argument एक बदलाव है। वही काम दोबारा करने वाला run पास होता है; दूसरे arguments के साथ कॉल किया गया टूल वहीं बताया जाता है जहाँ कॉल हुई (`parameters.metric: "churn" → "revenue"`); किसी एक जैसी कॉल से पहले जोड़ी गई कॉल एक ही जोड़ी गई कॉल है; `action.executed` जो `action.failed` बन गया, वह एक ही बदलाव है, कोई कमी और एक जोड़ नहीं।
+
+| विकल्प | किसके लिए | |
+| --- | --- | --- |
+| `ignoreEventTypes`, `validateAspects` (`intentions`, `actions`, `tools`, `policies`) | सत्यापन | कम इवेंट्स की तुलना करें |
+| `tolerance.dataFields` | सत्यापन | किसी भी गहराई पर और डेटा फ़ील्ड छोड़ें |
+| `tolerance.timestampMs`, `ignoreTimestampDiff` | सत्यापन | समय की तुलना, हर run की शुरुआत के सापेक्ष, सिर्फ़ `timestampMs` होने पर होती है |
+| `compareStructureOnly` | सत्यापन | डेटा के अंतर `fail` नहीं, `partial` देते हैं; जोड़े गए, हटाए गए, खिसकाए गए या बदले प्रकार वाले इवेंट अब भी fail होते हैं |
+| `tolerance.ignoreEventTypes`, `tolerance.ignoreDataFields` | रिग्रेशन | कम इवेंट्स की तुलना करें, डेटा फ़ील्ड छोड़ें |
+| `tolerance.criticalEventTypes` | रिग्रेशन | वे प्रकार जिनका आना, गायब होना या बदलना गंभीर है (डिफ़ॉल्ट: `run.failed`, `action.failed`, `tool.failed`, `policy.violated`) |
+| `tolerance.maxEventCountDiff` | रिग्रेशन | जोड़े या हटाए गए प्रक्रिया इवेंट्स (नीति जाँच, दोबारा कोशिशें, मंज़ूरियाँ) इस संख्या तक सहे जाते हैं; नतीजे का बदलना कभी नहीं |
+| `tolerance.maxDurationDiff`, `severityThresholds` | रिग्रेशन | अवधि की जाँच इनमें से किसी एक के होने पर ही होती है: जो run `maxDurationDiff` ms से ज़्यादा धीमा हो, वह रिग्रेशन है, पहुँची हुई सबसे ऊँची सीमा की गंभीरता के साथ; तेज़ run कभी रिग्रेशन नहीं होता |
+
+### रिग्रेशन सूट {#regression-suites}
+
+| Method | लौटाता है | |
+| --- | --- | --- |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | `regressionTestSuitesDir` में सहेजा जाता है। `agent`: इस SDK के किसी एजेंट का id या नाम। हर गोल्डन ट्रेस मौजूद होना चाहिए; `input` डिफ़ॉल्ट रूप से वह इनपुट है जो संदर्भ run को मिला था; सूट किसी इनपुट का `signal` और callbacks (`onEvent`, `onText`, `onTextRestart`) नहीं रखता |
+| `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | सबसे नए पहले |
+| `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | एजेंट के सभी सूट, सबसे पुराना पहले: हर टेस्ट अपना इनपुट एजेंट को भेजता है और run की तुलना अपने गोल्डन ट्रेस से करता है; `suites` में हर सूट का एक नतीजा होता है |
+| `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | एक सूट |
+| `runRegressionTestsForCI(agent, options?)` | `Promise<{ results, exitCode }>` | `exitCode`: 0 सभी टेस्ट पास, 1 किसी टेस्ट को रिग्रेशन मिला, 2 कोई टेस्ट चल नहीं सका (त्रुटि या समय-सीमा खत्म); विकल्पों में `exitCode: false` देने पर 0 |
+| `exportTestResults(results, 'junit' \| 'json' \| 'json-summary', { outputPath?, includeDetails? })` | `Promise<string>` | JUnit XML में हर सूट का एक `<testsuite>`; जो टेस्ट चल नहीं सका (त्रुटि या समय-सीमा खत्म) वह `<error>` होता है; जिन characters को XML नहीं रख सकता, वे हटा दिए जाते हैं |
+
+एजेंट के id हर प्रोसेस में नए होते हैं: इसलिए सूट अपने एजेंट का **नाम** भी दर्ज करता है, और कोई दूसरा प्रोसेस उसे उसी नाम वाले अपने एजेंट के साथ चलाता है (पहले सूट के एजेंट id से, अगर वह एजेंट SDK में हो)। एक SDK के भीतर, किसी एजेंट का id सिर्फ़ उसी का है: एक ही नाम वाले दो एजेंट (जैसे दो versions) अपने-अपने सूट, assertions और गोल्डन ट्रेस रखते हैं, और नाम उन सभी को दर्शाता है। `createAgent` से बना हर एजेंट अपने SDK में बना रहता है, इसलिए हर request पर एजेंट बनाने वाला application नाम को अस्पष्ट बना देता है: id दें, या हर एजेंट एक बार बनाकर उसे दोबारा इस्तेमाल करें। पुराने versions के सहेजे सूट में नाम नहीं होता: वे सिर्फ़ उसी प्रोसेस में चलते हैं जिसने उन्हें बनाया। विकल्प: `parallel` (एक सूट के टेस्ट एक साथ), `stopOnFirstFailure` (सिर्फ़ क्रमवार runs में: पास न होने वाले पहले टेस्ट के बाद कुछ नहीं चलता, अगले सूट भी नहीं), `filterTags`, `excludeTags`, `timeout` (हर टेस्ट के लिए ms, डिफ़ॉल्ट 60 000, ज़्यादा से ज़्यादा 2 147 483 647; इसके बाद run रद्द होता है और टेस्ट `timeout` होता है) और `detection` (ऊपर के रिग्रेशन विकल्प)।
+
+### Assertions {#assertions}
+
+| Method | लौटाता है | |
+| --- | --- | --- |
+| `defineAssertion(name, condition, { description?, severity?, tags?, agentId?, agentName? })` | `Promise<Assertion>` | सभी runs के लिए, या किसी एक एजेंट के runs के लिए; `agentId` से दिया गया इस SDK का एजेंट अपना नाम भी दर्ज करता है। जिस शर्त को जाँचा न जा सके, उसे `ValidationError` के साथ ठुकराया जाता है |
+| `getAssertions(agent?, tags?)` | `Promise<Assertion[]>` | सबसे नए पहले |
+| `evaluateAssertions(runId, assertionIds?)` | `Promise<AssertionEvaluationReport>` | दी गई assertions (अनजान id पर त्रुटि), नहीं तो सभी runs वाली assertions और उस run के एजेंट की assertions |
+| `deleteAssertion(assertionId)` | `Promise<void>` | |
+
+| `condition.type` | ज़रूरत | पास होती है जब |
+| --- | --- | --- |
+| `event_present`, `event_absent` | `eventType` या `eventTypes` | कोई एक प्रकार आता है / कोई नहीं आता |
+| `event_count` | `eventType` या `eventTypes`, फिर `count`, या `minCount` और `maxCount` | ऐसे इवेंट्स की संख्या सही बैठती है |
+| `event_order` | `beforeEventType`, `afterEventType` | एक का पहला इवेंट दूसरे के पहले इवेंट से पहले आता है |
+| `event_value` | `eventType`, `valuePath`, `valueMatcher` (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `contains`, `regex`) | उस प्रकार का हर इवेंट मेल खाता है |
+| `custom` | `customEvaluator(events) => boolean` | फ़ंक्शन `true` लौटाता है |
+
+`custom` assertion में एक फ़ंक्शन होता है, जिसे फ़ाइल में नहीं लिखा जा सकता: इसलिए वह **सहेजी नहीं जाती** और तभी तक रहती है जब तक उसे परिभाषित करने वाला SDK instance रहता है; शुरुआत में उसे दोबारा परिभाषित करें। बाकी प्रकार `assertionsDir` में सहेजे जाते हैं।
+
+### तुलना और असर {#comparisons-and-impact}
+
+| Method | लौटाता है | |
+| --- | --- | --- |
+| `compareRuns(runId1, runId2, { ignoreEventTypes?, focusAspects?, compareStructureOnly?, includeMetadata? })` | `Promise<RunComparison>` | ऊपर की तरह अर्थ से मिलाए गए अंतर: `event_added`, `event_removed`, `event_modified` (प्रकार बदला), `data_changed`, `sequence_changed` |
+| `getComparisonReport(comparison, 'text' \| 'json' \| 'html')` | `Promise<string>` | |
+| `analyzeImpact(beforeRunIds, afterRunIds, { metrics?, includeRecommendations? })` | `Promise<ImpactAnalysis>` | पहले और बाद के औसत: `duration` (ms), `cost` (जिन मॉडल कॉल की कीमत है उनके USD, `getRunCost` की तरह), `quality` (उन इवेंट्स का हिस्सा जो विफल actions नहीं हैं) और `success_rate`, व्यवहार के बदलावों के साथ; `impactAnalysesDir` में सहेजा जाता है |
+| `getImpactAnalysis(analysisId)` | `Promise<ImpactAnalysis>` | |
+| `compareVersions(agent, version1, version2, options?)` | `Promise<ImpactAnalysis>` | किसी नियंत्रित एजेंट (उसका नाम, या इस SDK के किसी एजेंट का id) के उन runs पर `analyzeImpact` जो हर version के साथ दर्ज हुए: उसका `version` या उसका `configHash`। उस नाम वाले सभी एजेंट गिने जाते हैं। रीप्ले शामिल नहीं होते; दोनों versions अलग होने चाहिए और अलग runs चुनने चाहिए; अनजान version पर त्रुटि आती है, जिसमें दर्ज versions की सूची होती है |
+
+किसी नियंत्रित एजेंट के runs के जीवनचक्र इवेंट (`run.started`, `run.completed`…) उसका `agentName`, `agentVersion` और `configHash` दर्ज करते हैं: एक ही नाम वाले दो एजेंट दो versions में, या दो प्रोसेस में, एक ही एजेंट हैं। hash में मॉडल, system prompt, `maxSteps` और `timeout`, provider की सेटिंग्स, `version`, capabilities, टूल (नाम, विवरण, version, पैरामीटर schema, metadata, दोबारा कोशिश की सेटिंग्स) और एजेंट की अपनी नीतियाँ उनके नियमों सहित शामिल हैं; यह `setPolicy` और `addTools` से बदलता है, और हर run वही hash दर्ज करता है जिसके साथ वह शुरू हुआ। पुराने versions के दर्ज किए runs में सिर्फ़ id और version होते हैं।
+
+### सभी runs पर क्वेरी {#queries-across-runs}
+
+| Method | लौटाता है |
+| --- | --- |
+| `queryEventsAdvanced(filter)` | `Promise<{ events, total, filtered, filters, executionTime }>`: मेल खाने वाले इवेंट्स समय के क्रम में (ज़्यादा से ज़्यादा `limit`), दायरे के इवेंट्स की संख्या, मेल खाने वालों की संख्या |
+| `countEventsAdvanced(filter)` | `Promise<number>` |
+| `getEventStatistics(filter)` | `Promise<{ total, byType, byAgent }>` |
+
+किसी फ़िल्टर में एक **दायरा** होता है — `runId` (इसके बिना, सभी runs), `since`, `until` — और कुछ **शर्तें** — `type`, `agentId`, `userId`, `sessionId`, `dataFilters` (`{ path, operator, value?, regex? }`) और `metadataFilters` (`{ field, operator, value? }`)। शर्तों को `logic` से जोड़ा जाता है (डिफ़ॉल्ट `and`; `or`: कम से कम एक), फिर `not` से उलटा जाता है; दायरा कभी नहीं उलटा जाता। हर built-in स्टोर जवाब देता है: फ़ाइल स्टोर हर क्वेरी में हर run की फ़ाइल एक बार पढ़ता है, SQL स्टोर डेटाबेस से पूछते हैं। जब सभी शर्तें ज़रूरी हों, डेटाबेस खुद प्रकार और id से इवेंट्स छाँटता है; `or` या `not` के साथ, स्टोर दायरे के सभी इवेंट्स लौटाता है और शर्तें memory में जाँची जाती हैं, जो बड़े डेटाबेस पर ज़्यादा महँगा पड़ता है। एक ही millisecond के इवेंट्स अपने run का क्रम बनाए रखते हैं: runs id के क्रम में, फिर हर run के भीतर उसी क्रम में जिसमें उसने उन्हें दर्ज किया।
 
 ## लाइव इवेंट {#live-events}
 
@@ -211,7 +287,7 @@ interface ModelCostLine {
 | `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | संज्ञानात्मक run के लिए भी यही, जिसका `limits.timeoutMs` भी इंतज़ार खत्म करता है |
 | `replay(runId, modifications?, { onEvent })` | रीप्ले के लिए भी यही, जिसे रद्द नहीं किया जा सकता: वह हमेशा इंतज़ार करता है |
 | `executeTool(name, params, { onEvent })` | कॉल के इवेंट, और उसके टूल द्वारा शुरू किए गए runs के इवेंट, सिर्फ़ एक स्तर तक: handler को listener `context.onEvent` के रूप में मिलता है, जिसे `governedAgentTool` और `cognitiveAgentTool` अपने एजेंट को देते हैं (लाइव इवेंट के बिना वाले स्टोर पर हाथ से बनाया गया एजेंट इसके बिना चलता है)। `signal` इंतज़ार खत्म करता है |
-| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: फ़िल्टर से मेल खाने वाले हर run का हर इवेंट (`agentId` का मतलब `metadata.agentId` है), जब तक आप लौटाया गया फ़ंक्शन कॉल नहीं करते, जो अभी तक न पहुँचाए गए इवेंट छोड़ देता है |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: फ़िल्टर से मेल खाने वाले हर run का हर इवेंट (`agentId` का मतलब `metadata.agentId` है), जब तक आप लौटाया गया फ़ंक्शन कॉल नहीं करते, जो अभी तक न पहुँचाए गए इवेंट छोड़ देता है। रिग्रेशन सूट के run और रीप्ले असली run हैं: listener को उनके इवेंट भी मिलते हैं (सूट अपने इनपुट का `onEvent` या `onText` नहीं रखता) |
 | `new ObservedEventStore(store, { onListenerError? })` | वह परत जो इवेंट पहुँचाती है; SDK अपने स्टोर को ऐसी एक परत में लपेटता है, या वह परत इस्तेमाल करता है जो आप `eventStore` के रूप में देते हैं, `MonitoredEventStore` के अंदर भी (तब उसकी घटना रिपोर्ट भी पहुँचाई जाती हैं)। इसका `subscribe(listener, options?)` `{ unsubscribe(), close() }` लौटाता है: `close()` तब तक इंतज़ार करता है जब तक listener उन इवेंट्स को निपटा न ले जो वह पहले ही ले चुका है। `onListenerError` को listener के errors और इवेंट छोड़े जाने की सूचनाएँ मिलती हैं |
 
 ## टूल: `ToolDefinition` {#tools-tooldefinition}

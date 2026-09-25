@@ -1,8 +1,20 @@
 import { promises as fs } from 'node:fs';
 import { v4 as uuidv4 } from 'uuid';
-import type { Event, EventFilters, EventLog } from '../types/events.js';
+import type {
+  Event,
+  EventAggregation,
+  EventFilters,
+  EventLog,
+  EventQueryResult,
+} from '../types/events.js';
 import type { IEventStore } from './event-store.js';
 import { fileInFolder, isFileId } from '../utils/file-in-folder.js';
+import {
+  acrossRunsInTimeOrder,
+  aggregateEvents,
+  checkEventFilters,
+  matchesEventFilters,
+} from '../utils/event-filters.js';
 import { deriveRunStatus } from '../utils/run-status.js';
 
 export class FileEventStore implements IEventStore {
@@ -109,6 +121,7 @@ export class FileEventStore implements IEventStore {
 
   async getEvents(runId: string, filters?: EventFilters): Promise<Event[]> {
     const filePath = this.getEventFilePath(runId);
+    checkEventFilters(filters);
     await this.flushRun(runId);
 
     try {
@@ -157,6 +170,54 @@ export class FileEventStore implements IEventStore {
     } catch (_error) {
       return [];
     }
+  }
+
+  /**
+   * Events of every run matching the filters, in time order: events of the same millisecond by
+   * run id, then in the order their run recorded them. Each run file is read once; a file that
+   * cannot be read or parsed is skipped with a warning, so one damaged run does not hide all
+   * the others.
+   */
+  async queryEvents(
+    filters?: EventFilters,
+    aggregation?: EventAggregation
+  ): Promise<EventQueryResult> {
+    checkEventFilters(filters);
+    await this.ready;
+    await this.flush();
+    let files: string[];
+    try {
+      files = await fs.readdir(this.eventsDir);
+    } catch (error) {
+      if (this.isFileNotFoundError(error)) return { events: [] };
+      throw error;
+    }
+
+    const runs: Array<[string, Event[]]> = [];
+    for (const file of files) {
+      const runId = file.endsWith('.json') ? file.slice(0, -'.json'.length) : '';
+      if (!isFileId(runId)) continue;
+      let events: Event[];
+      try {
+        events = JSON.parse(await fs.readFile(this.getEventFilePath(runId), 'utf-8'));
+      } catch (error) {
+        if (this.isFileNotFoundError(error)) continue;
+        console.warn(
+          `Skipping run ${runId} in an event query:`,
+          error instanceof Error ? error.message : error
+        );
+        continue;
+      }
+      if (!Array.isArray(events)) continue;
+      runs.push([runId, events.filter((event) => matchesEventFilters(event, filters))]);
+    }
+
+    const ordered = acrossRunsInTimeOrder(runs);
+    const limited = filters?.limit !== undefined ? ordered.slice(0, filters.limit) : ordered;
+    return {
+      events: limited,
+      ...(aggregation ? { aggregation: aggregateEvents(limited, aggregation) } : {}),
+    };
   }
 
   async exportEventLog(runId: string): Promise<EventLog> {
@@ -261,31 +322,11 @@ export class FileEventStore implements IEventStore {
     return fileInFolder(this.eventsDir, runId, '.json', 'runId');
   }
 
+  /** The filters of `getEvents`, with the same meaning as on every other store. */
   private filterEvents(events: Event[], filters?: EventFilters): Event[] {
     if (!filters) return events;
-
-    let filtered = events;
-
-    if (filters.type) {
-      const types = Array.isArray(filters.type) ? filters.type : [filters.type];
-      filtered = filtered.filter((e) => types.includes(e.type));
-    }
-
-    if (filters.since !== undefined) {
-      const since = filters.since;
-      filtered = filtered.filter((e) => e.timestamp >= since);
-    }
-
-    if (filters.until !== undefined) {
-      const until = filters.until;
-      filtered = filtered.filter((e) => e.timestamp <= until);
-    }
-
-    if (filters.limit) {
-      filtered = filtered.slice(0, filters.limit);
-    }
-
-    return filtered;
+    const matching = events.filter((event) => matchesEventFilters(event, filters));
+    return filters.limit !== undefined ? matching.slice(0, filters.limit) : matching;
   }
 
   private getStatusFromEvents(

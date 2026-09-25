@@ -96,6 +96,14 @@ npm run test:coverage
 npx vitest src/__tests__/agent.test.ts
 ```
 
+### PostgreSQL のテスト {#postgresql-tests}
+
+テストスイートは、PostgreSQL のイベントストアが送る SQL を、それを記録する接続で確認します。実際のサーバーに対しても実行するには、データベースの URL を指定してください。テストは専用のスキーマで動き、最後にそれを削除します。CI はこの変数を設定しないため、そこではテストはスキップとして報告されます。
+
+```bash
+SDK_TEST_POSTGRES_URL=postgres://postgres@localhost:5432/postgres npx vitest run src/__tests__/postgresql-live.test.ts
+```
+
 ## コードの品質 {#code-quality}
 
 ### リント {#linting}

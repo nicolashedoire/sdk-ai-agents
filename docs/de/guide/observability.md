@@ -136,4 +136,28 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-Regressionssuiten, Verhaltensassertionen, der Vergleich von Läufen und eine Auswirkungsanalyse vor der Bereitstellung sind ebenfalls verfügbar – siehe die [SDK-API](../reference/sdk-api).
+Läufe werden nach der Bedeutung ihrer Ereignisse verglichen – Typ, Reihenfolge, Tool, Parameter, Ergebnisse –, nie nach Ereignis-IDs, die in jedem Lauf neu sind; Zeitpunkte, Token-Zahlen und die anderen Werte, die das SDK schreibt und die sich von Lauf zu Lauf ändern, bleiben ebenfalls außen vor, aber Parameter und Ergebnisse eines Tools werden immer verglichen, wie auch immer ihre Schlüssel heißen. Ein Lauf, der dasselbe noch einmal tut, besteht; ein Tool, das mit anderen Argumenten aufgerufen wird, wird dort gemeldet, wo der Aufruf stattfand.
+
+### Regressionssuiten in der CI {#regression-suites-in-ci}
+
+Fassen Sie Golden Traces einmal in einer Suite zusammen und führen Sie sie dann in der CI aus:
+
+```ts
+// Once, after recording the good runs
+await sdk.createRegressionTestSuite('support-agent', {
+  name: 'refunds',
+  goldenTraces: [{ goldenTraceId: golden.id, name: 'refund flow' }],
+});
+
+// In CI: the same agent, created again
+sdk.createAgent({ name: 'support-agent', model: 'gpt-4o', tools });
+const { results, exitCode } = await sdk.runRegressionTestsForCI('support-agent', {
+  detection: { tolerance: { ignoreEventTypes: ['intention.generated'], ignoreDataFields: ['output'] } },
+});
+await sdk.exportTestResults(results, 'junit', { outputPath: 'regressions.xml' });
+process.exitCode = exitCode;
+```
+
+Eine Suite kennt ihren Agenten über seinen **Namen**, da Agenten-IDs in jedem Prozess neu sind. Alle Suiten des Agenten laufen, die älteste zuerst: Jeder Test schickt die Eingabe des Referenzlaufs an den Agenten und vergleicht den neuen Lauf mit dem Golden Trace. Der Exit-Code ist 0, wenn alle Tests bestanden haben, 1, wenn einer eine Regression gefunden hat, und 2, wenn einer nicht laufen konnte. Ein echtes Modell formuliert seine Antworten von Lauf zu Lauf anders: Die `detection` oben lässt den Text des Modells und die endgültige Antwort aus und prüft weiterhin jeden Tool-Aufruf mit seinen Argumenten.
+
+Assertions auf den Ereignissen eines Laufs, der Vergleich zweier Läufe, die Auswirkungen einer neuen Version eines Agenten und Abfragen über alle Läufe stehen in der [SDK-API](../reference/sdk-api#assertions).

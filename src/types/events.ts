@@ -43,8 +43,14 @@ export type EventType =
   | 'decision.evaluated';
 
 export interface EventMetadata {
+  /** Id of the agent: new every time an agent is created, so it changes from one process to the next. */
   agentId?: string;
+  /** `version` of the agent's configuration (`1.0.0` when none is given). */
   agentVersion?: string;
+  /** Name of the governed agent, on its run lifecycle events: the same in every process. */
+  agentName?: string;
+  /** Hash of the governed agent's configuration (see `AgentImpl.configHash`), on its run lifecycle events. */
+  configHash?: string;
   userId?: string;
   sessionId?: string;
   [key: string]: unknown;

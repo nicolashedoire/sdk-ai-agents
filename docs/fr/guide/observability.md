@@ -136,4 +136,28 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-Les suites de régression, les assertions de comportement, la comparaison d'exécutions et l'analyse d'impact avant déploiement sont également disponibles — voir l'[API du SDK](../reference/sdk-api).
+Les exécutions sont comparées d'après ce que signifient leurs événements — type, ordre, outil, paramètres, résultats —, jamais d'après les id des événements, nouveaux à chaque exécution ; les heures, les nombres de tokens et les autres valeurs que le SDK écrit et qui changent d'une exécution à l'autre sont aussi laissés de côté, mais les paramètres et les résultats d'un outil sont toujours comparés, quels que soient leurs noms de clés. Une exécution qui refait la même chose passe ; un outil appelé avec d'autres arguments est signalé là où l'appel a eu lieu.
+
+### Suites de régression en CI {#regression-suites-in-ci}
+
+Regroupez une fois les traces de référence dans une suite, puis exécutez-la en CI :
+
+```ts
+// Once, after recording the good runs
+await sdk.createRegressionTestSuite('support-agent', {
+  name: 'refunds',
+  goldenTraces: [{ goldenTraceId: golden.id, name: 'refund flow' }],
+});
+
+// In CI: the same agent, created again
+sdk.createAgent({ name: 'support-agent', model: 'gpt-4o', tools });
+const { results, exitCode } = await sdk.runRegressionTestsForCI('support-agent', {
+  detection: { tolerance: { ignoreEventTypes: ['intention.generated'], ignoreDataFields: ['output'] } },
+});
+await sdk.exportTestResults(results, 'junit', { outputPath: 'regressions.xml' });
+process.exitCode = exitCode;
+```
+
+Une suite connaît son agent par son **nom**, puisque les id d'agent sont nouveaux dans chaque processus. Toutes les suites de l'agent s'exécutent, la plus ancienne d'abord : chaque test envoie à l'agent l'entrée de l'exécution de référence et compare la nouvelle exécution à la trace de référence. Le code de sortie vaut 0 quand tous les tests passent, 1 quand l'un d'eux a trouvé une régression, 2 quand l'un d'eux n'a pas pu s'exécuter. Un vrai modèle formule ses réponses autrement d'une exécution à l'autre : la `detection` ci-dessus laisse de côté le texte du modèle et la réponse finale, et vérifie toujours chaque appel d'outil avec ses arguments.
+
+Les assertions sur les événements d'une exécution, la comparaison de deux exécutions, l'impact d'une nouvelle version d'un agent et les requêtes sur toutes les exécutions sont décrits dans l'[API du SDK](../reference/sdk-api#assertions).

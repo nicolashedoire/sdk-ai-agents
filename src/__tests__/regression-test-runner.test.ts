@@ -132,7 +132,10 @@ describe('RegressionTestRunner', () => {
 
     expect(result).toMatchObject({
       suiteId: 'suite-1',
-      agentId: 'test-agent',
+      suiteName: 'Test Suite',
+      // The agent that ran the tests (a suite saved by another process names another id).
+      agentId: agent.id,
+      agentName: 'Test Agent',
       totalTests: 2,
       passedTests: 2,
       failedTests: 0,
@@ -204,6 +207,25 @@ describe('RegressionTestRunner', () => {
     // The second golden trace never ran.
     expect(detector.calls.map((call) => call.goldenTraceId)).toEqual(['gt-1']);
     expect(await recordedInputs()).toEqual([{ message: 'Hello' }]);
+  });
+
+  it('should stop on a test that could not run, not only on a failing one', async () => {
+    const detector = new ScriptedRegressionDetector(env.store);
+    const suite = createTestSuite([
+      // An input without `message` (a suite file edited by hand): the test is an error.
+      { goldenTraceId: 'gt-1', name: 'Test 1', input: { text: 'Hello' } },
+      { goldenTraceId: 'gt-2', name: 'Test 2', input: { message: 'World' } },
+    ]);
+
+    const result = await RegressionTestRunner.runTestSuite(suite, agent, detector.detect, {
+      stopOnFirstFailure: true,
+    });
+
+    // Before, only a `fail` stopped the suite: the second test ran after the error.
+    expect(result.results.map((test) => [test.goldenTraceId, test.status])).toEqual([
+      ['gt-1', 'error'],
+    ]);
+    expect(await recordedInputs()).toEqual([]);
   });
 
   it('should filter tests by tags', async () => {

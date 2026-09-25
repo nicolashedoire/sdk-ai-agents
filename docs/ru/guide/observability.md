@@ -136,4 +136,28 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-Также доступны наборы регрессионных тестов, проверки поведения, сравнение запусков и анализ влияния перед развёртыванием — см. [API SDK](../reference/sdk-api).
+Запуски сравниваются по смыслу их событий — тип, порядок, инструмент, параметры, результаты, — а не по id событий, которые у каждого запуска новые; время, число токенов и другие значения, которые записывает SDK и которые меняются от запуска к запуску, тоже не сравниваются, но параметры и результаты инструмента сравниваются всегда, как бы ни назывались их ключи. Запуск, который снова делает то же самое, проходит; инструмент, вызванный с другими аргументами, отмечается там, где произошёл вызов.
+
+### Регрессионные наборы в CI {#regression-suites-in-ci}
+
+Один раз объедините эталонные трассы в набор, затем запускайте его в CI:
+
+```ts
+// Once, after recording the good runs
+await sdk.createRegressionTestSuite('support-agent', {
+  name: 'refunds',
+  goldenTraces: [{ goldenTraceId: golden.id, name: 'refund flow' }],
+});
+
+// In CI: the same agent, created again
+sdk.createAgent({ name: 'support-agent', model: 'gpt-4o', tools });
+const { results, exitCode } = await sdk.runRegressionTestsForCI('support-agent', {
+  detection: { tolerance: { ignoreEventTypes: ['intention.generated'], ignoreDataFields: ['output'] } },
+});
+await sdk.exportTestResults(results, 'junit', { outputPath: 'regressions.xml' });
+process.exitCode = exitCode;
+```
+
+Набор узнаёт своего агента по **имени**, поскольку id агентов новые в каждом процессе. Запускаются все наборы агента, начиная с самого старого: каждый тест отправляет агенту вход эталонного запуска и сравнивает новый запуск с эталонной трассой. Код выхода — 0, если все тесты прошли, 1, если тест нашёл регрессию, и 2, если тест не смог выполниться. Настоящая модель от запуска к запуску формулирует ответы по-разному: `detection` выше исключает текст модели и итоговый ответ, но по-прежнему проверяет каждый вызов инструмента с его аргументами.
+
+Проверки событий запуска, сравнение двух запусков, влияние новой версии агента и запросы по всем запускам описаны в [API SDK](../reference/sdk-api#assertions).

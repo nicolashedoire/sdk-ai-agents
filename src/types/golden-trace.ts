@@ -6,6 +6,8 @@ export interface GoldenTrace {
   description?: string;
   runId: string;
   agentId: string;
+  /** Name of the governed agent that ran it, when its events record one. */
+  agentName?: string;
   createdAt: number;
   trace: Trace;
   metadata?: Record<string, unknown>;

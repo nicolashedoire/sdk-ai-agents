@@ -1,4 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
+import { DEFAULT_PRICING, type PricingTable } from '../costs/pricing.js';
+import { computeRunCost } from '../costs/run-cost.js';
 import type { Trace } from '../types/sdk.js';
 import type {
   ImpactAnalysisOptions,
@@ -7,12 +9,14 @@ import type {
 } from '../types/impact-analysis.js';
 
 export class ImpactAnalyzer {
+  /** Compares two groups of runs; `pricing` prices the model calls of the `cost` metric. */
   static analyze(
     beforeTraces: Trace[],
     afterTraces: Trace[],
-    options: ImpactAnalysisOptions = {}
+    options: ImpactAnalysisOptions = {},
+    pricing: PricingTable = DEFAULT_PRICING
   ): ImpactAnalysis {
-    const metrics = ImpactAnalyzer.calculateMetrics(beforeTraces, afterTraces, options);
+    const metrics = ImpactAnalyzer.calculateMetrics(beforeTraces, afterTraces, options, pricing);
     const behaviorChanges = ImpactAnalyzer.identifyBehaviorChanges(beforeTraces, afterTraces);
     const impact = ImpactAnalyzer.assessImpact(metrics, behaviorChanges);
     const recommendations = options.includeRecommendations
@@ -34,7 +38,8 @@ export class ImpactAnalyzer {
   private static calculateMetrics(
     beforeTraces: Trace[],
     afterTraces: Trace[],
-    options: ImpactAnalysisOptions
+    options: ImpactAnalysisOptions,
+    pricing: PricingTable
   ): ImpactMetric[] {
     const requestedMetrics = options.metrics || ['duration', 'cost', 'quality', 'success_rate'];
     const metrics: ImpactMetric[] = [];
@@ -44,7 +49,7 @@ export class ImpactAnalyzer {
     }
 
     if (requestedMetrics.includes('cost')) {
-      metrics.push(ImpactAnalyzer.calculateCostMetric(beforeTraces, afterTraces));
+      metrics.push(ImpactAnalyzer.calculateCostMetric(beforeTraces, afterTraces, pricing));
     }
 
     if (requestedMetrics.includes('quality')) {
@@ -68,11 +73,19 @@ export class ImpactAnalyzer {
     return ImpactAnalyzer.createMetric('duration', beforeValues, afterValues, 'ms');
   }
 
-  private static calculateCostMetric(beforeTraces: Trace[], afterTraces: Trace[]): ImpactMetric {
-    const beforeValues = beforeTraces.map((t) => t.summary.toolsCalled * 0.01);
-    const afterValues = afterTraces.map((t) => t.summary.toolsCalled * 0.01);
-
-    return ImpactAnalyzer.createMetric('cost', beforeValues, afterValues, 'tokens');
+  /** USD of each run's model calls that have a price (as `getRunCost`). */
+  private static calculateCostMetric(
+    beforeTraces: Trace[],
+    afterTraces: Trace[],
+    pricing: PricingTable
+  ): ImpactMetric {
+    const costOf = (trace: Trace) => computeRunCost(trace.runId, trace.events, pricing).totalUsd;
+    return ImpactAnalyzer.createMetric(
+      'cost',
+      beforeTraces.map(costOf),
+      afterTraces.map(costOf),
+      'usd'
+    );
   }
 
   private static calculateQualityMetric(beforeTraces: Trace[], afterTraces: Trace[]): ImpactMetric {

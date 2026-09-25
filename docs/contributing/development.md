@@ -96,6 +96,14 @@ npm run test:coverage
 npx vitest src/__tests__/agent.test.ts
 ```
 
+### PostgreSQL Tests
+
+The suite checks the SQL the PostgreSQL event store sends with a recording connection. To also run it against a real server, give a database URL: the test works in a schema of its own and drops it at the end. CI does not set the variable, so there the test is reported as skipped.
+
+```bash
+SDK_TEST_POSTGRES_URL=postgres://postgres@localhost:5432/postgres npx vitest run src/__tests__/postgresql-live.test.ts
+```
+
 ## Code Quality
 
 ### Linting

@@ -1,13 +1,22 @@
 import type { AgentImpl } from '../agent.js';
 import type {
+  RegressionTestInput,
   RegressionTestSuite,
   RegressionTestOptions,
   RegressionTestResult,
+  RegressionTestRunResult,
   RegressionTestSuiteResult,
 } from '../types/regression-test.js';
 import type { RegressionReport } from '../types/regression.js';
 
+const DEFAULT_TIMEOUT_MS = 60_000;
+/** How long a timed-out run has, once cancelled, to record its cancellation. */
+const CANCELLATION_GRACE_MS = 1_000;
+
+type SuiteTest = RegressionTestSuite['goldenTraces'][number];
+
 export class RegressionTestRunner {
+  /** Runs each golden trace's input through `agent` and compares the run with the trace. */
   static async runTestSuite(
     suite: RegressionTestSuite,
     agent: AgentImpl,
@@ -17,128 +26,145 @@ export class RegressionTestRunner {
     const startTime = Date.now();
     const results: RegressionTestResult[] = [];
 
-    let goldenTraces = suite.goldenTraces;
+    let tests = suite.goldenTraces;
 
     const filterTags = options.filterTags;
     if (filterTags && filterTags.length > 0) {
-      goldenTraces = goldenTraces.filter((gt) => gt.tags?.some((tag) => filterTags.includes(tag)));
+      tests = tests.filter((gt) => gt.tags?.some((tag) => filterTags.includes(tag)));
     }
 
     const excludeTags = options.excludeTags;
     if (excludeTags && excludeTags.length > 0) {
-      goldenTraces = goldenTraces.filter(
-        (gt) => !gt.tags?.some((tag) => excludeTags.includes(tag))
-      );
+      tests = tests.filter((gt) => !gt.tags?.some((tag) => excludeTags.includes(tag)));
     }
 
     if (options.parallel) {
-      const testPromises = goldenTraces.map((gt) =>
-        RegressionTestRunner.runSingleTest(
-          gt.goldenTraceId,
-          gt.input,
-          agent,
-          detectRegressions,
-          options
-        )
+      // All tests start at once: every result is kept, in the suite's order.
+      results.push(
+        ...(await Promise.all(
+          tests.map((test) =>
+            RegressionTestRunner.runSingleTest(test, agent, detectRegressions, options)
+          )
+        ))
       );
-
-      const testResults = await Promise.allSettled(testPromises);
-      for (const result of testResults) {
-        if (result.status === 'fulfilled') {
-          results.push(result.value);
-          if (options.stopOnFirstFailure && result.value.status === 'fail') {
-            break;
-          }
-        } else {
-          results.push({
-            goldenTraceId: 'unknown',
-            runId: 'unknown',
-            status: 'error',
-            duration: 0,
-            error: result.reason?.message || 'Unknown error',
-          });
-        }
-      }
     } else {
-      for (const gt of goldenTraces) {
+      for (const test of tests) {
         const result = await RegressionTestRunner.runSingleTest(
-          gt.goldenTraceId,
-          gt.input,
+          test,
           agent,
           detectRegressions,
           options
         );
         results.push(result);
 
-        if (options.stopOnFirstFailure && result.status === 'fail') {
+        // A failure, an error or a timeout: the first test that does not pass.
+        if (options.stopOnFirstFailure && result.status !== 'pass') {
           break;
         }
       }
     }
 
-    const duration = Date.now() - startTime;
-    const summary = RegressionTestRunner.calculateSummary(results);
-
     return {
       suiteId: suite.id,
-      agentId: suite.agentId,
+      suiteName: suite.name,
+      agentId: agent.id,
+      agentName: agent.name,
       executedAt: startTime,
+      ...RegressionTestRunner.count(results),
+      duration: Date.now() - startTime,
+      results,
+      summary: RegressionTestRunner.calculateSummary(results),
+    };
+  }
+
+  /** The result of every suite of one agent, as one report. */
+  static combine(
+    agent: { id: string; name: string },
+    suites: RegressionTestSuiteResult[],
+    startTime: number
+  ): RegressionTestRunResult {
+    const results = suites.flatMap((suite) => suite.results);
+    return {
+      agentId: agent.id,
+      agentName: agent.name,
+      executedAt: startTime,
+      duration: Date.now() - startTime,
+      ...RegressionTestRunner.count(results),
+      suites,
+      summary: RegressionTestRunner.calculateSummary(results),
+    };
+  }
+
+  private static count(results: RegressionTestResult[]) {
+    return {
       totalTests: results.length,
       passedTests: results.filter((r) => r.status === 'pass').length,
       failedTests: results.filter((r) => r.status === 'fail').length,
       errorTests: results.filter((r) => r.status === 'error').length,
       timeoutTests: results.filter((r) => r.status === 'timeout').length,
-      duration,
-      results,
-      summary,
     };
   }
 
   private static async runSingleTest(
-    goldenTraceId: string,
-    input: unknown,
+    test: SuiteTest,
     agent: AgentImpl,
     detectRegressions: (runId: string, goldenTraceId: string) => Promise<RegressionReport>,
     options: RegressionTestOptions
   ): Promise<RegressionTestResult> {
     const startTime = Date.now();
-    const timeout = options.timeout || 60000;
+    const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS;
+    const base = { goldenTraceId: test.goldenTraceId, name: test.name };
 
-    try {
-      const timeoutPromise = new Promise<RegressionTestResult>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('Test timeout'));
-        }, timeout);
-      });
-
-      const testPromise = (async () => {
-        const runResult = await agent.run(input as { message: string });
-        const regressionReport = await detectRegressions(runResult.runId, goldenTraceId);
-
-        const status: RegressionTestResult['status'] =
-          regressionReport.status === 'no_regression' ? 'pass' : 'fail';
-
-        return {
-          goldenTraceId,
-          runId: runResult.runId,
-          status,
-          duration: Date.now() - startTime,
-          regressionReport,
-        };
-      })();
-
-      return await Promise.race([testPromise, timeoutPromise]);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const isTimeout = errorMessage.includes('timeout');
-
+    if (!isRunInput(test.input)) {
       return {
-        goldenTraceId,
+        ...base,
         runId: 'unknown',
-        status: isTimeout ? 'timeout' : 'error',
-        duration: Date.now() - startTime,
-        error: errorMessage,
+        status: 'error',
+        duration: 0,
+        error: 'The test input is not a run input: it needs a string `message`',
       };
+    }
+
+    const controller = new AbortController();
+    const timer = settleAfter(timeout);
+    try {
+      const run = agent.run({ ...test.input, signal: controller.signal });
+      const outcome = await Promise.race([run, timer.promise]);
+      if (outcome === 'elapsed') {
+        // The run is cancelled, not left running; the result waits (a little) for the run to
+        // record its cancellation, so it can name the run.
+        controller.abort();
+        const grace = settleAfter(CANCELLATION_GRACE_MS);
+        const stopped = await Promise.race([run, grace.promise]);
+        grace.cancel();
+        return {
+          ...base,
+          runId: stopped === 'elapsed' ? 'unknown' : stopped.runId,
+          status: 'timeout',
+          duration: Date.now() - startTime,
+          error: `Test timeout after ${timeout} ms`,
+        };
+      }
+      timer.cancel();
+
+      const regressionReport = await detectRegressions(outcome.runId, test.goldenTraceId);
+      return {
+        ...base,
+        runId: outcome.runId,
+        status: regressionReport.status === 'no_regression' ? 'pass' : 'fail',
+        duration: Date.now() - startTime,
+        regressionReport,
+      };
+    } catch (error) {
+      return {
+        ...base,
+        runId: 'unknown',
+        status: 'error',
+        duration: Date.now() - startTime,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    } finally {
+      timer.cancel();
     }
   }
 
@@ -158,4 +184,22 @@ export class RegressionTestRunner {
       criticalRegressions: totalRegressions,
     };
   }
+}
+
+/** A promise settled with 'elapsed' after `ms`, whose timer can be cleared. */
+function settleAfter(ms: number): { promise: Promise<'elapsed'>; cancel(): void } {
+  let timer: NodeJS.Timeout | undefined;
+  const promise = new Promise<'elapsed'>((resolve) => {
+    timer = setTimeout(() => resolve('elapsed'), ms);
+  });
+  return { promise, cancel: () => clearTimeout(timer) };
+}
+
+/** A run input as `agent.run` needs it; a suite file edited by hand may hold anything. */
+export function isRunInput(value: unknown): value is RegressionTestInput {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { message?: unknown }).message === 'string'
+  );
 }

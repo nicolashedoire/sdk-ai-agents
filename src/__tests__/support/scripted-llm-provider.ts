@@ -2,7 +2,8 @@ import type { LLMProvider, LLMRequest, LLMResponse } from '../../providers/llm-p
 
 export type ScriptedReply =
   | { content: string }
-  | { toolCall: { name: string; arguments: Record<string, unknown> } }
+  /** `content`: text the model writes alongside the call (Claude often does). */
+  | { toolCall: { name: string; arguments: Record<string, unknown> }; content?: string }
   | { error: Error };
 
 /**
@@ -46,7 +47,7 @@ export class ScriptedLLMProvider implements LLMProvider {
     const model = this.options.model ?? request.model;
     if ('toolCall' in reply) {
       return {
-        content: null,
+        content: reply.content ?? null,
         toolCalls: [
           {
             function: {

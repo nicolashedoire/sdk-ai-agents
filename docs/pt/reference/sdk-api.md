@@ -73,7 +73,7 @@ O seu próprio provedor implementa `generateCompletion(request)`, `supportsModel
 
 | Método | Devolve | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | Agente governado: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. Ele só pode executar as suas próprias ferramentas (`tools`, `capabilities`), mesmo que o modelo mencione outra ferramenta registrada no SDK; `signal` cancela a execução; `onText` recebe o texto que o modelo escreve à medida que ele é escrito, e `onTextRestart` a parte a descartar quando uma chamada ao modelo que falhou é tentada de novo (veja [Streaming da resposta](../guide/governed-agents#_7-streaming-the-answer)) |
+| `createAgent(config)` | `AgentImpl` | Agente governado: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`, `version`, `configHash`. Ele só pode executar as suas próprias ferramentas (`tools`, `capabilities`), mesmo que o modelo mencione outra ferramenta registrada no SDK; `signal` cancela a execução; `onText` recebe o texto que o modelo escreve à medida que ele é escrito, e `onTextRestart` a parte a descartar quando uma chamada ao modelo que falhou é tentada de novo (veja [Streaming da resposta](../guide/governed-agents#_7-streaming-the-answer)) |
 | `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()`. Os pensamentos dele são estruturados e não são enviados em streaming |
 | `defineTool(definition)` | `Tool` | Registra uma ferramenta; o handler é tipado a partir do seu schema Zod |
 | `defineCapability(definition)` | `Capability` | Agrupa ferramentas |
@@ -199,7 +199,83 @@ interface ModelCostLine {
 | `getTrace(runId)`, `exportTrace(runId, 'json' \| 'text')`, `getEvents(runId, filters?)` | Ler as execuções |
 | `replay(runId, modifications?, { onEvent? })` | Reexecutar sem o LLM |
 | `getReasoningGraph`, `exportReasoningGraph`, `getAlternatives`, `getDecisionPatterns`, `getTraceVisualization` | Entender as decisões |
-| `createGoldenTrace`, `getGoldenTraces`, `validateAgainstGoldenTrace`, `replayAndValidate`, `detectRegressions` | Testar agentes como código |
+
+### Golden traces {#golden-traces}
+
+| Método | Devolve | |
+| --- | --- | --- |
+| `createGoldenTrace(runId, { name, description?, metadata? })` | `Promise<GoldenTrace>` | Guarda uma execução como referência, com o nome do agente governado que a fez (`agentName`) |
+| `getGoldenTraces(agent?)`, `getGoldenTrace(id)`, `deleteGoldenTrace(id)`, `exportGoldenTrace(id, 'json' \| 'yaml')` | | `agent`: o id ou o nome de um agente |
+| `validateAgainstGoldenTrace(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | `pass`, `fail` ou `partial`, com cada diferença (`event_added`, `event_removed`, `event_modified`, `event_order_changed`) e a sua posição |
+| `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | As mesmas diferenças como regressões, cada uma com uma gravidade e um impacto: `no_regression` ou `regressions_detected` |
+| `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | Faz o replay da execução e depois valida o replay. Um replay não chama nenhum modelo: compare-o com `validateAspects: ['tools', 'policies']` |
+
+As execuções são comparadas **pelo que os seus eventos significam**, nunca pelo id dos eventos (cada execução tem ids novos). Os eventos são emparelhados em ordem: primeiro os eventos idênticos, depois os do mesmo tipo e assunto (a ferramenta, a operação, a resposta) cujos dados mudaram, depois aqueles cujo tipo mudou para o mesmo assunto. Nunca são comparados: os ids dos eventos, os horários, os metadados, os eventos `incident.reported` (eles registram os envios e a limitação de alertas; o evento que provocou o incidente é comparado) e os valores que o SDK escreve e que mudam de uma execução para outra: a duração de uma chamada de ferramenta, o consumo de tokens, as esperas antes de novas tentativas, os ids de aprovação, a execução de origem de um replay, o horário e o evento de origem de uma observação. O texto que um modelo escreve junto a uma chamada de ferramenta só é comparado em `intention.generated`. Os parâmetros, o resultado e a entrada de uma ferramenta são sempre comparados, sejam quais forem os nomes das suas chaves: um argumento `duration` que passou de 30 para 60 é uma mudança. Uma execução que volta a fazer a mesma coisa passa; uma ferramenta chamada com outros argumentos é apontada onde a chamada aconteceu (`parameters.metric: "churn" → "revenue"`); uma chamada inserida antes de outra idêntica é uma única chamada acrescentada; um `action.executed` que virou `action.failed` é uma única mudança, não uma perda mais um acréscimo.
+
+| Opção | Para | |
+| --- | --- | --- |
+| `ignoreEventTypes`, `validateAspects` (`intentions`, `actions`, `tools`, `policies`) | Validação | Comparar menos eventos |
+| `tolerance.dataFields` | Validação | Mais campos de dados deixados de fora, em qualquer profundidade |
+| `tolerance.timestampMs`, `ignoreTimestampDiff` | Validação | Os tempos só são comparados, em relação ao início de cada execução, com `timestampMs` |
+| `compareStructureOnly` | Validação | As diferenças de dados dão `partial`, não `fail`; eventos acrescentados, removidos, deslocados ou de outro tipo continuam falhando |
+| `tolerance.ignoreEventTypes`, `tolerance.ignoreDataFields` | Regressões | Comparar menos eventos, deixar campos de dados de fora |
+| `tolerance.criticalEventTypes` | Regressões | Tipos cujo aparecimento, perda ou mudança é crítico (padrão: `run.failed`, `action.failed`, `tool.failed`, `policy.violated`) |
+| `tolerance.maxEventCountDiff` | Regressões | Até este número de eventos de processo acrescentados ou removidos (verificações de política, novas tentativas, aprovações) é tolerado; uma mudança do resultado nunca é |
+| `tolerance.maxDurationDiff`, `severityThresholds` | Regressões | A duração só é verificada com uma delas: uma execução mais lenta em mais de `maxDurationDiff` ms é uma regressão, com a gravidade do limite mais alto atingido; uma execução mais rápida nunca é |
+
+### Suítes de regressão {#regression-suites}
+
+| Método | Devolve | |
+| --- | --- | --- |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Salva em `regressionTestSuitesDir`. `agent`: o id ou o nome de um agente deste SDK. Cada golden trace precisa existir; `input` é, por padrão, a entrada que a execução de referência recebeu; uma suíte não guarda o `signal` nem os callbacks (`onEvent`, `onText`, `onTextRestart`) de uma entrada |
+| `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | As mais recentes primeiro |
+| `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | Todas as suítes do agente, a mais antiga primeiro: cada teste envia a sua entrada ao agente e compara a execução com o seu golden trace; `suites` tem um resultado por suíte |
+| `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | Uma única suíte |
+| `runRegressionTestsForCI(agent, options?)` | `Promise<{ results, exitCode }>` | `exitCode`: 0 todos os testes passaram, 1 um teste encontrou uma regressão, 2 um teste não conseguiu rodar (erro ou tempo esgotado); `exitCode: false` nas opções dá 0 |
+| `exportTestResults(results, 'junit' \| 'json' \| 'json-summary', { outputPath?, includeDetails? })` | `Promise<string>` | JUnit XML: um `<testsuite>` por suíte; um teste que não conseguiu rodar (erro ou tempo esgotado) é um `<error>`; os caracteres que o XML não pode conter são removidos |
+
+Os ids dos agentes são novos em cada processo: uma suíte também registra o **nome** do seu agente, e outro processo a executa com o seu agente desse nome (primeiro com o id de agente da suíte, quando esse agente está no SDK). Dentro de um mesmo SDK, o id de um agente pertence só a ele: dois agentes com o mesmo nome (duas versões, por exemplo) mantêm cada um as suas suítes, asserções e golden traces, e um nome designa todos eles. Todo agente criado com `createAgent` permanece no seu SDK, então uma aplicação que cria um agente por requisição torna o nome ambíguo: passe ids, ou crie cada agente uma vez e reutilize-o. As suítes salvas por versões anteriores não têm nome: só rodam no processo que as criou. Opções: `parallel` (os testes de uma suíte ao mesmo tempo), `stopOnFirstFailure` (só em execuções sequenciais: nada mais roda depois do primeiro teste que não passa, incluindo as suítes seguintes), `filterTags`, `excludeTags`, `timeout` (ms por teste, 60 000 por padrão, no máximo 2 147 483 647; passado esse tempo, a execução é cancelada e o teste fica `timeout`) e `detection` (as opções de regressão acima).
+
+### Asserções {#assertions}
+
+| Método | Devolve | |
+| --- | --- | --- |
+| `defineAssertion(name, condition, { description?, severity?, tags?, agentId?, agentName? })` | `Promise<Assertion>` | Para todas as execuções ou para as de um agente; um agente deste SDK indicado por `agentId` também registra o seu nome. Uma condição que não poderia ser avaliada é recusada com um `ValidationError` |
+| `getAssertions(agent?, tags?)` | `Promise<Assertion[]>` | As mais recentes primeiro |
+| `evaluateAssertions(runId, assertionIds?)` | `Promise<AssertionEvaluationReport>` | As asserções indicadas (um id desconhecido lança um erro) ou, senão, as de todas as execuções mais as do agente da execução |
+| `deleteAssertion(assertionId)` | `Promise<void>` | |
+
+| `condition.type` | Precisa de | Passa quando |
+| --- | --- | --- |
+| `event_present`, `event_absent` | `eventType` ou `eventTypes` | Um dos tipos aparece / nenhum aparece |
+| `event_count` | `eventType` ou `eventTypes`, e depois `count`, ou `minCount` e `maxCount` | O número desses eventos se encaixa |
+| `event_order` | `beforeEventType`, `afterEventType` | O primeiro de um vem antes do primeiro do outro |
+| `event_value` | `eventType`, `valuePath`, `valueMatcher` (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `contains`, `regex`) | Todos os eventos do tipo correspondem |
+| `custom` | `customEvaluator(events) => boolean` | A função devolve `true` |
+
+Uma asserção `custom` contém uma função, que não pode ser escrita num arquivo: ela **não é salva** e dura tanto quanto a instância do SDK que a definiu; defina-a de novo na inicialização. Os outros tipos são salvos em `assertionsDir`.
+
+### Comparações e impacto {#comparisons-and-impact}
+
+| Método | Devolve | |
+| --- | --- | --- |
+| `compareRuns(runId1, runId2, { ignoreEventTypes?, focusAspects?, compareStructureOnly?, includeMetadata? })` | `Promise<RunComparison>` | As diferenças, alinhadas pelo significado como acima: `event_added`, `event_removed`, `event_modified` (tipo alterado), `data_changed`, `sequence_changed` |
+| `getComparisonReport(comparison, 'text' \| 'json' \| 'html')` | `Promise<string>` | |
+| `analyzeImpact(beforeRunIds, afterRunIds, { metrics?, includeRecommendations? })` | `Promise<ImpactAnalysis>` | Médias de antes e depois de `duration` (ms), `cost` (USD das chamadas ao modelo que têm preço, como `getRunCost`), `quality` (parcela dos eventos que não são ações falhadas) e `success_rate`, com as mudanças de comportamento; salva em `impactAnalysesDir` |
+| `getImpactAnalysis(analysisId)` | `Promise<ImpactAnalysis>` | |
+| `compareVersions(agent, version1, version2, options?)` | `Promise<ImpactAnalysis>` | `analyzeImpact` sobre as execuções de um agente governado (o seu nome, ou o id de um agente deste SDK) registradas com cada versão: a sua `version` ou o seu `configHash`. Todos os agentes com esse nome contam. Os replays ficam de fora; as duas versões precisam ser diferentes e selecionar execuções diferentes; uma versão desconhecida lança um erro que lista as registradas |
+
+Os eventos do ciclo de vida das execuções de um agente governado (`run.started`, `run.completed`…) registram o seu `agentName`, o seu `agentVersion` e o seu `configHash`: dois agentes com o mesmo nome são um mesmo agente em duas versões, ou em dois processos. O hash cobre o modelo, o prompt de sistema, `maxSteps` e `timeout`, as configurações do provedor, `version`, as capabilities, as ferramentas (nome, descrição, versão, esquema dos parâmetros, metadados, configurações de nova tentativa) e as políticas próprias do agente com as suas regras; ele muda com `setPolicy` e `addTools`, e cada execução registra o hash com que começou. As execuções registradas por versões anteriores só têm o id e a versão.
+
+### Consultas em todas as execuções {#queries-across-runs}
+
+| Método | Devolve |
+| --- | --- |
+| `queryEventsAdvanced(filter)` | `Promise<{ events, total, filtered, filters, executionTime }>`: os eventos que correspondem, em ordem cronológica (no máximo `limit`), os eventos do escopo, os que correspondem |
+| `countEventsAdvanced(filter)` | `Promise<number>` |
+| `getEventStatistics(filter)` | `Promise<{ total, byType, byAgent }>` |
+
+Um filtro tem um **escopo** — `runId` (sem ele, todas as execuções), `since`, `until` — e **condições** — `type`, `agentId`, `userId`, `sessionId`, `dataFilters` (`{ path, operator, value?, regex? }`) e `metadataFilters` (`{ field, operator, value? }`). As condições são combinadas com `logic` (`and` por padrão; `or`: pelo menos uma) e depois negadas por `not`; o escopo nunca é. Todos os armazenamentos incluídos respondem: o armazenamento de arquivos lê cada arquivo de execução uma vez por consulta, os armazenamentos SQL consultam o banco de dados. Quando todas as condições precisam valer, o banco de dados filtra ele mesmo os eventos por tipo e ids; com `or` ou `not`, o armazenamento devolve todos os eventos do escopo e as condições são verificadas em memória, o que custa mais num banco de dados grande. Os eventos do mesmo milissegundo mantêm a ordem da sua execução: as execuções por id e, dentro de cada uma, na ordem em que ela os registrou.
 
 ## Eventos em tempo real {#live-events}
 
@@ -211,7 +287,7 @@ Um listener é `(event: Event) => unknown`. Ele recebe um evento de cada vez, na
 | `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | O mesmo para uma execução cognitiva, cujo `limits.timeoutMs` também encerra a espera |
 | `replay(runId, modifications?, { onEvent })` | O mesmo para um replay, que não pode ser cancelado: ele sempre espera |
 | `executeTool(name, params, { onEvent })` | Os eventos da chamada, e os das execuções que a ferramenta chamada inicia, em um único nível: o handler recebe o listener como `context.onEvent`, que `governedAgentTool` e `cognitiveAgentTool` repassam ao agente deles (um agente construído à mão sobre um armazenamento sem eventos em tempo real é executado sem ele). `signal` encerra a espera |
-| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: todos os eventos de todas as execuções que correspondem ao filtro (`agentId` é `metadata.agentId`), até você chamar a função devolvida, que descarta os eventos ainda não entregues |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: todos os eventos de todas as execuções que correspondem ao filtro (`agentId` é `metadata.agentId`), até você chamar a função devolvida, que descarta os eventos ainda não entregues. As execuções das suítes de regressão e os replays são execuções reais: o listener também recebe os eventos deles (uma suíte não guarda o `onEvent` nem o `onText` da sua entrada) |
 | `new ObservedEventStore(store, { onListenerError? })` | A camada que os entrega; o SDK envolve o seu armazenamento em uma, ou usa aquela que você passa como `eventStore`, inclusive dentro de um `MonitoredEventStore` (cujos relatórios de incidente passam então a ser entregues também). O `subscribe(listener, options?)` dela devolve `{ unsubscribe(), close() }`: `close()` espera até que o listener tenha concluído os eventos que ele já pegou. `onListenerError` recebe os erros dos listeners e os descartes |
 
 ## Ferramentas: `ToolDefinition` {#tools-tooldefinition}

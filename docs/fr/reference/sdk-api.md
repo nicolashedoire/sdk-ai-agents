@@ -73,7 +73,7 @@ Votre propre fournisseur implémente `generateCompletion(request)`, `supportsMod
 
 | Méthode | Renvoie | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | Agent gouverné : `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. Il ne peut exécuter que ses propres outils (`tools`, `capabilities`), même si le modèle nomme un autre outil enregistré dans le SDK ; `signal` annule l'exécution ; `onText` reçoit le texte que le modèle écrit à mesure qu'il l'écrit, et `onTextRestart` la partie à retirer quand un appel au modèle en échec est retenté (voir [Recevoir la réponse en streaming](../guide/governed-agents#_7-streaming-the-answer)) |
+| `createAgent(config)` | `AgentImpl` | Agent gouverné : `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`, `version`, `configHash`. Il ne peut exécuter que ses propres outils (`tools`, `capabilities`), même si le modèle nomme un autre outil enregistré dans le SDK ; `signal` annule l'exécution ; `onText` reçoit le texte que le modèle écrit à mesure qu'il l'écrit, et `onTextRestart` la partie à retirer quand un appel au modèle en échec est retenté (voir [Recevoir la réponse en streaming](../guide/governed-agents#_7-streaming-the-answer)) |
 | `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()`. Ses pensées sont structurées et ne sont pas transmises en streaming |
 | `defineTool(definition)` | `Tool` | Enregistre un outil ; le gestionnaire est typé à partir de son schéma Zod |
 | `defineCapability(definition)` | `Capability` | Regroupe des outils |
@@ -199,7 +199,83 @@ interface ModelCostLine {
 | `getTrace(runId)`, `exportTrace(runId, 'json' \| 'text')`, `getEvents(runId, filters?)` | Lire des exécutions |
 | `replay(runId, modifications?, { onEvent? })` | Exécuter de nouveau sans le LLM |
 | `getReasoningGraph`, `exportReasoningGraph`, `getAlternatives`, `getDecisionPatterns`, `getTraceVisualization` | Comprendre les décisions |
-| `createGoldenTrace`, `getGoldenTraces`, `validateAgainstGoldenTrace`, `replayAndValidate`, `detectRegressions` | Tester les agents comme du code |
+
+### Traces de référence {#golden-traces}
+
+| Méthode | Renvoie | |
+| --- | --- | --- |
+| `createGoldenTrace(runId, { name, description?, metadata? })` | `Promise<GoldenTrace>` | Garde une exécution comme référence, avec le nom de l'agent gouverné qui l'a faite (`agentName`) |
+| `getGoldenTraces(agent?)`, `getGoldenTrace(id)`, `deleteGoldenTrace(id)`, `exportGoldenTrace(id, 'json' \| 'yaml')` | | `agent` : l'id ou le nom d'un agent |
+| `validateAgainstGoldenTrace(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | `pass`, `fail` ou `partial`, avec chaque différence (`event_added`, `event_removed`, `event_modified`, `event_order_changed`) et sa position |
+| `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | Les mêmes différences sous forme de régressions, chacune avec une gravité et un impact : `no_regression` ou `regressions_detected` |
+| `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | Rejoue l'exécution, puis valide le rejeu. Un rejeu n'appelle aucun modèle : comparez-le avec `validateAspects: ['tools', 'policies']` |
+
+Les exécutions sont comparées **d'après ce que signifient leurs événements**, jamais d'après leur id (chaque exécution en a de nouveaux). Les événements sont appariés dans l'ordre : d'abord les événements identiques, puis ceux de même type et de même objet (l'outil, l'opération, la réponse) dont les données ont changé, puis ceux dont le type a changé pour le même objet. Jamais comparés : les id des événements, les heures, les métadonnées, les événements `incident.reported` (ils enregistrent les envois et la limitation des alertes ; l'événement qui a déclenché l'incident est comparé), et les valeurs que le SDK écrit et qui changent d'une exécution à l'autre : la durée d'un appel d'outil, la consommation de tokens, les délais avant nouvelle tentative, les id d'approbation, l'exécution d'origine d'un rejeu, l'heure et l'événement source d'une observation. Le texte qu'un modèle écrit à côté d'un appel d'outil n'est comparé que dans `intention.generated`. Les paramètres, le résultat et l'entrée d'un outil sont toujours comparés, quels que soient leurs noms de clés : un argument `duration` passé de 30 à 60 est un changement. Une exécution qui refait la même chose passe ; un outil appelé avec d'autres arguments est signalé là où l'appel a eu lieu (`parameters.metric: "churn" → "revenue"`) ; un appel inséré avant un appel identique est un seul appel ajouté ; un `action.executed` devenu `action.failed` est un seul changement, pas une perte plus un ajout.
+
+| Option | Pour | |
+| --- | --- | --- |
+| `ignoreEventTypes`, `validateAspects` (`intentions`, `actions`, `tools`, `policies`) | La validation | Comparer moins d'événements |
+| `tolerance.dataFields` | La validation | D'autres champs de données laissés de côté, à toute profondeur |
+| `tolerance.timestampMs`, `ignoreTimestampDiff` | La validation | Les instants ne sont comparés, par rapport au début de chaque exécution, qu'avec `timestampMs` |
+| `compareStructureOnly` | La validation | Les différences de données donnent `partial`, pas `fail` ; des événements ajoutés, retirés, déplacés ou d'un autre type échouent toujours |
+| `tolerance.ignoreEventTypes`, `tolerance.ignoreDataFields` | Les régressions | Comparer moins d'événements, laisser des champs de données de côté |
+| `tolerance.criticalEventTypes` | Les régressions | Les types dont l'apparition, la perte ou le changement est critique (par défaut : `run.failed`, `action.failed`, `tool.failed`, `policy.violated`) |
+| `tolerance.maxEventCountDiff` | Les régressions | Jusqu'à ce nombre d'événements de déroulement ajoutés ou retirés (vérifications de politique, nouvelles tentatives, approbations) sont tolérés ; un changement du résultat ne l'est jamais |
+| `tolerance.maxDurationDiff`, `severityThresholds` | Les régressions | La durée n'est vérifiée qu'avec l'une de ces options : une exécution plus lente de plus de `maxDurationDiff` ms régresse, avec la gravité du plus haut seuil atteint ; une exécution plus rapide ne régresse jamais |
+
+### Suites de régression {#regression-suites}
+
+| Méthode | Renvoie | |
+| --- | --- | --- |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | Enregistrée dans `regressionTestSuitesDir`. `agent` : l'id ou le nom d'un agent de ce SDK. Chaque trace de référence doit exister ; `input` vaut par défaut l'entrée qu'a reçue l'exécution de référence ; une suite ne conserve ni le `signal` ni les callbacks (`onEvent`, `onText`, `onTextRestart`) d'une entrée |
+| `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | Les plus récentes d'abord |
+| `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | Toutes les suites de l'agent, la plus ancienne d'abord : chaque test envoie son entrée à l'agent et compare l'exécution à sa trace de référence ; `suites` contient un résultat par suite |
+| `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | Une seule suite |
+| `runRegressionTestsForCI(agent, options?)` | `Promise<{ results, exitCode }>` | `exitCode` : 0 tous les tests passent, 1 un test a trouvé une régression, 2 un test n'a pas pu s'exécuter (erreur ou délai dépassé) ; `exitCode: false` dans les options donne 0 |
+| `exportTestResults(results, 'junit' \| 'json' \| 'json-summary', { outputPath?, includeDetails? })` | `Promise<string>` | JUnit XML : un `<testsuite>` par suite ; un test qui n'a pas pu s'exécuter (erreur ou délai dépassé) est un `<error>` ; les caractères que XML ne peut pas contenir sont retirés |
+
+Les id d'agent sont nouveaux dans chaque processus : une suite enregistre aussi le **nom** de son agent, et un autre processus l'exécute avec son agent de ce nom (avec l'id d'agent de la suite d'abord, quand cet agent est dans le SDK). Dans un même SDK, l'id d'un agent n'appartient qu'à lui : deux agents de même nom (deux versions, par exemple) gardent chacun leurs suites, leurs assertions et leurs traces de référence, et un nom les désigne tous. Tout agent créé avec `createAgent` reste dans son SDK : une application qui crée un agent par requête rend donc le nom ambigu ; passez des id, ou créez chaque agent une fois et réutilisez-le. Les suites enregistrées par des versions antérieures n'ont pas de nom : elles ne s'exécutent que dans le processus qui les a créées. Options : `parallel` (les tests d'une suite en même temps), `stopOnFirstFailure` (exécutions séquentielles seulement : plus rien ne s'exécute après le premier test qui ne passe pas, suites suivantes comprises), `filterTags`, `excludeTags`, `timeout` (ms par test, 60 000 par défaut, 2 147 483 647 au plus ; au-delà, l'exécution est annulée et le test est `timeout`) et `detection` (les options de régression ci-dessus).
+
+### Assertions {#assertions}
+
+| Méthode | Renvoie | |
+| --- | --- | --- |
+| `defineAssertion(name, condition, { description?, severity?, tags?, agentId?, agentName? })` | `Promise<Assertion>` | Pour toutes les exécutions, ou pour celles d'un agent ; un agent de ce SDK donné par `agentId` enregistre aussi son nom. Une condition qui ne pourrait pas être évaluée est refusée avec une `ValidationError` |
+| `getAssertions(agent?, tags?)` | `Promise<Assertion[]>` | Les plus récentes d'abord |
+| `evaluateAssertions(runId, assertionIds?)` | `Promise<AssertionEvaluationReport>` | Les assertions données (un id inconnu lève une erreur), sinon celles de toutes les exécutions plus celles de l'agent de l'exécution |
+| `deleteAssertion(assertionId)` | `Promise<void>` | |
+
+| `condition.type` | Demande | Réussit quand |
+| --- | --- | --- |
+| `event_present`, `event_absent` | `eventType` ou `eventTypes` | L'un des types apparaît / aucun n'apparaît |
+| `event_count` | `eventType` ou `eventTypes`, puis `count`, ou `minCount` et `maxCount` | Le nombre de ces événements convient |
+| `event_order` | `beforeEventType`, `afterEventType` | Le premier de l'un vient avant le premier de l'autre |
+| `event_value` | `eventType`, `valuePath`, `valueMatcher` (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `contains`, `regex`) | Chaque événement du type correspond |
+| `custom` | `customEvaluator(events) => boolean` | La fonction renvoie `true` |
+
+Une assertion `custom` contient une fonction, qu'on ne peut pas écrire dans un fichier : elle **n'est pas enregistrée** et dure autant que l'instance du SDK qui l'a définie ; définissez-la de nouveau au démarrage. Les autres types sont enregistrés dans `assertionsDir`.
+
+### Comparaisons et impact {#comparisons-and-impact}
+
+| Méthode | Renvoie | |
+| --- | --- | --- |
+| `compareRuns(runId1, runId2, { ignoreEventTypes?, focusAspects?, compareStructureOnly?, includeMetadata? })` | `Promise<RunComparison>` | Les différences, alignées d'après le sens comme ci-dessus : `event_added`, `event_removed`, `event_modified` (type changé), `data_changed`, `sequence_changed` |
+| `getComparisonReport(comparison, 'text' \| 'json' \| 'html')` | `Promise<string>` | |
+| `analyzeImpact(beforeRunIds, afterRunIds, { metrics?, includeRecommendations? })` | `Promise<ImpactAnalysis>` | Les moyennes avant et après de `duration` (ms), `cost` (USD des appels de modèle qui ont un prix, comme `getRunCost`), `quality` (part des événements qui ne sont pas des actions échouées) et `success_rate`, avec les changements de comportement ; enregistrée dans `impactAnalysesDir` |
+| `getImpactAnalysis(analysisId)` | `Promise<ImpactAnalysis>` | |
+| `compareVersions(agent, version1, version2, options?)` | `Promise<ImpactAnalysis>` | `analyzeImpact` sur les exécutions d'un agent gouverné (son nom, ou l'id d'un agent de ce SDK) enregistrées avec chaque version : sa `version` ou son `configHash`. Tous les agents de ce nom comptent. Les rejeux sont laissés de côté ; les deux versions doivent être différentes et sélectionner des exécutions différentes ; une version inconnue lève une erreur qui liste celles qui sont enregistrées |
+
+Les événements de cycle de vie des exécutions d'un agent gouverné (`run.started`, `run.completed`…) enregistrent son `agentName`, son `agentVersion` et son `configHash` : deux agents de même nom sont un seul agent en deux versions, ou dans deux processus. L'empreinte couvre le modèle, le prompt système, `maxSteps` et `timeout`, les réglages du fournisseur, `version`, les capacités, les outils (nom, description, version, schéma des paramètres, métadonnées, réglages des nouvelles tentatives) et les politiques propres à l'agent avec leurs règles ; elle change avec `setPolicy` et `addTools`, et chaque exécution enregistre celle avec laquelle elle a commencé. Les exécutions enregistrées par des versions antérieures n'ont que l'id et la version.
+
+### Requêtes sur toutes les exécutions {#queries-across-runs}
+
+| Méthode | Renvoie |
+| --- | --- |
+| `queryEventsAdvanced(filter)` | `Promise<{ events, total, filtered, filters, executionTime }>` : les événements qui correspondent, dans l'ordre chronologique (au plus `limit`), les événements du périmètre, ceux qui correspondent |
+| `countEventsAdvanced(filter)` | `Promise<number>` |
+| `getEventStatistics(filter)` | `Promise<{ total, byType, byAgent }>` |
+
+Un filtre a un **périmètre** — `runId` (sans lui, toutes les exécutions), `since`, `until` — et des **conditions** — `type`, `agentId`, `userId`, `sessionId`, `dataFilters` (`{ path, operator, value?, regex? }`) et `metadataFilters` (`{ field, operator, value? }`). Les conditions sont combinées avec `logic` (`and` par défaut ; `or` : au moins une), puis inversées par `not` ; le périmètre ne l'est jamais. Tous les magasins fournis répondent : le magasin de fichiers lit chaque fichier d'exécution une fois par requête, les magasins SQL interrogent la base. Quand toutes les conditions doivent être vraies, la base filtre elle-même les événements par type et par id ; avec `or` ou `not`, le magasin renvoie tous les événements du périmètre et les conditions sont vérifiées en mémoire, ce qui coûte davantage sur une grosse base. Les événements de la même milliseconde gardent l'ordre de leur exécution : les exécutions par id, puis dans l'ordre où chacune les a enregistrés.
 
 ## Événements en direct {#live-events}
 
@@ -211,7 +287,7 @@ Un écouteur est de la forme `(event: Event) => unknown`. Il reçoit un événem
 | `ThinkInput.onEvent` : `agent.think({ problem, onEvent })` | De même pour une exécution cognitive, dont le `limits.timeoutMs` met aussi fin à l'attente |
 | `replay(runId, modifications?, { onEvent })` | De même pour un rejeu, qui ne peut pas être annulé : il attend toujours |
 | `executeTool(name, params, { onEvent })` | Les événements de l'appel, et ceux des exécutions que lance son outil, sur un seul niveau : le gestionnaire reçoit l'écouteur sous la forme `context.onEvent`, que `governedAgentTool` et `cognitiveAgentTool` transmettent à leur agent (un agent construit à la main sur un magasin sans événements en direct s'exécute sans lui). `signal` met fin à l'attente |
-| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void` : tous les événements de toutes les exécutions qui correspondent au filtre (`agentId` est `metadata.agentId`), jusqu'à ce que vous appeliez la fonction renvoyée, qui abandonne les événements pas encore transmis |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void` : tous les événements de toutes les exécutions qui correspondent au filtre (`agentId` est `metadata.agentId`), jusqu'à ce que vous appeliez la fonction renvoyée, qui abandonne les événements pas encore transmis. Les exécutions des suites de régression et les rejeux sont de vraies exécutions : l'écouteur reçoit aussi leurs événements (une suite ne garde ni le `onEvent` ni le `onText` de son entrée) |
 | `new ObservedEventStore(store, { onListenerError? })` | La couche qui les transmet ; le SDK enveloppe son magasin dans une telle couche, ou utilise celle que vous passez comme `eventStore`, y compris à l'intérieur d'un `MonitoredEventStore` (dont les rapports d'incident sont alors transmis eux aussi). Son `subscribe(listener, options?)` renvoie `{ unsubscribe(), close() }` : `close()` attend que l'écouteur ait fini de traiter les événements qu'il a déjà pris en charge. `onListenerError` reçoit les erreurs des écouteurs et les abandons |
 
 ## Outils : `ToolDefinition` {#tools-tooldefinition}

@@ -73,7 +73,7 @@ const analyst = sdk.createAgent({
 
 | 메서드 | 반환값 | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | 통제형 에이전트: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`. 모델이 SDK에 등록된 다른 도구의 이름을 대더라도 자신의 도구(`tools`, `capabilities`)만 실행할 수 있습니다. `signal`은 실행을 취소합니다. `onText`는 모델이 쓰는 텍스트를 쓰이는 대로 받고, `onTextRestart`는 실패한 모델 호출을 다시 시도할 때 지워야 할 부분을 받습니다([답변 스트리밍하기](../guide/governed-agents#_7-streaming-the-answer) 참고) |
+| `createAgent(config)` | `AgentImpl` | 통제형 에이전트: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`, `version`, `configHash`. 모델이 SDK에 등록된 다른 도구의 이름을 대더라도 자신의 도구(`tools`, `capabilities`)만 실행할 수 있습니다. `signal`은 실행을 취소합니다. `onText`는 모델이 쓰는 텍스트를 쓰이는 대로 받고, `onTextRestart`는 실패한 모델 호출을 다시 시도할 때 지워야 할 부분을 받습니다([답변 스트리밍하기](../guide/governed-agents#_7-streaming-the-answer) 참고) |
 | `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()`. 사고는 구조화되어 있으며 스트리밍되지 않습니다 |
 | `defineTool(definition)` | `Tool` | 도구를 등록합니다. 핸들러의 타입은 Zod 스키마로부터 정해집니다 |
 | `defineCapability(definition)` | `Capability` | 도구를 묶습니다 |
@@ -199,7 +199,83 @@ interface ModelCostLine {
 | `getTrace(runId)`, `exportTrace(runId, 'json' \| 'text')`, `getEvents(runId, filters?)` | 실행 읽기 |
 | `replay(runId, modifications?, { onEvent? })` | LLM 없이 다시 실행 |
 | `getReasoningGraph`, `exportReasoningGraph`, `getAlternatives`, `getDecisionPatterns`, `getTraceVisualization` | 결정 이해하기 |
-| `createGoldenTrace`, `getGoldenTraces`, `validateAgainstGoldenTrace`, `replayAndValidate`, `detectRegressions` | 에이전트를 코드처럼 테스트하기 |
+
+### 골든 트레이스 {#golden-traces}
+
+| 메서드 | 반환값 | |
+| --- | --- | --- |
+| `createGoldenTrace(runId, { name, description?, metadata? })` | `Promise<GoldenTrace>` | 실행을 기준으로 보관합니다. 그 실행을 한 통제형 에이전트의 이름(`agentName`)도 함께 기록합니다 |
+| `getGoldenTraces(agent?)`, `getGoldenTrace(id)`, `deleteGoldenTrace(id)`, `exportGoldenTrace(id, 'json' \| 'yaml')` | | `agent`: 에이전트의 id 또는 이름 |
+| `validateAgainstGoldenTrace(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | `pass`, `fail` 또는 `partial`. 차이마다 종류(`event_added`, `event_removed`, `event_modified`, `event_order_changed`)와 위치가 붙습니다 |
+| `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | 같은 차이를 심각도와 영향이 붙은 회귀로 돌려줍니다: `no_regression` 또는 `regressions_detected` |
+| `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | 실행을 리플레이한 뒤 그 리플레이를 검증합니다. 리플레이는 모델을 호출하지 않으므로 `validateAspects: ['tools', 'policies']`로 비교하세요 |
+
+실행은 **이벤트가 뜻하는 바로** 비교되며, 이벤트 id로는 절대 비교되지 않습니다(실행마다 id가 새로 생깁니다). 이벤트는 순서대로 짝지어집니다. 먼저 똑같은 이벤트, 그다음 종류와 대상(도구, 작업, 답변)이 같지만 데이터가 바뀐 이벤트, 마지막으로 대상은 같지만 종류가 바뀐 이벤트입니다. 비교하지 않는 것: 이벤트 id, 시각, 메타데이터, `incident.reported` 이벤트(알림 전송과 발송 제한을 기록합니다. 인시던트를 일으킨 이벤트는 비교됩니다), 그리고 SDK가 기록하며 실행마다 바뀌는 값인 도구 호출의 소요 시간, 토큰 사용량, 재시도 전 대기 시간, 승인 id, 리플레이의 원본 실행, 관찰의 시각과 원본 이벤트. 모델이 도구 호출 옆에 쓰는 텍스트는 `intention.generated`에서만 비교됩니다. 도구의 매개변수, 결과, 입력은 키 이름과 상관없이 항상 비교됩니다. 30에서 60으로 바뀐 `duration` 인수는 변경입니다. 같은 일을 다시 하는 실행은 통과하고, 다른 인수로 호출된 도구는 호출이 일어난 자리에서 보고됩니다(`parameters.metric: "churn" → "revenue"`). 똑같은 호출 앞에 끼워 넣은 호출은 추가된 호출 하나입니다. `action.executed`가 `action.failed`로 바뀐 것은 사라짐과 추가가 아니라 하나의 변경입니다.
+
+| 옵션 | 대상 | |
+| --- | --- | --- |
+| `ignoreEventTypes`, `validateAspects`(`intentions`, `actions`, `tools`, `policies`) | 검증 | 비교할 이벤트를 줄입니다 |
+| `tolerance.dataFields` | 검증 | 어느 깊이에서든 비교에서 뺄 데이터 필드를 더합니다 |
+| `tolerance.timestampMs`, `ignoreTimestampDiff` | 검증 | 시점은 `timestampMs`가 있을 때만, 각 실행의 시작을 기준으로 비교합니다 |
+| `compareStructureOnly` | 검증 | 데이터 차이는 `fail`이 아니라 `partial`이 됩니다. 추가, 제거, 이동되었거나 종류가 바뀐 이벤트는 여전히 실패입니다 |
+| `tolerance.ignoreEventTypes`, `tolerance.ignoreDataFields` | 회귀 | 비교할 이벤트를 줄이고 데이터 필드를 뺍니다 |
+| `tolerance.criticalEventTypes` | 회귀 | 나타나거나 사라지거나 바뀌면 치명적인 종류(기본값: `run.failed`, `action.failed`, `tool.failed`, `policy.violated`) |
+| `tolerance.maxEventCountDiff` | 회귀 | 추가되거나 제거된 처리 이벤트(정책 검사, 재시도, 승인)는 이 수까지 허용합니다. 결과의 변경은 절대 허용하지 않습니다 |
+| `tolerance.maxDurationDiff`, `severityThresholds` | 회귀 | 소요 시간은 둘 중 하나가 있을 때만 검사합니다. `maxDurationDiff` ms보다 더 느려진 실행은 회귀이며, 도달한 가장 높은 임계값의 심각도가 붙습니다. 더 빨라진 실행은 절대 회귀가 아닙니다 |
+
+### 회귀 테스트 스위트 {#regression-suites}
+
+| 메서드 | 반환값 | |
+| --- | --- | --- |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | `regressionTestSuitesDir`에 저장됩니다. `agent`: 이 SDK에 있는 에이전트의 id 또는 이름. 각 골든 트레이스는 존재해야 하며, `input`의 기본값은 기준 실행이 받은 입력입니다. 스위트는 입력의 `signal`과 콜백(`onEvent`, `onText`, `onTextRestart`)을 저장하지 않습니다 |
+| `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | 최신순 |
+| `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | 에이전트의 모든 스위트를 오래된 것부터 실행합니다. 각 테스트는 입력을 에이전트에 보내고 그 실행을 골든 트레이스와 비교합니다. `suites`에는 스위트마다 결과가 하나씩 있습니다 |
+| `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | 스위트 하나만 |
+| `runRegressionTestsForCI(agent, options?)` | `Promise<{ results, exitCode }>` | `exitCode`: 0은 모든 테스트 통과, 1은 회귀를 찾은 테스트가 있음, 2는 실행할 수 없었던 테스트가 있음(오류 또는 시간 초과). 옵션에 `exitCode: false`를 주면 0 |
+| `exportTestResults(results, 'junit' \| 'json' \| 'json-summary', { outputPath?, includeDetails? })` | `Promise<string>` | JUnit XML: 스위트마다 `<testsuite>` 하나. 실행할 수 없었던 테스트(오류 또는 시간 초과)는 `<error>`가 되고, XML에 담을 수 없는 문자는 제거됩니다 |
+
+에이전트 id는 프로세스마다 새로 생기므로, 스위트는 에이전트의 **이름**도 기록하고, 다른 프로세스는 그 이름의 에이전트로 스위트를 실행합니다(스위트의 에이전트 id가 SDK에 있으면 그것을 먼저 씁니다). 한 SDK 안에서 에이전트의 id는 그 에이전트만의 것입니다. 이름이 같은 두 에이전트(예를 들어 두 버전)는 각자 자신의 스위트, 단언, 골든 트레이스를 가지며, 이름은 그 모두를 가리킵니다. `createAgent`로 만든 에이전트는 모두 SDK에 남으므로, 요청마다 에이전트를 만드는 애플리케이션에서는 이름이 모호해집니다. id를 넘기거나, 각 에이전트를 한 번만 만들어 재사용하세요. 이전 버전이 저장한 스위트에는 이름이 없어서, 그것을 만든 프로세스에서만 실행됩니다. 옵션: `parallel`(한 스위트의 테스트를 동시에), `stopOnFirstFailure`(순차 실행일 때만. 통과하지 못한 첫 테스트 뒤로는 다음 스위트까지 포함해 아무것도 실행하지 않음), `filterTags`, `excludeTags`, `timeout`(테스트마다 ms, 기본값 60 000, 최대 2 147 483 647. 넘으면 실행이 취소되고 테스트는 `timeout`), `detection`(위의 회귀 옵션).
+
+### 단언 {#assertions}
+
+| 메서드 | 반환값 | |
+| --- | --- | --- |
+| `defineAssertion(name, condition, { description?, severity?, tags?, agentId?, agentName? })` | `Promise<Assertion>` | 모든 실행 또는 한 에이전트의 실행에 적용됩니다. `agentId`로 지정한 이 SDK의 에이전트는 이름도 기록됩니다. 평가할 수 없는 조건은 `ValidationError`로 거부됩니다 |
+| `getAssertions(agent?, tags?)` | `Promise<Assertion[]>` | 최신순 |
+| `evaluateAssertions(runId, assertionIds?)` | `Promise<AssertionEvaluationReport>` | 지정한 단언(알 수 없는 id는 오류), 아니면 모든 실행에 대한 단언과 그 실행의 에이전트에 대한 단언 |
+| `deleteAssertion(assertionId)` | `Promise<void>` | |
+
+| `condition.type` | 필요한 것 | 통과 조건 |
+| --- | --- | --- |
+| `event_present`, `event_absent` | `eventType` 또는 `eventTypes` | 종류 중 하나가 나타남 / 하나도 나타나지 않음 |
+| `event_count` | `eventType` 또는 `eventTypes`, 그리고 `count`, 또는 `minCount`와 `maxCount` | 그런 이벤트의 수가 맞음 |
+| `event_order` | `beforeEventType`, `afterEventType` | 한쪽의 첫 이벤트가 다른 쪽의 첫 이벤트보다 앞섬 |
+| `event_value` | `eventType`, `valuePath`, `valueMatcher`(`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `contains`, `regex`) | 그 종류의 모든 이벤트가 일치함 |
+| `custom` | `customEvaluator(events) => boolean` | 함수가 `true`를 반환함 |
+
+`custom` 단언은 함수를 담고 있는데, 함수는 파일에 쓸 수 없습니다. 그래서 **저장되지 않고**, 그것을 정의한 SDK 인스턴스가 살아 있는 동안만 유지되므로 시작할 때 다시 정의하세요. 다른 종류는 `assertionsDir`에 저장됩니다.
+
+### 비교와 영향 {#comparisons-and-impact}
+
+| 메서드 | 반환값 | |
+| --- | --- | --- |
+| `compareRuns(runId1, runId2, { ignoreEventTypes?, focusAspects?, compareStructureOnly?, includeMetadata? })` | `Promise<RunComparison>` | 위와 같이 뜻으로 맞춘 차이: `event_added`, `event_removed`, `event_modified`(종류가 바뀜), `data_changed`, `sequence_changed` |
+| `getComparisonReport(comparison, 'text' \| 'json' \| 'html')` | `Promise<string>` | |
+| `analyzeImpact(beforeRunIds, afterRunIds, { metrics?, includeRecommendations? })` | `Promise<ImpactAnalysis>` | 변경 전후의 평균: `duration`(ms), `cost`(가격이 있는 모델 호출의 USD, `getRunCost`와 같음), `quality`(실패한 액션이 아닌 이벤트의 비율), `success_rate`, 그리고 동작 변화. `impactAnalysesDir`에 저장됩니다 |
+| `getImpactAnalysis(analysisId)` | `Promise<ImpactAnalysis>` | |
+| `compareVersions(agent, version1, version2, options?)` | `Promise<ImpactAnalysis>` | 통제형 에이전트(이름, 또는 이 SDK에 있는 에이전트의 id)의 실행 중 각 버전(`version` 또는 `configHash`)으로 기록된 실행에 대한 `analyzeImpact`. 그 이름의 에이전트는 모두 포함됩니다. 리플레이는 제외됩니다. 두 버전은 서로 달라야 하고 서로 다른 실행을 골라야 합니다. 알 수 없는 버전은 기록된 버전 목록과 함께 오류를 던집니다 |
+
+통제형 에이전트 실행의 생명 주기 이벤트(`run.started`, `run.completed` 등)는 에이전트의 `agentName`, `agentVersion`, `configHash`를 기록합니다. 이름이 같은 두 에이전트는 두 버전, 또는 두 프로세스에 있는 하나의 에이전트입니다. 해시는 모델, 시스템 프롬프트, `maxSteps`와 `timeout`, 프로바이더 설정, `version`, 기능(capability), 도구(이름, 설명, 버전, 매개변수 스키마, 메타데이터, 재시도 설정), 그리고 에이전트 자신의 정책과 그 규칙을 포함합니다. `setPolicy`와 `addTools`로 바뀌며, 각 실행은 시작할 때의 해시를 기록합니다. 이전 버전이 기록한 실행에는 id와 버전만 있습니다.
+
+### 모든 실행에 걸친 쿼리 {#queries-across-runs}
+
+| 메서드 | 반환값 |
+| --- | --- |
+| `queryEventsAdvanced(filter)` | `Promise<{ events, total, filtered, filters, executionTime }>`: 일치하는 이벤트(시간순, 최대 `limit`개), 범위 안의 이벤트 수, 일치하는 이벤트 수 |
+| `countEventsAdvanced(filter)` | `Promise<number>` |
+| `getEventStatistics(filter)` | `Promise<{ total, byType, byAgent }>` |
+
+필터에는 **범위**(`runId`, 없으면 모든 실행, 그리고 `since`, `until`)와 **조건**(`type`, `agentId`, `userId`, `sessionId`, `dataFilters`(`{ path, operator, value?, regex? }`), `metadataFilters`(`{ field, operator, value? }`))이 있습니다. 조건은 `logic`(기본값 `and`, `or`는 적어도 하나)으로 결합된 뒤 `not`으로 부정됩니다. 범위는 절대 부정되지 않습니다. 기본 제공 저장소는 모두 답합니다. 파일 저장소는 쿼리마다 각 실행 파일을 한 번만 읽고, SQL 저장소는 데이터베이스에 질의합니다. 모든 조건이 성립해야 할 때는 데이터베이스가 직접 종류와 id로 이벤트를 걸러 냅니다. `or`나 `not`을 쓰면 저장소가 범위 안의 모든 이벤트를 돌려주고 조건은 메모리에서 검사되므로, 큰 데이터베이스에서는 비용이 더 듭니다. 같은 밀리초의 이벤트는 실행 안의 순서를 유지합니다. 실행은 id 순으로, 각 실행 안에서는 기록된 순서대로 정렬됩니다.
 
 ## 실시간 이벤트 {#live-events}
 
@@ -211,7 +287,7 @@ interface ModelCostLine {
 | `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | 인지 실행에 대해 위와 같습니다. 인지 실행에서는 `limits.timeoutMs`도 기다림을 끝냅니다 |
 | `replay(runId, modifications?, { onEvent })` | 리플레이에 대해 위와 같습니다. 리플레이는 취소할 수 없으므로 항상 기다립니다 |
 | `executeTool(name, params, { onEvent })` | 호출의 이벤트, 그리고 그 도구가 시작하는 실행의 이벤트(한 단계 깊이까지만). 핸들러는 리스너를 `context.onEvent`로 받으며, `governedAgentTool`과 `cognitiveAgentTool`은 이를 자신의 에이전트에 넘깁니다(실시간 이벤트가 없는 저장소 위에 직접 만든 에이전트는 리스너 없이 실행됩니다). `signal`은 기다림을 끝냅니다 |
-| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: 필터에 맞는 모든 실행의 모든 이벤트(`agentId`는 `metadata.agentId`). 반환된 함수를 호출할 때까지 받으며, 그 함수는 아직 전달되지 않은 이벤트를 버립니다 |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: 필터에 맞는 모든 실행의 모든 이벤트(`agentId`는 `metadata.agentId`). 반환된 함수를 호출할 때까지 받으며, 그 함수는 아직 전달되지 않은 이벤트를 버립니다. 회귀 테스트 스위트의 실행과 리플레이도 실제 실행이므로 리스너는 그 이벤트도 받습니다(스위트는 입력의 `onEvent`와 `onText`를 저장하지 않습니다) |
 | `new ObservedEventStore(store, { onListenerError? })` | 이벤트를 전달하는 계층. SDK는 자기 저장소를 이것으로 감싸거나, 여러분이 `eventStore`로 넘긴 것을 그대로 씁니다. `MonitoredEventStore` 안에 넣은 경우도 마찬가지입니다(그러면 그 인시던트 보고도 전달됩니다). 그 `subscribe(listener, options?)`는 `{ unsubscribe(), close() }`를 반환합니다. `close()`는 리스너가 이미 가져간 이벤트의 처리를 마칠 때까지 기다립니다. `onListenerError`는 리스너의 오류와 버려진 이벤트를 받습니다 |
 
 ## 도구: `ToolDefinition` {#tools-tooldefinition}

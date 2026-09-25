@@ -73,7 +73,7 @@ const analyst = sdk.createAgent({
 
 | الدالة | تعيد | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | وكيل خاضع للحوكمة: `run({ message, context?, signal?, onText?, onTextRestart? })`، و`stop(runId?)`، و`addTools()`، و`setPolicy()`، و`id`، و`name`. لا يستطيع تشغيل إلا أدواته الخاصة (`tools`، `capabilities`)، حتى لو ذكر النموذج أداة أخرى مسجَّلة في حزمة SDK؛ ويلغي `signal` التشغيل؛ ويتلقّى `onText` النص الذي يكتبه النموذج أثناء كتابته، و`onTextRestart` الجزء الذي يجب حذفه حين يُعاد تجريب استدعاء فاشل للنموذج (انظر [البث التدريجي للإجابة](../guide/governed-agents#_7-streaming-the-answer)) |
+| `createAgent(config)` | `AgentImpl` | وكيل خاضع للحوكمة: `run({ message, context?, signal?, onText?, onTextRestart? })`، و`stop(runId?)`، و`addTools()`، و`setPolicy()`، و`id`، و`name`، و`version`، و`configHash`. لا يستطيع تشغيل إلا أدواته الخاصة (`tools`، `capabilities`)، حتى لو ذكر النموذج أداة أخرى مسجَّلة في حزمة SDK؛ ويلغي `signal` التشغيل؛ ويتلقّى `onText` النص الذي يكتبه النموذج أثناء كتابته، و`onTextRestart` الجزء الذي يجب حذفه حين يُعاد تجريب استدعاء فاشل للنموذج (انظر [البث التدريجي للإجابة](../guide/governed-agents#_7-streaming-the-answer)) |
 | `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`، و`stop(runId?)`، و`learnFromFeedback(runId, feedback)`، و`getProfile()`، و`setProfile()`. أفكاره مهيكلة ولا تُبثّ تدريجيًا |
 | `defineTool(definition)` | `Tool` | يسجّل أداة؛ ويُستنتَج نوع المعالج من مخطط Zod الخاص بها |
 | `defineCapability(definition)` | `Capability` | يجمّع الأدوات |
@@ -199,7 +199,83 @@ interface ModelCostLine {
 | `getTrace(runId)`، `exportTrace(runId, 'json' \| 'text')`، `getEvents(runId, filters?)` | قراءة عمليات التشغيل |
 | `replay(runId, modifications?, { onEvent? })` | إعادة التنفيذ دون النموذج اللغوي |
 | `getReasoningGraph`، `exportReasoningGraph`، `getAlternatives`، `getDecisionPatterns`، `getTraceVisualization` | فهم القرارات |
-| `createGoldenTrace`، `getGoldenTraces`، `validateAgainstGoldenTrace`، `replayAndValidate`، `detectRegressions` | اختبار الوكلاء كما تُختبَر الشيفرة |
+
+### الآثار المرجعية {#golden-traces}
+
+| الدالة | تعيد | |
+| --- | --- | --- |
+| `createGoldenTrace(runId, { name, description?, metadata? })` | `Promise<GoldenTrace>` | تحفظ تشغيلًا مرجعًا، مع اسم الوكيل الخاضع للحوكمة الذي نفّذه (`agentName`) |
+| `getGoldenTraces(agent?)`، `getGoldenTrace(id)`، `deleteGoldenTrace(id)`، `exportGoldenTrace(id, 'json' \| 'yaml')` | | `agent`: معرّف وكيل أو اسمه |
+| `validateAgainstGoldenTrace(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | `pass` أو `fail` أو `partial`، مع كل فرق (`event_added`، `event_removed`، `event_modified`، `event_order_changed`) وموضعه |
+| `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | الفروق نفسها في صورة تراجعات، لكلٍّ منها خطورة وأثر: `no_regression` أو `regressions_detected` |
+| `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | تعيد تشغيل التشغيل ثم تتحقّق من إعادة التشغيل. لا تستدعي إعادة التشغيل أي نموذج: قارنها باستخدام `validateAspects: ['tools', 'policies']` |
+
+تُقارَن عمليات التشغيل **بحسب ما تعنيه أحداثها**، ولا تُقارَن أبدًا بمعرّفات الأحداث (لكل تشغيل معرّفات جديدة). تُطابَق الأحداث بالترتيب: أولًا الأحداث المتطابقة، ثم الأحداث التي لها النوع والموضوع نفسهما (الأداة، أو العملية، أو الإجابة) وتغيّرت بياناتها، ثم الأحداث التي تغيّر نوعها للموضوع نفسه. ما لا يُقارَن أبدًا: معرّفات الأحداث، والأوقات، والبيانات الوصفية، وأحداث `incident.reported` (تسجّل إرسال التنبيهات وتقييدها؛ أما الحدث الذي أطلق الحادثة فيُقارَن)، والقيم التي يكتبها SDK وتتغيّر من تشغيل إلى آخر: مدة استدعاء أداة، واستهلاك الرموز، وفترات الانتظار قبل إعادة المحاولة، ومعرّفات الموافقات، والتشغيل الذي جاءت منه إعادة التشغيل، ووقت الملاحظة وحدثها المصدر. النص الذي يكتبه النموذج بجانب استدعاء أداة لا يُقارَن إلا في `intention.generated`. أما معاملات الأداة ونتيجتها ومُدخلها فتُقارَن دائمًا، أيًّا كانت أسماء مفاتيحها: الوسيط `duration` الذي تغيّر من 30 إلى 60 تغيير. التشغيل الذي يفعل الشيء نفسه مرة أخرى ينجح؛ والأداة التي تُستدعى بوسائط أخرى يُبلَّغ عنها حيث وقع الاستدعاء (`parameters.metric: "churn" → "revenue"`)؛ والاستدعاء المُدرَج قبل استدعاء مطابق استدعاءٌ واحد مضاف؛ و`action.executed` الذي صار `action.failed` تغيير واحد، لا فقدان وإضافة.
+
+| الخيار | يخص | |
+| --- | --- | --- |
+| `ignoreEventTypes`، `validateAspects` (`intentions`، `actions`، `tools`، `policies`) | التحقق | مقارنة أحداث أقل |
+| `tolerance.dataFields` | التحقق | حقول بيانات أخرى تُستبعَد، على أي عمق |
+| `tolerance.timestampMs`، `ignoreTimestampDiff` | التحقق | لا يُقارَن التوقيت، نسبةً إلى بداية كل تشغيل، إلا مع `timestampMs` |
+| `compareStructureOnly` | التحقق | فروق البيانات تعطي `partial` لا `fail`؛ أما الأحداث المضافة أو المحذوفة أو المنقولة أو التي تغيّر نوعها فتظل تُفشل التحقق |
+| `tolerance.ignoreEventTypes`، `tolerance.ignoreDataFields` | التراجعات | مقارنة أحداث أقل، واستبعاد حقول بيانات |
+| `tolerance.criticalEventTypes` | التراجعات | أنواع يكون ظهورها أو فقدانها أو تغيّرها حرجًا (افتراضيًا: `run.failed`، `action.failed`، `tool.failed`، `policy.violated`) |
+| `tolerance.maxEventCountDiff` | التراجعات | يُتسامَح مع هذا العدد على الأكثر من أحداث سير العمل المضافة أو المحذوفة (فحوص السياسات، وإعادة المحاولات، والموافقات)؛ ولا يُتسامَح أبدًا مع تغيّر النتيجة |
+| `tolerance.maxDurationDiff`، `severityThresholds` | التراجعات | لا تُفحَص المدة إلا مع أحدهما: التشغيل الأبطأ بأكثر من `maxDurationDiff` ملّي ثانية تراجُع، بخطورة أعلى عتبة بلغها؛ والتشغيل الأسرع لا يُعدّ تراجعًا أبدًا |
+
+### مجموعات اختبار التراجعات {#regression-suites}
+
+| الدالة | تعيد | |
+| --- | --- | --- |
+| `createRegressionTestSuite(agent, { name, goldenTraces: [{ goldenTraceId, name, input?, tags? }] })` | `Promise<RegressionTestSuite>` | تُحفَظ في `regressionTestSuitesDir`. `agent`: معرّف وكيل من هذه الحزمة أو اسمه. يجب أن يوجد كل أثر مرجعي؛ وقيمة `input` الافتراضية هي المُدخل الذي تلقّاه التشغيل المرجعي؛ ولا تحتفظ المجموعة بـ`signal` المُدخل ولا بدوال الاستدعاء فيه (`onEvent`، `onText`، `onTextRestart`) |
+| `getRegressionTestSuites(agent?)` | `Promise<RegressionTestSuite[]>` | الأحدث أولًا |
+| `runRegressionTests(agent, options?)` | `Promise<RegressionTestRunResult>` | كل مجموعات الوكيل، الأقدم أولًا: يرسل كل اختبار مُدخله إلى الوكيل ويقارن التشغيل بأثره المرجعي؛ وفي `suites` نتيجة واحدة لكل مجموعة |
+| `runRegressionTestSuite(suiteId, options?)` | `Promise<RegressionTestSuiteResult>` | مجموعة واحدة |
+| `runRegressionTestsForCI(agent, options?)` | `Promise<{ results, exitCode }>` | `exitCode`: 0 نجحت كل الاختبارات، 1 وجد اختبار تراجعًا، 2 تعذّر تشغيل اختبار (خطأ أو انتهاء المهلة)؛ و`exitCode: false` في الخيارات يعطي 0 |
+| `exportTestResults(results, 'junit' \| 'json' \| 'json-summary', { outputPath?, includeDetails? })` | `Promise<string>` | في JUnit XML عنصر `<testsuite>` واحد لكل مجموعة؛ والاختبار الذي تعذّر تشغيله (خطأ أو انتهاء المهلة) عنصر `<error>`؛ وتُحذَف المحارف التي لا يستطيع XML احتواءها |
+
+معرّفات الوكلاء جديدة في كل عملية: لذلك تسجّل المجموعة أيضًا **اسم** وكيلها، وتشغّلها عملية أخرى بوكيلها الذي يحمل هذا الاسم (بمعرّف وكيل المجموعة أولًا، إن كان ذلك الوكيل موجودًا في الحزمة). داخل الحزمة الواحدة، معرّف الوكيل له وحده: الوكيلان اللذان يحملان الاسم نفسه (إصداران مثلًا) يحتفظ كلٌّ منهما بمجموعاته وتوكيداته وآثاره المرجعية، والاسم يدلّ عليهم جميعًا. كل وكيل يُنشأ بـ`createAgent` يبقى في حزمته، لذا فإن التطبيق الذي ينشئ وكيلًا لكل طلب يجعل الاسم ملتبسًا: مرّر المعرّفات، أو أنشئ كل وكيل مرة واحدة وأعد استخدامه. المجموعات التي حفظتها إصدارات سابقة لا تحمل اسمًا: فلا تعمل إلا في العملية التي أنشأتها. الخيارات: `parallel` (اختبارات المجموعة في الوقت نفسه)، و`stopOnFirstFailure` (للتشغيل المتتابع فقط: لا يُشغَّل شيء بعد أول اختبار لا ينجح، بما في ذلك المجموعات التالية)، و`filterTags`، و`excludeTags`، و`timeout` (بالملّي ثانية لكل اختبار، 60 000 افتراضيًا، و2 147 483 647 على الأكثر؛ بعدها يُلغى التشغيل ويصير الاختبار `timeout`)، و`detection` (خيارات التراجعات أعلاه).
+
+### التوكيدات {#assertions}
+
+| الدالة | تعيد | |
+| --- | --- | --- |
+| `defineAssertion(name, condition, { description?, severity?, tags?, agentId?, agentName? })` | `Promise<Assertion>` | لكل عمليات التشغيل، أو لعمليات تشغيل وكيل واحد؛ والوكيل من هذه الحزمة المُعطى عبر `agentId` يُسجَّل اسمه أيضًا. يُرفَض الشرط الذي لا يمكن تقييمه بخطأ `ValidationError` |
+| `getAssertions(agent?, tags?)` | `Promise<Assertion[]>` | الأحدث أولًا |
+| `evaluateAssertions(runId, assertionIds?)` | `Promise<AssertionEvaluationReport>` | التوكيدات المُعطاة (المعرّف المجهول يرمي خطأً)، وإلا فتوكيدات كل عمليات التشغيل مع توكيدات وكيل هذا التشغيل |
+| `deleteAssertion(assertionId)` | `Promise<void>` | |
+
+| `condition.type` | يحتاج إلى | ينجح عندما |
+| --- | --- | --- |
+| `event_present`، `event_absent` | `eventType` أو `eventTypes` | يظهر أحد الأنواع / لا يظهر أيٌّ منها |
+| `event_count` | `eventType` أو `eventTypes`، ثم `count`، أو `minCount` و`maxCount` | يناسب عددُ هذه الأحداث |
+| `event_order` | `beforeEventType`، `afterEventType` | يأتي أول حدث من أحدهما قبل أول حدث من الآخر |
+| `event_value` | `eventType`، `valuePath`، `valueMatcher` (`eq`، `ne`، `gt`، `gte`، `lt`، `lte`، `contains`، `regex`) | يطابق كل حدث من هذا النوع |
+| `custom` | `customEvaluator(events) => boolean` | تعيد الدالة `true` |
+
+يحمل توكيد `custom` دالة، والدالة لا يمكن كتابتها في ملف: لذلك **لا يُحفَظ**، ويبقى ما دامت نسخة SDK التي عرّفته قائمة؛ فعرّفه من جديد عند بدء التشغيل. أما الأنواع الأخرى فتُحفَظ في `assertionsDir`.
+
+### المقارنات والأثر {#comparisons-and-impact}
+
+| الدالة | تعيد | |
+| --- | --- | --- |
+| `compareRuns(runId1, runId2, { ignoreEventTypes?, focusAspects?, compareStructureOnly?, includeMetadata? })` | `Promise<RunComparison>` | الفروق، مُطابَقة بحسب المعنى كما أعلاه: `event_added`، `event_removed`، `event_modified` (تغيّر النوع)، `data_changed`، `sequence_changed` |
+| `getComparisonReport(comparison, 'text' \| 'json' \| 'html')` | `Promise<string>` | |
+| `analyzeImpact(beforeRunIds, afterRunIds, { metrics?, includeRecommendations? })` | `Promise<ImpactAnalysis>` | متوسطات قبل وبعد لـ`duration` (ملّي ثانية)، و`cost` (الدولارات الأمريكية لاستدعاءات النموذج التي لها سعر، كما في `getRunCost`)، و`quality` (نسبة الأحداث التي ليست إجراءات فاشلة)، و`success_rate`، مع التغيّرات في السلوك؛ ويُحفَظ في `impactAnalysesDir` |
+| `getImpactAnalysis(analysisId)` | `Promise<ImpactAnalysis>` | |
+| `compareVersions(agent, version1, version2, options?)` | `Promise<ImpactAnalysis>` | `analyzeImpact` على عمليات تشغيل وكيل خاضع للحوكمة (اسمه، أو معرّف وكيل من هذه الحزمة) المُسجَّلة بكل إصدار: قيمة `version` أو `configHash` الخاصة به. يُحسَب كل وكيل يحمل هذا الاسم. تُستبعَد إعادات التشغيل؛ ويجب أن يختلف الإصداران وأن يختارا عمليات تشغيل مختلفة؛ والإصدار المجهول يرمي خطأً يسرد الإصدارات المُسجَّلة |
+
+تسجّل أحداث دورة حياة عمليات تشغيل الوكيل الخاضع للحوكمة (`run.started`، `run.completed`…) قيم `agentName` و`agentVersion` و`configHash` الخاصة به: والوكيلان اللذان يحملان الاسم نفسه وكيل واحد في إصدارين، أو في عمليتين. يشمل الهاش النموذج، وموجّه النظام، و`maxSteps` و`timeout`، وإعدادات المزوّد، و`version`، والقدرات، والأدوات (الاسم، والوصف، والإصدار، ومخطط المعاملات، والبيانات الوصفية، وإعدادات إعادة المحاولة)، وسياسات الوكيل نفسه مع قواعدها؛ ويتغيّر مع `setPolicy` و`addTools`، ويسجّل كل تشغيل الهاش الذي بدأ به. أما عمليات التشغيل التي سجّلتها إصدارات سابقة فلا تحمل إلا المعرّف والإصدار.
+
+### الاستعلامات عبر كل عمليات التشغيل {#queries-across-runs}
+
+| الدالة | تعيد |
+| --- | --- |
+| `queryEventsAdvanced(filter)` | `Promise<{ events, total, filtered, filters, executionTime }>`: الأحداث المطابقة بترتيبها الزمني (`limit` على الأكثر)، وعدد الأحداث في النطاق، وعدد المطابقة منها |
+| `countEventsAdvanced(filter)` | `Promise<number>` |
+| `getEventStatistics(filter)` | `Promise<{ total, byType, byAgent }>` |
+
+للمرشّح **نطاق** — `runId` (ومن دونه: كل عمليات التشغيل)، و`since`، و`until` — و**شروط** — `type`، و`agentId`، و`userId`، و`sessionId`، و`dataFilters` (`{ path, operator, value?, regex? }`)، و`metadataFilters` (`{ field, operator, value? }`). تُجمَع الشروط بـ`logic` (`and` افتراضيًا؛ و`or`: شرط واحد على الأقل)، ثم تُنفى بـ`not`؛ أما النطاق فلا يُنفى أبدًا. يجيب كل مخزن مُضمَّن: مخزن الملفات يقرأ ملف كل تشغيل مرة واحدة في كل استعلام، ومخازن SQL تستعلم قاعدة البيانات. حين يجب أن تتحقّق كل الشروط، ترشّح قاعدة البيانات الأحداث بنفسها بحسب النوع والمعرّفات؛ ومع `or` أو `not` يعيد المخزن كل أحداث النطاق وتُفحَص الشروط في الذاكرة، وهذا أكثر كلفة مع قاعدة بيانات كبيرة. تحتفظ الأحداث التي تقع في الملّي ثانية نفسها بترتيب تشغيلها: عمليات التشغيل بحسب المعرّف، ثم بالترتيب الذي سجّلها به كل تشغيل.
 
 ## الأحداث المباشرة {#live-events}
 
@@ -211,7 +287,7 @@ interface ModelCostLine {
 | `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | الشيء نفسه لتشغيل معرفي، تُنهي `limits.timeoutMs` الخاصة به الانتظارَ أيضًا |
 | `replay(runId, modifications?, { onEvent })` | الشيء نفسه لإعادة تشغيل، وهي لا يمكن إلغاؤها: فتنتظر دائمًا |
 | `executeTool(name, params, { onEvent })` | أحداث الاستدعاء، وأحداث عمليات التشغيل التي تبدؤها أداته، على مستوى واحد فقط: يتلقّى المعالج المستمِع بوصفه `context.onEvent`، وتمرّره `governedAgentTool` و`cognitiveAgentTool` إلى وكيلهما (أما الوكيل المبني يدويًا على مخزن دون أحداث مباشرة فيعمل من دونه). ويُنهي `signal` الانتظار |
-| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: كل حدث من كل تشغيل يطابق المرشِّح (`agentId` هو `metadata.agentId`)، إلى أن تستدعي الدالة المُعادة، التي تُسقِط الأحداث التي لم تُسلَّم بعد |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: كل حدث من كل تشغيل يطابق المرشِّح (`agentId` هو `metadata.agentId`)، إلى أن تستدعي الدالة المُعادة، التي تُسقِط الأحداث التي لم تُسلَّم بعد. وتشغيلات مجموعات اختبار التراجعات وإعادات التشغيل تشغيلات حقيقية: فيتلقى المستمِع أحداثها أيضًا (لا تحفظ المجموعة `onEvent` ولا `onText` من مُدخَلها) |
 | `new ObservedEventStore(store, { onListenerError? })` | الطبقة التي تسلّم الأحداث؛ تغلّف حزمة SDK مخزنها بواحدة منها، أو تستخدم تلك التي تعطيها بوصفها `eventStore`، حتى داخل `MonitoredEventStore` (فتُسلَّم عندئذٍ تقارير الحوادث الخاصة به أيضًا). وتعيد `subscribe(listener, options?)` الخاصة بها `{ unsubscribe(), close() }`: تنتظر `close()` إلى أن يفرغ المستمِع من الأحداث التي أخذها بالفعل. ويتلقّى `onListenerError` أخطاء المستمِعات وحالات الإسقاط |
 
 ## الأدوات: `ToolDefinition` {#tools-tooldefinition}

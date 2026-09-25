@@ -1,12 +1,19 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
-import type { Assertion } from '../types/assertion.js';
+import type { Assertion, AssertionOptions } from '../types/assertion.js';
 import { fileInFolder } from '../utils/file-in-folder.js';
 
+/**
+ * Assertions are saved as JSON files in `assertionsDir`, except `custom` ones: their evaluator
+ * is a function, which a file cannot hold. Those live in this manager only, for the life of
+ * the SDK instance that defined them.
+ */
 export class AssertionManager {
   private assertionsDir: string;
   private assertionsCache: Map<string, Assertion> = new Map();
+  /** `custom` assertions, never written to disk. */
+  private inMemory: Map<string, Assertion> = new Map();
 
   constructor(assertionsDir = './assertions') {
     // Created on first use, not at start-up: an SDK used only for tools (an MCP server
@@ -25,15 +32,8 @@ export class AssertionManager {
   async createAssertion(
     name: string,
     condition: Assertion['condition'],
-    options: {
-      description?: string;
-      severity?: 'error' | 'warning';
-      tags?: string[];
-      agentId?: string;
-    } = {}
+    options: AssertionOptions = {}
   ): Promise<Assertion> {
-    await this.ensureAssertionsDir();
-
     const assertion: Assertion = {
       id: uuidv4(),
       name,
@@ -42,9 +42,16 @@ export class AssertionManager {
       severity: options.severity || 'error',
       tags: options.tags,
       agentId: options.agentId,
+      agentName: options.agentName,
       createdAt: Date.now(),
     };
 
+    if (condition.type === 'custom') {
+      this.inMemory.set(assertion.id, assertion);
+      return assertion;
+    }
+
+    await this.ensureAssertionsDir();
     const filePath = fileInFolder(this.assertionsDir, assertion.id, '.json', 'id');
     await fs.writeFile(filePath, JSON.stringify(assertion, null, 2), 'utf-8');
 
@@ -54,7 +61,7 @@ export class AssertionManager {
   }
 
   async getAssertion(assertionId: string): Promise<Assertion | null> {
-    const cached = this.assertionsCache.get(assertionId);
+    const cached = this.inMemory.get(assertionId) ?? this.assertionsCache.get(assertionId);
     if (cached) {
       return cached;
     }
@@ -72,13 +79,19 @@ export class AssertionManager {
     }
   }
 
-  async getAssertions(agentId?: string, tags?: string[]): Promise<Assertion[]> {
+  /**
+   * Saved and in-memory assertions, newest first. `matchesAgent` keeps those of one agent;
+   * `tags` those with at least one of the tags.
+   */
+  async getAssertions(
+    matchesAgent?: (assertion: Assertion) => boolean,
+    tags?: string[]
+  ): Promise<Assertion[]> {
     await this.ensureAssertionsDir();
 
+    const assertions: Assertion[] = [...this.inMemory.values()];
     try {
       const files = await fs.readdir(this.assertionsDir);
-      const assertions: Assertion[] = [];
-
       for (const file of files) {
         if (!file.endsWith('.json')) continue;
 
@@ -86,32 +99,30 @@ export class AssertionManager {
         try {
           const content = await fs.readFile(filePath, 'utf-8');
           const assertion = JSON.parse(content) as Assertion;
-
-          if (agentId && assertion.agentId !== agentId) {
-            continue;
-          }
-
-          if (tags && tags.length > 0) {
-            const hasMatchingTag = tags.some((tag) => assertion.tags?.includes(tag));
-            if (!hasMatchingTag) {
-              continue;
-            }
-          }
-
           assertions.push(assertion);
           this.assertionsCache.set(assertion.id, assertion);
         } catch {
           // Ignore invalid files
         }
       }
-
-      return assertions.sort((a, b) => b.createdAt - a.createdAt);
     } catch {
-      return [];
+      // No folder: only the in-memory assertions.
     }
+
+    return assertions
+      .filter((assertion) => !matchesAgent || matchesAgent(assertion))
+      .filter(
+        (assertion) =>
+          !tags || tags.length === 0 || tags.some((tag) => assertion.tags?.includes(tag))
+      )
+      .sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
   }
 
   async deleteAssertion(assertionId: string): Promise<boolean> {
+    if (this.inMemory.delete(assertionId)) {
+      return true;
+    }
+
     await this.ensureAssertionsDir();
 
     try {

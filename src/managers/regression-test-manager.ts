@@ -7,6 +7,8 @@ import { fileInFolder } from '../utils/file-in-folder.js';
 export class RegressionTestManager {
   private testSuitesDir: string;
   private testSuitesCache: Map<string, RegressionTestSuite> = new Map();
+  /** Suites created here get increasing times, so their order survives the same millisecond. */
+  private lastCreatedAt = 0;
 
   constructor(testSuitesDir = './regression-test-suites') {
     // Created on first use, not at start-up: an SDK used only for tools (an MCP server
@@ -23,26 +25,24 @@ export class RegressionTestManager {
   }
 
   async createTestSuite(
-    agentId: string,
+    agent: { id: string; name?: string },
     config: {
       name: string;
-      goldenTraces: Array<{
-        goldenTraceId: string;
-        name: string;
-        input: unknown;
-        tags?: string[];
-      }>;
+      goldenTraces: RegressionTestSuite['goldenTraces'];
     }
   ): Promise<RegressionTestSuite> {
     await this.ensureTestSuitesDir();
 
+    const createdAt = Math.max(Date.now(), this.lastCreatedAt + 1);
+    this.lastCreatedAt = createdAt;
     const suite: RegressionTestSuite = {
       id: uuidv4(),
       name: config.name,
-      agentId,
+      agentId: agent.id,
+      ...(agent.name !== undefined ? { agentName: agent.name } : {}),
       goldenTraces: config.goldenTraces,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt,
+      updatedAt: createdAt,
     };
 
     const filePath = fileInFolder(this.testSuitesDir, suite.id, '.json', 'id');
@@ -75,7 +75,10 @@ export class RegressionTestManager {
     }
   }
 
-  async getTestSuites(agentId?: string): Promise<RegressionTestSuite[]> {
+  /** Suites of the folder, newest first; `matchesAgent` keeps those of one agent. */
+  async getTestSuites(
+    matchesAgent?: (suite: RegressionTestSuite) => boolean
+  ): Promise<RegressionTestSuite[]> {
     await this.ensureTestSuitesDir();
 
     try {
@@ -90,7 +93,7 @@ export class RegressionTestManager {
           const content = await fs.readFile(filePath, 'utf-8');
           const suite = JSON.parse(content) as RegressionTestSuite;
 
-          if (!agentId || suite.agentId === agentId) {
+          if (!matchesAgent || matchesAgent(suite)) {
             suites.push(suite);
             this.testSuitesCache.set(suite.id, suite);
           }
@@ -99,7 +102,7 @@ export class RegressionTestManager {
         }
       }
 
-      return suites.sort((a, b) => b.createdAt - a.createdAt);
+      return suites.sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
     } catch {
       return [];
     }

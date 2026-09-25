@@ -136,4 +136,28 @@ const validation = await sdk.validateAgainstGoldenTrace(newRunId, golden.id);
 const regressions = await sdk.detectRegressions(newRunId, golden.id);
 ```
 
-تتوفّر أيضًا مجموعات اختبار التراجعات، والتوكيدات السلوكية، ومقارنة عمليات التشغيل، وتحليل التأثير قبل النشر — انظر [واجهة SDK البرمجية](../reference/sdk-api).
+تُقارَن عمليات التشغيل بحسب ما تعنيه أحداثها — النوع، والترتيب، والأداة، والمعاملات، والنتائج — ولا تُقارَن أبدًا بمعرّفات الأحداث، الجديدة في كل تشغيل؛ وتُستبعَد كذلك الأوقات وأعداد الرموز (tokens) وسائر القيم التي يكتبها SDK وتتغيّر من تشغيل إلى آخر، لكن معاملات الأداة ونتائجها تُقارَن دائمًا، أيًّا كانت أسماء مفاتيحها. التشغيل الذي يفعل الشيء نفسه مرة أخرى ينجح؛ والأداة التي تُستدعى بوسائط أخرى يُبلَّغ عنها حيث وقع الاستدعاء.
+
+### مجموعات اختبار التراجعات في التكامل المستمر {#regression-suites-in-ci}
+
+اجمع الآثار المرجعية في مجموعة مرة واحدة، ثم شغّلها في التكامل المستمر (CI):
+
+```ts
+// Once, after recording the good runs
+await sdk.createRegressionTestSuite('support-agent', {
+  name: 'refunds',
+  goldenTraces: [{ goldenTraceId: golden.id, name: 'refund flow' }],
+});
+
+// In CI: the same agent, created again
+sdk.createAgent({ name: 'support-agent', model: 'gpt-4o', tools });
+const { results, exitCode } = await sdk.runRegressionTestsForCI('support-agent', {
+  detection: { tolerance: { ignoreEventTypes: ['intention.generated'], ignoreDataFields: ['output'] } },
+});
+await sdk.exportTestResults(results, 'junit', { outputPath: 'regressions.xml' });
+process.exitCode = exitCode;
+```
+
+تعرف المجموعة وكيلها **باسمه**، لأن معرّفات الوكلاء جديدة في كل عملية. تُشغَّل كل مجموعات الوكيل، الأقدم أولًا: يرسل كل اختبار مُدخل التشغيل المرجعي إلى الوكيل ويقارن التشغيل الجديد بالأثر المرجعي. رمز الخروج 0 حين تنجح كل الاختبارات، و1 حين يجد اختبار تراجعًا، و2 حين يتعذّر تشغيل اختبار. النموذج الحقيقي يصوغ إجاباته بطريقة مختلفة من تشغيل إلى آخر: يستبعد `detection` أعلاه نصّ النموذج والإجابة النهائية، ويظل يفحص كل استدعاء أداة بوسائطه.
+
+التوكيدات على أحداث التشغيل، ومقارنة تشغيلين، وأثر إصدار جديد من وكيل، والاستعلامات عبر كل عمليات التشغيل موجودة في [واجهة SDK البرمجية](../reference/sdk-api#assertions).

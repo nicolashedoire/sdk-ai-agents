@@ -1,7 +1,64 @@
 import type { Event } from '../types/events.js';
 import type { Assertion, AssertionCondition, AssertionResult } from '../types/assertion.js';
 
+const ASSERTION_TYPES: ReadonlyArray<AssertionCondition['type']> = [
+  'event_present',
+  'event_absent',
+  'event_order',
+  'event_count',
+  'event_value',
+  'custom',
+];
+
 export class AssertionEvaluator {
+  /**
+   * What makes a condition impossible to evaluate, checked when an assertion is defined (the
+   * same problems would otherwise only show as `error` results); null when it can be evaluated.
+   */
+  static problemWith(condition: AssertionCondition): string | null {
+    if (typeof condition !== 'object' || condition === null) return 'must be an object';
+    if (!ASSERTION_TYPES.includes(condition.type)) {
+      return `type must be one of ${ASSERTION_TYPES.join(', ')}`;
+    }
+    // `eventTypes` wins over `eventType`: an empty list would match no event at all.
+    if (condition.eventTypes !== undefined) {
+      if (!Array.isArray(condition.eventTypes) || condition.eventTypes.length === 0) {
+        return 'eventTypes must list at least one event type';
+      }
+    }
+    const hasTypes = typeof condition.eventType === 'string' || condition.eventTypes !== undefined;
+    for (const bound of ['count', 'minCount', 'maxCount'] as const) {
+      const value = condition[bound];
+      if (value !== undefined && !(Number.isInteger(value) && value >= 0)) {
+        return `${bound} must be a whole number >= 0`;
+      }
+    }
+    switch (condition.type) {
+      case 'event_present':
+      case 'event_absent':
+        return hasTypes ? null : `${condition.type} requires eventType or eventTypes`;
+      case 'event_count':
+        if (!hasTypes) return 'event_count requires eventType or eventTypes';
+        return condition.count !== undefined ||
+          condition.minCount !== undefined ||
+          condition.maxCount !== undefined
+          ? null
+          : 'event_count requires count, minCount or maxCount';
+      case 'event_order':
+        return condition.beforeEventType && condition.afterEventType
+          ? null
+          : 'event_order requires both beforeEventType and afterEventType';
+      case 'event_value':
+        return condition.eventType && condition.valuePath && condition.valueMatcher
+          ? null
+          : 'event_value requires eventType, valuePath, and valueMatcher';
+      case 'custom':
+        return typeof condition.customEvaluator === 'function'
+          ? null
+          : 'customEvaluator must be a function for a custom assertion';
+    }
+  }
+
   static evaluate(assertion: Assertion, events: Event[]): AssertionResult {
     try {
       const result = AssertionEvaluator.evaluateCondition(assertion.condition, events);
@@ -269,8 +326,11 @@ export class AssertionEvaluator {
     condition: AssertionCondition,
     events: Event[]
   ): { passed: boolean; message?: string; details?: Record<string, unknown> } {
-    if (!condition.customEvaluator) {
-      throw new Error('custom assertion requires customEvaluator function');
+    if (typeof condition.customEvaluator !== 'function') {
+      // A custom assertion read from a file (saved by an older version) lost its function.
+      throw new Error(
+        'custom assertion has no customEvaluator function: a function cannot be saved to a file, define the assertion again in this process'
+      );
     }
 
     try {
