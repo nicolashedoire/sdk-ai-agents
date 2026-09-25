@@ -106,6 +106,8 @@ import type {
   AdvancedEventQueryResult,
   EventStatistics,
 } from './types/advanced-event-filter.js';
+import { Study } from './study/study.js';
+import type { StudyConfig } from './study/study-types.js';
 
 export interface SDK {
   createAgent(config: AgentConfig): AgentImpl;
@@ -354,6 +356,15 @@ export interface SDK {
   exportControllerDataset(runIds?: string[]): Promise<string>;
   /** Extracts a thinker profile from topics explained in someone's own words. */
   distillThinkerProfile(input: DistillProfileInput): Promise<ThinkerProfile>;
+  /**
+   * Creates a study: a researcher that understands an object, then proposes a redesign of it
+   * with today's means, through the seven passages of the method, and designs the experiments
+   * that would decide. Its charter (object, question, objective, needs, leads, scope) is frozen
+   * and hashed. It searches only with `sources`, SDK tools already defined, run through
+   * `executeTool`. Its model calls count in `getRunCost` and in budgets per period. Throws a
+   * `ValidationError` for a bad configuration or a source that is not a defined tool.
+   */
+  createStudy(config: StudyConfig): Study;
   /** Typed decisions (Jev): context injection, single/multiple choice, checks, ratings. */
   readonly decisions: DecisionService;
   /**
@@ -550,6 +561,17 @@ export class SDKImpl implements SDK {
 
   distillThinkerProfile(input: DistillProfileInput): Promise<ThinkerProfile> {
     return distillThinkerProfile(this.provider, input);
+  }
+
+  createStudy(config: StudyConfig): Study {
+    return new Study(config, {
+      provider: this.provider,
+      eventStore: this.eventStore,
+      liveEvents: this.liveEvents,
+      policyEngine: this.policyEngine,
+      findTool: (name) => this.toolRegistry.getTool(name) ?? undefined,
+      executeTool: (name, parameters, options) => this.executeTool(name, parameters, options),
+    });
   }
 
   get decisions(): DecisionService {
