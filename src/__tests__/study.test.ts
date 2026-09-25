@@ -456,8 +456,8 @@ describe('sdk.createStudy', () => {
         status: 'novelty',
         toVerify: true,
         statusReason: reason(
-          'noveltyNoSource',
-          'Novelty to verify: the study has no source to search its prior art.'
+          'priorArtNoSource',
+          'To verify against prior art: the study has no source to search its prior art.'
         ),
       });
       expect(report.noveltyClaims[0]?.priorArt).toBeUndefined();
@@ -522,7 +522,7 @@ describe('sdk.createStudy', () => {
       expect(result.report.noveltyClaims[0]).toMatchObject({
         status: 'novelty',
         toVerify: true,
-        statusReason: reason('noveltySearchBudget'),
+        statusReason: reason('priorArtSearchBudget'),
       });
       expect(result.report.notices).toContainEqual(
         expect.objectContaining({ code: 'searchesSkipped', details: ['design'] })
@@ -539,8 +539,8 @@ describe('sdk.createStudy', () => {
       expect(report.noveltyClaims[0]).toMatchObject({
         toVerify: true,
         statusReason: reason(
-          'noveltyNotSearched',
-          'Novelty to verify: no prior-art search was asked for it.'
+          'priorArtNotSearched',
+          'To verify against prior art: no prior-art search was asked for it.'
         ),
       });
       expect(provider.channels()).not.toContain('study-prior-art-check:design');
@@ -641,7 +641,7 @@ describe('sdk.createStudy', () => {
       const attempts = requestsOf(provider, 'study:observe');
       expect(attempts).toHaveLength(2);
       expect(lastMessage(attempts[1])).toContain(
-        `- "The history of the typewriter ${OFF_OBJECTIVE}": It is about another subject`
+        `{"statement":"The history of the typewriter ${OFF_OBJECTIVE}","reason":"It is about another subject"}`
       );
       expect(result.report.observations.map((observation) => [observation.id, observation.statement])).toEqual([
         ['O4', 'Heavy pages freeze the interface'],

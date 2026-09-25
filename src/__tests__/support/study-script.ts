@@ -373,7 +373,7 @@ export function claimsShown(request: LLMRequest): Array<{ id: string; statement:
 
 /** The first search source a prompt lists. */
 function firstSource(request: LLMRequest): string {
-  return /Search sources:\n- ([^:]+):/.exec(request.messages.at(-1)?.content ?? '')?.[1] ?? '';
+  return /"name":"([^"]+)"/.exec(request.messages.at(-1)?.content ?? '')?.[1] ?? '';
 }
 
 /** The items a guardian prompt shows: an architecture also shows its kind. */

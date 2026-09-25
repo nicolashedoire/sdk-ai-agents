@@ -67,6 +67,11 @@ export class StudyRun {
   searches = 0;
   skipped = 0;
   loops = 0;
+  /**
+   * The guardian judged items late in a passage already complete: the later passages that read
+   * them run again in this run (it took a loop).
+   */
+  catchingUp = false;
   redos = 0;
   /**
    * Steps admitted by the budget policies: each passage performed, reopenings, redos and the

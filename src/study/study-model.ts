@@ -53,7 +53,9 @@ export class StudyModel {
    * is admitted by the run first (`maxModelCalls`, timeout, cancellation). The attempts the
    * vendor answered are recorded as one `study.model_called` event, and the answers a
    * provider discarded as `provider.answer_discarded` events, whatever the outcome: every
-   * billed call reaches the run's cost and budgets.
+   * billed call reaches the run's cost and budgets. When the repair cannot be used at all, the
+   * first reply is read as a last attempt would be (what it lacked is accepted as missing):
+   * a guardian's verdicts on some items are not lost to a repair written in prose.
    */
   async ask<Value>(run: StudyRun, call: StudyCall<Value>): Promise<Value> {
     const attempts: AnsweredAttempt[] = [];
@@ -62,7 +64,9 @@ export class StudyModel {
       discarded.push(answer);
     };
     let rejection: string | undefined;
-    let answer: { value: Value } | undefined;
+    let answer: { value: Value; attempt: number } | undefined;
+    // The last refused reply that a last attempt would have accepted, with what it lacks.
+    let fallback: { value: Value; attempt: number } | undefined;
     let failure: unknown;
     try {
       for (let attempt = 0; attempt < MAX_ATTEMPTS && !answer; attempt++) {
@@ -78,15 +82,32 @@ export class StudyModel {
         });
         attempts.push(answered);
         run.answered++;
-        const parsed = call.parse(answered.response.content ?? '', attempt === MAX_ATTEMPTS - 1);
-        if (parsed.ok) answer = { value: parsed.value };
-        else rejection = parsed.error;
+        const content = answered.response.content ?? '';
+        const final = attempt === MAX_ATTEMPTS - 1;
+        const parsed = call.parse(content, final);
+        if (parsed.ok) {
+          answer = { value: parsed.value, attempt: attempt + 1 };
+          continue;
+        }
+        rejection = parsed.error;
+        if (!final) {
+          const lenient = call.parse(content, true);
+          if (lenient.ok) fallback = { value: lenient.value, attempt: attempt + 1 };
+        }
       }
+      answer = answer ?? fallback;
     } catch (error) {
       failure = run.stopFor(error);
     }
     const unusable = failure === undefined ? rejection : describe(failure);
-    await this.recordCall(run, call, attempts, discarded, answer ? undefined : unusable);
+    await this.recordCall(
+      run,
+      call,
+      attempts,
+      discarded,
+      answer ? undefined : unusable,
+      answer && answer.attempt < attempts.length ? answer.attempt : undefined
+    );
     if (answer) return answer.value;
     throw failure ?? new StudyReplyError(call, rejection ?? 'no reply');
   }
@@ -96,7 +117,8 @@ export class StudyModel {
     call: StudyCall<unknown>,
     attempts: AnsweredAttempt[],
     discarded: DiscardedAnswer[],
-    failed: string | undefined
+    failed: string | undefined,
+    usedAttempt: number | undefined
   ): Promise<void> {
     const settled = settleAttempts(attempts, discarded);
     for (const answer of settled.discarded) {
@@ -116,6 +138,8 @@ export class StudyModel {
       ...(settled.requestedModel ? { requestedModel: settled.requestedModel } : {}),
       usage: settled.usage,
       ...(failed ? { failed: truncate(failed) } : {}),
+      // The repair could not be used: the reply of this attempt was.
+      ...(usedAttempt ? { usedAttempt } : {}),
     });
   }
 }

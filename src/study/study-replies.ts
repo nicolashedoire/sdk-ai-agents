@@ -39,6 +39,11 @@ export interface ReopenRequest {
 export interface PassageReply {
   items: ProposedItem[];
   refused: RefusedItem[];
+  /**
+   * Verdicts a reopened passage gave again on leads already judged: dropped, and not drift
+   * (nothing left the objective).
+   */
+  duplicates: RefusedItem[];
   reopen?: ReopenRequest;
 }
 
@@ -86,6 +91,7 @@ export function parsePassageReply(
 
   const items: ProposedItem[] = [];
   const refused: RefusedItem[] = [];
+  const duplicates: RefusedItem[] = [];
   const judged = new Set((context.judgedLeads ?? []).map(leadKey));
   for (const collection of spec.collections) {
     const entries = json[collection.key] ?? [];
@@ -95,8 +101,9 @@ export function parsePassageReply(
     const before = items.length;
     for (const entry of entries) {
       const read = readItem(collection.key, collection.fields, entry, context, judged);
-      if ('reason' in read) refused.push(read);
-      else items.push(read);
+      if (!('reason' in read)) items.push(read);
+      else if (read.reason.code === 'leadAlreadyJudged') duplicates.push(read);
+      else refused.push(read);
     }
     const valid = items.length - before;
     const min = context.reopened ? 0 : (context.minimums?.[collection.key] ?? collection.min);
@@ -133,7 +140,7 @@ export function parsePassageReply(
   }
 
   const reopen = readReopen(json.reopen, context.reopenable);
-  return { ok: true, value: { items, refused, ...(reopen ? { reopen } : {}) } };
+  return { ok: true, value: { items, refused, duplicates, ...(reopen ? { reopen } : {}) } };
 }
 
 function readItem(

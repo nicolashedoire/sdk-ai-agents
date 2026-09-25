@@ -44,8 +44,12 @@ export function renderStudyMarkdown(report: StudyReport): string {
       out.line(
         amendment.accepted
           ? `${amendment.number}. ${inline(amendment.text)} — _${verdict}_`
-          : `- ~~${inline(amendment.text)}~~ — _${l.refused}, ${verdict}_${l.sep}${inline(reasonText(amendment.reason, l))}${amendment.verdict === 'changesObjective' ? ` ${inline(l.newObjectiveNewStudy)}` : ''}`
+          : `- ~~${inline(amendment.text)}~~ — _${l.refused}, ${verdict}_${l.sep}${inline(reasonText(amendment.reason, l))}`
       );
+      // A sentence of its own, never glued to the model's reason.
+      if (amendment.verdict === 'changesObjective') {
+        out.line(`  - _${inline(l.newObjectiveNewStudy)}_`);
+      }
     }
     out.line('');
   }
@@ -113,11 +117,17 @@ class Writer {
     return `_(${status}${sources}${unlisted})_`;
   }
 
-  notes(claim: Pick<StudyClaim, 'statusReason' | 'priorArt' | 'unchecked'>, indent: string): void {
+  notes(
+    claim: Pick<StudyClaim, 'statusReason' | 'priorArt' | 'unchecked' | 'priorArtReason'>,
+    indent: string
+  ): void {
     const l = this.l;
     // The reason names the declared status itself ("Declared established, but…").
     if (claim.statusReason) {
       this.lines.push(`${indent}- _${inline(reasonText(claim.statusReason, l))}_`);
+    }
+    if (claim.priorArtReason) {
+      this.lines.push(`${indent}- _${inline(reasonText(claim.priorArtReason, l))}_`);
     }
     if (claim.priorArt) {
       const { priorArt } = claim;
@@ -427,8 +437,20 @@ function driftSection(out: Writer, report: StudyReport, l: StudyLabels): void {
   for (const entry of report.driftLog) {
     const id = entry.item.id ? `${entry.item.id} ` : '';
     const statement = entry.item.statement ? `“${inline(entry.item.statement)}”` : '';
+    // Each entry says its attempt: a redo's rejections may belong to an attempt discarded later.
+    const attempt = entry.attempt > 1 ? ` (${l.attemptLabel} ${entry.attempt})` : '';
     out.line(
-      `- **${l.passageNames[entry.passage]}** · ${id}${statement} — _${l.driftBy[entry.by]}_${l.sep}${inline(reasonText(entry.reason, l))}`
+      `- **${l.passageNames[entry.passage]}**${attempt} · ${id}${statement} — _${l.driftBy[entry.by]}_${l.sep}${inline(reasonText(entry.reason, l))}`
+    );
+  }
+  for (const state of report.passages) {
+    if (!state.discarded) continue;
+    out.line(
+      `- _${fillLabel(l.redoDiscarded, {
+        passage: l.passageNames[state.passage],
+        attempt: String(state.discarded.attempt),
+        items: String(state.discarded.items),
+      })}_`
     );
   }
   out.line('');
@@ -485,6 +507,7 @@ function noticeText(notice: StudyNotice, l: StudyLabels): string {
       break;
     case 'passagesNotRun':
     case 'uncheckedItems':
+    case 'passagesOutdated':
       detail = passages().join(l.list);
       break;
     case 'searchesSkipped':
@@ -504,6 +527,8 @@ function noticeText(notice: StudyNotice, l: StudyLabels): string {
     case 'leadsNotVerified':
     case 'analoguesNotDeconstructed':
     case 'untracedAssembly':
+    case 'capabilitiesToVerify':
+    case 'capabilitiesExist':
       detail = inline(details.join(l.list));
       break;
     case 'noveltiesToVerify':

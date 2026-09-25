@@ -188,6 +188,9 @@ export interface StudyLabels {
   unlisted: string;
   newObjectiveNewStudy: string;
   capabilityAimReminder: string;
+  /** A redo discarded for a better first attempt (`{passage}`, `{attempt}`, `{items}`). */
+  redoDiscarded: string;
+  attemptLabel: string;
   noCapabilityReminder: string;
   none: string;
 }
@@ -217,6 +220,12 @@ const en: StudyLabels = {
   refused: 'refused',
   notices: 'Before reading',
   noticeTexts: {
+    capabilitiesExist:
+      'Capabilities whose assembly already exists, ranked after the others: {detail}.',
+    passagesOutdated:
+      'Passages written before items the guardian judged late, not yet written again: {detail}.',
+    capabilitiesToVerify:
+      'Capabilities whose assembly was not checked against prior art: {detail}.',
     noDesign: 'The design passage kept no architecture.',
     minimumsNotMet: 'Fewer items than required once the guardian judged them, in: {detail}.',
     untracedAssembly: 'Parts of the design cite no record of the investigation, in: {detail}.',
@@ -424,21 +433,24 @@ const en: StudyLabels = {
   },
   judgedImprovement: 'the guardian judged it only faster or cheaper: {reason}',
   reasons: {
+    assemblyExists: 'Its assembly already exists: {closest}',
     judged: '{text}',
     noSourceConfigured:
       'Declared established, but the study has no source: nothing can be established.',
     citesUnlisted: 'Declared established, but it cites {ids}, not listed in its prompt.',
     citesNothing: 'Declared established, but it cites no result listed in its prompt.',
-    noveltyNotSearchedYet: 'Novelty to verify: its prior art has not been searched yet.',
-    noveltyNoSource: 'Novelty to verify: the study has no source to search its prior art.',
-    noveltySearchBudget:
-      'Novelty to verify: the search budget (maxSearches) ran out before its prior-art search.',
-    noveltyNotSearched: 'Novelty to verify: no prior-art search was asked for it.',
-    noveltySearchFailed: 'Novelty to verify: its prior-art searches failed.',
-    noveltyNoResult: 'Novelty to verify: its prior-art searches found no result.',
-    noveltyNotAssessed:
-      'Novelty to verify: its prior-art search ran, but its results were not assessed.',
-    noveltyUnsupported: 'Novelty to verify: the prior-art check cited none of its own results.',
+    priorArtNotSearchedYet: 'To verify against prior art: its prior art has not been searched yet.',
+    priorArtNoSource:
+      'To verify against prior art: the study has no source to search its prior art.',
+    priorArtSearchBudget:
+      'To verify against prior art: the search budget (maxSearches) ran out before its prior-art search.',
+    priorArtNotSearched: 'To verify against prior art: no prior-art search was asked for it.',
+    priorArtSearchFailed: 'To verify against prior art: its prior-art searches failed.',
+    priorArtNoResult: 'To verify against prior art: its prior-art searches found no result.',
+    priorArtNotAssessed:
+      'To verify against prior art: its prior-art search ran, but its results were not assessed.',
+    priorArtUnsupported:
+      'To verify against prior art: the prior-art check cited none of its own results.',
     priorArtExists: 'Not a novelty: {closest}',
     componentDocumented:
       'Presented as new, but a component is a prior technique, and a result listed in its prompt documents it: the novelty lies in the assembly.',
@@ -467,6 +479,9 @@ const en: StudyLabels = {
   capabilityAimReminder: 'Capability aimed at',
   noCapabilityReminder:
     'none named: propose what a change of principle would make possible that is difficult today, not only faster',
+  redoDiscarded:
+    '{passage}: the redo (attempt {attempt}, {items} item(s) kept by the guardian) was discarded, the first attempt being better.',
+  attemptLabel: 'attempt',
   none: 'none',
 };
 
@@ -496,6 +511,12 @@ const fr: StudyLabels = {
   refused: 'refusé',
   notices: 'Avant de lire',
   noticeTexts: {
+    capabilitiesExist:
+      'Capacités dont l’assemblage existe déjà, classées après les autres : {detail}.',
+    passagesOutdated:
+      'Passages écrits avant des éléments jugés tardivement par le gardien, pas encore réécrits : {detail}.',
+    capabilitiesToVerify:
+      'Capacités dont l’assemblage n’a pas été confronté à l’existant : {detail}.',
     noDesign: 'Le passage de conception n’a gardé aucune architecture.',
     minimumsNotMet: 'Moins d’éléments que requis une fois jugés par le gardien, dans : {detail}.',
     untracedAssembly:
@@ -705,24 +726,26 @@ const fr: StudyLabels = {
   },
   judgedImprovement: 'le gardien l’a jugée seulement plus rapide ou moins chère : {reason}',
   reasons: {
+    assemblyExists: 'Son assemblage existe déjà : {closest}',
     judged: '{text}',
     noSourceConfigured:
       'Déclaré établi, mais l’étude n’a aucune source : rien ne peut être établi.',
     citesUnlisted: 'Déclaré établi, mais il cite {ids}, absent de la liste de son prompt.',
     citesNothing: 'Déclaré établi, mais il ne cite aucun résultat de la liste de son prompt.',
-    noveltyNotSearchedYet: 'Nouveauté à vérifier : l’existant n’a pas encore été recherché.',
-    noveltyNoSource: 'Nouveauté à vérifier : l’étude n’a aucune source pour rechercher l’existant.',
-    noveltySearchBudget:
-      'Nouveauté à vérifier : le budget de recherches (maxSearches) s’est épuisé avant sa recherche de l’existant.',
-    noveltyNotSearched:
-      'Nouveauté à vérifier : aucune recherche de l’existant n’a été demandée pour elle.',
-    noveltySearchFailed: 'Nouveauté à vérifier : ses recherches de l’existant ont échoué.',
-    noveltyNoResult:
-      'Nouveauté à vérifier : ses recherches de l’existant n’ont trouvé aucun résultat.',
-    noveltyNotAssessed:
-      'Nouveauté à vérifier : sa recherche de l’existant a eu lieu, mais ses résultats n’ont pas été évalués.',
-    noveltyUnsupported:
-      'Nouveauté à vérifier : l’évaluation de l’existant ne cite aucun de ses propres résultats.',
+    priorArtNotSearchedYet: 'À confronter à l’existant : l’existant n’a pas encore été recherché.',
+    priorArtNoSource:
+      'À confronter à l’existant : l’étude n’a aucune source pour rechercher l’existant.',
+    priorArtSearchBudget:
+      'À confronter à l’existant : le budget de recherches (maxSearches) s’est épuisé avant sa recherche de l’existant.',
+    priorArtNotSearched:
+      'À confronter à l’existant : aucune recherche de l’existant n’a été demandée pour elle.',
+    priorArtSearchFailed: 'À confronter à l’existant : ses recherches de l’existant ont échoué.',
+    priorArtNoResult:
+      'À confronter à l’existant : ses recherches de l’existant n’ont trouvé aucun résultat.',
+    priorArtNotAssessed:
+      'À confronter à l’existant : sa recherche de l’existant a eu lieu, mais ses résultats n’ont pas été évalués.',
+    priorArtUnsupported:
+      'À confronter à l’existant : l’évaluation de l’existant ne cite aucun de ses propres résultats.',
     priorArtExists: 'Pas une nouveauté : {closest}',
     componentDocumented:
       'Présenté comme nouveau, mais un composant est une technique antérieure, et un résultat de la liste de son prompt le documente : la nouveauté est dans l’assemblage.',
@@ -753,6 +776,9 @@ const fr: StudyLabels = {
   capabilityAimReminder: 'Capacité visée',
   noCapabilityReminder:
     'aucune nommée : proposer ce qu’un changement de principe rendrait possible, difficile aujourd’hui, pas seulement plus rapide',
+  redoDiscarded:
+    '{passage} : la reprise (tentative {attempt}, {items} élément(s) gardé(s) par le gardien) a été écartée, la première tentative étant meilleure.',
+  attemptLabel: 'tentative',
   none: 'aucun',
 };
 
@@ -781,6 +807,11 @@ const es: StudyLabels = {
   refused: 'rechazada',
   notices: 'Antes de leer',
   noticeTexts: {
+    capabilitiesExist:
+      'Capacidades cuyo ensamblaje ya existe, clasificadas después de las demás: {detail}.',
+    passagesOutdated:
+      'Pasajes escritos antes de elementos que el guardián juzgó tarde, aún no reescritos: {detail}.',
+    capabilitiesToVerify: 'Capacidades cuyo ensamblaje no se contrastó con lo existente: {detail}.',
     noDesign: 'El pasaje de diseño no conservó ninguna arquitectura.',
     minimumsNotMet:
       'Menos elementos de los requeridos una vez juzgados por el guardián, en: {detail}.',
@@ -989,26 +1020,28 @@ const es: StudyLabels = {
   },
   judgedImprovement: 'el guardián la juzgó solo más rápida o más barata: {reason}',
   reasons: {
+    assemblyExists: 'Su ensamblaje ya existe: {closest}',
     judged: '{text}',
     noSourceConfigured:
       'Declarado establecido, pero el estudio no tiene ninguna fuente: no se puede establecer nada.',
     citesUnlisted:
       'Declarado establecido, pero cita {ids}, que no figura en la lista de su prompt.',
     citesNothing: 'Declarado establecido, pero no cita ningún resultado de la lista de su prompt.',
-    noveltyNotSearchedYet: 'Novedad por verificar: aún no se ha buscado lo existente.',
-    noveltyNoSource:
-      'Novedad por verificar: el estudio no tiene ninguna fuente para buscar lo existente.',
-    noveltySearchBudget:
-      'Novedad por verificar: el presupuesto de búsquedas (maxSearches) se agotó antes de su búsqueda de lo existente.',
-    noveltyNotSearched:
-      'Novedad por verificar: no se pidió ninguna búsqueda de lo existente para ella.',
-    noveltySearchFailed: 'Novedad por verificar: sus búsquedas de lo existente fallaron.',
-    noveltyNoResult:
-      'Novedad por verificar: sus búsquedas de lo existente no encontraron ningún resultado.',
-    noveltyNotAssessed:
-      'Novedad por verificar: su búsqueda de lo existente se hizo, pero sus resultados no se evaluaron.',
-    noveltyUnsupported:
-      'Novedad por verificar: la evaluación de lo existente no cita ninguno de sus propios resultados.',
+    priorArtNotSearchedYet: 'Por contrastar con lo existente: aún no se ha buscado lo existente.',
+    priorArtNoSource:
+      'Por contrastar con lo existente: el estudio no tiene ninguna fuente para buscar lo existente.',
+    priorArtSearchBudget:
+      'Por contrastar con lo existente: el presupuesto de búsquedas (maxSearches) se agotó antes de su búsqueda de lo existente.',
+    priorArtNotSearched:
+      'Por contrastar con lo existente: no se pidió ninguna búsqueda de lo existente para ella.',
+    priorArtSearchFailed:
+      'Por contrastar con lo existente: sus búsquedas de lo existente fallaron.',
+    priorArtNoResult:
+      'Por contrastar con lo existente: sus búsquedas de lo existente no encontraron ningún resultado.',
+    priorArtNotAssessed:
+      'Por contrastar con lo existente: su búsqueda de lo existente se hizo, pero sus resultados no se evaluaron.',
+    priorArtUnsupported:
+      'Por contrastar con lo existente: la evaluación de lo existente no cita ninguno de sus propios resultados.',
     priorArtExists: 'No es una novedad: {closest}',
     componentDocumented:
       'Presentado como nuevo, pero un componente es una técnica anterior, y un resultado de la lista de su prompt lo documenta: la novedad está en el ensamblaje.',
@@ -1037,6 +1070,9 @@ const es: StudyLabels = {
   capabilityAimReminder: 'Capacidad buscada',
   noCapabilityReminder:
     'ninguna nombrada: proponer lo que un cambio de principio haría posible, difícil hoy, no solo más rápido',
+  redoDiscarded:
+    '{passage}: la repetición (intento {attempt}, {items} elemento(s) conservado(s) por el guardián) se descartó, al ser mejor el primer intento.',
+  attemptLabel: 'intento',
   none: 'ninguno',
 };
 
@@ -1065,6 +1101,12 @@ const de: StudyLabels = {
   refused: 'abgelehnt',
   notices: 'Vor dem Lesen',
   noticeTexts: {
+    capabilitiesExist:
+      'Fähigkeiten, deren Zusammenbau bereits existiert, nach den anderen eingeordnet: {detail}.',
+    passagesOutdated:
+      'Schritte, geschrieben vor Einträgen, die der Wächter spät beurteilt hat, noch nicht neu geschrieben: {detail}.',
+    capabilitiesToVerify:
+      'Fähigkeiten, deren Zusammenbau nicht mit dem Stand der Technik abgeglichen wurde: {detail}.',
     noDesign: 'Der Entwurfsschritt hat keine Architektur behalten.',
     minimumsNotMet:
       'Weniger Einträge als verlangt, nachdem der Wächter sie beurteilt hat, in: {detail}.',
@@ -1274,6 +1316,7 @@ const de: StudyLabels = {
   },
   judgedImprovement: 'der Wächter hat sie nur als schneller oder billiger beurteilt: {reason}',
   reasons: {
+    assemblyExists: 'Ihr Zusammenbau existiert bereits: {closest}',
     judged: '{text}',
     noSourceConfigured:
       'Als belegt angegeben, aber die Studie hat keine Quelle: Nichts kann belegt werden.',
@@ -1281,21 +1324,22 @@ const de: StudyLabels = {
       'Als belegt angegeben, aber es zitiert {ids}, nicht in der Liste seines Prompts.',
     citesNothing:
       'Als belegt angegeben, aber es zitiert kein Ergebnis aus der Liste seines Prompts.',
-    noveltyNotSearchedYet: 'Zu prüfende Neuheit: Der Stand der Technik wurde noch nicht gesucht.',
-    noveltyNoSource:
-      'Zu prüfende Neuheit: Die Studie hat keine Quelle, um den Stand der Technik zu suchen.',
-    noveltySearchBudget:
-      'Zu prüfende Neuheit: Das Suchbudget (maxSearches) war vor ihrer Suche nach dem Stand der Technik aufgebraucht.',
-    noveltyNotSearched:
-      'Zu prüfende Neuheit: Für sie wurde keine Suche nach dem Stand der Technik verlangt.',
-    noveltySearchFailed:
-      'Zu prüfende Neuheit: Ihre Suchen nach dem Stand der Technik sind fehlgeschlagen.',
-    noveltyNoResult:
-      'Zu prüfende Neuheit: Ihre Suchen nach dem Stand der Technik fanden kein Ergebnis.',
-    noveltyNotAssessed:
-      'Zu prüfende Neuheit: Ihre Suche nach dem Stand der Technik lief, aber die Ergebnisse wurden nicht bewertet.',
-    noveltyUnsupported:
-      'Zu prüfende Neuheit: Die Prüfung des Stands der Technik zitiert keines ihrer eigenen Ergebnisse.',
+    priorArtNotSearchedYet:
+      'Mit dem Stand der Technik abzugleichen: Der Stand der Technik wurde noch nicht gesucht.',
+    priorArtNoSource:
+      'Mit dem Stand der Technik abzugleichen: Die Studie hat keine Quelle, um den Stand der Technik zu suchen.',
+    priorArtSearchBudget:
+      'Mit dem Stand der Technik abzugleichen: Das Suchbudget (maxSearches) war vor ihrer Suche nach dem Stand der Technik aufgebraucht.',
+    priorArtNotSearched:
+      'Mit dem Stand der Technik abzugleichen: Für sie wurde keine Suche nach dem Stand der Technik verlangt.',
+    priorArtSearchFailed:
+      'Mit dem Stand der Technik abzugleichen: Ihre Suchen nach dem Stand der Technik sind fehlgeschlagen.',
+    priorArtNoResult:
+      'Mit dem Stand der Technik abzugleichen: Ihre Suchen nach dem Stand der Technik fanden kein Ergebnis.',
+    priorArtNotAssessed:
+      'Mit dem Stand der Technik abzugleichen: Ihre Suche nach dem Stand der Technik lief, aber die Ergebnisse wurden nicht bewertet.',
+    priorArtUnsupported:
+      'Mit dem Stand der Technik abzugleichen: Die Prüfung des Stands der Technik zitiert keines ihrer eigenen Ergebnisse.',
     priorArtExists: 'Keine Neuheit: {closest}',
     componentDocumented:
       'Als neu dargestellt, aber ein Baustein ist eine frühere Technik, und ein Ergebnis aus der Liste seines Prompts belegt ihn: Die Neuheit liegt im Zusammenbau.',
@@ -1325,6 +1369,9 @@ const de: StudyLabels = {
   capabilityAimReminder: 'Angestrebte Fähigkeit',
   noCapabilityReminder:
     'keine benannt: vorschlagen, was eine Änderung des Prinzips möglich machen würde, das heute schwierig ist, nicht nur schneller',
+  redoDiscarded:
+    '{passage}: Die Wiederholung (Versuch {attempt}, {items} vom Wächter behaltene Einträge) wurde verworfen, da der erste Versuch besser war.',
+  attemptLabel: 'Versuch',
   none: 'keine',
 };
 
@@ -1354,6 +1401,12 @@ const pt: StudyLabels = {
   refused: 'recusada',
   notices: 'Antes de ler',
   noticeTexts: {
+    capabilitiesExist:
+      'Capacidades cuja montagem já existe, classificadas depois das outras: {detail}.',
+    passagesOutdated:
+      'Passagens escritas antes de itens que o guardião julgou tarde, ainda não reescritas: {detail}.',
+    capabilitiesToVerify:
+      'Capacidades cuja montagem não foi confrontada com o existente: {detail}.',
     noDesign: 'A passagem de concepção não manteve nenhuma arquitetura.',
     minimumsNotMet: 'Menos itens do que o exigido depois de julgados pelo guardião, em: {detail}.',
     untracedAssembly: 'Partes do projeto não citam nenhum registro da investigação, em: {detail}.',
@@ -1561,24 +1614,26 @@ const pt: StudyLabels = {
   },
   judgedImprovement: 'o guardião a julgou apenas mais rápida ou mais barata: {reason}',
   reasons: {
+    assemblyExists: 'Sua montagem já existe: {closest}',
     judged: '{text}',
     noSourceConfigured:
       'Declarado estabelecido, mas o estudo não tem nenhuma fonte: nada pode ser estabelecido.',
     citesUnlisted: 'Declarado estabelecido, mas cita {ids}, fora da lista do seu prompt.',
     citesNothing: 'Declarado estabelecido, mas não cita nenhum resultado da lista do seu prompt.',
-    noveltyNotSearchedYet: 'Novidade a verificar: o existente ainda não foi pesquisado.',
-    noveltyNoSource:
-      'Novidade a verificar: o estudo não tem nenhuma fonte para pesquisar o existente.',
-    noveltySearchBudget:
-      'Novidade a verificar: o orçamento de pesquisas (maxSearches) se esgotou antes da sua pesquisa do existente.',
-    noveltyNotSearched: 'Novidade a verificar: nenhuma pesquisa do existente foi pedida para ela.',
-    noveltySearchFailed: 'Novidade a verificar: suas pesquisas do existente falharam.',
-    noveltyNoResult:
-      'Novidade a verificar: suas pesquisas do existente não encontraram nenhum resultado.',
-    noveltyNotAssessed:
-      'Novidade a verificar: sua pesquisa do existente foi feita, mas os resultados não foram avaliados.',
-    noveltyUnsupported:
-      'Novidade a verificar: a avaliação do existente não cita nenhum dos seus próprios resultados.',
+    priorArtNotSearchedYet: 'A confrontar com o existente: o existente ainda não foi pesquisado.',
+    priorArtNoSource:
+      'A confrontar com o existente: o estudo não tem nenhuma fonte para pesquisar o existente.',
+    priorArtSearchBudget:
+      'A confrontar com o existente: o orçamento de pesquisas (maxSearches) se esgotou antes da sua pesquisa do existente.',
+    priorArtNotSearched:
+      'A confrontar com o existente: nenhuma pesquisa do existente foi pedida para ela.',
+    priorArtSearchFailed: 'A confrontar com o existente: suas pesquisas do existente falharam.',
+    priorArtNoResult:
+      'A confrontar com o existente: suas pesquisas do existente não encontraram nenhum resultado.',
+    priorArtNotAssessed:
+      'A confrontar com o existente: sua pesquisa do existente foi feita, mas os resultados não foram avaliados.',
+    priorArtUnsupported:
+      'A confrontar com o existente: a avaliação do existente não cita nenhum dos seus próprios resultados.',
     priorArtExists: 'Não é uma novidade: {closest}',
     componentDocumented:
       'Apresentado como novo, mas um componente é uma técnica anterior, e um resultado da lista do seu prompt o documenta: a novidade está na montagem.',
@@ -1607,6 +1662,9 @@ const pt: StudyLabels = {
   capabilityAimReminder: 'Capacidade visada',
   noCapabilityReminder:
     'nenhuma nomeada: propor o que uma mudança de princípio tornaria possível, difícil hoje, e não apenas mais rápido',
+  redoDiscarded:
+    '{passage}: a repetição (tentativa {attempt}, {items} item(ns) mantido(s) pelo guardião) foi descartada, pois a primeira tentativa era melhor.',
+  attemptLabel: 'tentativa',
   none: 'nenhum',
 };
 
@@ -1635,6 +1693,10 @@ const ja: StudyLabels = {
   refused: '却下',
   notices: '読む前に',
   noticeTexts: {
+    capabilitiesExist: '組み立てが既に存在し、他の後に並べた能力：{detail}。',
+    passagesOutdated:
+      '守護者が後から判定した項目より前に書かれ、まだ書き直されていない段階：{detail}。',
+    capabilitiesToVerify: '組み立てが先行事例と照合されていない能力：{detail}。',
     noDesign: '設計の段階はアーキテクチャを一つも残さなかった。',
     minimumsNotMet: '守護者の判定後、必要な数に満たない項目：{detail}。',
     untracedAssembly: '調査のどの記録も引用していない設計の部分：{detail}。',
@@ -1826,18 +1888,20 @@ const ja: StudyLabels = {
   architectureKinds: { capability: '新しい能力', improvement: '改善：より速いか安いだけ' },
   judgedImprovement: '守護者はより速いか安いだけと判定した：{reason}',
   reasons: {
+    assemblyExists: 'その組み立ては既に存在する：{closest}',
     judged: '{text}',
     noSourceConfigured: '確立と申告されたが、研究に情報源がない。何も確立できない。',
     citesUnlisted: '確立と申告されたが、プロンプトの一覧にない {ids} を引用している。',
     citesNothing: '確立と申告されたが、プロンプトの一覧にある結果を引用していない。',
-    noveltyNotSearchedYet: '要検証の新規性：先行事例はまだ検索されていない。',
-    noveltyNoSource: '要検証の新規性：研究に先行事例を検索する情報源がない。',
-    noveltySearchBudget: '要検証の新規性：先行事例の検索の前に検索の予算（maxSearches）が尽きた。',
-    noveltyNotSearched: '要検証の新規性：先行事例の検索が求められなかった。',
-    noveltySearchFailed: '要検証の新規性：先行事例の検索が失敗した。',
-    noveltyNoResult: '要検証の新規性：先行事例の検索で結果が見つからなかった。',
-    noveltyNotAssessed: '要検証の新規性：先行事例の検索は行われたが、結果は評価されなかった。',
-    noveltyUnsupported: '要検証の新規性：先行事例の評価が自身の検索結果を一つも引用していない。',
+    priorArtNotSearchedYet: '先行事例と要照合：先行事例はまだ検索されていない。',
+    priorArtNoSource: '先行事例と要照合：研究に先行事例を検索する情報源がない。',
+    priorArtSearchBudget:
+      '先行事例と要照合：先行事例の検索の前に検索の予算（maxSearches）が尽きた。',
+    priorArtNotSearched: '先行事例と要照合：先行事例の検索が求められなかった。',
+    priorArtSearchFailed: '先行事例と要照合：先行事例の検索が失敗した。',
+    priorArtNoResult: '先行事例と要照合：先行事例の検索で結果が見つからなかった。',
+    priorArtNotAssessed: '先行事例と要照合：先行事例の検索は行われたが、結果は評価されなかった。',
+    priorArtUnsupported: '先行事例と要照合：先行事例の評価が自身の検索結果を一つも引用していない。',
     priorArtExists: '新規性ではない：{closest}',
     componentDocumented:
       '新しいものとして示されたが、構成要素は既存の技術であり、プロンプトの一覧にある結果がそれを裏付けている。新規性は組み立てにある。',
@@ -1864,6 +1928,9 @@ const ja: StudyLabels = {
   capabilityAimReminder: '目指す能力',
   noCapabilityReminder:
     '指定なし：単に速くするだけでなく、今日難しいことを可能にする原理の変更を提案する',
+  redoDiscarded:
+    '{passage}：最初の試行の方が良かったため、やり直し（試行 {attempt}、守護者が残した項目 {items} 件）は破棄された。',
+  attemptLabel: '試行',
   none: 'なし',
 };
 
@@ -1891,6 +1958,9 @@ const zh: StudyLabels = {
   refused: '已拒绝',
   notices: '阅读之前',
   noticeTexts: {
+    capabilitiesExist: '组装已经存在、排在其他之后的能力：{detail}。',
+    passagesOutdated: '写于守护者后来才判断的条目之前、尚未重写的环节：{detail}。',
+    capabilitiesToVerify: '组装尚未与已有工作比对的能力：{detail}。',
     noDesign: '设计环节没有保留任何架构。',
     minimumsNotMet: '经守护者判断后，条目少于要求：{detail}。',
     untracedAssembly: '设计中有部分没有引用调查的任何记录：{detail}。',
@@ -2072,18 +2142,19 @@ const zh: StudyLabels = {
   architectureKinds: { capability: '新能力', improvement: '改进：更快或更便宜' },
   judgedImprovement: '守护者判定它只是更快或更便宜：{reason}',
   reasons: {
+    assemblyExists: '它的组装已经存在：{closest}',
     judged: '{text}',
     noSourceConfigured: '声称已确立，但本研究没有来源：任何论断都无法确立。',
     citesUnlisted: '声称已确立，但引用了其提示词列表之外的 {ids}。',
     citesNothing: '声称已确立，但没有引用其提示词列表中的任何结果。',
-    noveltyNotSearchedYet: '待验证的新颖性：尚未检索已有工作。',
-    noveltyNoSource: '待验证的新颖性：本研究没有可用于检索已有工作的来源。',
-    noveltySearchBudget: '待验证的新颖性：在检索已有工作之前，检索预算（maxSearches）已用完。',
-    noveltyNotSearched: '待验证的新颖性：没有为它请求检索已有工作。',
-    noveltySearchFailed: '待验证的新颖性：它的已有工作检索失败了。',
-    noveltyNoResult: '待验证的新颖性：它的已有工作检索没有找到结果。',
-    noveltyNotAssessed: '待验证的新颖性：已检索已有工作，但结果未被评估。',
-    noveltyUnsupported: '待验证的新颖性：已有工作的评估没有引用它自己的任何结果。',
+    priorArtNotSearchedYet: '待与已有工作比对：尚未检索已有工作。',
+    priorArtNoSource: '待与已有工作比对：本研究没有可用于检索已有工作的来源。',
+    priorArtSearchBudget: '待与已有工作比对：在检索已有工作之前，检索预算（maxSearches）已用完。',
+    priorArtNotSearched: '待与已有工作比对：没有为它请求检索已有工作。',
+    priorArtSearchFailed: '待与已有工作比对：它的已有工作检索失败了。',
+    priorArtNoResult: '待与已有工作比对：它的已有工作检索没有找到结果。',
+    priorArtNotAssessed: '待与已有工作比对：已检索已有工作，但结果未被评估。',
+    priorArtUnsupported: '待与已有工作比对：已有工作的评估没有引用它自己的任何结果。',
     priorArtExists: '不是新颖：{closest}',
     componentDocumented:
       '被当作新的，但组件是已有技术，且其提示词列表中的结果记载了它：新颖性在于组装。',
@@ -2107,6 +2178,9 @@ const zh: StudyLabels = {
   newObjectiveNewStudy: '新的目标就是新的研究：用 sdk.createStudy 创建。',
   capabilityAimReminder: '目标能力',
   noCapabilityReminder: '未指定：提出一种原理变化，让今天难以做到的事成为可能，而不只是更快',
+  redoDiscarded:
+    '{passage}：第一次尝试更好，因此重做（第 {attempt} 次尝试，守护者保留了 {items} 个条目）被舍弃。',
+  attemptLabel: '尝试',
   none: '无',
 };
 
@@ -2135,6 +2209,10 @@ const ko: StudyLabels = {
   refused: '거부됨',
   notices: '읽기 전에',
   noticeTexts: {
+    capabilitiesExist: '조립이 이미 존재하여 다른 것 뒤에 놓인 능력: {detail}.',
+    passagesOutdated:
+      '수호자가 나중에 판단한 항목보다 먼저 쓰였고 아직 다시 쓰이지 않은 단계: {detail}.',
+    capabilitiesToVerify: '조립이 선행 사례와 대조되지 않은 능력: {detail}.',
     noDesign: '설계 단계가 아키텍처를 하나도 남기지 않았습니다.',
     minimumsNotMet: '수호자의 판단 후 요구보다 적은 항목: {detail}.',
     untracedAssembly: '조사의 어떤 기록도 인용하지 않는 설계의 부분: {detail}.',
@@ -2321,21 +2399,23 @@ const ko: StudyLabels = {
   architectureKinds: { capability: '새로운 능력', improvement: '개선: 더 빠르거나 더 저렴함' },
   judgedImprovement: '수호자가 더 빠르거나 더 저렴할 뿐이라고 판단함: {reason}',
   reasons: {
+    assemblyExists: '그 조립은 이미 존재합니다: {closest}',
     judged: '{text}',
     noSourceConfigured:
       '확립으로 선언되었지만 연구에 출처가 없습니다. 아무것도 확립할 수 없습니다.',
     citesUnlisted: '확립으로 선언되었지만 프롬프트 목록에 없는 {ids}을(를) 인용합니다.',
     citesNothing: '확립으로 선언되었지만 프롬프트 목록의 결과를 인용하지 않습니다.',
-    noveltyNotSearchedYet: '검증할 새로움: 선행 사례를 아직 검색하지 않았습니다.',
-    noveltyNoSource: '검증할 새로움: 연구에 선행 사례를 검색할 출처가 없습니다.',
-    noveltySearchBudget:
-      '검증할 새로움: 선행 사례 검색 전에 검색 예산(maxSearches)이 소진되었습니다.',
-    noveltyNotSearched: '검증할 새로움: 선행 사례 검색이 요청되지 않았습니다.',
-    noveltySearchFailed: '검증할 새로움: 선행 사례 검색이 실패했습니다.',
-    noveltyNoResult: '검증할 새로움: 선행 사례 검색에서 결과를 찾지 못했습니다.',
-    noveltyNotAssessed: '검증할 새로움: 선행 사례를 검색했지만 결과를 평가하지 않았습니다.',
-    noveltyUnsupported:
-      '검증할 새로움: 선행 사례 평가가 자신의 검색 결과를 하나도 인용하지 않습니다.',
+    priorArtNotSearchedYet: '선행 사례와 대조 필요: 선행 사례를 아직 검색하지 않았습니다.',
+    priorArtNoSource: '선행 사례와 대조 필요: 연구에 선행 사례를 검색할 출처가 없습니다.',
+    priorArtSearchBudget:
+      '선행 사례와 대조 필요: 선행 사례 검색 전에 검색 예산(maxSearches)이 소진되었습니다.',
+    priorArtNotSearched: '선행 사례와 대조 필요: 선행 사례 검색이 요청되지 않았습니다.',
+    priorArtSearchFailed: '선행 사례와 대조 필요: 선행 사례 검색이 실패했습니다.',
+    priorArtNoResult: '선행 사례와 대조 필요: 선행 사례 검색에서 결과를 찾지 못했습니다.',
+    priorArtNotAssessed:
+      '선행 사례와 대조 필요: 선행 사례를 검색했지만 결과를 평가하지 않았습니다.',
+    priorArtUnsupported:
+      '선행 사례와 대조 필요: 선행 사례 평가가 자신의 검색 결과를 하나도 인용하지 않습니다.',
     priorArtExists: '새로움이 아닙니다: {closest}',
     componentDocumented:
       '새로운 것으로 제시되었지만 구성 요소는 이전의 기술이며, 프롬프트 목록의 결과가 이를 뒷받침합니다. 새로움은 조립에 있습니다.',
@@ -2363,6 +2443,9 @@ const ko: StudyLabels = {
   capabilityAimReminder: '목표 능력',
   noCapabilityReminder:
     '지정 없음: 단지 더 빠르게가 아니라 오늘 어려운 일을 가능하게 할 원리의 변화를 제안',
+  redoDiscarded:
+    '{passage}: 첫 시도가 더 나아서 다시 한 결과(시도 {attempt}, 수호자가 남긴 항목 {items}개)는 버려졌습니다.',
+  attemptLabel: '시도',
   none: '없음',
 };
 
@@ -2391,6 +2474,12 @@ const ru: StudyLabels = {
   refused: 'отклонена',
   notices: 'Перед чтением',
   noticeTexts: {
+    capabilitiesExist:
+      'Возможности, сборка которых уже существует, поставлены после остальных: {detail}.',
+    passagesOutdated:
+      'Этапы, написанные до элементов, которые страж оценил позже, и ещё не переписанные: {detail}.',
+    capabilitiesToVerify:
+      'Возможности, сборка которых не сверена с существующими работами: {detail}.',
     noDesign: 'Этап проектирования не сохранил ни одной архитектуры.',
     minimumsNotMet: 'Меньше элементов, чем требуется, после оценки стражем, в: {detail}.',
     untracedAssembly: 'Части проекта не ссылаются ни на одну запись исследования, в: {detail}.',
@@ -2604,6 +2693,7 @@ const ru: StudyLabels = {
   },
   judgedImprovement: 'страж счёл её лишь более быстрой или дешёвой: {reason}',
   reasons: {
+    assemblyExists: 'Её сборка уже существует: {closest}',
     judged: '{text}',
     noSourceConfigured:
       'Заявлено как установленное, но у исследования нет источника: ничего нельзя установить.',
@@ -2611,18 +2701,22 @@ const ru: StudyLabels = {
       'Заявлено как установленное, но ссылается на {ids}, которых нет в списке его промпта.',
     citesNothing:
       'Заявлено как установленное, но не ссылается ни на один результат из списка его промпта.',
-    noveltyNotSearchedYet: 'Новизна для проверки: существующие работы ещё не искались.',
-    noveltyNoSource:
-      'Новизна для проверки: у исследования нет источника для поиска существующих работ.',
-    noveltySearchBudget:
-      'Новизна для проверки: бюджет поиска (maxSearches) исчерпан до поиска существующих работ.',
-    noveltyNotSearched: 'Новизна для проверки: поиск существующих работ для неё не запрашивался.',
-    noveltySearchFailed: 'Новизна для проверки: её поиски существующих работ завершились ошибкой.',
-    noveltyNoResult: 'Новизна для проверки: её поиски существующих работ не дали результатов.',
-    noveltyNotAssessed:
-      'Новизна для проверки: поиск существующих работ выполнен, но результаты не оценены.',
-    noveltyUnsupported:
-      'Новизна для проверки: оценка существующих работ не ссылается ни на один из её собственных результатов.',
+    priorArtNotSearchedYet:
+      'Требует сверки с существующими работами: существующие работы ещё не искались.',
+    priorArtNoSource:
+      'Требует сверки с существующими работами: у исследования нет источника для поиска существующих работ.',
+    priorArtSearchBudget:
+      'Требует сверки с существующими работами: бюджет поиска (maxSearches) исчерпан до поиска существующих работ.',
+    priorArtNotSearched:
+      'Требует сверки с существующими работами: поиск существующих работ для неё не запрашивался.',
+    priorArtSearchFailed:
+      'Требует сверки с существующими работами: её поиски существующих работ завершились ошибкой.',
+    priorArtNoResult:
+      'Требует сверки с существующими работами: её поиски существующих работ не дали результатов.',
+    priorArtNotAssessed:
+      'Требует сверки с существующими работами: поиск существующих работ выполнен, но результаты не оценены.',
+    priorArtUnsupported:
+      'Требует сверки с существующими работами: оценка существующих работ не ссылается ни на один из её собственных результатов.',
     priorArtExists: 'Не новизна: {closest}',
     componentDocumented:
       'Представлено как новое, но компонент — это прежняя технология, и результат из списка его промпта её подтверждает: новизна — в сборке.',
@@ -2651,6 +2745,9 @@ const ru: StudyLabels = {
   capabilityAimReminder: 'Искомая возможность',
   noCapabilityReminder:
     'не названа: предложить, какое изменение принципа сделало бы возможным то, что сегодня трудно, а не просто быстрее',
+  redoDiscarded:
+    '{passage}: повторная попытка (попытка {attempt}, элементов, сохранённых стражем: {items}) отброшена, так как первая попытка была лучше.',
+  attemptLabel: 'попытка',
   none: 'нет',
 };
 
@@ -2679,6 +2776,10 @@ const ar: StudyLabels = {
   refused: 'مرفوض',
   notices: 'قبل القراءة',
   noticeTexts: {
+    capabilitiesExist: 'قدرات تجميعها موجود بالفعل، رُتِّبت بعد غيرها: {detail}.',
+    passagesOutdated:
+      'مراحل كُتبت قبل عناصر حكم عليها الحارس متأخرًا، ولم تُكتب من جديد بعد: {detail}.',
+    capabilitiesToVerify: 'قدرات لم يُقارَن تجميعها بالأعمال السابقة: {detail}.',
     noDesign: 'لم تحتفظ مرحلة التصميم بأي بنية.',
     minimumsNotMet: 'عناصر أقل من المطلوب بعد حكم الحارس، في: {detail}.',
     untracedAssembly: 'أجزاء من التصميم لا تستشهد بأي سجل من التحقيق، في: {detail}.',
@@ -2873,19 +2974,24 @@ const ar: StudyLabels = {
   architectureKinds: { capability: 'قدرة جديدة', improvement: 'تحسين: أسرع أو أرخص' },
   judgedImprovement: 'حكم الحارس بأنها أسرع أو أرخص فقط: {reason}',
   reasons: {
+    assemblyExists: 'تجميعها موجود بالفعل: {closest}',
     judged: '{text}',
     noSourceConfigured: 'أُعلن ثابتًا، لكن الدراسة بلا مصدر: لا يمكن إثبات أي شيء.',
     citesUnlisted: 'أُعلن ثابتًا، لكنه يستشهد بـ {ids}، وهي ليست في قائمة الموجِّه الخاص به.',
     citesNothing: 'أُعلن ثابتًا، لكنه لا يستشهد بأي نتيجة من قائمة الموجِّه الخاص به.',
-    noveltyNotSearchedYet: 'جِدّة يجب التحقق منها: لم يُبحث عن الأعمال السابقة بعد.',
-    noveltyNoSource: 'جِدّة يجب التحقق منها: لا تملك الدراسة مصدرًا للبحث عن الأعمال السابقة.',
-    noveltySearchBudget:
-      'جِدّة يجب التحقق منها: نفدت ميزانية البحث (maxSearches) قبل البحث عن أعمالها السابقة.',
-    noveltyNotSearched: 'جِدّة يجب التحقق منها: لم يُطلب لها أي بحث عن الأعمال السابقة.',
-    noveltySearchFailed: 'جِدّة يجب التحقق منها: فشلت عمليات البحث عن أعمالها السابقة.',
-    noveltyNoResult: 'جِدّة يجب التحقق منها: لم تجد عمليات البحث عن أعمالها السابقة أي نتيجة.',
-    noveltyNotAssessed: 'جِدّة يجب التحقق منها: جرى البحث عن أعمالها السابقة، لكن نتائجه لم تُقيَّم.',
-    noveltyUnsupported: 'جِدّة يجب التحقق منها: لا يستشهد تقييم الأعمال السابقة بأي من نتائجها.',
+    priorArtNotSearchedYet: 'تجب مقارنته بالأعمال السابقة: لم يُبحث عن الأعمال السابقة بعد.',
+    priorArtNoSource:
+      'تجب مقارنته بالأعمال السابقة: لا تملك الدراسة مصدرًا للبحث عن الأعمال السابقة.',
+    priorArtSearchBudget:
+      'تجب مقارنته بالأعمال السابقة: نفدت ميزانية البحث (maxSearches) قبل البحث عن أعمالها السابقة.',
+    priorArtNotSearched: 'تجب مقارنته بالأعمال السابقة: لم يُطلب لها أي بحث عن الأعمال السابقة.',
+    priorArtSearchFailed: 'تجب مقارنته بالأعمال السابقة: فشلت عمليات البحث عن أعمالها السابقة.',
+    priorArtNoResult:
+      'تجب مقارنته بالأعمال السابقة: لم تجد عمليات البحث عن أعمالها السابقة أي نتيجة.',
+    priorArtNotAssessed:
+      'تجب مقارنته بالأعمال السابقة: جرى البحث عن أعمالها السابقة، لكن نتائجه لم تُقيَّم.',
+    priorArtUnsupported:
+      'تجب مقارنته بالأعمال السابقة: لا يستشهد تقييم الأعمال السابقة بأي من نتائجها.',
     priorArtExists: 'ليست جِدّة: {closest}',
     componentDocumented:
       'قُدِّم على أنه جديد، لكن المكوّن تقنية سابقة، وتوثّقه نتيجة من قائمة الموجِّه الخاص به: الجِدّة في التجميع.',
@@ -2909,6 +3015,9 @@ const ar: StudyLabels = {
   newObjectiveNewStudy: 'الهدف الجديد دراسة جديدة: أنشئها باستخدام sdk.createStudy.',
   capabilityAimReminder: 'القدرة المستهدفة',
   noCapabilityReminder: 'لم تُسمَّ: اقترح تغييرًا في المبدأ يجعل ممكنًا ما هو صعب اليوم، لا مجرد أسرع',
+  redoDiscarded:
+    '{passage}: استُبعدت الإعادة (المحاولة {attempt}، وأبقى الحارس منها {items} عنصرًا) لأن المحاولة الأولى كانت أفضل.',
+  attemptLabel: 'المحاولة',
   none: 'لا شيء',
 };
 
@@ -2937,6 +3046,10 @@ const hi: StudyLabels = {
   refused: 'अस्वीकृत',
   notices: 'पढ़ने से पहले',
   noticeTexts: {
+    capabilitiesExist: 'ऐसी क्षमताएँ जिनका संयोजन पहले से मौजूद है, बाकी के बाद रखी गईं: {detail}।',
+    passagesOutdated:
+      'ऐसे चरण जो संरक्षक द्वारा बाद में जाँचे गए आइटम से पहले लिखे गए और अभी दोबारा नहीं लिखे गए: {detail}।',
+    capabilitiesToVerify: 'ऐसी क्षमताएँ जिनके संयोजन का पूर्व कार्य से मिलान नहीं हुआ: {detail}।',
     noDesign: 'डिज़ाइन चरण ने कोई आर्किटेक्चर नहीं रखा।',
     minimumsNotMet: 'संरक्षक के निर्णय के बाद आवश्यकता से कम आइटम, इनमें: {detail}।',
     untracedAssembly: 'डिज़ाइन के कुछ हिस्से जाँच के किसी रिकॉर्ड का हवाला नहीं देते, इनमें: {detail}।',
@@ -3139,19 +3252,22 @@ const hi: StudyLabels = {
   architectureKinds: { capability: 'नई क्षमता', improvement: 'सुधार: तेज़ या सस्ता' },
   judgedImprovement: 'संरक्षक ने इसे केवल तेज़ या सस्ता माना: {reason}',
   reasons: {
+    assemblyExists: 'इसका संयोजन पहले से मौजूद है: {closest}',
     judged: '{text}',
     noSourceConfigured: 'स्थापित घोषित, पर अध्ययन के पास कोई स्रोत नहीं है: कुछ भी स्थापित नहीं हो सकता।',
     citesUnlisted: 'स्थापित घोषित, पर यह {ids} का हवाला देता है, जो इसके प्रॉम्प्ट की सूची में नहीं हैं।',
     citesNothing: 'स्थापित घोषित, पर यह अपने प्रॉम्प्ट की सूची के किसी परिणाम का हवाला नहीं देता।',
-    noveltyNotSearchedYet: 'जाँचने योग्य नवीनता: पूर्व कार्य अभी खोजा नहीं गया है।',
-    noveltyNoSource: 'जाँचने योग्य नवीनता: अध्ययन के पास पूर्व कार्य खोजने का कोई स्रोत नहीं है।',
-    noveltySearchBudget:
-      'जाँचने योग्य नवीनता: पूर्व कार्य की खोज से पहले खोज का बजट (maxSearches) समाप्त हो गया।',
-    noveltyNotSearched: 'जाँचने योग्य नवीनता: इसके लिए पूर्व कार्य की कोई खोज नहीं माँगी गई।',
-    noveltySearchFailed: 'जाँचने योग्य नवीनता: इसके पूर्व कार्य की खोजें विफल रहीं।',
-    noveltyNoResult: 'जाँचने योग्य नवीनता: इसके पूर्व कार्य की खोजों में कोई परिणाम नहीं मिला।',
-    noveltyNotAssessed: 'जाँचने योग्य नवीनता: इसके पूर्व कार्य की खोज हुई, पर परिणामों का आकलन नहीं हुआ।',
-    noveltyUnsupported: 'जाँचने योग्य नवीनता: पूर्व कार्य का आकलन इसके अपने किसी परिणाम का हवाला नहीं देता।',
+    priorArtNotSearchedYet: 'पूर्व कार्य से मिलान आवश्यक: पूर्व कार्य अभी खोजा नहीं गया है।',
+    priorArtNoSource: 'पूर्व कार्य से मिलान आवश्यक: अध्ययन के पास पूर्व कार्य खोजने का कोई स्रोत नहीं है।',
+    priorArtSearchBudget:
+      'पूर्व कार्य से मिलान आवश्यक: पूर्व कार्य की खोज से पहले खोज का बजट (maxSearches) समाप्त हो गया।',
+    priorArtNotSearched: 'पूर्व कार्य से मिलान आवश्यक: इसके लिए पूर्व कार्य की कोई खोज नहीं माँगी गई।',
+    priorArtSearchFailed: 'पूर्व कार्य से मिलान आवश्यक: इसके पूर्व कार्य की खोजें विफल रहीं।',
+    priorArtNoResult: 'पूर्व कार्य से मिलान आवश्यक: इसके पूर्व कार्य की खोजों में कोई परिणाम नहीं मिला।',
+    priorArtNotAssessed:
+      'पूर्व कार्य से मिलान आवश्यक: इसके पूर्व कार्य की खोज हुई, पर परिणामों का आकलन नहीं हुआ।',
+    priorArtUnsupported:
+      'पूर्व कार्य से मिलान आवश्यक: पूर्व कार्य का आकलन इसके अपने किसी परिणाम का हवाला नहीं देता।',
     priorArtExists: 'नवीनता नहीं: {closest}',
     componentDocumented:
       'नया बताया गया, पर घटक एक पूर्व तकनीक है, और इसके प्रॉम्प्ट की सूची का एक परिणाम इसे प्रलेखित करता है: नवीनता संयोजन में है।',
@@ -3178,6 +3294,9 @@ const hi: StudyLabels = {
   capabilityAimReminder: 'लक्षित क्षमता',
   noCapabilityReminder:
     'कोई नाम नहीं: ऐसा सिद्धांत-परिवर्तन सुझाएँ जो आज कठिन चीज़ को संभव बनाए, केवल तेज़ नहीं',
+  redoDiscarded:
+    '{passage}: दोबारा किया गया प्रयास (प्रयास {attempt}, संरक्षक द्वारा रखे गए {items} आइटम) छोड़ दिया गया, क्योंकि पहला प्रयास बेहतर था।',
+  attemptLabel: 'प्रयास',
   none: 'कोई नहीं',
 };
 

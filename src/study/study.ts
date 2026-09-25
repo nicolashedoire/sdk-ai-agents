@@ -68,6 +68,7 @@ import type {
   StudyExperimentOutcome,
   StudyPassage,
   StudyReason,
+  StudyReasonCode,
   StudyReport,
   StudyResult,
   StudyRunOptions,
@@ -116,6 +117,12 @@ const MAX_TIMEOUT_MS = 2_147_483_647;
 interface PassageMode {
   /** Reopened by a later passage, on one unknown: its new items are added to the earlier ones. */
   reopened?: { by: StudyPassage; focus: string; reason: string };
+  /** The redo a stopped run owed it: the first attempt, what was rejected, its results. */
+  redo?: {
+    first: Attempt;
+    feedback: Array<{ statement: string; reason: string }>;
+    results: string[];
+  };
 }
 
 /** A passage's reply, and what its prompt listed: the only ids its items may cite. */
@@ -127,11 +134,13 @@ interface Generated {
   traceable: ReadonlySet<string>;
 }
 
-/** One attempt of a passage: what the guardian kept of it, and its reply. */
+/** One attempt of a passage: what the guardian kept of it, and what its reply asked. */
 interface Attempt {
   attempt: number;
   kept: StoredItem[];
-  reply: PassageReply;
+  reopen?: ReopenRequest;
+  /** Verdicts it gave again on leads already judged. */
+  duplicates: RefusedItem[];
 }
 
 /**
@@ -173,6 +182,8 @@ export class Study {
   private readonly amendmentTotals = { count: 0, modelCalls: 0 };
   private last?: { status: StudyStatus; stoppedBy?: StudyStopReason; error?: string };
   private running = false;
+  /** The amendment classified last: the next one waits for it. */
+  private amending: Promise<unknown> = Promise.resolve();
 
   constructor(
     config: StudyConfig,
@@ -292,29 +303,48 @@ export class Study {
    * every later prompt (those of a run in progress included); `conflicts` and
    * `changesObjective` are refused with the reason, and never reach a prompt. An amendment that
    * cannot be classified (an error, a policy, `options.timeoutMs`, `options.signal`) is refused
-   * too. Throws a `ValidationError` for an empty text, a text longer than 500 characters, or a
-   * study that already accepted 10 amendments.
+   * too. Since each is judged against the charter alone, two amendments that contradict each
+   * other can both be accepted: each refines the charter, and the guardian judges every later
+   * item against the charter and all of them. Amendments are classified one at a time, in the
+   * order they were asked (the timeout of one counts from its turn). Throws a `ValidationError`
+   * for an empty text, a text longer than 500 characters, or a study that already accepted 10
+   * amendments when its turn comes.
    */
-  async amend(text: string, options: StudyAmendOptions = {}): Promise<StudyAmendment> {
+  amend(text: string, options: StudyAmendOptions = {}): Promise<StudyAmendment> {
     if (typeof text !== 'string' || text.trim() === '') {
-      throw new ValidationError('text', 'must be a non-empty string');
+      return Promise.reject(new ValidationError('text', 'must be a non-empty string'));
     }
     const instruction = text.trim();
     if (instruction.length > MAX_AMENDMENT_LENGTH) {
-      throw new ValidationError(
-        'text',
-        `must be at most ${MAX_AMENDMENT_LENGTH} characters (an amendment refines the charter; a longer one is a new study)`
+      return Promise.reject(
+        new ValidationError(
+          'text',
+          `must be at most ${MAX_AMENDMENT_LENGTH} characters (an amendment refines the charter; a longer one is a new study)`
+        )
       );
     }
+    const timeoutMs = options.timeoutMs ?? AMENDMENT_TIMEOUT_MS;
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMEOUT_MS) {
+      return Promise.reject(
+        new ValidationError('timeoutMs', 'must be a whole number of milliseconds, at least 1')
+      );
+    }
+    // One at a time: the limit is checked when each one's turn comes, never twice at once.
+    const turn = this.amending.then(() => this.classifyAmendment(instruction, options, timeoutMs));
+    this.amending = turn.catch(() => undefined);
+    return turn;
+  }
+
+  private async classifyAmendment(
+    instruction: string,
+    options: StudyAmendOptions,
+    timeoutMs: number
+  ): Promise<StudyAmendment> {
     if (this.amendmentLog.filter((entry) => entry.accepted).length >= MAX_AMENDMENTS) {
       throw new ValidationError(
         'text',
         `this study already accepted ${MAX_AMENDMENTS} amendments: create a new study with a charter that says it all`
       );
-    }
-    const timeoutMs = options.timeoutMs ?? AMENDMENT_TIMEOUT_MS;
-    if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMEOUT_MS) {
-      throw new ValidationError('timeoutMs', 'must be a whole number of milliseconds, at least 1');
     }
     const runId = generateRunId();
     // One call and its repair: nothing else runs in it.
@@ -470,38 +500,115 @@ export class Study {
   /**
    * The passages in order; a passage may reopen an earlier one. A passage left by a stopped
    * run is taken up where it stopped: the guardian judges first what it had not judged (never
-   * skipped), then a passage judged but not finished only finishes, and one that was waiting
-   * for a loop runs again.
+   * skipped); items it keeps then reach the passages that had run without them (`catchUp`); a
+   * passage judged but not finished takes the redo it was due, or finishes; one that was
+   * waiting for a loop runs again.
    */
   private async runPassages(run: StudyRun): Promise<void> {
     for (const spec of PASSAGES) {
       const record = this.records.get(spec.passage);
       if (record) {
         if (record.items.some((item) => item.claim.unchecked)) {
-          await this.judgeLeftovers(run, spec, record);
+          const judged = await this.judgeLeftovers(run, spec, record);
+          if (judged.length > 0 && record.complete) await this.catchUp(run, spec, judged);
         }
-        if (record.complete) continue;
-        if (!record.awaitingLoop) {
-          await this.completePassage(run, spec, record, {}, true);
+        // Outdated passages run again as a loop does; without a loop left, they stay outdated.
+        if (record.outdated && !run.catchingUp && run.loops < run.limits.maxLoops) {
+          run.loops++;
+          run.catchingUp = true;
+        }
+        if (record.complete && !(record.outdated && run.catchingUp)) continue;
+        if (!record.complete && !record.awaitingLoop) {
+          // Stopped after its guardian: the redo rules apply as they would have, then it ends.
+          const redo = await this.redoDue(run, spec, record);
+          if (!redo) {
+            await this.completePassage(run, spec, record, {}, { resumed: true });
+            continue;
+          }
+          await this.loop(run, spec, await this.performPassage(run, spec, { redo }));
           continue;
         }
       }
-      let reopen = await this.performPassage(run, spec, {});
-      while (reopen) {
-        run.loops++;
-        const reopened = { by: spec.passage, focus: reopen.focus, reason: reopen.reason };
-        await this.performPassage(run, passageSpec(reopen.passage), { reopened });
-        // The passage that was blocked runs again, with what the reopened one added.
-        reopen = await this.performPassage(run, spec, {});
-      }
+      await this.loop(run, spec, await this.performPassage(run, spec, {}));
     }
+  }
+
+  /** Reopens the earlier passage a passage asked for, then runs that passage again. */
+  private async loop(
+    run: StudyRun,
+    spec: PassageSpec,
+    reopen: ReopenRequest | undefined
+  ): Promise<void> {
+    let request = reopen;
+    while (request) {
+      run.loops++;
+      const reopened = { by: spec.passage, focus: request.focus, reason: request.reason };
+      await this.performPassage(run, passageSpec(request.passage), { reopened });
+      // The passage that was blocked runs again, with what the reopened one added.
+      request = await this.performPassage(run, spec, {});
+    }
+  }
+
+  /**
+   * Items the guardian judged late, in a passage already complete, reach the passages that ran
+   * without them: a design gets their prior-art search, and the later passages that read their
+   * collections run again, as a loop does (`limits.maxLoops`). Without a loop left, those
+   * passages stay outdated, and the report says so.
+   */
+  private async catchUp(run: StudyRun, spec: PassageSpec, judged: StoredItem[]): Promise<void> {
+    if (spec.passage === 'design') await this.checkPriorArt(run);
+    this.markOutdated(spec, new Set(judged.map((item) => item.collection)));
+  }
+
+  /**
+   * Marks outdated the later passages, already complete, that read one of `changed`; stops at a
+   * passage waiting for its loop, since what follows it has not run since.
+   */
+  private markOutdated(spec: PassageSpec, changed: Set<StudyCollection>): void {
+    for (const later of PASSAGES.filter((candidate) => candidate.number > spec.number)) {
+      const record = this.records.get(later.passage);
+      if (!record) return;
+      if (record.awaitingLoop) return;
+      if (record.complete && later.needs.some((key) => changed.has(key))) record.outdated = true;
+    }
+  }
+
+  /**
+   * The redo a passage stopped after its first attempt's guardian was due, by the same rules as
+   * in a run: past the drift threshold, or a design without any capability.
+   */
+  private async redoDue(
+    run: StudyRun,
+    spec: PassageSpec,
+    record: PassageRecord
+  ): Promise<PassageMode['redo']> {
+    const generation = record.generation;
+    if (!generation || generation.attempt !== 1) return undefined;
+    const drifted =
+      generation.produced > 0 &&
+      generation.rejected.length / generation.produced > this.settings.driftThreshold;
+    const aimless =
+      spec.passage === 'design' ? await this.guardCapability(run, record.items, 1) : [];
+    if (!drifted && aimless.length === 0) return undefined;
+    run.redos++;
+    return {
+      first: {
+        attempt: 1,
+        kept: [...record.items],
+        ...(generation.reopen ? { reopen: generation.reopen } : {}),
+        duplicates: [],
+      },
+      feedback: feedbackOf([...generation.rejected, ...aimless]),
+      results: generation.results,
+    };
   }
 
   /**
    * One passage: its searches, its items, the guardian's check (and one redo past the drift
    * threshold, keeping the better of the two attempts), then its end (`completePassage`). Its
-   * items are kept as soon as they exist, so a run that stops keeps them, unchecked. Returns
-   * the earlier passage it asks to reopen, when a loop is left: it is then not complete.
+   * items are kept as soon as they exist, so a run that stops keeps them, unchecked; a redo that
+   * cannot be judged leaves the first attempt standing. Returns the earlier passage it asks to
+   * reopen, when a loop is left: it is then not complete.
    */
   private async performPassage(
     run: StudyRun,
@@ -510,6 +617,7 @@ export class Study {
   ): Promise<ReopenRequest | undefined> {
     await this.admitStep(run, spec.passage);
     const amendments = this.frame().amendments.map((amendment) => amendment.number);
+    const earlier = this.records.get(spec.passage);
     await run.record('study.passage_started', {
       passage: spec.passage,
       number: spec.number,
@@ -517,10 +625,15 @@ export class Study {
       ...(mode.reopened
         ? { reopenedBy: mode.reopened.by, focus: mode.reopened.focus, reason: mode.reopened.reason }
         : {}),
+      ...(mode.redo ? { redo: true, resumed: true } : {}),
+      ...(earlier?.outdated && !mode.reopened ? { outdated: true } : {}),
     });
-    const results = spec.researches ? await this.research(run, spec, mode) : [];
+    const results = mode.redo
+      ? this.resultsById(mode.redo.results)
+      : spec.researches
+        ? await this.research(run, spec, mode)
+        : [];
 
-    const earlier = this.records.get(spec.passage);
     // A reopened passage adds to its items; otherwise a new attempt replaces them.
     const kept = mode.reopened ? [...(earlier?.items ?? [])] : [];
     const record: PassageRecord = {
@@ -532,31 +645,60 @@ export class Study {
       runId: run.runId,
     };
 
-    let feedback: Array<{ statement: string; reason: string }> | undefined;
-    let first: Attempt | undefined;
-    let chosen: Attempt | undefined;
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    let feedback = mode.redo?.feedback;
+    let first = mode.redo?.first;
+    let chosen = first;
+    for (let attempt = mode.redo ? 2 : 1; attempt <= 2; attempt++) {
       // A redo is a step of its own: the budget policies are checked again before it.
-      if (attempt === 2) await this.admitStep(run, spec.passage);
-      const generated = await this.generate(run, spec, { results, mode, feedback });
-      const batch = this.settle(run, spec, generated);
-      record.items = [...kept, ...batch];
-      record.attempts = attempt;
-      this.records.set(spec.passage, record);
-      const refused = await this.logRefused(run, spec.passage, generated.reply.refused, attempt);
-      const removed = await this.guard(run, spec.passage, batch, attempt);
-      const keptBatch = batch.filter((item) => !removed.some((entry) => entry.item === item));
-      record.items = [...kept, ...keptBatch];
-      // A design that aims at no new capability is off the objective as a whole.
-      const aimless =
-        spec.passage === 'design' && !mode.reopened
-          ? await this.guardCapability(run, keptBatch, attempt)
-          : [];
-      const current: Attempt = { attempt, kept: keptBatch, reply: generated.reply };
-      // A redo worse than the first attempt does not replace it.
+      if (attempt === 2 && !mode.redo) await this.admitStep(run, spec.passage);
+      let current: Attempt;
+      let rejected: StudyDriftEntry[];
+      let aimless: StudyDriftEntry[];
+      try {
+        const generated = await this.generate(run, spec, { results, mode, feedback });
+        const batch = this.settle(run, spec, generated);
+        record.items = [...kept, ...batch];
+        record.attempts = attempt;
+        this.records.set(spec.passage, record);
+        const refused = await this.logRefused(run, spec.passage, generated.reply.refused, attempt);
+        record.generation = {
+          attempt,
+          produced: batch.length + refused.length,
+          rejected: [...refused],
+          results: results.map((result) => result.id),
+          ...(generated.reply.reopen ? { reopen: generated.reply.reopen } : {}),
+        };
+        const removed = await this.guard(run, spec.passage, batch, attempt);
+        record.generation.rejected.push(...removed.map((entry) => entry.drift));
+        const keptBatch = batch.filter((item) => !removed.some((entry) => entry.item === item));
+        record.items = [...kept, ...keptBatch];
+        // A design that aims at no new capability is off the objective as a whole.
+        aimless =
+          spec.passage === 'design' && !mode.reopened
+            ? await this.guardCapability(run, keptBatch, attempt)
+            : [];
+        rejected = record.generation.rejected;
+        current = {
+          attempt,
+          kept: keptBatch,
+          ...(generated.reply.reopen ? { reopen: generated.reply.reopen } : {}),
+          duplicates: generated.reply.duplicates,
+        };
+      } catch (error) {
+        // A redo that could not be judged leaves the first attempt standing.
+        if (first) {
+          record.items = [...kept, ...first.kept];
+          record.keptAttempt = first.attempt;
+          record.generation = undefined;
+          this.records.set(spec.passage, record);
+        }
+        throw error;
+      }
+      // A redo worse than the first attempt does not replace it: it is discarded, and said so.
       if (first && this.better(spec, first, current)) {
         record.items = [...kept, ...first.kept];
         record.keptAttempt = first.attempt;
+        record.discarded = { attempt: current.attempt, items: current.kept.length };
         chosen = first;
         break;
       }
@@ -564,32 +706,31 @@ export class Study {
 
       // Past the threshold, or without a capability, the passage is redone once, told what
       // was rejected and why.
-      // A verdict repeated on a lead already judged is a duplicate, not drift: it is logged,
-      // but it does not make the passage redo.
-      const drift = refused.filter((entry) => entry.reason.code !== 'leadAlreadyJudged');
-      const rejected = [...drift, ...removed.map((entry) => entry.drift)];
-      const produced = batch.length + drift.length;
-      const drifted = produced > 0 && rejected.length / produced > this.settings.driftThreshold;
+      const drifted =
+        record.generation.produced > 0 &&
+        rejected.length / record.generation.produced > this.settings.driftThreshold;
       if (attempt === 1 && (drifted || aimless.length > 0)) {
         run.redos++;
         first = current;
-        feedback = [...rejected, ...aimless].map((entry) => ({
-          statement: entry.item.statement ?? '(no statement)',
-          reason: entry.reason.message,
-        }));
+        feedback = feedbackOf([...rejected, ...aimless]);
         continue;
       }
       break;
     }
 
-    const reopen = mode.reopened ? undefined : chosen?.reply.reopen;
+    const extra = chosen?.duplicates.length ? { duplicates: chosen.duplicates } : {};
+    const reopen = mode.reopened ? undefined : chosen?.reopen;
     if (reopen && run.loops < run.limits.maxLoops) {
       // It runs again after the loop: not complete, and no prior-art search on it yet.
       record.awaitingLoop = true;
-      await this.recordCompleted(run, record, mode, { reopen });
+      await this.recordCompleted(run, record, mode, { ...extra, reopen });
       return reopen;
     }
-    await this.completePassage(run, spec, record, mode);
+    await this.completePassage(run, spec, record, mode, extra);
+    // Its items changed after the passages that read them ran: they run again.
+    if (earlier?.outdated && !mode.reopened) {
+      this.markOutdated(spec, new Set(spec.collections.map((collection) => collection.key)));
+    }
     return undefined;
   }
 
@@ -599,31 +740,36 @@ export class Study {
     spec: PassageSpec,
     record: PassageRecord,
     mode: PassageMode,
-    resumed = false
+    extra: { resumed?: boolean; duplicates?: RefusedItem[] } = {}
   ): Promise<void> {
-    if (resumed) await this.admitStep(run, spec.passage);
+    if (extra.resumed) await this.admitStep(run, spec.passage);
     if (spec.passage === 'design' && !mode.reopened) await this.checkPriorArt(run);
     record.awaitingLoop = undefined;
+    record.generation = undefined;
     if (!mode.reopened) record.complete = true;
-    await this.recordCompleted(run, record, mode, resumed ? { resumed: true } : {});
+    await this.recordCompleted(run, record, mode, extra);
   }
 
   private recordCompleted(
     run: StudyRun,
     record: PassageRecord,
     mode: PassageMode,
-    extra: { reopen?: ReopenRequest; resumed?: boolean }
+    extra: { reopen?: ReopenRequest; resumed?: boolean; duplicates?: RefusedItem[] }
   ): Promise<void> {
+    const { duplicates, ...rest } = extra;
     return run.record('study.passage_completed', {
       passage: record.passage,
       attempts: record.attempts,
       ...(record.keptAttempt ? { keptAttempt: record.keptAttempt } : {}),
+      ...(record.discarded ? { discarded: record.discarded } : {}),
       items: record.items.map(({ collection, claim: { runId: _runId, ...claim } }) => ({
         collection,
         ...claim,
       })),
       ...(mode.reopened ? { reopenedBy: mode.reopened.by } : {}),
-      ...extra,
+      // Verdicts given again on leads already judged: dropped, and not drift.
+      ...(duplicates?.length ? { duplicates } : {}),
+      ...rest,
     });
   }
 
@@ -658,17 +804,21 @@ export class Study {
 
   /**
    * The guardian judges, first, what a stopped run left unjudged (or what it gave no valid
-   * verdict): nothing unjudged goes further.
+   * verdict): nothing unjudged goes further. Returns the items it judged and kept.
    */
   private async judgeLeftovers(
     run: StudyRun,
     spec: PassageSpec,
     record: PassageRecord
-  ): Promise<void> {
+  ): Promise<StoredItem[]> {
     await this.admitStep(run, spec.passage);
     const pending = record.items.filter((item) => item.claim.unchecked);
     const removed = await this.guard(run, spec.passage, pending, Math.max(1, record.attempts));
+    record.generation?.rejected.push(...removed.map((entry) => entry.drift));
     record.items = record.items.filter((item) => !removed.some((entry) => entry.item === item));
+    return pending.filter(
+      (item) => !item.claim.unchecked && !removed.some((entry) => entry.item === item)
+    );
   }
 
   /**
@@ -1037,15 +1187,19 @@ export class Study {
    */
   private async checkPriorArt(run: StudyRun): Promise<void> {
     const claims = this.allClaims().filter(
-      (claim) =>
-        !claim.priorArt &&
-        (claim.status === 'novelty' ||
-          ('kind' in claim && (claim as StudyArchitecture).kind === 'capability'))
+      (claim) => !claim.priorArt && (claim.status === 'novelty' || isCapability(claim))
     );
+    // Whatever happens next, a claim whose prior art is not assessed carries why, a capability
+    // of any status included: never a silent gap.
+    const mark = (claim: StudyClaim, code: StudyReasonCode) =>
+      leaveToVerify(claim, code, isCapability(claim));
+    for (const claim of claims) {
+      mark(claim, this.sources.length === 0 ? 'priorArtNoSource' : 'priorArtNotSearchedYet');
+    }
     if (claims.length === 0 || this.sources.length === 0) return;
     if (run.searchesLeft === 0) {
       run.unsearched.add('design');
-      for (const claim of claims) leaveToVerify(claim, 'noveltySearchBudget');
+      for (const claim of claims) mark(claim, 'priorArtSearchBudget');
       return;
     }
     const ids = claims.map((claim) => claim.id);
@@ -1073,17 +1227,17 @@ export class Study {
     }
     for (const claim of claims) {
       const tally = searched.get(claim.id);
-      leaveToVerify(
+      mark(
         claim,
         !tally
-          ? 'noveltyNotSearched'
+          ? 'priorArtNotSearched'
           : tally.results.length > 0
-            ? 'noveltyNotAssessed'
+            ? 'priorArtNotAssessed'
             : tally.ran > 0
-              ? 'noveltyNoResult'
+              ? 'priorArtNoResult'
               : tally.skipped > 0
-                ? 'noveltySearchBudget'
-                : 'noveltySearchFailed'
+                ? 'priorArtSearchBudget'
+                : 'priorArtSearchFailed'
       );
     }
     const checked = claims.filter((claim) => (searched.get(claim.id)?.results.length ?? 0) > 0);
@@ -1107,7 +1261,7 @@ export class Study {
       const own = new Set(searched.get(claim.id)?.results ?? []);
       const sources = check.sources.filter((id) => own.has(id));
       if (sources.length === 0) {
-        leaveToVerify(claim, 'noveltyUnsupported');
+        mark(claim, 'priorArtUnsupported');
         continue;
       }
       applyPriorArt(claim, { closest: check.closest, sources, verdict: check.verdict });
@@ -1195,7 +1349,20 @@ export class Study {
 
 /** A passage a run still has to work on: not complete, or with items the guardian must judge. */
 function needsWork(record: PassageRecord | undefined): boolean {
-  return !record || !record.complete || record.items.some((item) => item.claim.unchecked);
+  return (
+    !record ||
+    !record.complete ||
+    record.outdated === true ||
+    record.items.some((item) => item.claim.unchecked)
+  );
+}
+
+/** What a redo is told: the items rejected, and why. */
+function feedbackOf(rejected: StudyDriftEntry[]): Array<{ statement: string; reason: string }> {
+  return rejected.map((entry) => ({
+    statement: entry.item.statement ?? '(no statement)',
+    reason: entry.reason.message,
+  }));
 }
 
 /** The status a run ends with, from what stopped it. */
@@ -1213,6 +1380,11 @@ function outcomeOf(stopped: unknown): {
     status: 'failed',
     error: stopped instanceof Error ? stopped : new Error(String(stopped)),
   };
+}
+
+/** An architecture aiming at a new capability, whose assembly's prior art is searched. */
+function isCapability(claim: StudyClaim): boolean {
+  return 'kind' in claim && (claim as StudyArchitecture).kind === 'capability';
 }
 
 /** Why an amendment could not be classified. */

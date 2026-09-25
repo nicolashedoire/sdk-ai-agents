@@ -50,7 +50,7 @@ export function settleClaim(id: string, proposed: ProposedItem, context: ClaimCo
     lower(claim, 'hypothesis', unsupported(unlisted, context.hasSources));
   }
   if (claim.status === 'novelty') {
-    leaveToVerify(claim, context.hasSources ? 'noveltyNotSearchedYet' : 'noveltyNoSource');
+    leaveToVerify(claim, context.hasSources ? 'priorArtNotSearchedYet' : 'priorArtNoSource');
   }
   return claim;
 }
@@ -132,19 +132,34 @@ function unsupported(unlisted: string[], hasSources: boolean): StudyReason {
  */
 export function applyPriorArt(claim: StudyClaim, priorArt: StudyPriorArt): void {
   claim.priorArt = priorArt;
-  if (claim.status !== 'novelty') return;
   claim.toVerify = undefined;
+  claim.priorArtReason = undefined;
+  if (claim.status !== 'novelty') {
+    // Not a novelty, but an assembly already done is no new capability: the report says so.
+    if (priorArt.verdict === 'exists') {
+      claim.priorArtReason = studyReason('assemblyExists', { closest: priorArt.closest });
+    }
+    return;
+  }
   claim.statusReason = undefined;
   if (priorArt.verdict === 'exists') {
     lower(claim, 'hypothesis', studyReason('priorArtExists', { closest: priorArt.closest }));
   }
 }
 
-/** A novelty whose prior art could not be searched or assessed: why it stays to verify. */
-export function leaveToVerify(claim: StudyClaim, code: StudyReasonCode): void {
-  if (claim.status !== 'novelty') return;
-  claim.toVerify = true;
-  claim.statusReason = studyReason(code);
+/**
+ * A claim whose prior art could not be searched or assessed stays to verify, with why: a
+ * novelty in its `statusReason`, the assembly of a capability of another status (`capability`)
+ * in its `priorArtReason`, so that its other reasons stay. Any other claim is left as it is.
+ */
+export function leaveToVerify(claim: StudyClaim, code: StudyReasonCode, capability = false): void {
+  if (claim.status === 'novelty') {
+    claim.toVerify = true;
+    claim.statusReason = studyReason(code);
+  } else if (capability) {
+    claim.toVerify = true;
+    claim.priorArtReason = studyReason(code);
+  }
 }
 
 function lower(claim: StudyClaim, status: StudyClaimStatus, reason: StudyReason): void {

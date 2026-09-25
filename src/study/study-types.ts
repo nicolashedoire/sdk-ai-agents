@@ -40,15 +40,16 @@ export type StudyReasonCode =
   | 'noSourceConfigured'
   | 'citesUnlisted'
   | 'citesNothing'
-  | 'noveltyNotSearchedYet'
-  | 'noveltyNoSource'
-  | 'noveltySearchBudget'
-  | 'noveltyNotSearched'
-  | 'noveltySearchFailed'
-  | 'noveltyNoResult'
-  | 'noveltyNotAssessed'
-  | 'noveltyUnsupported'
+  | 'priorArtNotSearchedYet'
+  | 'priorArtNoSource'
+  | 'priorArtSearchBudget'
+  | 'priorArtNotSearched'
+  | 'priorArtSearchFailed'
+  | 'priorArtNoResult'
+  | 'priorArtNotAssessed'
+  | 'priorArtUnsupported'
   | 'priorArtExists'
+  | 'assemblyExists'
   | 'componentDocumented'
   | 'componentUndocumented'
   | 'noServesObjective'
@@ -92,8 +93,16 @@ export interface StudyClaim {
   unlistedSources?: string[];
   /** Which part of the objective, or which need, it serves, in one sentence. */
   servesObjective: string;
-  /** A novelty whose prior art was not searched and assessed yet. */
+  /**
+   * A novelty, or the assembly of a capability, whose prior art was not searched and assessed:
+   * for a novelty `statusReason` says why, for a capability of another status `priorArtReason`.
+   */
   toVerify?: boolean;
+  /**
+   * For the assembly of a capability that is not a novelty: why its prior art was not checked,
+   * or that the check found it already exists (`assemblyExists`).
+   */
+  priorArtReason?: StudyReason;
   /** The prior art found for a novelty. */
   priorArt?: StudyPriorArt;
   /**
@@ -567,6 +576,10 @@ export interface StudyPassageState {
   attempts: number;
   /** The passages that reopened it (loops). */
   reopenedBy: StudyPassage[];
+  /** The attempt whose items it kept, when the redo was worse than the first. */
+  keptAttempt?: number;
+  /** The redo it discarded for a better first attempt, and the items the guardian kept of it. */
+  discarded?: { attempt: number; items: number };
   runId?: string;
 }
 
@@ -584,6 +597,9 @@ export type StudyNoticeCode =
   | 'noCapability'
   | 'minimumsNotMet'
   | 'untracedAssembly'
+  | 'passagesOutdated'
+  | 'capabilitiesToVerify'
+  | 'capabilitiesExist'
   | 'noveltiesToVerify';
 
 /**

@@ -56,7 +56,7 @@ describe('studies aim at a new capability', () => {
       const attempts = requestsOf(provider, 'study:design');
       expect(attempts).toHaveLength(2);
       expect(lastMessage(attempts[1])).toContain(
-        '- "The design as a whole": The design offers no new capability, only improvements (faster or cheaper)'
+        '{"statement":"The design as a whole","reason":"The design offers no new capability, only improvements (faster or cheaper)'
       );
       expect(result.report.driftLog).toContainEqual(
         expect.objectContaining({
@@ -280,8 +280,8 @@ describe('studies aim at a new capability', () => {
         status: 'novelty',
         toVerify: true,
         statusReason: reason(
-          'noveltyNotSearched',
-          'Novelty to verify: no prior-art search was asked for it.'
+          'priorArtNotSearched',
+          'To verify against prior art: no prior-art search was asked for it.'
         ),
       });
       // The prior-art search was offered the assembly as a combination.

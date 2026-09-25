@@ -53,7 +53,8 @@ export function resolveSources(
         `tool "${name}" takes no text query: a source needs a string parameter such as "query"`
       );
     }
-    return { name, description: truncate(tool.description, 300), queryParameter };
+    // The tool's own text, as data: on one line, like a result.
+    return { name, description: oneLine(tool.description, 300), queryParameter };
   });
 }
 
@@ -141,9 +142,9 @@ export function readResults(output: unknown, depth = 0): FoundResult[] {
     const blocks = labelledBlocks(output);
     if (blocks.length > 0) return blocks.flatMap((block) => readRecord(block, depth));
     const content = output.trim();
-    return content
-      ? [{ title: oneLine(firstLine(content), 200), excerpt: excerptOf(content) }]
-      : [];
+    // "No results found" is an answer, not a result anyone could cite.
+    if (!content || NO_RESULT.test(content)) return [];
+    return [{ title: oneLine(firstLine(content), 200), excerpt: excerptOf(content) }];
   }
   if (Array.isArray(output)) {
     return output.flatMap((entry) =>
@@ -186,6 +187,10 @@ function readRecord(record: Record<string, unknown>, depth: number): FoundResult
   ];
 }
 
+/** What a search tool writes when it found nothing. */
+const NO_RESULT =
+  /^(?:no\s+(?:web\s+|search\s+)?(?:results?|matches|documents|hits)(?:\s+(?:were\s+)?found)?(?:\s+for\b.*)?|nothing\s+(?:was\s+)?found(?:\s+for\b.*)?|0\s+results?(?:\s+found)?(?:\s+for\b.*)?|not\s+found)[.!]?$/i;
+
 /** A line like `Title: …` or `URL: …`: a known field name, then its value. */
 const FIELD_LINE = /^\s*([A-Za-z][A-Za-z ]{0,20}?)\s*:\s*(.*)$/;
 const FIELD_NAMES = new Map<string, string>([
@@ -198,26 +203,35 @@ const FIELD_NAMES = new Map<string, string>([
 ]);
 
 /**
- * The results of a text written as blocks of labelled lines, separated by blank lines (or by a
- * new `Title:` line), as MCP search servers often return them. None when the text is not so.
+ * The results of a text written as blocks of labelled lines, as MCP search servers often return
+ * them: a field seen again starts the next result, and unlabelled prose goes with the excerpt
+ * of the result above it. None when the text is not so.
  */
 function labelledBlocks(text: string): Array<Record<string, unknown>> {
   const blocks: Array<Record<string, unknown>> = [];
   let current: Record<string, unknown> | undefined;
   let lastField: string | undefined;
   for (const line of text.split(/\r?\n/)) {
-    if (line.trim() === '') {
-      current = undefined;
-      continue;
-    }
+    // A blank line does not end a block: the prose after it may still describe it.
+    if (line.trim() === '') continue;
     const match = FIELD_LINE.exec(line);
     const field = match?.[1] ? FIELD_NAMES.get(match[1].trim().toLowerCase()) : undefined;
     if (!field) {
-      // A line that continues the value of the field before it.
-      if (current && lastField) current[lastField] = `${String(current[lastField])} ${line.trim()}`;
+      // Prose under a block describes that result: it goes with its excerpt, never with its
+      // title or locator.
+      if (current) {
+        const key =
+          lastField && EXCERPT_KEYS.includes(lastField)
+            ? lastField
+            : (EXCERPT_KEYS.find((candidate) => current?.[candidate] !== undefined) ?? 'excerpt');
+        const earlier = current[key];
+        current[key] = earlier === undefined ? line.trim() : `${String(earlier)} ${line.trim()}`;
+        lastField = key;
+      }
       continue;
     }
-    if (!current || (TITLE_KEYS.includes(field) && current[field] !== undefined)) {
+    // A field seen again (a second `Title:`, `URL:`) starts the next result.
+    if (!current || current[field] !== undefined) {
       current = {};
       blocks.push(current);
     }

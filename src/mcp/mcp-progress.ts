@@ -126,12 +126,11 @@ export function progressDescriber(): (event: Event) => string {
         return 'amendment refused';
       case 'study.result_recorded':
         return 'result recorded';
+      // The run's own end says "study completed": these say the report, once each.
       case 'study.completed':
-        return 'study completed';
+        return 'report ready';
       case 'study.failed':
-        return data.status === 'stopped'
-          ? 'study stopped'
-          : `study ${String(data.status ?? 'failed')}`;
+        return 'partial report ready';
       default:
         return event.type;
     }

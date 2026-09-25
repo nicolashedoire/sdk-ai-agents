@@ -41,6 +41,25 @@ export interface PassageRecord {
   attempts: number;
   /** The attempt whose items it kept, when the redo was worse than the first. */
   keptAttempt?: number;
+  /** The redo discarded for a better first attempt, and the items the guardian kept of it. */
+  discarded?: { attempt: number; items: number };
+  /**
+   * The guardian judged items late in a passage it reads, after it ran: it runs again (a
+   * loop), or the report says it is outdated.
+   */
+  outdated?: boolean;
+  /**
+   * The generation in progress, until the passage ends: its attempt, the items it produced and
+   * those rejected, its results and the reopening it asked, so that a resumed run applies the
+   * redo rules as the stopped one would have.
+   */
+  generation?: {
+    attempt: number;
+    produced: number;
+    rejected: StudyDriftEntry[];
+    results: string[];
+    reopen?: { passage: StudyPassage; focus: string; reason: string };
+  };
   reopenedBy: StudyPassage[];
   runId: string;
 }
@@ -87,11 +106,14 @@ export function buildStudyReport(state: StudyState): StudyReport {
   const undeconstructedAnalogues = state.charter.analogues.filter(
     (named, index) => !analogues.some((analogue) => deconstructsNamed(analogue, named, index))
   );
-  // A new capability comes first; an improvement, only faster or cheaper, after.
+  // A new capability comes first, then a capability whose assembly already exists, then an
+  // improvement, only faster or cheaper.
   const architectures = items('architectures');
+  const exists = (architecture: StudyArchitecture) => architecture.priorArt?.verdict === 'exists';
   const ranked = [
-    ...architectures.filter((architecture) => architecture.kind === 'capability'),
-    ...architectures.filter((architecture) => architecture.kind !== 'capability'),
+    ...architectures.filter((one) => one.kind === 'capability' && !exists(one)),
+    ...architectures.filter((one) => one.kind === 'capability' && exists(one)),
+    ...architectures.filter((one) => one.kind !== 'capability'),
   ];
   const all = PASSAGES.flatMap((spec) =>
     (state.records.get(spec.passage)?.items ?? []).map((item) => item.claim)
@@ -153,6 +175,8 @@ function passageStates(state: StudyState): StudyPassageState[] {
       state: unchecked ? 'unchecked' : record.complete ? 'complete' : 'partial',
       attempts: record.attempts,
       reopenedBy: [...record.reopenedBy],
+      ...(record.keptAttempt ? { keptAttempt: record.keptAttempt } : {}),
+      ...(record.discarded ? { discarded: { ...record.discarded } } : {}),
       runId: record.runId,
     };
   });
@@ -333,6 +357,45 @@ function noticesOf(
         'untracedAssembly',
         `Parts of the design cite no record of the investigation, in: ${untraced.join(', ')}.`,
         { details: untraced }
+      )
+    );
+  }
+  const outdated = PASSAGES.filter((spec) => state.records.get(spec.passage)?.outdated).map(
+    (spec) => spec.passage
+  );
+  if (outdated.length > 0) {
+    notices.push(
+      notice(
+        'passagesOutdated',
+        `Passages written before items the guardian judged late, not yet written again: ${outdated.join(', ')}.`,
+        { details: outdated }
+      )
+    );
+  }
+  const existing = judged
+    .filter(
+      (architecture) =>
+        architecture.kind === 'capability' && architecture.priorArt?.verdict === 'exists'
+    )
+    .map((architecture) => architecture.id);
+  if (existing.length > 0) {
+    notices.push(
+      notice(
+        'capabilitiesExist',
+        `Capabilities whose assembly already exists, ranked after the others: ${existing.join(', ')}.`,
+        { details: existing }
+      )
+    );
+  }
+  const unverified = judged
+    .filter((architecture) => architecture.kind === 'capability' && architecture.toVerify)
+    .map((architecture) => architecture.id);
+  if (unverified.length > 0) {
+    notices.push(
+      notice(
+        'capabilitiesToVerify',
+        `Capabilities whose assembly was not checked against prior art: ${unverified.join(', ')}.`,
+        { details: unverified }
       )
     );
   }
