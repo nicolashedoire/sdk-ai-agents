@@ -1,7 +1,9 @@
 /**
  * A study: understand an object, then propose how to organise it with the knowledge and
  * techniques of today. Here the Web browser from 1990 to 2026, with three leads of the owner
- * to verify (examples, not truths): vectorisation, poids, ReLU.
+ * to verify (examples, not truths): vectorisation, poids, ReLU. The study looks for a change of
+ * principle that makes possible something difficult today, not only faster, and deconstructs
+ * Bitcoin as a breakthrough by assembly: prior techniques that, together, opened a capability.
  *
  * Run: OPENAI_API_KEY=... npm run example:study
  *   SEARCH_MCP    command of an MCP search server, e.g. "npx -y @modelcontextprotocol/server-brave-search"
@@ -37,6 +39,8 @@ const study = sdk.createStudy({
   objective: "Une conception de navigateur dont chaque choix découle de l'enquête",
   needs: ['interactions', 'accessibilité', 'compatibilité attendue avec le Web existant'],
   leads: ['vectorisation', 'poids', 'ReLU'],
+  // No capability named: the study proposes candidates (set `capability` to aim at one).
+  analogues: ['Bitcoin'],
   sources,
   model: process.env.MODEL ?? 'gpt-4o',
   language: 'fr',
@@ -62,6 +66,10 @@ console.log(`\nStatus: ${result.status}${result.stoppedBy ? ` (${result.stoppedB
 console.log(
   `${stats.items} items: ${stats.byStatus.established} established, ${stats.byStatus.hypothesis} hypotheses, ${stats.byStatus.novelty} novelties (${stats.noveltiesToVerify} to verify); ${stats.rejected} rejected`
 );
+// Capabilities first, then improvements (only faster or cheaper).
+for (const { id, kind, name, capability } of result.report.architectures) {
+  console.log(`  ${id} [${kind}] ${name}: ${capability.what}`);
+}
 console.log(`Dossier: ${file}`);
 console.log('Cost:', await sdk.getRunCost(result.runId));
 
