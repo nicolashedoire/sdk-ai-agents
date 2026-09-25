@@ -525,7 +525,7 @@ interface ResourceProvider {
 }
 ```
 
-`web_search` 按顺序询问它的提供商；抛出错误的提供商会把请求交给下一个，而抛出 `SearchThrottledError`（或连续失败三次）的提供商会在 `circuitBreaker.cooldownMs`（2 分钟）内被跳过。Web 工具对它们有意拒绝的请求抛出 `WebRequestRefusedError`（`reason`：`private-address`、`scheme`、`downgrade`、`redirects`、`robots`、`content-type`、`too-large`、`pacing`），对非 2xx 的应答抛出 `WebHttpError`（`status`），超时则抛出 `WebTimeoutError`（单个请求、调用的时限或提取的时间预算），缺少配置时抛出 `WebConfigurationError`（`unpdf`、GitHub 令牌），没有任何提供商作答时抛出 `SearchUnavailableError`（`failures`）。`retry` 从不重试被拒绝的请求、缺少的配置或没有任何提供商作答的搜索。
+`web_search` 按顺序询问它的提供商；抛出错误的提供商会把请求交给下一个，而抛出 `SearchThrottledError`（或连续失败三次）的提供商会在 `circuitBreaker.cooldownMs`（2 分钟）内被跳过。Web 工具对它们有意拒绝的请求抛出 `WebRequestRefusedError`（`reason`：`private-address`、`scheme`、`downgrade`、`redirects`、`robots`、`content-type`、`too-large`、`unreadable`、`pacing`），对非 2xx 的应答抛出 `WebHttpError`（`status`），超时则抛出 `WebTimeoutError`（单个请求、调用的时限或提取的时间预算），缺少配置时抛出 `WebConfigurationError`（`unpdf`、GitHub 令牌），没有任何提供商作答时抛出 `SearchUnavailableError`（`failures`）。`retry` 从不重试被拒绝的请求、缺少的配置或没有任何提供商作答的搜索。
 
 ```ts
 interface SearchProvider {

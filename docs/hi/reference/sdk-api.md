@@ -525,7 +525,7 @@ interface ResourceProvider {
 }
 ```
 
-`web_search` अपने प्रदाताओं से क्रम से पूछता है; जो प्रदाता error फेंके, वह अगले को काम सौंप देता है, और जो `SearchThrottledError` फेंके (या लगातार तीन बार विफल हो), उसे `circuitBreaker.cooldownMs` (2 मिनट) तक छोड़ दिया जाता है। जो चीज़ें वेब टूल जान-बूझकर ठुकराते हैं, उनके लिए वे `WebRequestRefusedError` फेंकते हैं (`reason`: `private-address`, `scheme`, `downgrade`, `redirects`, `robots`, `content-type`, `too-large`, `pacing`), गैर-2xx उत्तर के लिए `WebHttpError` (`status`), `WebTimeoutError` (किसी अनुरोध, कॉल की समय-सीमा, या सामग्री निकालने के समय-बजट के लिए), अधूरे सेटअप (`unpdf`, GitHub token) के लिए `WebConfigurationError` और जब किसी प्रदाता ने जवाब नहीं दिया तो `SearchUnavailableError` (`failures`)। `retry` किसी अस्वीकृति, अधूरे सेटअप या ऐसी खोज को कभी दोबारा नहीं आज़माता जिसका किसी प्रदाता ने जवाब नहीं दिया।
+`web_search` अपने प्रदाताओं से क्रम से पूछता है; जो प्रदाता error फेंके, वह अगले को काम सौंप देता है, और जो `SearchThrottledError` फेंके (या लगातार तीन बार विफल हो), उसे `circuitBreaker.cooldownMs` (2 मिनट) तक छोड़ दिया जाता है। जो चीज़ें वेब टूल जान-बूझकर ठुकराते हैं, उनके लिए वे `WebRequestRefusedError` फेंकते हैं (`reason`: `private-address`, `scheme`, `downgrade`, `redirects`, `robots`, `content-type`, `too-large`, `unreadable`, `pacing`), गैर-2xx उत्तर के लिए `WebHttpError` (`status`), `WebTimeoutError` (किसी अनुरोध, कॉल की समय-सीमा, या सामग्री निकालने के समय-बजट के लिए), अधूरे सेटअप (`unpdf`, GitHub token) के लिए `WebConfigurationError` और जब किसी प्रदाता ने जवाब नहीं दिया तो `SearchUnavailableError` (`failures`)। `retry` किसी अस्वीकृति, अधूरे सेटअप या ऐसी खोज को कभी दोबारा नहीं आज़माता जिसका किसी प्रदाता ने जवाब नहीं दिया।
 
 ```ts
 interface SearchProvider {

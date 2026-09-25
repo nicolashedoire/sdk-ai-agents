@@ -525,7 +525,7 @@ interface ResourceProvider {
 }
 ```
 
-يسأل `web_search` مزوّديه بالترتيب؛ والمزوّد الذي يرمي خطأً يسلّم إلى التالي، والذي يرمي `SearchThrottledError` (أو يفشل ثلاث مرات متتالية) يُتخطّى طوال `circuitBreaker.cooldownMs` (دقيقتان). وترمي أدوات الويب `WebRequestRefusedError` لما ترفضه عن قصد (`reason`: `private-address`، `scheme`، `downgrade`، `redirects`، `robots`، `content-type`، `too-large`، `pacing`)، و`WebHttpError` لإجابة ليست 2xx (`status`)، و`WebTimeoutError` (لطلب، أو للمهلة النهائية للاستدعاء، أو لميزانية الوقت المخصّصة للاستخراج)، و`WebConfigurationError` لإعداد ناقص (`unpdf`، أو رمز GitHub)، و`SearchUnavailableError` حين لا يجيب أي مزوّد (`failures`). ولا يعيد `retry` أبدًا محاولة رفضٍ، ولا إعداد ناقص، ولا بحث لم يُجب عنه أي مزوّد.
+يسأل `web_search` مزوّديه بالترتيب؛ والمزوّد الذي يرمي خطأً يسلّم إلى التالي، والذي يرمي `SearchThrottledError` (أو يفشل ثلاث مرات متتالية) يُتخطّى طوال `circuitBreaker.cooldownMs` (دقيقتان). وترمي أدوات الويب `WebRequestRefusedError` لما ترفضه عن قصد (`reason`: `private-address`، `scheme`، `downgrade`، `redirects`، `robots`، `content-type`، `too-large`، `unreadable`، `pacing`)، و`WebHttpError` لإجابة ليست 2xx (`status`)، و`WebTimeoutError` (لطلب، أو للمهلة النهائية للاستدعاء، أو لميزانية الوقت المخصّصة للاستخراج)، و`WebConfigurationError` لإعداد ناقص (`unpdf`، أو رمز GitHub)، و`SearchUnavailableError` حين لا يجيب أي مزوّد (`failures`). ولا يعيد `retry` أبدًا محاولة رفضٍ، ولا إعداد ناقص، ولا بحث لم يُجب عنه أي مزوّد.
 
 ```ts
 interface SearchProvider {

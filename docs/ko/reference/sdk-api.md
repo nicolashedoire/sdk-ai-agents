@@ -525,7 +525,7 @@ interface ResourceProvider {
 }
 ```
 
-`web_search`는 프로바이더들에게 순서대로 묻습니다. 예외를 던진 프로바이더는 다음 프로바이더에게 차례를 넘기고, `SearchThrottledError`를 던진(또는 세 번 연속 실패한) 프로바이더는 `circuitBreaker.cooldownMs`(2분) 동안 건너뜁니다. 웹 도구는 일부러 거부한 것에 대해 `WebRequestRefusedError`(`reason`: `private-address`, `scheme`, `downgrade`, `redirects`, `robots`, `content-type`, `too-large`, `pacing`)를, 2xx가 아닌 응답에 대해 `WebHttpError`(`status`)를, 요청이나 호출의 마감 시간 또는 추출의 시간 예산을 넘으면 `WebTimeoutError`를, 설정이 빠졌을 때(`unpdf`, GitHub 토큰) `WebConfigurationError`를, 어느 프로바이더도 답하지 않았을 때 `SearchUnavailableError`(`failures`)를 던집니다. `retry`는 거부, 빠진 설정, 어느 프로바이더도 답하지 않은 검색을 절대 재시도하지 않습니다.
+`web_search`는 프로바이더들에게 순서대로 묻습니다. 예외를 던진 프로바이더는 다음 프로바이더에게 차례를 넘기고, `SearchThrottledError`를 던진(또는 세 번 연속 실패한) 프로바이더는 `circuitBreaker.cooldownMs`(2분) 동안 건너뜁니다. 웹 도구는 일부러 거부한 것에 대해 `WebRequestRefusedError`(`reason`: `private-address`, `scheme`, `downgrade`, `redirects`, `robots`, `content-type`, `too-large`, `unreadable`, `pacing`)를, 2xx가 아닌 응답에 대해 `WebHttpError`(`status`)를, 요청이나 호출의 마감 시간 또는 추출의 시간 예산을 넘으면 `WebTimeoutError`를, 설정이 빠졌을 때(`unpdf`, GitHub 토큰) `WebConfigurationError`를, 어느 프로바이더도 답하지 않았을 때 `SearchUnavailableError`(`failures`)를 던집니다. `retry`는 거부, 빠진 설정, 어느 프로바이더도 답하지 않은 검색을 절대 재시도하지 않습니다.
 
 ```ts
 interface SearchProvider {

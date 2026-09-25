@@ -525,7 +525,7 @@ interface ResourceProvider {
 }
 ```
 
-`web_search` はプロバイダーに順番に問い合わせます。例外を投げたプロバイダーは次のプロバイダーに引き継ぎ、`SearchThrottledError` を投げた（または 3 回続けて失敗した）プロバイダーは、`circuitBreaker.cooldownMs`（2 分）のあいだ飛ばされます。Web ツールは、意図的に拒否したものには `WebRequestRefusedError`（`reason`：`private-address`、`scheme`、`downgrade`、`redirects`、`robots`、`content-type`、`too-large`、`pacing`）を、2xx 以外の応答には `WebHttpError`（`status`）を、タイムアウトには `WebTimeoutError`（リクエスト、呼び出しの期限、または抽出の時間予算）を、準備の不足には `WebConfigurationError`（`unpdf`、GitHub のトークン）を、どのプロバイダーも答えなかったときには `SearchUnavailableError`（`failures`）を投げます。`retry` は、拒否、準備の不足、どのプロバイダーも答えなかった検索を決してリトライしません。
+`web_search` はプロバイダーに順番に問い合わせます。例外を投げたプロバイダーは次のプロバイダーに引き継ぎ、`SearchThrottledError` を投げた（または 3 回続けて失敗した）プロバイダーは、`circuitBreaker.cooldownMs`（2 分）のあいだ飛ばされます。Web ツールは、意図的に拒否したものには `WebRequestRefusedError`（`reason`：`private-address`、`scheme`、`downgrade`、`redirects`、`robots`、`content-type`、`too-large`、`unreadable`、`pacing`）を、2xx 以外の応答には `WebHttpError`（`status`）を、タイムアウトには `WebTimeoutError`（リクエスト、呼び出しの期限、または抽出の時間予算）を、準備の不足には `WebConfigurationError`（`unpdf`、GitHub のトークン）を、どのプロバイダーも答えなかったときには `SearchUnavailableError`（`failures`）を投げます。`retry` は、拒否、準備の不足、どのプロバイダーも答えなかった検索を決してリトライしません。
 
 ```ts
 interface SearchProvider {
