@@ -9,8 +9,14 @@ import { WebRequestRefusedError } from './web-errors.js';
  * made (the host asked for more patience than a tool call has).
  */
 export class HostPacer {
-  /** Per host: when the last request queued finishes (its end time), and when that is known. */
-  private readonly hosts = new Map<string, { tail: Promise<number>; lastEnd: number }>();
+  /**
+   * Per host: when the last request queued finishes (its end time), when the last one
+   * finished, and how many are queued or running (a host with any is never forgotten).
+   */
+  private readonly hosts = new Map<
+    string,
+    { tail: Promise<number>; lastEnd: number; pending: number }
+  >();
 
   /**
    * Waits for this host's turn. Call the function it gives once the request has finished
@@ -22,14 +28,20 @@ export class HostPacer {
     maxWaitMs: number,
     signal?: AbortSignal
   ): Promise<() => void> {
-    const state = this.hosts.get(host);
-    const previous = state?.tail ?? Promise.resolve(Number.NEGATIVE_INFINITY);
+    this.forgetOld();
+    let state = this.hosts.get(host);
+    if (!state) {
+      const start = Number.NEGATIVE_INFINITY;
+      state = { tail: Promise.resolve(start), lastEnd: start, pending: 0 };
+      this.hosts.set(host, state);
+    }
+    const previous = state.tail;
     let finish: (end: number) => void = () => undefined;
-    const mine = new Promise<number>((resolve) => {
+    state.tail = new Promise<number>((resolve) => {
       finish = resolve;
     });
-    this.hosts.set(host, { tail: mine, lastEnd: state?.lastEnd ?? Number.NEGATIVE_INFINITY });
-    this.forgetOld();
+    state.pending++;
+    const slot = state;
     try {
       const previousEnd = await untilAborted(previous, signal);
       const delay = previousEnd + intervalMs - Date.now();
@@ -42,6 +54,7 @@ export class HostPacer {
       if (delay > 0) await sleep(delay, signal);
     } catch (error) {
       // A caller that gives up passes its turn on: the next one is paced from the previous.
+      slot.pending--;
       void previous.then(finish);
       throw error;
     }
@@ -50,18 +63,21 @@ export class HostPacer {
       if (released) return;
       released = true;
       const end = Date.now();
-      const current = this.hosts.get(host);
-      if (current) current.lastEnd = end;
+      slot.lastEnd = end;
+      slot.pending--;
       finish(end);
     };
   }
 
-  /** Hosts not asked for in a while are forgotten, so the map stays small. */
+  /**
+   * Hosts not asked for in a while are forgotten, so the map stays small — never one with a
+   * request queued or running, whose next request must still wait for it.
+   */
   private forgetOld(): void {
     if (this.hosts.size < 1_000) return;
     const now = Date.now();
     for (const [host, state] of this.hosts) {
-      if (now - state.lastEnd > 600_000) this.hosts.delete(host);
+      if (state.pending === 0 && now - state.lastEnd > 600_000) this.hosts.delete(host);
     }
   }
 }

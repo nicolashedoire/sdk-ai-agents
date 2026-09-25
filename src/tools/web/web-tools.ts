@@ -52,8 +52,9 @@ export interface WebToolsOptions {
   circuitBreaker?: CircuitBreakerOptions;
   /**
    * A provider or source that throttles a call (DuckDuckGo's empty page, HTTP 429, arXiv's
-   * 406) gets a second try after this wait, or the `Retry-After` it gave (at most 30 s), when
-   * the call's deadline leaves room. Default 10 000 ms.
+   * 406) gets a second try after this wait, or the `Retry-After` it gave, when the call's
+   * deadline leaves room. One that asks for more than 30 s gets no second try: the call fails
+   * at once, `throttled`, with the wait it asked for. Default 10 000 ms.
    */
   throttleWaitMs?: number;
   /** Language of searches that name none (BCP 47: `fr`, `en-GB`). */

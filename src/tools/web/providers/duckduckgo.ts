@@ -88,11 +88,11 @@ export function duckDuckGo(options: DuckDuckGoOptions = {}): SearchProvider {
       ensureOk(response, 'DuckDuckGo');
       const page = parseDuckDuckGoPage(bodyText(response));
       if (page.results.length > 0) return page.results;
-      // "No results." first: the page echoes the query, which may say "captcha".
-      if (page.noResults) return [];
+      // A block first: taken for "no results", it would pass for a search that found nothing.
       if (page.blocked) {
         throw new SearchThrottledError('DuckDuckGo answered with a captcha page (unusual traffic)');
       }
+      if (page.noResults) return [];
       // An empty page where results were expected: DuckDuckGo's way of throttling.
       throw new SearchThrottledError('DuckDuckGo answered an empty page (throttled)');
     },
@@ -122,16 +122,19 @@ const DATE = /\b(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}:\d{2}/;
  * DuckDuckGo's "no results" page, in its markups: `<div class="no-results">No results.</div>`,
  * and since 2026 `result--no-result`, `<span class='no-results'>`, `no-results__message`, and
  * "No results found for …". Read as an empty page, it was taken for a throttle, which opened the
- * circuit breaker: exact-phrase searches often find nothing.
+ * circuit breaker: exact-phrase searches often find nothing. Looked for in the page's body
+ * only: its `<title>` echoes the query, which may begin with "No results found".
  */
 const NO_RESULTS =
-  /\bclass=["'][^"']{0,200}\b(?:no-results(?:__[a-z-]+)?|result--no-result)["'\s]|>\s*No\s+results(?:\.|\s+found\b)/i;
+  /<[a-z][^<>]*\bclass=["'][^"']{0,200}\b(?:no-results(?:__[a-z-]+)?|result--no-result)["'\s]|>\s*No\s+results(?:\.|\s+found\b)/i;
 
 /**
- * The markup of DuckDuckGo's block page (its "anomaly" challenge), never words the page could
- * echo from the query. Looked for only when the page has no result (see `blocked`).
+ * The markup of DuckDuckGo's block page (its "anomaly" challenge), inside a tag: a query the
+ * page echoes (its `<` and quotes escaped) cannot make it up. Looked for only when the page has
+ * no result (see `blocked`).
  */
-const BLOCK_MARKUP = /\bclass="[^"]{0,100}\banomaly-modal|\/anomaly\.js|\bid="challenge-form"/i;
+const BLOCK_MARKUP =
+  /<[a-z][^<>]*\b(?:class="[^"]{0,100}\banomaly-modal|(?:action|src)="[^"]*\/anomaly\.js|id="challenge-form")/i;
 
 /**
  * Reads the results of a DuckDuckGo HTML page: title and link (`result__a`, a direct URL or a
@@ -158,11 +161,24 @@ export function parseDuckDuckGoPage(html: string): DuckDuckGoPage {
       ...(date ? { date } : {}),
     });
   });
+  const body = bodyOf(html);
   return {
     results,
-    blocked: results.length === 0 && BLOCK_MARKUP.test(html),
-    noResults: NO_RESULTS.test(html),
+    blocked: results.length === 0 && BLOCK_MARKUP.test(body),
+    noResults: NO_RESULTS.test(body),
   };
+}
+
+/**
+ * The page from its `<body>` on (else from after its last `</head>` or `</title>`): its
+ * `<title>` echoes the query.
+ */
+function bodyOf(html: string): string {
+  const body = html.search(/<body\b/i);
+  if (body !== -1) return html.slice(body);
+  let end = 0;
+  for (const close of html.matchAll(/<\/(?:head|title)\s*>/gi)) end = close.index + close[0].length;
+  return html.slice(end);
 }
 
 /** The target of a result link: `uddg=` decoded; ads and DuckDuckGo's own links dropped. */

@@ -98,17 +98,20 @@ export class SearchUnavailableError extends Error {
 }
 
 /**
- * Worth retrying: 429, server errors, timeouts and network failures — not refusals, 4xx, a
- * missing setup or a search no provider could answer.
+ * Worth retrying: server errors, timeouts and network failures — not refusals, 4xx, a missing
+ * setup, a search no provider could answer, nor a throttle (429, captcha): the tool already
+ * gave a throttled call its one second try, after the wait the service asked for, and more
+ * tries would only lengthen the block.
  */
 export function isRetryableWebError(error: Error): boolean {
   if (
     error instanceof WebRequestRefusedError ||
     error instanceof WebConfigurationError ||
-    error instanceof SearchUnavailableError
+    error instanceof SearchUnavailableError ||
+    error instanceof SearchThrottledError
   ) {
     return false;
   }
-  if (error instanceof WebHttpError) return error.status === 429 || error.status >= 500;
+  if (error instanceof WebHttpError) return error.status >= 500;
   return true;
 }

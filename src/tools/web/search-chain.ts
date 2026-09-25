@@ -1,7 +1,7 @@
 import type { WebClient } from './guarded-http.js';
 import type { SearchHit, SearchProvider, SearchRequest } from './search-provider.js';
 import { isThrottle, retryOnceIfThrottled, THROTTLE_WAIT_MS } from './throttle.js';
-import { SearchUnavailableError } from './web-errors.js';
+import { SearchThrottledError, SearchUnavailableError } from './web-errors.js';
 
 /** A provider that did not answer a search, and why. */
 export interface ProviderFailure {
@@ -106,7 +106,9 @@ export class SearchChain {
         const throttled = isThrottle(error);
         allThrottled &&= throttled;
         if (throttled || breaker.failures >= this.failureThreshold) {
-          breaker.openUntil = Date.now() + this.cooldownMs;
+          // A provider that asked for a longer wait than the cooldown gets it.
+          const asked = error instanceof SearchThrottledError ? (error.retryAfterMs ?? 0) : 0;
+          breaker.openUntil = Date.now() + Math.max(this.cooldownMs, asked);
           breaker.throttled = throttled;
           retryAt = Math.min(retryAt ?? breaker.openUntil, breaker.openUntil);
         }

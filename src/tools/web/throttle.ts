@@ -24,9 +24,11 @@ export function isThrottle(error: unknown): error is Error {
 
 /**
  * Runs `attempt`; when a service throttles it, waits (as long as it asked with `Retry-After`,
- * else `waitMs`, at most 30 s) and runs it once more — only if the call's deadline leaves room
- * for the wait and the second try. Otherwise, or when the second try is throttled too, the
- * throttle is thrown.
+ * else `waitMs`) and runs it once more — only if that wait is at most 30 s and the call's
+ * deadline leaves room for it and the second try. A service that asked for longer is never
+ * tried again early: its throttle is thrown at once, with the wait it asked for
+ * (`retryAfterMs`), for a caller that can come back later (a study). When the second try is
+ * throttled too, that throttle is thrown.
  */
 export async function retryOnceIfThrottled<T>(
   attempt: () => Promise<T>,
@@ -37,7 +39,9 @@ export async function retryOnceIfThrottled<T>(
   } catch (error) {
     if (!isThrottle(error) || options.signal?.aborted) throw error;
     const asked = error instanceof SearchThrottledError ? error.retryAfterMs : undefined;
-    const wait = Math.min(asked ?? options.waitMs, MAX_THROTTLE_WAIT_MS);
+    // Sooner than asked, the second try would be throttled again, and could lengthen the block.
+    if (asked !== undefined && asked > MAX_THROTTLE_WAIT_MS) throw error;
+    const wait = asked ?? options.waitMs;
     const deadline = options.deadline ?? Number.POSITIVE_INFINITY;
     if (Date.now() + wait + ATTEMPT_ROOM_MS > deadline) throw error;
     await sleep(wait, options.signal);

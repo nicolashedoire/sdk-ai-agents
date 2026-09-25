@@ -1,11 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { brave } from '../tools/web/providers/brave.js';
+import { HostPacer, sleep } from '../tools/web/politeness.js';
 import { duckDuckGo } from '../tools/web/providers/duckduckgo.js';
-import { SearchUnavailableError } from '../tools/web/web-errors.js';
+import {
+  isRetryableWebError,
+  SearchThrottledError,
+  SearchUnavailableError,
+  WebHttpError,
+} from '../tools/web/web-errors.js';
 import { type WebToolsOptions, webTools } from '../tools/web/web-tools.js';
 import type { ToolDefinition } from '../types/tool.js';
 import { type Route, reply, replyJson, WebServer } from './support/web-server.js';
+import { createTestSDK } from './support/test-sdk.js';
 
 const fixture = (name: string) =>
   readFileSync(new URL(`./fixtures/web/${name}`, import.meta.url), 'utf8');
@@ -98,6 +105,26 @@ describe('pacing: one request at a time per host, spaced from the end of the pre
 
     expect(gap(spans, 1)).toBeGreaterThanOrEqual(290);
   });
+
+  it('never forgets a host with a request in flight, however many hosts it has seen', async () => {
+    const pacer = new HostPacer();
+    const release = await pacer.acquire('busy.example', 50, 30_000);
+    // Past 1 000 hosts, the pacer forgets the idle ones: never this one, still busy.
+    for (let index = 0; index < 1_100; index++) {
+      (await pacer.acquire(`host-${index}.example`, 50, 30_000))();
+    }
+    let turn = false;
+    const next = pacer.acquire('busy.example', 50, 30_000).then((released) => {
+      turn = true;
+      return released;
+    });
+
+    await sleep(150);
+    expect(turn).toBe(false);
+    release();
+    (await next)();
+    expect(turn).toBe(true);
+  });
 });
 
 describe('throttling: one more try after a wait, within the call deadline', () => {
@@ -159,6 +186,70 @@ describe('throttling: one more try after a wait, within the call deadline', () =
     expect(error).toBeInstanceOf(SearchUnavailableError);
     expect(error).toMatchObject({ throttled: true });
     expect((error as SearchUnavailableError).retryAfterMs).toBeGreaterThan(100_000);
+  });
+
+  it('never tries again sooner than asked: a Retry-After past 30 s fails at once, with that wait', async () => {
+    server.on('/w/api.php', (_request, response) => {
+      response.writeHead(429, { 'content-type': 'application/json', 'retry-after': '120' }).end('{}');
+    });
+    server.on('/res/v1/web/search', (_request, response) => {
+      response.writeHead(429, { 'content-type': 'application/json', 'retry-after': '600' }).end('{}');
+    });
+    const tools = webTools({
+      include: ['wikipedia_search', 'web_search'],
+      wikipedia: { baseUrl: server.url, minIntervalMs: 0 },
+      search: brave({ apiKey: 'k', baseUrl: server.url, minIntervalMs: 0 }),
+      cache: false,
+    });
+    const run = (name: string) => {
+      const found = tools.find((candidate) => candidate.name === name);
+      if (!found) throw new Error(`no ${name}`);
+      return found.handler(found.schema.parse({ query: 'x' })).catch((caught: Error) => caught);
+    };
+    const started = Date.now();
+
+    const source = await run('wikipedia_search');
+    const search = await run('web_search');
+    const again = await run('web_search');
+
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(server.hits('/w/api.php')).toHaveLength(1);
+    expect(source).toBeInstanceOf(SearchThrottledError);
+    expect(source).toMatchObject({ throttled: true, retryAfterMs: 120_000 });
+    // The provider is left alone as long as it asked, not only the breaker's 120 s.
+    expect(server.hits('/res/v1/web/search')).toHaveLength(1);
+    expect(search).toMatchObject({ name: 'SearchUnavailableError', throttled: true });
+    expect((search as SearchUnavailableError).retryAfterMs).toBeGreaterThan(590_000);
+    expect((again as SearchUnavailableError).retryAfterMs).toBeGreaterThan(590_000);
+  });
+
+  it('is not retried by a configured retry: the tool already gave the throttle its second try', async () => {
+    server.on('/w/api.php', (_request, response) => {
+      response.writeHead(429, { 'content-type': 'application/json' }).end('{}');
+    });
+    const env = createTestSDK();
+    try {
+      for (const tool of webTools({
+        include: ['wikipedia_search'],
+        wikipedia: { baseUrl: server.url, minIntervalMs: 0 },
+        throttleWaitMs: 20,
+        retry: { maxRetries: 2, initialDelayMs: 1 },
+        cache: false,
+      })) {
+        env.sdk.defineTool(tool);
+      }
+
+      await expect(env.sdk.executeTool('wikipedia_search', { query: 'x' })).rejects.toThrow(
+        'Tool execution failed'
+      );
+      // The tool's two tries, and no more.
+      expect(server.hits('/w/api.php')).toHaveLength(2);
+    } finally {
+      await env.dispose();
+    }
+    expect(isRetryableWebError(new SearchThrottledError('captcha'))).toBe(false);
+    expect(isRetryableWebError(new WebHttpError('rate limited', 429))).toBe(false);
+    expect(isRetryableWebError(new WebHttpError('down', 503))).toBe(true);
   });
 
   it('says a search failed for another reason is not throttled', async () => {

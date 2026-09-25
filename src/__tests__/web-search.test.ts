@@ -158,6 +158,32 @@ describe('web_search', () => {
       expect(backup.requests).toHaveLength(0);
     });
 
+    it('never takes a block for no results because the query in the title says "No results"', async () => {
+      // The title echoes the query: an empty page or a captcha must still read as a throttle.
+      const titled = (name: string, title: string) =>
+        fixture(name).replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
+      expect(
+        parseDuckDuckGoPage(titled('duckduckgo-empty.html', 'No results found at DuckDuckGo'))
+      ).toMatchObject({ noResults: false, blocked: false });
+      expect(
+        parseDuckDuckGoPage(titled('duckduckgo-captcha.html', 'No results. at DuckDuckGo'))
+      ).toMatchObject({ blocked: true });
+      server.on('/html/', reply(titled('duckduckgo-captcha.html', 'No results. at DuckDuckGo')));
+
+      const error = await search(searchTool({ search: ddg() }), { query: 'No results.' }).catch(
+        (caught: Error) => caught
+      );
+
+      expect(error).toMatchObject({ name: 'SearchUnavailableError', throttled: true });
+      // Nor a no-results page for a block because the query it echoes quotes the block's markup.
+      const quoted = 'duck/anomaly.js id=&quot;challenge-form&quot; class=&quot;anomaly-modal&quot;';
+      expect(
+        parseDuckDuckGoPage(
+          `<html><head><title>${quoted}</title></head><body><form><input name="q" value="${quoted}"></form><h1>No results found for <strong>${quoted}</strong></h1></body></html>`
+        )
+      ).toMatchObject({ noResults: true, blocked: false });
+    });
+
     it('is not fooled by a results page that mentions a captcha', () => {
       const page = parseDuckDuckGoPage(fixture('duckduckgo-results.html'));
       expect(page.blocked).toBe(false);

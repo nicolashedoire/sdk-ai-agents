@@ -183,6 +183,28 @@ describe('a study whose prior-art searches are throttled', () => {
     });
   }, 60_000);
 
+  it('never tries again sooner than a service asked, when that is longer than a study waits', async () => {
+    duckDuckGoServer((_request, response) => {
+      response.writeHead(429, { 'content-type': 'text/html', 'retry-after': '600' }).end('');
+    }, 600_000);
+    const started = Date.now();
+
+    const { report } = await runStudy();
+
+    expect(Date.now() - started).toBeLessThan(20_000);
+    const priorArt = report.searches.filter((search) => search.purpose === 'priorArt');
+    expect(priorArt.length).toBeGreaterThan(0);
+    expect(priorArt.every((search) => search.throttled && !search.retry)).toBe(true);
+    const priorArtHits = server
+      .hits('/html/')
+      .filter((request) => (new URLSearchParams(request.body).get('q') ?? '').startsWith('prior art'));
+    expect(priorArtHits).toHaveLength(1);
+    expect(report.noveltyClaims[0]).toMatchObject({
+      toVerify: true,
+      statusReason: { code: 'priorArtSearchFailed' },
+    });
+  }, 60_000);
+
   it('does not try again a search that failed for another reason', async () => {
     duckDuckGoServer(reply('down', { status: 500, type: 'text/plain' }), 600_000);
 

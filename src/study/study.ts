@@ -1244,22 +1244,23 @@ export class Study {
       if (entry.throttled) throttled.push({ search, entry });
     }
     // A throttle is transient: a novelty check must not be lost to one. The searches it failed
-    // are tried once more, after the wait the services asked for, if the run has time left.
-    const wait = Math.min(
-      Math.max(
-        STUDY_THROTTLE_WAIT_MS,
-        ...throttled.map(({ entry }) => this.throttleWaits.get(entry) ?? 0)
-      ),
-      STUDY_MAX_THROTTLE_WAIT_MS
-    );
-    if (
-      throttled.length > 0 &&
-      run.searchesLeft > 0 &&
-      Date.now() + wait + STUDY_TIME_AFTER_RETRY_MS <= run.deadline
-    ) {
-      await pause(wait, run.signal).catch(() => run.checkpoint());
+    // are tried once more, after the wait their services asked for, when the run has time left
+    // for it and for the second tries. A service that asked for more than a study waits
+    // (150 s), or for more than the run has left, is never tried again sooner than it asked:
+    // its claims stay to verify.
+    const room = run.deadline - Date.now() - STUDY_TIME_AFTER_RETRY_MS;
+    const waitFor = (entry: StudySearch) =>
+      Math.max(STUDY_THROTTLE_WAIT_MS, this.throttleWaits.get(entry) ?? 0);
+    const retried = throttled.filter(({ entry }) => {
+      const wait = waitFor(entry);
+      return wait <= STUDY_MAX_THROTTLE_WAIT_MS && wait <= room;
+    });
+    if (retried.length > 0 && run.searchesLeft > 0) {
+      await pause(Math.max(...retried.map(({ entry }) => waitFor(entry))), run.signal).catch(() =>
+        run.checkpoint()
+      );
       run.checkpoint();
-      for (const { search } of throttled) {
+      for (const { search } of retried) {
         if (!search.claim) continue;
         count(search.claim, await this.search(run, 'design', 'priorArt', search, { retry: true }));
       }
@@ -1470,10 +1471,9 @@ function claimedNovelty(claim: StudyClaim): ClaimedNovelty {
   };
 }
 
-/** Why a search failed: the tool's own error, not only the governed pipeline's wrapper. */
 /** How long a study waits before a throttled prior-art search's second try, at least. */
 const STUDY_THROTTLE_WAIT_MS = 5_000;
-/** How long at most, whatever the services asked. */
+/** The longest wait a study gives a service: one that asks for more is not tried again. */
 const STUDY_MAX_THROTTLE_WAIT_MS = 150_000;
 /** The time the run must still have after that wait for the second tries to be made. */
 const STUDY_TIME_AFTER_RETRY_MS = 60_000;
@@ -1516,6 +1516,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+/** Why a search failed: the tool's own error, not only the governed pipeline's wrapper. */
 function searchError(error: unknown): string {
   let cause = error;
   while (cause instanceof SDKError && cause.originalError && cause.originalError !== cause) {
