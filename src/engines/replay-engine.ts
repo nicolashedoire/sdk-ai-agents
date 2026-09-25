@@ -12,6 +12,7 @@ import type {
 } from '../types/run.js';
 import { generateEventId, generateRunId } from '../utils/id.js';
 import { modelCallsOf } from '../costs/run-cost.js';
+import { stableJson } from '../utils/stable-json.js';
 import { uniqueById } from '../utils/unique-events.js';
 import { tokensOfUsage } from '../utils/usage-tokens.js';
 import { type ActionEngine, TOOL_APPROVAL_POLICY } from './action-engine.js';
@@ -333,15 +334,6 @@ function toolCallOfEvent(data: unknown): { toolName: string; parameters: unknown
   } catch {
     return undefined;
   }
-}
-
-/** JSON with sorted keys, to compare parameters whatever their key order. */
-function stableJson(value: unknown): string {
-  return JSON.stringify(value, (_key, item: unknown) =>
-    typeof item === 'object' && item !== null && !Array.isArray(item)
-      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
-      : item
-  );
 }
 
 /** Tools a cognitive run was restricted to, as recorded in its `cognition.started` event. */

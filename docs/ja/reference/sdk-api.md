@@ -287,7 +287,7 @@ interface ModelCostLine {
 | `ThinkInput.onEvent`：`agent.think({ problem, onEvent })` | 認知エージェントの実行について同じ。その `limits.timeoutMs` でも待機が終わる |
 | `replay(runId, modifications?, { onEvent })` | リプレイについて同じ。リプレイはキャンセルできないので、必ず待つ |
 | `executeTool(name, params, { onEvent })` | 呼び出しのイベントと、そのツールが開始する実行のイベント（1 階層分まで）。ハンドラーはリスナーを `context.onEvent` として受け取り、`governedAgentTool` と `cognitiveAgentTool` はそれを自分のエージェントに渡す（リアルタイムのイベントに対応していないストアの上に手作業で組み立てたエージェントは、リスナーなしで動く）。`signal` で待機が終わる |
-| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`：フィルターに一致するすべての実行のすべてのイベント（`agentId` は `metadata.agentId`）。返された関数を呼び出すまで続き、その関数を呼び出すと、まだ配信されていないイベントは破棄される |
+| `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`：フィルターに一致するすべての実行のすべてのイベント（`agentId` は `metadata.agentId`）。返された関数を呼び出すまで続き、その関数を呼び出すと、まだ配信されていないイベントは破棄される。リグレッションスイートの実行とリプレイも実際の実行なので、そのイベントもリスナーに届く（スイートは入力の `onEvent` と `onText` を保存しない） |
 | `new ObservedEventStore(store, { onListenerError? })` | イベントを配信する層。SDK は自分のストアをこれでラップするか、`eventStore` として渡されたものを使う（`MonitoredEventStore` の中にあるものも含む。その場合、そのインシデント報告も配信される）。その `subscribe(listener, options?)` は `{ unsubscribe(), close() }` を返す。`close()` は、リスナーがすでに受け取ったイベントの処理を終えるまで待つ。`onListenerError` は、リスナーのエラーとイベントの破棄を受け取る |
 
 ## ツール：`ToolDefinition` {#tools-tooldefinition}

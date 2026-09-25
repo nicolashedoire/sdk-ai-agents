@@ -504,20 +504,7 @@ export class SQLEventStore implements IEventStore {
    * Returns a BackupData object that can be used to restore the events.
    */
   async backup(): Promise<BackupData> {
-    const sql = `SELECT * FROM ${this.tableName} ORDER BY timestamp ASC`;
-    const rows = await this.connection.query<{
-      id: string;
-      run_id: string;
-      type: string;
-      timestamp: number;
-      data: string;
-      metadata: string | null;
-    }>(sql);
-
-    const events = rows.map((row) => ({
-      runId: row.run_id,
-      event: this.rowToEvent(row),
-    }));
+    const events = await this.backupEvents();
 
     // Try to get runs information if runs table exists
     let runs: BackupData['runs'] | undefined;
@@ -542,6 +529,23 @@ export class SQLEventStore implements IEventStore {
       events,
       runs,
     };
+  }
+
+  /**
+   * Every event, in the order `queryEvents` returns them: by time, the events of one millisecond
+   * by run, then in the order their run recorded them. `restore` appends them in this order, so
+   * each run keeps its own.
+   */
+  protected async backupEvents(): Promise<BackupData['events']> {
+    const rows = await this.connection.query<{
+      id: string;
+      run_id: string;
+      type: string;
+      timestamp: number;
+      data: string;
+      metadata: string | null;
+    }>(`SELECT * FROM ${this.tableName} ORDER BY timestamp ASC, run_id ASC, rowid ASC`);
+    return rows.map((row) => ({ runId: row.run_id, event: this.rowToEvent(row) }));
   }
 
   /**

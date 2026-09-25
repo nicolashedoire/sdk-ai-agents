@@ -236,6 +236,31 @@ describe('configHash', () => {
     expect(hashOf({ tools: [tool(11n)] })).not.toBe(small);
   });
 
+  it('hashes tool metadata whose toJSON returns the object itself', () => {
+    const metadata = (team: string): Record<string, unknown> => ({
+      owner: {
+        team,
+        toJSON() {
+          return this;
+        },
+      },
+    });
+    const tool = (team: string) =>
+      defineTool({
+        name: 'refund',
+        description: 'Refunds an order',
+        schema: z.object({}),
+        handler: async () => 'ok',
+        metadata: metadata(team),
+      });
+
+    // Before: "Maximum call stack size exceeded" from createAgent.
+    const billing = hashOf({ tools: [tool('billing')] });
+    expect(billing).toMatch(/^[0-9a-f]{16}$/);
+    expect(hashOf({ tools: [tool('billing')] })).toBe(billing);
+    expect(hashOf({ tools: [tool('support')] })).not.toBe(billing);
+  });
+
   it('follows setPolicy and addTools, and each run records the hash it started with', async () => {
     const greeter = env.sdk.createAgent({ name: 'greeter', model: 'test-model' });
     const [before] = await runTwice(env, greeter);

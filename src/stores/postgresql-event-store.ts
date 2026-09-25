@@ -80,6 +80,16 @@ export class PostgreSQLEventStore extends SQLEventStore {
     // The order events were appended in: events of the same millisecond have random ids, and a
     // table has no order of its own. Tables created by earlier versions get the column here.
     const addSequenceSQL = `ALTER TABLE ${this.tableName} ADD COLUMN IF NOT EXISTS seq BIGSERIAL`;
+    // PostgreSQL 12 and earlier create the column's sequence even when IF NOT EXISTS skips the
+    // column: the column is looked up first, so a start leaves no unused sequence behind. The
+    // table name is not quoted in the SQL, so PostgreSQL folds it to lower case; without a
+    // schema, it is in the first schema of the search path (where CREATE TABLE put it).
+    const findSequenceSQL = `SELECT 1 FROM information_schema.columns
+      WHERE table_schema = COALESCE($1, current_schema()) AND table_name = $2 AND column_name = 'seq'`;
+    const tableParams = [
+      this.schemaName?.toLowerCase() ?? null,
+      this.unqualifiedTableName.toLowerCase(),
+    ];
 
     // Create indexes for common queries
     const createIndexesSQL = [
@@ -109,7 +119,9 @@ export class PostgreSQLEventStore extends SQLEventStore {
 
     await connection.execute(createRunsTableSQL);
     await connection.execute(createTableSQL);
-    await connection.execute(addSequenceSQL);
+    if ((await connection.query(findSequenceSQL, tableParams)).length === 0) {
+      await connection.execute(addSequenceSQL);
+    }
 
     for (const indexSQL of createIndexesSQL) {
       await connection.execute(indexSQL);
@@ -398,6 +410,17 @@ export class PostgreSQLEventStore extends SQLEventStore {
 
     const rows = await this.connection.query<{ key: string; count: number }>(sql, params);
     return rows.filter((row) => row.key !== null);
+  }
+
+  /**
+   * Every event, in the order `queryEvents` returns them (see the base class), with the JSONB
+   * and BIGINT columns as node-postgres returns them.
+   */
+  protected async backupEvents(): Promise<BackupData['events']> {
+    const rows = await this.connection.query<PostgreSQLEventRow>(
+      `SELECT * FROM ${this.tableName} ORDER BY timestamp ASC, run_id ASC, seq ASC`
+    );
+    return rows.map((row) => ({ runId: row.run_id, event: toEvent(row) }));
   }
 
   /**

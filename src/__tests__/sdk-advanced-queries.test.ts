@@ -174,16 +174,28 @@ if (nodeSqlite) {
 class RecordingPostgreSQLPool implements PostgreSQLPool {
   readonly statements: Array<{ sql: string; params: unknown[] }> = [];
 
-  constructor(private readonly rows: Array<Record<string, unknown>>) {}
+  /** `hasSequence`: the table already has its `seq` column (information_schema lists it). */
+  constructor(
+    private readonly rows: Array<Record<string, unknown>>,
+    private readonly hasSequence = false
+  ) {}
 
   async query(sql: string, params: unknown[] = []): Promise<{ rows: unknown[] }> {
     this.statements.push({ sql: sql.replace(/\s+/g, ' ').trim(), params });
+    if (/information_schema\.columns/.test(sql)) {
+      return { rows: this.hasSequence ? [{ '?column?': 1 }] : [] };
+    }
     if (/^\s*SELECT COUNT\(\*\)/.test(sql)) return { rows: [{ count: String(this.rows.length) }] };
     if (/^\s*SELECT \*/.test(sql)) return { rows: this.rows };
     return { rows: [] };
   }
 
   async end(): Promise<void> {}
+}
+
+/** A statement reading events, not one of the store's schema. */
+function readsEvents(statement: { sql: string }): boolean {
+  return /^SELECT (\*|COUNT)/.test(statement.sql);
 }
 
 describe('advanced queries on PostgreSQL', () => {
@@ -212,7 +224,7 @@ describe('advanced queries on PostgreSQL', () => {
 
       // Before, the values were sent twice ("bind message supplies 6 parameters") and the
       // JSONB objects went through JSON.parse.
-      const reads = pool.statements.filter((statement) => statement.sql.startsWith('SELECT'));
+      const reads = pool.statements.filter(readsEvents);
       expect(reads).toEqual([
         {
           sql: "SELECT * FROM events WHERE 1=1 AND type = $1 AND timestamp >= $2 AND metadata->>'agentId' = $3 ORDER BY timestamp ASC, run_id ASC, seq ASC",
@@ -249,7 +261,7 @@ describe('advanced queries on PostgreSQL', () => {
 
       expect(count).toBe(1);
       // Before, each call also ran SELECT COUNT(*) for a total nobody read.
-      expect(pool.statements.filter((statement) => statement.sql.startsWith('SELECT'))).toEqual([
+      expect(pool.statements.filter(readsEvents)).toEqual([
         {
           sql: 'SELECT * FROM events WHERE 1=1 AND type = $1 ORDER BY timestamp ASC, run_id ASC, seq ASC',
           params: ['tool.called'],
@@ -284,7 +296,7 @@ describe('advanced queries on PostgreSQL', () => {
 
       // Before: data->>'${field}' written into the SQL, JSON.stringify("churn") compared with
       // the text '"churn"' (never equal), gt/contains and metadataQuery silently ignored.
-      expect(pool.statements.filter((statement) => statement.sql.startsWith('SELECT'))).toEqual([
+      expect(pool.statements.filter(readsEvents)).toEqual([
         {
           sql: 'SELECT * FROM events WHERE 1=1 AND (data #> $1::text[]) = $2::jsonb AND ((metadata #> $3::text[]) = $4::jsonb) IS NOT TRUE ORDER BY timestamp ASC, run_id ASC, seq ASC',
           params: [['parameters', 'metric'], '"churn"', ['agentVersion'], '"1.0.0"'],
@@ -322,7 +334,7 @@ describe('advanced queries on PostgreSQL', () => {
       });
 
       expect(count).toBe(1);
-      expect(pool.statements.filter((statement) => statement.sql.startsWith('SELECT'))).toEqual([
+      expect(pool.statements.filter(readsEvents)).toEqual([
         {
           sql: 'SELECT * FROM events WHERE 1=1 ORDER BY timestamp ASC, run_id ASC, seq ASC',
           params: [],
@@ -597,6 +609,39 @@ if (nodeSqlite) {
     const store = new SQLiteEventStore({ db: new nodeSqlite.DatabaseSync(':memory:') });
     return { store, dispose: () => store.close() };
   });
+
+  describe('a SQLite backup', () => {
+    it('keeps the order of events recorded in the same millisecond', async () => {
+      const source = new SQLiteEventStore({ db: new nodeSqlite.DatabaseSync(':memory:') });
+      const copy = new SQLiteEventStore({ db: new nodeSqlite.DatabaseSync(':memory:') });
+      const steps = (events: Event[]) => events.map((event) => [event.runId, event.data.step]);
+      try {
+        // Two runs recording in the same millisecond, their events interleaved.
+        const runs = [sameMillisecond('run_b', 10), sameMillisecond('run_a', 10)];
+        for (let step = 0; step < 10; step++) {
+          for (const run of runs) {
+            const event = run[step];
+            if (event) await source.append(event.runId, event);
+          }
+        }
+        const queried = steps((await source.queryEvents({})).events);
+
+        const backup = await source.backup();
+        await copy.restore(backup);
+
+        // Before, the backup was ordered by time only: the events of one millisecond came in
+        // the order the database happened to read them, which a restore then kept.
+        expect(steps(backup.events.map(({ event }) => event))).toEqual(queried);
+        expect(steps((await copy.queryEvents({})).events)).toEqual(queried);
+        expect(steps(await copy.getEvents('run_b'))).toEqual(
+          steps(await source.getEvents('run_b'))
+        );
+      } finally {
+        await source.close();
+        await copy.close();
+      }
+    });
+  });
 }
 
 describe('the order of events on PostgreSQL', () => {
@@ -610,9 +655,71 @@ describe('the order of events on PostgreSQL', () => {
       const statements = pool.statements.map((statement) => statement.sql);
       // Tables of earlier versions get the column when the store starts.
       expect(statements).toContain('ALTER TABLE events ADD COLUMN IF NOT EXISTS seq BIGSERIAL');
-      expect(statements.filter((sql) => sql.startsWith('SELECT'))).toEqual([
+      expect(statements.filter((sql) => sql.startsWith('SELECT *'))).toEqual([
         'SELECT * FROM events WHERE run_id = $1 ORDER BY timestamp ASC, seq ASC',
         'SELECT * FROM events WHERE 1=1 ORDER BY timestamp ASC, run_id ASC, seq ASC',
+      ]);
+    } finally {
+      await store.close();
+    }
+  });
+
+  it('adds the sequence column only to a table that has none', async () => {
+    const lookup =
+      "SELECT 1 FROM information_schema.columns WHERE table_schema = COALESCE($1, current_schema()) AND table_name = $2 AND column_name = 'seq'";
+    const schemaStatements = async (hasSequence: boolean, tableName?: string) => {
+      const pool = new RecordingPostgreSQLPool([], hasSequence);
+      const store = new PostgreSQLEventStore({ pool, ...(tableName ? { tableName } : {}) });
+      await store.getEvents('run_1');
+      await store.close();
+      return pool.statements.filter(({ sql }) => /^ALTER TABLE|information_schema/.test(sql));
+    };
+
+    // Before, ALTER TABLE … ADD COLUMN IF NOT EXISTS ran at every start: PostgreSQL 12 and
+    // earlier then created a sequence the existing column never used.
+    expect(await schemaStatements(true)).toEqual([{ sql: lookup, params: [null, 'events'] }]);
+    expect(await schemaStatements(false)).toEqual([
+      { sql: lookup, params: [null, 'events'] },
+      { sql: 'ALTER TABLE events ADD COLUMN IF NOT EXISTS seq BIGSERIAL', params: [] },
+    ]);
+    // PostgreSQL folds the unquoted names to lower case.
+    expect(await schemaStatements(true, 'App.Agent_Events')).toEqual([
+      { sql: lookup, params: ['app', 'agent_events'] },
+    ]);
+  });
+
+  it('backs up every event in the order of queryEvents, read as node-postgres returns them', async () => {
+    const pool = new RecordingPostgreSQLPool([
+      {
+        id: 'evt_1',
+        run_id: 'run_1',
+        type: 'tool.called',
+        timestamp: '1000',
+        data: { toolName: 'lookup_metric' },
+        metadata: { agentId: 'agent-1' },
+      },
+    ]);
+    const store = new PostgreSQLEventStore({ pool });
+    try {
+      const backup = await store.backup();
+
+      // Before: ordered by time only, and JSON.parse of the JSONB objects threw
+      // ('"[object Object]" is not valid JSON').
+      expect(
+        pool.statements.filter(({ sql }) => sql.startsWith('SELECT *')).map(({ sql }) => sql)
+      ).toEqual(['SELECT * FROM events ORDER BY timestamp ASC, run_id ASC, seq ASC']);
+      expect(backup.events).toEqual([
+        {
+          runId: 'run_1',
+          event: {
+            id: 'evt_1',
+            runId: 'run_1',
+            type: 'tool.called',
+            timestamp: 1000,
+            data: { toolName: 'lookup_metric' },
+            metadata: { agentId: 'agent-1' },
+          },
+        },
       ]);
     } finally {
       await store.close();

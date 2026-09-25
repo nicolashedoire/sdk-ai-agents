@@ -38,13 +38,23 @@ describe.skipIf(!url)(
       }
     }
 
-    /** A store whose tables (its events and `runs`) live in the test's schema. */
-    function openStore(tableName?: string): PostgreSQLEventStore {
+    /**
+     * A store whose tables (its events and `runs`) live in the test's schema. `statements`,
+     * when given, receives the text of every statement the store sends.
+     */
+    function openStore(tableName?: string, statements?: string[]): PostgreSQLEventStore {
       const pool = new pg.Pool({
         connectionString: url ?? '',
         options: `-c search_path=${schema}`,
       });
-      return new PostgreSQLEventStore({ pool, ...(tableName ? { tableName } : {}) });
+      const recorded: PostgreSQLPool = {
+        query: (sql, params) => {
+          statements?.push(sql.replace(/\s+/g, ' ').trim());
+          return pool.query(sql, params);
+        },
+        end: () => pool.end(),
+      };
+      return new PostgreSQLEventStore({ pool: recorded, ...(tableName ? { tableName } : {}) });
     }
 
     beforeAll(async () => {
@@ -128,6 +138,57 @@ describe.skipIf(!url)(
         );
       } finally {
         await env.dispose();
+      }
+    });
+
+    it('restores a backup in the order of each run', async () => {
+      const source = openStore('backed_up_events');
+      const copy = openStore('restored_events');
+      const steps = (events: Event[]) => events.map((event) => [event.runId, event.data.step]);
+      try {
+        // Two runs recording in the same millisecond, their events interleaved.
+        for (let step = 0; step < 10; step++) {
+          for (const runId of ['run_backup_b', 'run_backup_a']) {
+            await source.append(runId, {
+              id: generateEventId(),
+              runId,
+              type: 'tool.called',
+              timestamp: 7_000,
+              data: { step },
+            });
+          }
+        }
+        const queried = steps((await source.queryEvents({})).events);
+
+        const backup = await source.backup();
+        await copy.restore(backup);
+
+        // Before, backup() threw: JSON.parse of the JSONB columns node-postgres had parsed.
+        expect(steps(backup.events.map(({ event }) => event))).toEqual(queried);
+        expect(steps((await copy.queryEvents({})).events)).toEqual(queried);
+        expect(steps(await copy.getEvents('run_backup_b'))).toEqual(
+          steps(await source.getEvents('run_backup_b'))
+        );
+      } finally {
+        await source.close();
+        await copy.close();
+      }
+    });
+
+    it('finds the sequence column of an existing table instead of adding it again', async () => {
+      for (const tableName of ['Reopened_Events', `${schema}.Qualified_Events`]) {
+        await openStore(tableName).close();
+        const statements: string[] = [];
+        const reopened = openStore(tableName, statements);
+        try {
+          await reopened.getEvents('run_reopened');
+
+          // Before, ALTER TABLE … ADD COLUMN IF NOT EXISTS ran at every start.
+          expect(statements.filter((sql) => sql.startsWith('ALTER TABLE'))).toEqual([]);
+          expect(statements.some((sql) => sql.includes('information_schema.columns'))).toBe(true);
+        } finally {
+          await reopened.close();
+        }
       }
     });
 
