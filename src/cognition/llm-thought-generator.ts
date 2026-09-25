@@ -166,30 +166,37 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
     });
   }
 
-  /**
-   * One call to the provider, and the model it asked for. A fallback chain may send a fallback
-   * its own default model instead of this generator's: that is what the answer is priced on.
-   */
-  private async complete(request: LLMRequest): Promise<AnsweredAttempt> {
-    if (this.provider instanceof FallbackProvider) {
-      const result = await this.provider.generateCompletionWithFallback(request);
-      return {
-        response: result.response,
-        provider: result.usedProvider,
-        ...(result.requestedModel ? { requestedModel: result.requestedModel } : {}),
-      };
-    }
-    const response = await this.provider.generateCompletion(request);
-    return {
-      response,
-      provider: this.provider.getProviderName(),
-      ...(request.model ? { requestedModel: request.model } : {}),
-    };
+  private complete(request: LLMRequest): Promise<AnsweredAttempt> {
+    return answerWithNames(this.provider, request);
   }
 }
 
+/**
+ * One call to the provider, and the model it asked for. A fallback chain may send a fallback
+ * its own default model instead of the caller's: that is what the answer is priced on.
+ */
+export async function answerWithNames(
+  provider: LLMProvider,
+  request: LLMRequest
+): Promise<AnsweredAttempt> {
+  if (provider instanceof FallbackProvider) {
+    const result = await provider.generateCompletionWithFallback(request);
+    return {
+      response: result.response,
+      provider: result.usedProvider,
+      ...(result.requestedModel ? { requestedModel: result.requestedModel } : {}),
+    };
+  }
+  const response = await provider.generateCompletion(request);
+  return {
+    response,
+    provider: provider.getProviderName(),
+    ...(request.model ? { requestedModel: request.model } : {}),
+  };
+}
+
 /** An attempt a provider answered, and the names its tokens are priced on. */
-interface AnsweredAttempt {
+export interface AnsweredAttempt {
   response: LLMResponse;
   provider: string;
   requestedModel?: string;
@@ -200,7 +207,7 @@ interface AnsweredAttempt {
  * answered under other names (a repair a fallback answered) is not added to it: it is
  * reported with the discarded answers, priced on its own names, as its reply was not used.
  */
-function settleAttempts(
+export function settleAttempts(
   attempts: AnsweredAttempt[],
   discarded: DiscardedAnswer[]
 ): {

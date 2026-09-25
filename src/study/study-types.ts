@@ -1,0 +1,495 @@
+import type { LLMProvider } from '../providers/llm-provider.js';
+import type { LiveEventListener } from '../types/events.js';
+
+/**
+ * The seven passages of the method, in order. They form a loop: a passage may reopen an
+ * earlier one (see `StudyLimits.maxLoops`).
+ */
+export type StudyPassage =
+  | 'observe'
+  | 'decompose'
+  | 'historicalChoices'
+  | 'changes'
+  | 'cross'
+  | 'design'
+  | 'confront';
+
+/**
+ * What a claim is worth, checked by the study rather than trusted to the model:
+ * - `established`: it cites a result the study itself retrieved from a source;
+ * - `hypothesis`: plausible, not documented here;
+ * - `novelty`: a new idea; it stays "to verify" until the study searched for prior art.
+ */
+export type StudyClaimStatus = 'established' | 'hypothesis' | 'novelty';
+
+/** What the closest existing work says of a novelty, after a search for prior art. */
+export interface StudyPriorArt {
+  /** The closest existing work found, or why none is close. */
+  closest: string;
+  /** Results retrieved by the prior-art search that show it. */
+  sources: string[];
+  /** `exists`: the idea is already done, so it is not a novelty. */
+  verdict: 'novel' | 'partlyNovel' | 'exists';
+}
+
+/**
+ * Every item of a study is a claim: a statement with its status, the results it cites and what
+ * it serves in the objective. Ids are given by the study and never reused (`O1`, `A2`, `M1`).
+ */
+export interface StudyClaim {
+  id: string;
+  passage: StudyPassage;
+  statement: string;
+  /** The status after the study's checks. */
+  status: StudyClaimStatus;
+  /** The status the model gave, when the study changed it. */
+  declaredStatus?: StudyClaimStatus;
+  /** Why the status was changed, or why a novelty is still to verify. */
+  statusReason?: string;
+  /** Ids of results retrieved in this study that support it (`S1`…). */
+  sources: string[];
+  /** Ids the model cited that this study never retrieved: they support nothing. */
+  unretrievedSources?: string[];
+  /** Which part of the objective, or which need, it serves, in one sentence. */
+  servesObjective: string;
+  /** A novelty whose prior art was not searched and assessed yet. */
+  toVerify?: boolean;
+  /** The prior art found for a novelty. */
+  priorArt?: StudyPriorArt;
+  /** The guardian has not judged it yet (the run stopped first). */
+  unchecked?: boolean;
+  /** The run that produced it. */
+  runId: string;
+}
+
+export interface StudyObservation extends StudyClaim {
+  kind: 'behaviour' | 'use' | 'variation' | 'failure';
+  /** When, where, for whom and with what it holds. */
+  conditions: string;
+  era?: string;
+}
+
+/** A piece of the object: the map of its working, with its unknowns. */
+export interface StudyPiece extends StudyClaim {
+  name: string;
+  function: string;
+  inputs: string[];
+  outputs: string[];
+  /** The pieces it exchanges with, and how. */
+  relations: string[];
+  /** What stays to open, measure or document. */
+  unknowns: string[];
+  /** The piece it details, when the study went down into an opaque piece. */
+  parent?: string;
+}
+
+/** A stage of the whole chain of the object (for a browser: receive, understand, execute…). */
+export interface StudyChainStage extends StudyClaim {
+  stage: string;
+  pieces: string[];
+}
+
+export type StudyChoiceFactor =
+  | 'hardware'
+  | 'tools'
+  | 'uses'
+  | 'knowledge'
+  | 'costs'
+  | 'compatibility'
+  | 'other';
+
+export interface StudyHistoricalChoice extends StudyClaim {
+  choice: string;
+  piece?: string;
+  /** The conditions of the time it answered. */
+  factors: StudyChoiceFactor[];
+  era?: string;
+}
+
+/** A research result, realisation, library, hardware or method that appeared since. */
+export interface StudyAdvance extends StudyClaim {
+  mechanism: string;
+  date?: string;
+  /** From the object's own domain, or from another one (`field`). */
+  domain: 'object' | 'other';
+  field?: string;
+  evidence: string;
+  conditions: string;
+  availability: string;
+  piece?: string;
+}
+
+/** The verdict on one of the user's leads, which are examples to verify, not truths. */
+export interface StudyLeadVerdict extends StudyClaim {
+  lead: string;
+  verdict: 'relevant' | 'partlyRelevant' | 'notRelevant';
+  reasons: string;
+}
+
+/** A tool the study found beyond the user's leads. */
+export interface StudyIndependentLead extends StudyClaim {
+  tool: string;
+  kind: 'mathematical' | 'technical' | 'other';
+  piece?: string;
+}
+
+/** One of the best current realisations: the reference for "better". */
+export interface StudyReference extends StudyClaim {
+  name: string;
+  piece?: string;
+  date?: string;
+}
+
+export interface StudyConstraint extends StudyClaim {
+  constraint: string;
+  state: 'remains' | 'weakened' | 'newRequirement';
+  piece?: string;
+}
+
+export interface StudyRevisableDecision extends StudyClaim {
+  decision: string;
+  /** The condition that changed. */
+  because: string;
+  /** The possibility it opens. */
+  opens: string;
+}
+
+/** A combination A + B. */
+export interface StudyCombination extends StudyClaim {
+  a: string;
+  b: string;
+  /** What A lets B do. */
+  enables: string;
+  /** What they must exchange. */
+  exchange: string;
+  /** What it costs: conversions, synchronisation. */
+  cost: string;
+  /** What it changes in the object, if anything. */
+  changes: Array<'representation' | 'distribution' | 'responsibilities'>;
+}
+
+export interface StudyArchitecture extends StudyClaim {
+  name: string;
+  mechanism: string;
+  conditions: string;
+  benefit: string;
+  addedCost: string;
+  counterexample: string;
+  /** How it covers each stage of the whole chain. */
+  chain: Array<{ stage: string; how: string }>;
+  /** Stages of the chain (passage `decompose`) it does not cover, as the study checked. */
+  uncoveredStages: string[];
+  predictions: string[];
+}
+
+/** One of the three states of a piece. */
+export interface StudyThreeState extends StudyClaim {
+  piece: string;
+  state: 'atItsTime' | 'currentBest' | 'proposal';
+  architecture?: string;
+}
+
+/** What is novel in the design (status `novelty`) and what is not (any other status). */
+export interface StudyNoveltyClaim extends StudyClaim {
+  architecture?: string;
+}
+
+export interface StudyExperiment extends StudyClaim {
+  name: string;
+  /** The architectures it decides between. */
+  architectures: string[];
+  protocol: string;
+  measures: string[];
+  criteria: string[];
+  expected: Array<{ architecture: string; result: string }>;
+  /** It tests the whole chain, not one mechanism. */
+  wholeChain: boolean;
+}
+
+/**
+ * The reusable card of a mechanism (11 fields). The study fills fields 1 to 9; fields 10 and 11
+ * stay empty until the user records the result of an experiment they ran (`recordResult`).
+ */
+export interface MechanismCard extends StudyClaim {
+  observation: string;
+  mechanism: string;
+  unknown: string;
+  historicalChoice: string;
+  evolution: string;
+  newPossibility: string;
+  proposedCombination: string;
+  prediction: string;
+  experiment: string;
+  /** Field 10: what was found, and where the explanation fails. */
+  resultAndError?: { result: string; error?: string };
+  /** Field 11: what is kept, what changes, where the mechanism could be reused. */
+  conclusionAndMemory?: string;
+  /** When the user recorded fields 10 and 11. */
+  resultRecordedAt?: number;
+}
+
+/** A result a source returned, numbered once for the whole study. */
+export interface StudySearchResult {
+  /** `S1`, `S2`…: the same result found again keeps its id. */
+  id: string;
+  title: string;
+  /** Its URL, or another locator when the source gives none. */
+  locator: string;
+  date?: string;
+  excerpt: string;
+  /** The source tool that returned it first, and the query. */
+  tool: string;
+  query: string;
+  runId: string;
+}
+
+/** A search the study asked for: run, failed, or skipped past `maxSearches`. */
+export interface StudySearch {
+  passage: StudyPassage;
+  /** `priorArt`: looking for work that already does a novelty. */
+  purpose: 'research' | 'priorArt';
+  tool: string;
+  query: string;
+  servesObjective: string;
+  /** The novelty claims whose prior art it looks for. */
+  claims?: string[];
+  resultIds: string[];
+  error?: string;
+  skipped?: 'maxSearches';
+  runId: string;
+}
+
+/** An item removed for leaving the objective, or refused by the schema. */
+export interface StudyDriftEntry {
+  passage: StudyPassage;
+  collection: string;
+  /** The item as the model gave it. */
+  item: { id?: string; statement?: string; servesObjective?: string };
+  reason: string;
+  /** `guardian`: judged off the objective; `schema`: refused before (no `servesObjective`…). */
+  by: 'guardian' | 'schema';
+  /** 2 when the passage was redone. */
+  attempt: number;
+  runId: string;
+}
+
+export type StudyAmendmentVerdict = 'refines' | 'conflicts' | 'changesObjective' | 'unclassified';
+
+/**
+ * An instruction added after creation, classified against the charter: only `refines` is
+ * accepted; it is numbered and shown under the charter in every later prompt.
+ */
+export interface StudyAmendment {
+  /** The number of an accepted amendment, from 1. */
+  number?: number;
+  text: string;
+  verdict: StudyAmendmentVerdict;
+  accepted: boolean;
+  reason: string;
+  /** The run that recorded its classification. */
+  runId: string;
+}
+
+/**
+ * The frozen frame of a study: every prompt starts with it. Changing the objective means a new
+ * study.
+ */
+export interface StudyCharter {
+  readonly object: string;
+  /** The guiding question (the method's, in the study's language, by default). */
+  readonly question: string;
+  readonly objective: string;
+  /** Needs and criteria of today: interactions, accessibility, compatibility… */
+  readonly needs: readonly string[];
+  /** The user's leads: examples to verify, not truths. */
+  readonly leads: readonly string[];
+  readonly scope: { readonly exclude: readonly string[] };
+}
+
+export interface StudyLimits {
+  /** Model calls per run, repairs and checks included (default 60). */
+  maxModelCalls: number;
+  /** Searches per run (default 20). Past it, the study goes on without new results. */
+  maxSearches: number;
+  /** Earlier passages a run may reopen (default 1). */
+  maxLoops: number;
+  /** Length of a run in milliseconds (default 20 minutes). */
+  timeoutMs: number;
+  /** Results kept from one search (default 5). */
+  maxResultsPerSearch: number;
+}
+
+export interface StudyConfig {
+  /** A short name for the study (recorded with its events). */
+  name: string;
+  /** The object to understand and redesign. */
+  object: string;
+  /** What the study must deliver. It never changes: a new objective is a new study. */
+  objective: string;
+  /** Defaults to the method's guiding question, in `language`. */
+  question?: string;
+  needs?: string[];
+  /** Your leads, to verify: the study also looks beyond them. */
+  leads?: string[];
+  scope?: { exclude?: string[] };
+  /**
+   * Names of SDK tools the study searches with (typically tools of an MCP search server added
+   * with `connectMcpServer` and `sdk.defineTool`). They run through `executeTool`, governed.
+   * Without sources, no claim can be established.
+   */
+  sources?: string[];
+  /** Model of every call (the provider's default when omitted). */
+  model?: string;
+  /** A provider for this study instead of the SDK's. */
+  llmProvider?: LLMProvider;
+  /** Language of the texts and of the dossier (`en` by default; `fr`, `de`…). */
+  language?: string;
+  limits?: Partial<StudyLimits>;
+  /**
+   * Share of a passage's items that may be rejected (off the objective, or refused by the
+   * schema) before the passage is redone once with the rejections as feedback (default 1/3).
+   */
+  driftThreshold?: number;
+  /** Sampling temperature of the passages (default 0.4). Checks run at 0. */
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface StudyRunOptions {
+  /** Cancels the run when aborted: it ends as `cancelled`, with the report of what was done. */
+  signal?: AbortSignal;
+  /**
+   * Called with every event of the run, in order, once the event store has accepted it, as
+   * with `agent.run`: a promise it returns is awaited before its next event.
+   */
+  onEvent?: LiveEventListener;
+  /** Runs every passage again, instead of resuming at the first one not complete. */
+  restart?: boolean;
+}
+
+/**
+ * `completed`: every passage ran. `stopped`: a limit or a policy ended the run (`stoppedBy`).
+ * `failed`: an error ended it. `cancelled`: its signal did. The report keeps what was done.
+ */
+export type StudyStatus = 'completed' | 'stopped' | 'failed' | 'cancelled';
+
+export type StudyStopReason = 'maxModelCalls' | 'timeoutMs' | 'policy';
+
+export interface StudyPassageState {
+  passage: StudyPassage;
+  /** `unchecked`: it has items the guardian did not judge yet. */
+  state: 'complete' | 'unchecked' | 'notRun';
+  /** Times it was generated in its last run: 2 when the guardian made it redo. */
+  attempts: number;
+  /** The passages that reopened it (loops). */
+  reopenedBy: StudyPassage[];
+  runId?: string;
+}
+
+export type StudyNoticeCode =
+  | 'noSources'
+  | 'stopped'
+  | 'failed'
+  | 'cancelled'
+  | 'passagesNotRun'
+  | 'uncheckedItems'
+  | 'searchesSkipped'
+  | 'leadsNotVerified'
+  | 'noveltiesToVerify';
+
+/** What the reader must know before reading the dossier. */
+export interface StudyNotice {
+  code: StudyNoticeCode;
+  message: string;
+  /** The passages, leads or limit concerned. */
+  details?: string[];
+}
+
+/** For each piece, the object at its time, the best current realisations and our proposal. */
+export interface StudyPieceStates {
+  piece: string;
+  atItsTime: StudyThreeState[];
+  currentBest: StudyThreeState[];
+  proposal: StudyThreeState[];
+}
+
+export interface StudyStats {
+  runs: number;
+  modelCalls: number;
+  searches: number;
+  searchesSkipped: number;
+  results: number;
+  items: number;
+  /** Items removed: off the objective (guardian) or refused by the schema. */
+  rejected: number;
+  byStatus: Record<StudyClaimStatus, number>;
+  /** Claims whose declared status the study lowered. */
+  downgraded: number;
+  noveltiesToVerify: number;
+  /** Passages redone after the guardian rejected too many items. */
+  redos: number;
+  /** Earlier passages reopened. */
+  loops: number;
+}
+
+export interface StudyReport {
+  studyId: string;
+  name: string;
+  language: string;
+  charter: StudyCharter;
+  /** SHA-256 of the charter, recorded in `study.started`. */
+  charterHash: string;
+  /** Accepted and refused amendments, in order. */
+  amendments: StudyAmendment[];
+  /** Status of the last run (`notRun` before the first). */
+  status: StudyStatus | 'notRun';
+  stoppedBy?: StudyStopReason;
+  error?: string;
+  notices: StudyNotice[];
+  passages: StudyPassageState[];
+  observations: StudyObservation[];
+  /** The component map, with the unknowns of each piece. */
+  pieces: StudyPiece[];
+  chain: StudyChainStage[];
+  threeStates: StudyPieceStates[];
+  historicalChoices: StudyHistoricalChoice[];
+  advances: StudyAdvance[];
+  leadVerdicts: StudyLeadVerdict[];
+  /** The user's leads that received no verdict. */
+  unverifiedLeads: string[];
+  independentLeads: StudyIndependentLead[];
+  references: StudyReference[];
+  constraints: StudyConstraint[];
+  revisableDecisions: StudyRevisableDecision[];
+  combinations: StudyCombination[];
+  architectures: StudyArchitecture[];
+  noveltyClaims: StudyNoveltyClaim[];
+  experiments: StudyExperiment[];
+  cards: MechanismCard[];
+  results: StudySearchResult[];
+  searches: StudySearch[];
+  driftLog: StudyDriftEntry[];
+  stats: StudyStats;
+  /** The runs of the study, oldest first. */
+  runIds: string[];
+}
+
+export interface StudyResult {
+  runId: string;
+  status: StudyStatus;
+  stoppedBy?: StudyStopReason;
+  error?: Error;
+  report: StudyReport;
+  /** The report as a readable dossier, in the study's language. */
+  markdown: string;
+}
+
+/** The result of an experiment the user ran: fields 10 and 11 of a card. */
+export interface StudyExperimentOutcome {
+  /** What was found. */
+  result: string;
+  /** Where the explanation fails. */
+  error?: string;
+  /** What is kept, what changes, where the mechanism could be reused. */
+  conclusion?: string;
+}
