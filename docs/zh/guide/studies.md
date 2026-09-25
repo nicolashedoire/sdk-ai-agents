@@ -112,7 +112,7 @@ await study.recordResult('M1', {
 
 你可以在章程中写明你所追求的能力（`capability`）；此后每个 prompt 都会带上它。如果没有写明，`cross` 环节就必须至少提出一个候选能力（`capabilities`，`Y1`……），说明它为谁服务、为什么今天很难做到，以及哪项原理会改变。
 
-守护者（参见[守护者](#the-guardian)）能看到每种架构的机制、组件和组装，并分开评判两件事：它是否服务于目标，以及它是否开启了一项新能力。被它认为只是更快或更便宜的能力会变成 `improvement`，并用 `declaredKind: 'capability'` 表明模型当初的主张，用 `kindReason` 说明原因，同时产生一个 `study.capability_demoted` 事件。服务于目标的改进会被保留：它排在能力之后，从不因为是改进而被移除。完全没有能力的设计整体上偏离了目标：它会被记入偏离日志并重做一次；如果重做后仍然没有，报告会指出这一点（提示 `noCapability`），而如果守护者一种架构都没有保留，报告也会指出这一点（提示 `noDesign`）。在报告中，**能力在前，改进在后**。
+守护者（参见[守护者](#the-guardian)）能看到每种架构的机制、组件和组装，并分开评判两件事：它是否服务于目标，以及它是否开启了一项新能力。被它认为只是更快或更便宜的能力会变成 `improvement`，并用 `declaredKind: 'capability'` 表明模型当初的主张，用 `kindReason` 说明原因，同时产生一个 `study.capability_demoted` 事件。服务于目标的改进会被保留：它排在能力之后，从不因为是改进而被移除。完全没有能力的设计整体上偏离了目标：它会被记入偏离日志并重做一次；如果重做后仍然没有，报告会指出这一点（提示 `noCapability`），而如果守护者一种架构都没有保留，报告也会指出这一点（提示 `noDesign`）。如果现有技术搜索发现某项能力的组装已经有人做过，它仍然是能力，但不再是新的：参见[现有技术](#prior-art)。在报告中，**新能力在前，然后是组装已经存在的能力，最后是改进**。
 
 ### 新意在于组装 {#novelty-lies-in-the-assembly}
 
@@ -146,7 +146,7 @@ await study.recordResult('M1', {
 
 研究为另一个环节检索到的结果是不够的：模型必须在写出这条论断的那个 prompt 中看到过它。架构的组件也遵循同样的规则。研究无法读懂的状态按 `hypothesis` 计算，绝不会按更强的状态计算。**没有来源，就什么也无法确立**：每条论断最多只是假设，任何创新点都无法核查，报告会在它的第一条提示中说明这一点（`noSources`）。
 
-研究给出的每一个原因——状态为什么被降低、条目为什么被移除、修正案为什么被拒绝——都是一个 `StudyReason`：一个 `code`（例如 `citesUnlisted` 或 `noveltyNoResult`）、它的 `params`，以及用英文表述的同一个原因（`message`）。档案会用研究的语言写出它；守护者或模型写下的原因，代码为 `judged`，其文本在 `params.text` 中。
+研究给出的每一个原因——状态为什么被降低、条目为什么被移除、修正案为什么被拒绝——都是一个 `StudyReason`：一个 `code`（例如 `citesUnlisted` 或 `priorArtNoResult`）、它的 `params`，以及用英文表述的同一个原因（`message`）。档案会用研究的语言写出它；守护者或模型写下的原因，代码为 `judged`，其文本在 `params.text` 中。
 
 ### 现有技术 {#prior-art}
 
@@ -155,9 +155,9 @@ await study.recordResult('M1', {
 - `novel` 或 `partlyNovel`：创新点仍然是创新点，不再需要核查，并附有它的 `priorArt`（`closest`、`sources`、`verdict`）；
 - `exists`：这个想法已经有人做过；创新点变成 `hypothesis`，`statusReason` 会指出最接近的工作。
 
-不是创新点的架构，它的现有技术也会被记录下来，而它的状态不会改变：研究只会降低状态，从不提高状态。
+不是创新点的能力，它的现有技术也会被记录下来，而它的状态不会改变：研究只会降低状态，从不提高状态。当它的组装已经存在时，它保持 `kind: 'capability'`，它的 `priorArtReason` 会指出这一点（`assemblyExists`，并附上最接近的工作），它排在其他能力之后、改进之前（提示 `capabilitiesExist`）。
 
-如果一个创新点的现有技术无法被搜索或评估，它就仍然有待核查，它的 `statusReason` 会说明原因：没有来源（`noveltyNoSource`）、没有为它请求搜索（`noveltyNotSearched`）、它的搜索失败了（`noveltySearchFailed`）或什么也没找到（`noveltyNoResult`）、搜索预算用完了（`noveltySearchBudget`）、它的结果没有被评估（`noveltyNotAssessed`），或者核查没有引用它自己的任何结果（`noveltyUnsupported`）。在设计之后才提出的创新点也仍然有待核查。报告会统计这些创新点（提示 `noveltiesToVerify`）。
+如果一条论断的现有技术无法被搜索或评估，它就仍然有待核查（`toVerify`），并说明原因：对于创新点，原因写在它的 `statusReason` 中；对于其他状态的能力，原因写在它的 `priorArtReason` 中。这些原因是：它的搜索还没有运行（`priorArtNotSearchedYet`）、没有来源（`priorArtNoSource`）、没有为它请求搜索（`priorArtNotSearched`）、它的搜索失败了（`priorArtSearchFailed`）或什么也没找到（`priorArtNoResult`）、搜索预算用完了（`priorArtSearchBudget`）、它的结果没有被评估（`priorArtNotAssessed`），或者核查没有引用它自己的任何结果（`priorArtUnsupported`）。在设计之后才提出的创新点也仍然有待核查。报告会统计这些论断（提示 `noveltiesToVerify` 和 `capabilitiesToVerify`）。
 
 ## 通过你的来源开展研究 {#research-through-your-sources}
 
@@ -185,11 +185,11 @@ const study = sdk.createStudy({ name: 'browser', object, objective, sources });
 - **在创建研究时检查。** 如果某个来源不是已定义的工具，或者不接受文本查询，`createStudy` 会抛出 `ValidationError`。查询放在工具的 `query` 参数中，或者放在另一个常见名称的参数中（`q`、`search`、`keywords`……），否则放在它唯一必需的文本参数中，再否则放在它的第一个文本参数中。
 - **受治理。** 每次搜索都通过 `sdk.executeTool` 执行，以研究的 `id` 作为智能体 id，并且只允许使用这些来源：允许列表、策略、预算、审批、重试和追踪记录都像对任何工具调用一样适用，工具事件（`action.executing`、`policy.checked`、`tool.called`、`action.executed`）会记录在研究的运行中。失败的搜索，或者被策略拒绝的搜索，会连同它的错误一起被记录下来，研究继续进行。
 - **何时搜索。** 在 `historicalChoices` 之前和 `changes` 之前，模型会请求该环节所需的搜索——对于 `changes`：核实你的每条线索，在它们之外寻找其他工具，找出当前最好的实现，以及为组装式突破寻找文献依据。在 `design` 之后，它会搜索各创新点的现有技术。一次最多请求六次搜索。
-- **编号的结果。** 无论结果是什么形状（列表；包含列表的对象，例如 `results` 或 `items`；JSON 文本；MCP 文本部分；由 `Title:`、`Description:` 和 `URL:` 行组成的块写成的文本——每块一个结果，MCP 搜索服务器常常这样应答——或者纯文本），研究都能读取。它会保留标题、URL 或其他定位符、给出时的日期以及一段摘录，每一项各占一行，并在整个研究范围内只编号一次，直到重新开始为止：再次找到的同一个结果（按其定位符判断）保留原来的 id。每次搜索它保留 `limits.maxResultsPerSearch` 个结果（默认 5 个）。
-- **作为数据呈现。** prompt 把它可以引用的结果列成一个 JSON 数组，放在标记 `<<<UNTRUSTED-SEARCH-RESULTS` 和 `UNTRUSTED-SEARCH-RESULTS>>>` 之间，并告诉模型：两个标记之间的内容是来自外部来源的数据，绝不是要遵循的指令。为这个步骤找到的结果附带它们的摘录；较早记录所引用的结果则附带它们的 id、标题和定位符。只有列在那里的 id 才能支持根据这个 prompt 写出的论断。
+- **编号的结果。** 无论结果是什么形状（列表；包含列表的对象，例如 `results` 或 `items`；JSON 文本；MCP 文本部分；由 `Title:`、`Description:` 和 `URL:` 行组成的块写成的文本——每块一个结果，MCP 搜索服务器常常这样应答，块下方的文字会放进该结果的摘录——或者纯文本），研究都能读取。像“No results found”这样的应答不是结果。它会保留标题、URL 或其他定位符、给出时的日期以及一段摘录，每一项各占一行，并在整个研究范围内只编号一次，直到重新开始为止：再次找到的同一个结果（按其定位符判断）保留原来的 id。每次搜索它保留 `limits.maxResultsPerSearch` 个结果（默认 5 个）。
+- **作为数据呈现。** 每一段来自研究之外的文本——搜索结果、来源的描述、重做时被告知的那些被拒绝条目——都以一个带标签的 JSON 块的形式到达模型，放在一行 `<<<UNTRUSTED-DATA-<id>` 和一行 `UNTRUSTED-DATA-<id>>>` 之间。这个 id 为每个 prompt 随机抽取，因此一段文本无法用它自己写出的标记来关闭它所在的块；模型会被告知：两个标记之间的内容是数据，绝不是要遵循的指令。为这个步骤找到的结果附带它们的摘录；较早记录所引用的结果则附带它们的 id、标题和定位符。只有列在那里的 id 才能支持根据这个 prompt 写出的论断。
 - **有上限。** `limits.maxSearches`（默认每次运行 20 次）限制搜索的次数。一旦用完，运行**并不会停止**：它会在不搜索的情况下继续，需要来源的论断仍然是假设，创新点仍然有待核查，报告会说明哪些环节无法搜索（提示 `searchesSkipped`）。
 
-你的线索是有待核实的例子，而不是真理：`changes` 必须对每一条给出判定——`relevant`、`partlyRelevant` 或 `notRelevant`，并附上理由——遗漏了某一条的回复会被退回一次。章程会为线索编号，模型用编号指明每一条，无论它用什么语言撰写；报告会按照章程的写法写回这条线索。一条线索只得到一个判定：对它的另一个判定会被拒绝（`leadAlreadyJudged`）。`changes` 运行之后仍然没有判定的线索会被列在 `unverifiedLeads` 中（提示 `leadsNotVerified`）。研究自己找到的工具是 `independentLeads`。
+你的线索是有待核实的例子，而不是真理：`changes` 必须对每一条给出判定——`relevant`、`partlyRelevant` 或 `notRelevant`，并附上理由——遗漏了某一条的回复会被退回一次。章程会为线索编号，模型用编号指明每一条，无论它用什么语言撰写；报告会按照章程的写法写回这条线索。一条线索只得到一个判定：对它再次给出的判定会被丢弃（`leadAlreadyJudged`），并在 `study.passage_completed` 中作为重复判定列出；它不算偏离。`changes` 运行之后仍然没有判定的线索会被列在 `unverifiedLeads` 中（提示 `leadsNotVerified`）。研究自己找到的工具是 `independentLeads`。
 
 ## 紧扣目标 {#staying-on-the-objective}
 
@@ -250,8 +250,9 @@ Objective: A browser design whose every choice follows from the investigation
 每个环节结束后，会有一次独立的调用——**守护者**——它只看到章程、已接受的修正案和该环节的条目：看不到任务，看不到较早的记录，也看不到搜索。它以温度 0 运行，并逐条单独评判：是否紧扣目标，以及原因。对于设计，它还能看到每种架构的机制、组件和组装，并评判它是否开启了一项新能力（参见[能力、原理、机制](#capability-principle-mechanism)）。
 
 - 偏离目标的条目会被移除，并连同原因记入**偏离日志**（`by: 'guardian'`），同时记录为一个 `study.drift_rejected` 事件。
-- **它失效即关闭。** 只有 `onObjective` 为 true 或 false 的判定才算数。没有得到这种判定的条目保持 `unchecked`：它留在报告中并被标出（提示 `uncheckedItems`），但永远不会进入之后的 prompt，下一次运行会先让守护者评判它。如果守护者对某个环节的条目一个也没有评判，运行就会失败。
-- 当被拒绝的条目（被守护者或被 schema 拒绝）超过该环节产出的一定比例——`driftThreshold`，默认为三分之一——该环节会**重做一次**，并被告知哪些条目被拒绝了以及原因。重做本身是一个独立的步骤，预算策略会先对它进行检查。两次尝试中较好的那一次会被保留：对于设计，是以新能力为目标的那一次；其次是经过评判后，具备每个集合所需条目的那一次；再其次是保留条目更多的那一次；两者相当时保留重做。`study.passage_completed` 会说明何时保留了第一次尝试（`keptAttempt`）。对已经评判过的线索给出的第二个判定会被记录下来，但不计入触发重做的统计。
+- **它失效即关闭。** 只有 `onObjective` 为 true 或 false 的判定才算数。没有得到这种判定的条目保持 `unchecked`：它留在报告中并被标出（提示 `uncheckedItems`），但永远不会进入之后的 prompt，下一次运行会先让守护者评判它。如果守护者对某个环节的条目一个也没有评判，运行就会失败。当一次修复无法使用时，会改为宽松地读取第一次回复：它的有效判定算数，没有判定的条目仍未经评判（`study.model_called` 上的 `usedAttempt: 1`）。
+- **迟来的评判会传递到后续环节。** 当下一次运行的守护者保留了某个已完成环节的条目时，那些在没有这些条目的情况下运行过的环节会补上它们：设计会为它们补做现有技术搜索，而读取它们的后续环节会像循环那样再运行一次（`limits.maxLoops`；`study.passage_started` 会写明 `outdated: true`）。如果没有剩余的循环，这些环节就保持过时状态（提示 `passagesOutdated`），之后的某次运行会重新写出它们。
+- 当被拒绝的条目（被守护者或被 schema 拒绝）超过该环节产出的一定比例——`driftThreshold`，默认为三分之一——该环节会**重做一次**，并被告知哪些条目被拒绝了以及原因。重做本身是一个独立的步骤，预算策略会先对它进行检查。两次尝试中较好的那一次会被保留：对于设计，是以新能力为目标的那一次；其次是经过评判后，具备每个集合所需条目的那一次；再其次是保留条目更多的那一次；两者相当时保留重做。守护者无法评判的重做会让第一次尝试保留下来。当第一次尝试被保留时，`study.passage_completed` 和该环节的状态会指出这一点（`keptAttempt`），并说明被舍弃的重做包含了什么（`discarded`）；档案也会指出这一点，它的偏离日志的每一条都会显示所属的尝试。
 - 经评判后条目少于所需数量的环节（例如少于两种架构）会按原样保留，报告会指出这一点（提示 `minimumsNotMet`）。
 - 报告保留每一次拒绝（`driftLog`），并在 `stats` 中统计拒绝和重做的次数。
 
@@ -274,7 +275,7 @@ amendment.reason;   // why: { code, params?, message }
 | `changesObjective` | 它改变了对象或目标 | 被拒绝：新的目标就是一项新的研究，要用 `sdk.createStudy` 创建 |
 | `unclassified` | 它无法被分类：出错（`amendmentUnclassified`）、超过了它的 `timeoutMs`（默认 60 000 毫秒，`amendmentTimedOut`）、它的 `signal` 被中止（`amendmentCancelled`），或者某个预算策略拒绝了这次调用（`amendmentPolicy`） | 被拒绝：目标优先 |
 
-被接受和被拒绝的修正案都会被记录（`study.amendment_accepted`、`study.amendment_refused`），并列在 `study.amendments` 和报告中。指令从不会悄无声息地累积：每一条都有编号，从属于目标，并且看得见。它们也有上限：文本超过 500 个字符时（`MAX_AMENDMENT_LENGTH`），或者研究已经接受了 10 条修正案之后（`MAX_AMENDMENTS`），`amend()` 会抛出 `ValidationError`——超出之后，应该在一项新的研究中，由章程把一切都说清楚。
+被接受和被拒绝的修正案都会被记录（`study.amendment_accepted`、`study.amendment_refused`），并列在 `study.amendments` 和报告中。指令从不会悄无声息地累积：每一条都有编号，从属于目标，并且看得见。由于每一条都只对照章程来评判，两条相互矛盾的修正案可能都会被接受：每一条都在细化章程，守护者随后会对照章程和所有这些修正案来评判此后的每个条目。修正案按提出的顺序逐条分类，每一条的 `timeoutMs` 从轮到它时开始计算。它们也有上限：文本超过 500 个字符时（`MAX_AMENDMENT_LENGTH`），或者轮到它时研究已经接受了 10 条修正案（`MAX_AMENDMENTS`），`amend()` 会抛出 `ValidationError`，因此同时发出的调用无法一起越过这个上限——超出之后，应该在一项新的研究中，由章程把一切都说清楚。
 
 ### 为什么这样有效 {#why-this-works}
 
@@ -327,7 +328,7 @@ const second = await study.run();
 const fresh = await study.run({ restart: true });
 ```
 
-- **恢复。** 停止、失败或取消的运行可以通过再次调用 `run()` 来恢复。守护者首先评判上一次运行留下的未评判内容；然后，已评判但尚未结束的环节只做收尾——现有技术搜索被中断的设计会从这次搜索处恢复，它的 `study.passage_completed` 会写明 `resumed: true`——接着运行尚未完成的环节。已经完成的环节会被保留；`study.started` 记录第一个还有工作要做的环节（`resumeAt`）。
+- **恢复。** 停止、失败或取消的运行可以通过再次调用 `run()` 来恢复。守护者首先评判上一次运行留下的未评判内容，它保留下来的条目会传递到在没有它们的情况下运行过的环节（参见[守护者](#the-guardian)）。然后，第一次尝试在停止之前已经评判过的环节，会按照与运行中相同的规则进行它应有的重做（`study.passage_started` 会写明 `redo: true` 和 `resumed: true`）；否则它只做收尾——现有技术搜索被中断的设计会从这次搜索处恢复，它的 `study.passage_completed` 会写明 `resumed: true`。接着运行尚未完成的环节。已经完成的环节会被保留；`study.started` 记录第一个还有工作要做的环节（`resumeAt`）。
 - **重新开始。** `restart: true` 让研究从头开始：它会清除各个环节、结果（重新从 `S1` 开始编号）、搜索、偏离日志、条目的编号以及各次运行。只有章程和修正案会保留下来。
 - **一次只能有一个运行。** 在一次运行进行期间再调用 `run()` 会抛出 `ValidationError`。运行期间可以调用 `amend()`。
 - **在内存中。** 研究的状态保存在它的 `Study` 对象中，它的 `id` 在每个进程中都不同：恢复要在同一个对象上进行。事件记录了每个环节的条目、每次搜索和每个判定，以供审计，但 SDK 不会根据它们重建一项研究。
@@ -349,7 +350,7 @@ const result = await study.run({
 const unsubscribe = sdk.subscribe(listener, { agentId: study.id });
 ```
 
-研究记录十二种事件类型：`study.started`、`study.passage_started`、`study.passage_completed`、`study.search`、`study.model_called`、`study.drift_rejected`、`study.capability_demoted`、`study.amendment_accepted`、`study.amendment_refused`、`study.result_recorded`、`study.completed` 和 `study.failed`。[事件目录](../reference/events#studies)给出了它们的数据。一个运行研究、并把它上下文中的 `onEvent` 传给研究的工具，也能被 MCP 客户端跟随：它的[进度通知](./mcp-deploy#progress-notifications)会写出各个环节的名称（`passage changes started`、`search in changes`），但从不写出查询或研究中的文本。
+研究记录十二种事件类型：`study.started`、`study.passage_started`、`study.passage_completed`、`study.search`、`study.model_called`、`study.drift_rejected`、`study.capability_demoted`、`study.amendment_accepted`、`study.amendment_refused`、`study.result_recorded`、`study.completed` 和 `study.failed`。[事件目录](../reference/events#studies)给出了它们的数据。一个运行研究、并把它上下文中的 `onEvent` 传给研究的工具，也能被 MCP 客户端跟随：它的[进度通知](./mcp-deploy#progress-notifications)会写出各个环节的名称（`passage changes started`、`search in changes`，然后是 `report ready` 或 `partial report ready`），但从不写出查询或研究中的文本。
 
 ## 一个完整的示例 {#a-complete-example}
 
@@ -429,7 +430,7 @@ await eventStore.destroy();
 ```ts
 const { report } = result;
 report.notices;       // read first: no sources, a stop, leads without a verdict…
-report.architectures; // capabilities first, then improvements
+report.architectures; // new capabilities, then existing ones, then improvements
 report.experiments;   // what would decide between the architectures
 report.cards;         // one mechanism card per main mechanism
 report.driftLog;      // what left the objective, and why
@@ -437,7 +438,7 @@ report.results;       // every result retrieved, S1, S2…
 report.stats;         // model calls, searches, items by status, rejections, redos, loops, amendments
 ```
 
-报告还包含章程及其哈希、修正案、每个环节的状态（`complete`、`partial`、`unchecked` 或 `notRun`，以及它的尝试次数和重开过它的环节）、各环节的每一个集合、按部件分组的三种状态、搜索，以及上一次重新开始以来 `run()` 的各次运行（`runIds`）。`stats.runs` 和 `stats.modelCalls` 统计的是这些运行，并且只统计提供商作出应答的调用；修正案单独统计，重新开始也会保留它们（`stats.amendments`：有多少条修正案被分类，以及它们的模型调用）。[SDK API 参考](../reference/sdk-api#studies)列出了它的类型。
+报告还包含章程及其哈希、修正案、每个环节的状态（`complete`、`partial`、`unchecked` 或 `notRun`，以及它的尝试次数、重开过它的环节和它可能舍弃的重做）、各环节的每一个集合、按部件分组的三种状态、搜索，以及上一次重新开始以来 `run()` 的各次运行（`runIds`）。`stats.runs` 和 `stats.modelCalls` 统计的是这些运行，并且只统计提供商作出应答的调用；修正案单独统计，重新开始也会保留它们（`stats.amendments`：有多少条修正案被分类，以及它们的模型调用）。[SDK API 参考](../reference/sdk-api#studies)列出了它的类型。
 
 **提示**说明了读者在信任其余内容之前必须知道的东西。每条提示都有一个 `code`、它的 `params` 和 `details`，以及用英文表述的同一条提示（`message`）：
 
@@ -455,6 +456,9 @@ report.stats;         // model calls, searches, items by status, rejections, red
 | `minimumsNotMet` | 经评判后条目少于所需数量的集合（`details`：`passage.collection`） |
 | `untracedAssembly` | 有某个组件或某条组装连接不引用调查中任何记录的架构（`details`：它们的 id） |
 | `noveltiesToVerify` | 仍需对照现有技术核查的创新点 |
+| `capabilitiesToVerify` | 组装尚未对照现有技术核查的能力（`details`：它们的 id） |
+| `capabilitiesExist` | 组装已经存在的能力，排在其他能力之后（`details`：它们的 id） |
+| `passagesOutdated` | 在守护者迟来评判某些条目之前写出、尚未重新写出的环节 |
 
 ### 档案 {#the-dossier}
 
@@ -467,7 +471,7 @@ report.stats;         // model calls, searches, items by status, rejections, red
 5. 每个部件的三种状态、组合，以及组装式突破；
 6. 设计思路：每种架构都标明是新能力还是改进（对于被降级的架构，还说明原因），并附有它为谁服务、解除的约束、原理的改变、机制、“组件 → 组装 → 能力”路径及每一部分的出处、它的条件、收益、额外成本、反例、链条覆盖情况和预测；然后是哪些是新的、哪些不是；
 7. 实验，以及机制卡片；
-8. 偏离日志、来源和统计数据。
+8. 偏离日志（每一条都附有它所属的尝试，以及被舍弃的重做）、来源和统计数据。
 
 每条论断都会显示它的状态和它引用的结果（`S1, S3`），以及它引用了、但它的 prompt 没有列出的 id；被研究降级的状态会说明模型当初声明了什么以及原因；创新点会显示它的现有技术，或者说明它仍有待核查。只有 http 和 https 定位符会变成链接。档案中的用语有本文档的十一种语言版本；其他语言会得到英文标签，但模型仍然用那种语言撰写它的文本。报告中每条提示和每个原因的 `message` 是英文的；档案会根据它们的代码，用它自己的语言写出它们。
 

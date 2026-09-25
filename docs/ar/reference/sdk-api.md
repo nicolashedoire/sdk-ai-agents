@@ -179,7 +179,7 @@ interface OutcomeEvaluator {
 | `name`، `language`، `charter`، `charterHash` | الاسم، واللغة، و`StudyCharter` المُجمَّد، وبصمته SHA-256 (بالنظام الست عشري)، المسجَّلة في `study.started` ومع كل تعديل |
 | `amendments` | `StudyAmendment[]`: المقبولة والمرفوضة، بالترتيب |
 | `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`. يستأنف من حيث توقّف آخر تشغيل: يحكم الحارس أولًا على ما تركه ذلك التشغيل دون حكم، والمرحلة التي حُكم عليها ولم تنتهِ لا تفعل سوى أن تنتهي، ثم تُشغَّل المراحل غير المكتملة. ويعيد `restart` بدء الدراسة من أولها: تُمحى المراحل، والنتائج، وعمليات البحث، وسجلّ الانحراف، والترقيم، وعمليات التشغيل؛ ويبقى الميثاق والتعديلات. ينهي الحدُّ أو السياسةُ أو الإلغاءُ أو الخطأُ التشغيلَ بحالته وبتقرير ما أُنجِز؛ ولا يرمي إلا لتشغيل جارٍ بالفعل، أو لـ `onEvent` يتعذّر تقديمه، أو لمخزن أحداث يفشل. ويعمل `onEvent` كما مع `agent.run` |
-| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`. يُصنَّف مقابل الميثاق وحده، لا مقابل التعديلات السابقة أبدًا، في تشغيل خاص به (`mode: 'study-amendment'`) تُفحَص فيه سياسات الميزانية أولًا؛ ولا يُقبَل إلا `refines`، ويظهر في كل موجّه لاحق. ويحدّ `timeoutMs` (الافتراضي 60 000) و`signal` التصنيفَ: فإذا تجاوزهما، أو إذا رفضته سياسة، رُفض التعديل بوصفه `unclassified`. ويرمي `ValidationError` لنص فارغ، أو لنص أطول من `MAX_AMENDMENT_LENGTH` (500 حرف)، أو بعد قبول `MAX_AMENDMENTS` (10) تعديلات |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`. يُصنَّف مقابل الميثاق وحده، لا مقابل التعديلات السابقة أبدًا (فقد يُقبَل تعديلان يناقض أحدهما الآخر)، واحدًا تلو الآخر بالترتيب الذي طُلبت به التعديلات، في تشغيل خاص به (`mode: 'study-amendment'`) تُفحَص فيه سياسات الميزانية أولًا؛ ولا يُقبَل إلا `refines`، ويظهر في كل موجّه لاحق. ويحدّ `timeoutMs` (الافتراضي 60 000، ويُحتسَب من حلول دوره) و`signal` التصنيفَ: فإذا تجاوزهما، أو إذا رفضته سياسة، رُفض التعديل بوصفه `unclassified`. ويرمي `ValidationError` لنص فارغ، أو لنص أطول من `MAX_AMENDMENT_LENGTH` (500 حرف)، أو حين يحلّ دوره وقد قُبل `MAX_AMENDMENTS` (10) تعديلات |
 | `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`. يملأ الحقلين 10 و11 من بطاقة ويسجّل `study.result_recorded` في التشغيل الذي كتبها؛ و`ValidationError` لبطاقة مجهولة أو لـ `result` فارغ |
 | `report()` | `StudyReport`: التقرير كما هو الآن، بما فيه النتائج المسجَّلة منذ آخر تشغيل |
 
@@ -220,7 +220,7 @@ interface StudyReport {
   revisableDecisions: StudyRevisableDecision[]; // D1…
   combinations: StudyCombination[];             // X1…
   capabilities: StudyCapability[];              // Y1…
-  architectures: StudyArchitecture[];           // A1…, capabilities first
+  architectures: StudyArchitecture[];           // A1…: new capabilities, existing ones, improvements
   noveltyClaims: StudyNoveltyClaim[];           // N1…
   experiments: StudyExperiment[];               // E1…
   cards: MechanismCard[];                       // M1…
@@ -241,7 +241,8 @@ interface StudyClaim {
   sources: string[];                                // results listed in the prompt that wrote it
   unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
   servesObjective: string;
-  toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
+  toVerify?: boolean;                               // prior art not assessed: a novelty, or a capability's assembly
+  priorArtReason?: StudyReason;                     // a capability that is not a novelty: why not checked, or assemblyExists
   priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
   unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
   runId: string;
@@ -260,15 +261,17 @@ interface StudyTrace {
 }
 ```
 
-كل سبب في التقرير هو `StudyReason`: `statusReason` للادعاءات والمكوّنات، و`reason` لمدخلات سجلّ الانحراف وللتعديلات، و`kindReason` للبنية التي خُفِّض نوعها. ويعرض الملف البحثي `code` الخاص به بلغة الدراسة (`studyLabels(language).reasons`)؛ والنص الذي كتبه الحارس أو النموذج رمزه `judged`، في `params.text`. الرموز (`StudyReasonCode`):
+كل سبب في التقرير هو `StudyReason`: `statusReason` للادعاءات والمكوّنات، و`priorArtReason` للقدرة التي ليست جِدّة، و`reason` لمدخلات سجلّ الانحراف وللتعديلات، و`kindReason` للبنية التي خُفِّض نوعها. ويعرض الملف البحثي `code` الخاص به بلغة الدراسة (`studyLabels(language).reasons`)؛ والنص الذي كتبه الحارس أو النموذج رمزه `judged`، في `params.text`. الرموز (`StudyReasonCode`):
 
 | الرموز | السبب |
 | --- | --- |
 | `noSourceConfigured`، `citesUnlisted`، `citesNothing` | ادعاء أو مكوّن `established` خُفِّض إلى `hypothesis`: لا مصدر، أو لا معرّف مُدرَجًا في موجّهه |
-| `noveltyNotSearchedYet`، `noveltyNoSource`، `noveltySearchBudget`، `noveltyNotSearched`، `noveltySearchFailed`، `noveltyNoResult`، `noveltyNotAssessed`، `noveltyUnsupported` | لماذا ما زالت الجِدّة للتحقّق |
+| `priorArtNotSearchedYet`، `priorArtNoSource`، `priorArtSearchBudget`، `priorArtNotSearched`، `priorArtSearchFailed`، `priorArtNoResult`، `priorArtNotAssessed`، `priorArtUnsupported` | لماذا ما زالت الأعمال السابقة لجِدّة، أو لتركيب قدرة، للتحقّق (ويبدأ نصّها الإنجليزي بـ «To verify against prior art:») |
 | `priorArtExists` | جِدّة خُفِّضت إلى `hypothesis`: أقرب عمل ينجزها من قبل |
+| `assemblyExists` | قدرة ليست جِدّة، وتركيبها موجود من قبل (في `priorArtReason` الخاص بها) |
 | `componentDocumented`، `componentUndocumented` | مكوّن مقدَّم على أنه جديد |
-| `noServesObjective`، `invalidItem`، `notAnObject`، `notAUserLead`، `leadAlreadyJudged` | عنصر رفضه المخطط |
+| `noServesObjective`، `invalidItem`، `notAnObject`، `notAUserLead` | عنصر رفضه المخطط |
+| `leadAlreadyJudged` | حكم أُعطي من جديد على خيط سبق الحكم عليه: أُسقط، وليس انحرافًا (`duplicates` في `study.passage_completed`) |
 | `designWithoutCapability` | تصميم بلا أي قدرة جديدة |
 | `amendmentUnclassified`، `amendmentCancelled`، `amendmentTimedOut`، `amendmentPolicy` | تعديل تعذّر تصنيفه |
 | `judged` | كلمات الحارس أو النموذج نفسها |
@@ -304,8 +307,8 @@ interface StudyTrace {
 | `StudyDriftEntry` | `passage`، و`collection`، و`item` (`id?`، `statement?`، `servesObjective?`)، و`reason` (`StudyReason`)، و`by` (`guardian`: خارج عن الهدف؛ `schema`: رُفض قبل ذلك، مثلًا لغياب `servesObjective`)، و`attempt` (2 في الإعادة)، و`runId` |
 | `StudySearchResult` | `id` (`S1`…، ويُحتفَظ به حين يُعثَر على النتيجة نفسها مرة أخرى، حتى إعادة البدء)، و`title`، و`locator` (رابط URL أو محدِّد موقع آخر)، و`date?`، و`excerpt`، و`tool`، و`query`، و`runId` |
 | `StudySearch` | `passage`، و`purpose` (`research` أو `priorArt`)، و`tool`، و`query`، و`servesObjective`، و`claims?`، و`resultIds`، و`error?`، و`skipped?` (`maxSearches`)، و`runId` |
-| `StudyPassageState` | `passage`، و`state` (`complete`؛ و`partial`: حُكم عليها لكنها لم تنتهِ، إذ تنتظر دورتها أو قُطع بحثها عن الأعمال السابقة؛ و`unchecked`: عناصر لم يحكم عليها الحارس؛ و`notRun`)، و`attempts` (2 بعد إعادة)، و`reopenedBy`، و`runId?` |
-| `StudyNotice` | `code` (`noSources`، `stopped`، `failed`، `cancelled`، `passagesNotRun`، `uncheckedItems`، `searchesSkipped`، `leadsNotVerified`، `analoguesNotDeconstructed`، `noDesign`، `noCapability`، `minimumsNotMet`، `untracedAssembly`، `noveltiesToVerify`)، و`params?` (`limit`، `error`، `count`)، و`details?` (المراحل، أو أزواج `passage.collection`، أو الخيوط، أو الاختراقات، أو البنى المعنية)، و`message` (بالإنجليزية؛ ويعرض الملف البحثي الرمز بلغته) |
+| `StudyPassageState` | `passage`، و`state` (`complete`؛ و`partial`: حُكم عليها لكنها لم تنتهِ، إذ تنتظر دورتها أو قُطع بحثها عن الأعمال السابقة؛ و`unchecked`: عناصر لم يحكم عليها الحارس؛ و`notRun`)، و`attempts` (2 بعد إعادة)، و`keptAttempt?` و`discarded?` (`attempt`، `items`: إعادة استُبعدت لصالح محاولة أولى أفضل)، و`reopenedBy`، و`runId?` |
+| `StudyNotice` | `code` (`noSources`، `stopped`، `failed`، `cancelled`، `passagesNotRun`، `uncheckedItems`، `searchesSkipped`، `leadsNotVerified`، `analoguesNotDeconstructed`، `noDesign`، `noCapability`، `minimumsNotMet`، `untracedAssembly`، `passagesOutdated`، `capabilitiesToVerify`، `capabilitiesExist`، `noveltiesToVerify`)، و`params?` (`limit`، `error`، `count`)، و`details?` (المراحل، أو أزواج `passage.collection`، أو الخيوط، أو الاختراقات، أو البنى المعنية)، و`message` (بالإنجليزية؛ ويعرض الملف البحثي الرمز بلغته) |
 | `StudyStats` | منذ آخر إعادة بدء: `runs` و`modelCalls` (عمليات تشغيل `run()`، والاستدعاءات التي أجاب عنها المزوّد فيها)، و`searches`، و`searchesSkipped`، و`results`، و`items`، و`rejected`، و`byStatus` (لكل حالة)، و`downgraded` (الادعاءات التي خفّضت الدراسة حالتها)، و`noveltiesToVerify`، و`redos`، و`loops`. و`amendments` (`count`، `modelCalls`): كل تعديلات الدراسة، مَعدودةً على حدة |
 
 ### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}

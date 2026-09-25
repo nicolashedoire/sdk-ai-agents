@@ -112,7 +112,7 @@ await study.recordResult('M1', {
 
 目指す能力を憲章で指定することもできます（`capability`）。その場合、すべてのプロンプトがそれを含みます。指定しない場合、`cross` 工程は少なくとも 1 つの候補（`capabilities`、`Y1`…）を、それが誰のためのものか、なぜ今日難しいのか、どの原理が変わるのかとともに提案しなければなりません。
 
-監視役（[監視役](#the-guardian) を参照）は、各アーキテクチャのメカニズム、構成要素、組み立てを見て、2 つのことを別々に判定します。目的に役立つかどうかと、新しい能力を開くかどうかです。より速い、あるいは安いだけだと監視役が判断した能力は `improvement` になります。モデルが何を主張したかを示す `declaredKind: 'capability'` と、その理由を述べる `kindReason` が付き、`study.capability_demoted` イベントが記録されます。目的に役立つ改良は残ります。能力の後に並べられ、改良だからという理由で取り除かれることは決してありません。能力をまったく含まない設計は、全体として目的から外れています。逸脱ログに記録され、一度だけやり直されます。やり直しても能力がなければ、レポートがそう述べます（注意事項 `noCapability`）。監視役がアーキテクチャを 1 つも残さなかった場合も、レポートはそう述べます（注意事項 `noDesign`）。レポートでは、**能力が先に、改良が後に** 並びます。
+監視役（[監視役](#the-guardian) を参照）は、各アーキテクチャのメカニズム、構成要素、組み立てを見て、2 つのことを別々に判定します。目的に役立つかどうかと、新しい能力を開くかどうかです。より速い、あるいは安いだけだと監視役が判断した能力は `improvement` になります。モデルが何を主張したかを示す `declaredKind: 'capability'` と、その理由を述べる `kindReason` が付き、`study.capability_demoted` イベントが記録されます。目的に役立つ改良は残ります。能力の後に並べられ、改良だからという理由で取り除かれることは決してありません。能力をまったく含まない設計は、全体として目的から外れています。逸脱ログに記録され、一度だけやり直されます。やり直しても能力がなければ、レポートがそう述べます（注意事項 `noCapability`）。監視役がアーキテクチャを 1 つも残さなかった場合も、レポートはそう述べます（注意事項 `noDesign`）。先行技術の検索によって、組み立てがすでに実現されているとわかった能力は、能力のままですが、もはや新しいものではありません。[先行技術](#prior-art) を参照してください。レポートでは、**新しい能力が先に、次に組み立てがすでに存在する能力、最後に改良が** 並びます。
 
 ### 新しさは組み立てにある {#novelty-lies-in-the-assembly}
 
@@ -146,7 +146,7 @@ await study.recordResult('M1', {
 
 研究が別の工程のために取得した結果では足りません。モデルは、その主張を書いたプロンプトの中でその結果を見ていなければなりません。アーキテクチャの構成要素にも同じ規則が当てはまります。研究が読み取れない状態は `hypothesis` として数えられ、それより強い状態として数えられることは決してありません。**情報源がなければ、何も確立できません**。どの主張もせいぜい仮説にとどまり、どの新規性も確認できず、レポートは最初の注意事項（`noSources`）でそう述べます。
 
-研究が示すすべての理由（状態がなぜ引き下げられたか、項目がなぜ取り除かれたか、追加指示がなぜ拒否されたか）は `StudyReason` です。これは、理由コード（`code`。たとえば `citesUnlisted` や `noveltyNoResult`）、その `params`、そして同じ理由の英語版（`message`）からなります。調査書は理由を研究の言語で書きます。監視役やモデルが書いた理由はコード `judged` を持ち、そのテキストは `params.text` に入ります。
+研究が示すすべての理由（状態がなぜ引き下げられたか、項目がなぜ取り除かれたか、追加指示がなぜ拒否されたか）は `StudyReason` です。これは、理由コード（`code`。たとえば `citesUnlisted` や `priorArtNoResult`）、その `params`、そして同じ理由の英語版（`message`）からなります。調査書は理由を研究の言語で書きます。監視役やモデルが書いた理由はコード `judged` を持ち、そのテキストは `params.text` に入ります。
 
 ### 先行技術 {#prior-art}
 
@@ -155,9 +155,9 @@ await study.recordResult('M1', {
 - `novel` または `partlyNovel`：新規性は新規性のままですが、もはや確認すべきものではなくなり、その `priorArt`（`closest`、`sources`、`verdict`）が付きます。
 - `exists`：そのアイデアはすでに実現されています。新規性は `hypothesis` になり、`statusReason` が最も近い成果を挙げます。
 
-新規性ではないアーキテクチャの先行技術も記録されますが、その状態は変わりません。研究は状態を引き下げることはあっても、引き上げることは決してありません。
+新規性ではない能力の先行技術も記録されますが、その状態は変わりません。研究は状態を引き下げることはあっても、引き上げることは決してありません。その組み立てがすでに存在する場合、その能力は `kind: 'capability'` のままで、その `priorArtReason` がそのことを述べ（`assemblyExists`。最も近い成果を添えて）、ほかの能力の後、改良の前に並べられます（注意事項 `capabilitiesExist`）。
 
-先行技術を検索または評価できなかった新規性は確認すべきもののままで、その `statusReason` がその理由を述べます。情報源がない（`noveltyNoSource`）、その新規性のための検索が求められなかった（`noveltyNotSearched`）、その検索が失敗した（`noveltySearchFailed`）か何も見つからなかった（`noveltyNoResult`）、検索の予算が尽きた（`noveltySearchBudget`）、その結果が評価されなかった（`noveltyNotAssessed`）、あるいはチェックがその新規性自身の結果を 1 つも引用しなかった（`noveltyUnsupported`）のいずれかです。設計の後に主張された新規性も、確認すべきもののままです。レポートはそれらを数えます（注意事項 `noveltiesToVerify`）。
+先行技術を検索または評価できなかった主張は確認すべきもの（`toVerify`）のままで、その理由が示されます。新規性ならその `statusReason` に、それ以外の状態の能力ならその `priorArtReason` に示されます。理由は次のいずれかです。その検索がまだ実行されていない（`priorArtNotSearchedYet`）、情報源がない（`priorArtNoSource`）、その主張のための検索が求められなかった（`priorArtNotSearched`）、その検索が失敗した（`priorArtSearchFailed`）か何も見つからなかった（`priorArtNoResult`）、検索の予算が尽きた（`priorArtSearchBudget`）、その結果が評価されなかった（`priorArtNotAssessed`）、あるいはチェックがその主張自身の結果を 1 つも引用しなかった（`priorArtUnsupported`）。設計の後に主張された新規性も、確認すべきもののままです。レポートはそれらを数えます（注意事項 `noveltiesToVerify` と `capabilitiesToVerify`）。
 
 ## あなたの情報源で調べる {#research-through-your-sources}
 
@@ -185,11 +185,11 @@ const study = sdk.createStudy({ name: 'browser', object, objective, sources });
 - **研究の作成時にチェックされる。** 情報源が定義済みのツールでない場合や、テキストのクエリを受け取らない場合、`createStudy` は `ValidationError` を投げます。クエリはツールの `query` パラメーターに入ります。それがなければ別の一般的な名前（`q`、`search`、`keywords`…）、それもなければ唯一の必須のテキストパラメーター、それもなければ最初のテキストパラメーターに入ります。
 - **ガバナンスされる。** すべての検索は `sdk.executeTool` を通じて実行されます。エージェント ID には研究の `id` が使われ、許可されるツールは情報源だけです。許可リスト、ポリシー、予算、承認、リトライ、トレースは、ほかのツール呼び出しと同じように適用され、ツールのイベント（`action.executing`、`policy.checked`、`tool.called`、`action.executed`）は研究の実行に記録されます。失敗した検索や、ポリシーが拒否した検索は、そのエラーとともに記録され、研究は続行されます。
 - **検索するタイミング。** `historicalChoices` の前と `changes` の前に、モデルはその工程に必要な検索を求めます。`changes` では、あなたの手がかりのそれぞれを検証するため、それ以外の道具を見つけるため、現在の最良の実現例を見つけるため、そして組み立てによるブレークスルーを文書化するための検索です。`design` の後には、新規性の先行技術を検索します。一度に求められる検索は最大 6 件です。
-- **番号付きの結果。** 研究は、結果がどのような形（リスト、`results` や `items` のようにリストを持つオブジェクト、JSON テキスト、MCP のテキストパート、`Title:`、`Description:`、`URL:` の行からなるブロックで書かれたテキスト、プレーンテキスト）であっても読み取ります。ブロックで書かれたテキストでは、MCP の検索サーバーがよくそう答えるように、1 つのブロックが 1 つの結果です。研究は、タイトル、URL またはその他の所在情報、日付（あれば）、抜粋をそれぞれ 1 行にして保持し、リスタートするまでは研究全体を通して一度だけ番号を付けます。同じ結果が再び見つかった場合は、その所在情報によって判別され、同じ ID を保ちます。各検索の結果は `limits.maxResultsPerSearch` 件（デフォルトは 5）まで保持します。
-- **データとして示される。** プロンプトは、引用してよい結果を、目印 `<<<UNTRUSTED-SEARCH-RESULTS` と `UNTRUSTED-SEARCH-RESULTS>>>` のあいだに JSON 配列として一覧し、そのあいだにあるものは外部の情報源からのデータであって、従うべき指示では決してないとモデルに伝えます。このステップのために見つかった結果には抜粋が付き、それより前のレコードが引用している結果には ID、タイトル、所在情報が付きます。そのプロンプトから書かれた主張を裏付けられるのは、そこに一覧された ID だけです。
+- **番号付きの結果。** 研究は、結果がどのような形（リスト、`results` や `items` のようにリストを持つオブジェクト、JSON テキスト、MCP のテキストパート、`Title:`、`Description:`、`URL:` の行からなるブロックで書かれたテキスト、プレーンテキスト）であっても読み取ります。ブロックで書かれたテキストでは、MCP の検索サーバーがよくそう答えるように、1 つのブロックが 1 つの結果で、ブロックの下にある文章はその抜粋に入ります。「No results found」のような応答は、結果ではありません。研究は、タイトル、URL またはその他の所在情報、日付（あれば）、抜粋をそれぞれ 1 行にして保持し、リスタートするまでは研究全体を通して一度だけ番号を付けます。同じ結果が再び見つかった場合は、その所在情報によって判別され、同じ ID を保ちます。各検索の結果は `limits.maxResultsPerSearch` 件（デフォルトは 5）まで保持します。
+- **データとして示される。** 研究の外から来るすべてのテキスト（検索結果、情報源の説明、やり直しに伝えられる拒否された項目）は、`<<<UNTRUSTED-DATA-<id>` という行と `UNTRUSTED-DATA-<id>>>` という行のあいだに置かれた、ラベル付きの JSON ブロックとしてモデルに届きます。この ID はプロンプトごとにランダムに決められるので、テキストが自分で書いた目印で自分のブロックを閉じることはできません。そして、目印のあいだにあるものはデータであって、従うべき指示では決してないことが、モデルに伝えられます。このステップのために見つかった結果には抜粋が付き、それより前のレコードが引用している結果には ID、タイトル、所在情報が付きます。そのプロンプトから書かれた主張を裏付けられるのは、そこに一覧された ID だけです。
 - **上限がある。** `limits.maxSearches`（デフォルトは 1 回の実行あたり 20）が検索の回数を制限します。使い切っても、実行は **止まりません**。検索せずに続行し、情報源を必要とした主張は仮説のまま、新規性は確認すべきもののまま残り、レポートはどの工程が検索できなかったかを述べます（注意事項 `searchesSkipped`）。
 
-あなたの手がかりは検証すべき例であって、真実ではありません。`changes` はそれぞれに判定（`relevant`、`partlyRelevant`、`notRelevant` のいずれかと、その理由）を下さなければならず、1 つでも漏らした応答は一度だけ送り返されます。憲章は手がかりに番号を付け、モデルはどの言語で書いていても、それぞれの手がかりをその番号で示します。レポートは、手がかりを憲章に書かれたとおりに書き戻します。1 つの手がかりに下される判定は 1 つだけで、同じ手がかりへの別の判定は拒否されます（`leadAlreadyJudged`）。`changes` が実行された後も判定のない手がかりは `unverifiedLeads` に挙げられます（注意事項 `leadsNotVerified`）。研究が自分で見つけた道具は `independentLeads` です。
+あなたの手がかりは検証すべき例であって、真実ではありません。`changes` はそれぞれに判定（`relevant`、`partlyRelevant`、`notRelevant` のいずれかと、その理由）を下さなければならず、1 つでも漏らした応答は一度だけ送り返されます。憲章は手がかりに番号を付け、モデルはどの言語で書いていても、それぞれの手がかりをその番号で示します。レポートは、手がかりを憲章に書かれたとおりに書き戻します。1 つの手がかりに下される判定は 1 つだけです。同じ手がかりにもう一度下された判定は捨てられ（`leadAlreadyJudged`）、`study.passage_completed` に重複として挙げられます。これは逸脱ではありません。`changes` が実行された後も判定のない手がかりは `unverifiedLeads` に挙げられます（注意事項 `leadsNotVerified`）。研究が自分で見つけた道具は `independentLeads` です。
 
 ## 目的から外れない {#staying-on-the-objective}
 
@@ -250,8 +250,9 @@ Objective: A browser design whose every choice follows from the investigation
 各工程の後、別の呼び出し、つまり **監視役** が、憲章、受け入れられた追加指示、その工程の項目だけを見ます。タスクも、それより前のレコードも、検索も見ません。監視役は温度 0 で動き、各項目を個別に判定します。目的に沿っているかどうかと、その理由です。設計については、各アーキテクチャのメカニズム、構成要素、組み立ても見て、新しい能力を開くかどうかを判定します（[能力、原理、メカニズム](#capability-principle-mechanism) を参照）。
 
 - 目的から外れた項目は取り除かれ、理由とともに **逸脱ログ** に記録され（`by: 'guardian'`）、`study.drift_rejected` イベントとして記録されます。
-- **判定のないものは通さない（フェイルクローズ）。** 数えられるのは、`onObjective` が true または false の判定だけです。判定のないまま残った項目は `unchecked` のままです。レポートにはそのことを示したうえで残りますが（注意事項 `uncheckedItems`）、それ以降のプロンプトに入ることは決してなく、次の実行では監視役がまずそれを判定します。工程の項目を 1 つも判定しない監視役は、実行を失敗させます。
-- 拒否された項目（監視役によるものとスキーマによるもの）が、工程が生み出したものの一定の割合（`driftThreshold`、デフォルトは 3 分の 1）を超えると、その工程は、どの項目がなぜ拒否されたかを伝えられたうえで **一度だけやり直されます**。やり直しはそれ自体が 1 つのステップで、予算のポリシーがまずそれを確認します。2 つの試行のうち、より良いほうが残されます。設計では新しい能力を目指すほう、次に、判定を経た後に各コレクションが必要とする項目をそろえているほう、次に、残された項目が多いほう、それらが同じならやり直しのほうです。最初の試行が残されたときは、`study.passage_completed` がそれを示します（`keptAttempt`）。すでに判定された手がかりへの 2 つ目の判定は記録されますが、やり直すかどうかの判断には数えられません。
+- **判定のないものは通さない（フェイルクローズ）。** 数えられるのは、`onObjective` が true または false の判定だけです。判定のないまま残った項目は `unchecked` のままです。レポートにはそのことを示したうえで残りますが（注意事項 `uncheckedItems`）、それ以降のプロンプトに入ることは決してなく、次の実行では監視役がまずそれを判定します。工程の項目を 1 つも判定しない監視役は、実行を失敗させます。修復が使えないときは、代わりに最初の応答が寛容に読まれます。その有効な判定は数えられ、判定のない項目は未判定のまま残ります（`study.model_called` の `usedAttempt: 1`）。
+- **後から下された判定は、その後の工程にも反映される。** 次の実行の監視役が、すでに完了した工程の項目を残したときは、それらの項目なしで実行された工程が遅れを取り戻します。設計については、それらの項目の先行技術が検索されます。それらを読む後の工程は、ループと同じようにもう一度実行されます（`limits.maxLoops`。`study.passage_started` は `outdated: true` を示します）。ループが残っていなければ、それらの工程は古くなったまま残り（注意事項 `passagesOutdated`）、後の実行がそれらを書き直します。
+- 拒否された項目（監視役によるものとスキーマによるもの）が、工程が生み出したものの一定の割合（`driftThreshold`、デフォルトは 3 分の 1）を超えると、その工程は、どの項目がなぜ拒否されたかを伝えられたうえで **一度だけやり直されます**。やり直しはそれ自体が 1 つのステップで、予算のポリシーがまずそれを確認します。2 つの試行のうち、より良いほうが残されます。設計では新しい能力を目指すほう、次に、判定を経た後に各コレクションが必要とする項目をそろえているほう、次に、残された項目が多いほう、それらが同じならやり直しのほうです。監視役が判定できなかったやり直しの場合は、最初の試行がそのまま残ります。最初の試行が残されたときは、`study.passage_completed` と工程の状態がそのことを示し（`keptAttempt`）、破棄されたやり直しが何を含んでいたかも示します（`discarded`）。調査書もそのことを述べ、その逸脱ログの各エントリーは、それがどの試行のものかを示します。
 - 判定を経た項目が必要な数に満たない工程（たとえば、アーキテクチャが 2 つ未満）は、そのまま残され、レポートがそのことを述べます（注意事項 `minimumsNotMet`）。
 - レポートはすべての拒否を保持し（`driftLog`）、拒否とやり直しの回数を `stats` に数えます。
 
@@ -274,7 +275,7 @@ amendment.reason;   // why: { code, params?, message }
 | `changesObjective` | 対象または目的を変える | 拒否される。新しい目的は新しい研究であり、`sdk.createStudy` で作る |
 | `unclassified` | 分類できなかった：エラー（`amendmentUnclassified`）、その `timeoutMs` の経過（デフォルトは 60 000 ms、`amendmentTimedOut`）、その `signal` の中断（`amendmentCancelled`）、または予算のポリシーによる呼び出しの拒否（`amendmentPolicy`） | 拒否される。目的が優先される |
 
-受け入れられた追加指示と拒否された追加指示は記録され（`study.amendment_accepted`、`study.amendment_refused`）、`study.amendments` とレポートに一覧されます。指示が黙って積み重なることは決してありません。どの指示も番号が付き、目的に従属し、目に見えます。追加指示には上限もあります。500 文字を超えるテキスト（`MAX_AMENDMENT_LENGTH`）の場合、または研究がすでに 10 の追加指示を受け入れている場合（`MAX_AMENDMENTS`）、`amend()` は `ValidationError` を投げます。そこから先は、新しい研究の憲章ですべてを述べるべきです。
+受け入れられた追加指示と拒否された追加指示は記録され（`study.amendment_accepted`、`study.amendment_refused`）、`study.amendments` とレポートに一覧されます。指示が黙って積み重なることは決してありません。どの指示も番号が付き、目的に従属し、目に見えます。各追加指示は憲章だけに照らして判定されるので、互いに矛盾する 2 つの追加指示がどちらも受け入れられることがあります。どちらも憲章を詳しくするものであり、監視役はその後、それ以降のすべての項目を、憲章とそれらすべての追加指示に照らして判定します。追加指示は、求められた順に 1 つずつ分類され、それぞれの `timeoutMs` は、その追加指示の順番が来たときから数えられます。追加指示には上限もあります。500 文字を超えるテキスト（`MAX_AMENDMENT_LENGTH`）の場合、または順番が来たときに研究がすでに 10 の追加指示を受け入れている場合（`MAX_AMENDMENTS`）、`amend()` は `ValidationError` を投げます。そのため、同時に行われた呼び出しが、そろって上限を超えることはありません。そこから先は、新しい研究の憲章ですべてを述べるべきです。
 
 ### なぜこれでうまくいくのか {#why-this-works}
 
@@ -327,7 +328,7 @@ const second = await study.run();
 const fresh = await study.run({ restart: true });
 ```
 
-- **再開。** 止まった実行、失敗した実行、キャンセルされた実行は、もう一度 `run()` を呼び出せば再開されます。まず監視役が、最後の実行が判定しないまま残したものを判定します。次に、判定済みだが終わっていない工程は仕上げだけを行い（先行技術の検索が途中で打ち切られた設計はその検索から再開し、その `study.passage_completed` は `resumed: true` を示します）、そのあと完了していない工程が実行されます。すでに完了した工程は保持されます。`study.started` は、作業が残っている最初の工程を記録します（`resumeAt`）。
+- **再開。** 止まった実行、失敗した実行、キャンセルされた実行は、もう一度 `run()` を呼び出せば再開されます。まず監視役が、最後の実行が判定しないまま残したものを判定し、監視役が残したものは、それなしで実行された工程に反映されます（[監視役](#the-guardian) を参照）。次に、止まる前に最初の試行が判定されていた工程は、本来受けるはずだったやり直しを、実行中と同じ規則で受けます（`study.passage_started` は `redo: true` と `resumed: true` を示します）。そうでない工程は仕上げだけを行います。先行技術の検索が途中で打ち切られた設計はその検索から再開し、その `study.passage_completed` は `resumed: true` を示します。そのあと、完了していない工程が実行されます。すでに完了した工程は保持されます。`study.started` は、作業が残っている最初の工程を記録します（`resumeAt`）。
 - **リスタート。** `restart: true` は研究を最初から始め直します。工程、結果（ふたたび `S1` から番号が付きます）、検索、逸脱ログ、項目の番号付け、実行が消去されます。残るのは憲章と追加指示だけです。
 - **一度に 1 つの実行。** 実行の進行中に 2 回目の `run()` を呼び出すと `ValidationError` を投げます。`amend()` は実行中にも呼び出せます。
 - **メモリー上で。** 研究の状態はその `Study` オブジェクトの中にあり、その `id` はプロセスごとに変わります。再開は同じオブジェクトに対して行います。イベントは、監査のために、すべての工程の項目、すべての検索、すべての判定を記録しますが、SDK がそれらから研究を再構築することはありません。
@@ -349,7 +350,7 @@ const result = await study.run({
 const unsubscribe = sdk.subscribe(listener, { agentId: study.id });
 ```
 
-研究は 12 種類のイベントを記録します：`study.started`、`study.passage_started`、`study.passage_completed`、`study.search`、`study.model_called`、`study.drift_rejected`、`study.capability_demoted`、`study.amendment_accepted`、`study.amendment_refused`、`study.result_recorded`、`study.completed`、`study.failed`。そのデータは [イベントカタログ](../reference/events#studies) に示されています。研究を実行し、そのコンテキストの `onEvent` を研究に渡すツールは、MCP クライアントからも追跡されます。その [進捗通知](./mcp-deploy#progress-notifications) は工程の名前を示し（`passage changes started`、`search in changes`）、クエリや研究のテキストを示すことは決してありません。
+研究は 12 種類のイベントを記録します：`study.started`、`study.passage_started`、`study.passage_completed`、`study.search`、`study.model_called`、`study.drift_rejected`、`study.capability_demoted`、`study.amendment_accepted`、`study.amendment_refused`、`study.result_recorded`、`study.completed`、`study.failed`。そのデータは [イベントカタログ](../reference/events#studies) に示されています。研究を実行し、そのコンテキストの `onEvent` を研究に渡すツールは、MCP クライアントからも追跡されます。その [進捗通知](./mcp-deploy#progress-notifications) は工程の名前を示し（`passage changes started`、`search in changes`、その後 `report ready` または `partial report ready`）、クエリや研究のテキストを示すことは決してありません。
 
 ## 完全な例 {#a-complete-example}
 
@@ -429,7 +430,7 @@ await eventStore.destroy();
 ```ts
 const { report } = result;
 report.notices;       // read first: no sources, a stop, leads without a verdict…
-report.architectures; // capabilities first, then improvements
+report.architectures; // new capabilities, then existing ones, then improvements
 report.experiments;   // what would decide between the architectures
 report.cards;         // one mechanism card per main mechanism
 report.driftLog;      // what left the objective, and why
@@ -437,7 +438,7 @@ report.results;       // every result retrieved, S1, S2…
 report.stats;         // model calls, searches, items by status, rejections, redos, loops, amendments
 ```
 
-レポートにはほかに、憲章とそのハッシュ、追加指示、各工程の状態（`complete`、`partial`、`unchecked`、`notRun` のいずれかと、その試行回数、その工程を差し戻した工程）、工程のすべてのコレクション、部品ごとにまとめた 3 つの状態、検索、そして最後のリスタート以降の `run()` の実行（`runIds`）が含まれます。`stats.runs` と `stats.modelCalls` は、それらの実行と、その中でベンダーが応答した呼び出しだけを数えます。追加指示は別に数えられ、リスタートしてもその数は保たれます（`stats.amendments`：分類された追加指示の数と、そのモデル呼び出し）。その型は [SDK API リファレンス](../reference/sdk-api#studies) に一覧されています。
+レポートにはほかに、憲章とそのハッシュ、追加指示、各工程の状態（`complete`、`partial`、`unchecked`、`notRun` のいずれかと、その試行回数、その工程を差し戻した工程、そして破棄したやり直しがあればそのやり直し）、工程のすべてのコレクション、部品ごとにまとめた 3 つの状態、検索、そして最後のリスタート以降の `run()` の実行（`runIds`）が含まれます。`stats.runs` と `stats.modelCalls` は、それらの実行と、その中でベンダーが応答した呼び出しだけを数えます。追加指示は別に数えられ、リスタートしてもその数は保たれます（`stats.amendments`：分類された追加指示の数と、そのモデル呼び出し）。その型は [SDK API リファレンス](../reference/sdk-api#studies) に一覧されています。
 
 **注意事項** は、残りを信頼する前に読み手が知っておくべきことを述べます。どの注意事項も、`code`、その `params` と `details`、そして同じ注意事項の英語版（`message`）を持ちます。
 
@@ -455,6 +456,9 @@ report.stats;         // model calls, searches, items by status, rejections, red
 | `minimumsNotMet` | 判定を経た項目が必要な数に満たないまま残ったコレクション（`details`：`passage.collection`） |
 | `untracedAssembly` | 調査のどのレコードも引用しない構成要素または組み立てのつながりを持つアーキテクチャ（`details`：それらの ID） |
 | `noveltiesToVerify` | 先行技術と照らし合わせてまだ確認すべき新規性 |
+| `capabilitiesToVerify` | 組み立てが先行技術と照らし合わせて確認されていない能力（`details`：それらの ID） |
+| `capabilitiesExist` | 組み立てがすでに存在し、ほかの能力の後に並べられた能力（`details`：それらの ID） |
+| `passagesOutdated` | 監視役が後から判定した項目より前に書かれ、まだ書き直されていない工程 |
 
 ### 調査書 {#the-dossier}
 
@@ -467,7 +471,7 @@ report.stats;         // model calls, searches, items by status, rejections, red
 5. 各部品の 3 つの状態、組み合わせ、組み立てによるブレークスルー
 6. 設計の方向性：新しい能力か改良かのラベルが付いた各アーキテクチャ（格下げされたものには、その理由も）と、その対象者、取り除かれる制約、原理の転換、メカニズム、各部分の出どころを添えた構成要素 → 組み立て → 能力の道筋、条件、利点、追加コスト、反例、連鎖のカバー範囲、予測。続いて、何が新規で何がそうでないか
 7. 実験とメカニズムカード
-8. 逸脱ログ、情報源、統計
+8. 逸脱ログ（各エントリーとその試行、そして破棄されたやり直し）、情報源、統計
 
 すべての主張は、その状態と引用する結果（`S1, S3`）、そしてそのプロンプトに一覧されていなかったのに引用した ID を示します。研究が引き下げた状態については、モデルが何を宣言したか、そしてその理由が示されます。新規性には、その先行技術、またはまだ確認すべきものであることが示されます。リンクになるのは、http と https の所在情報だけです。調査書の文言は、このドキュメントの 11 の言語で用意されています。それ以外の言語では英語のラベルになりますが、モデルは引き続きその言語でテキストを書きます。レポートの各注意事項と各理由の `message` は英語で、調査書はそれらをコードから自分の言語で書きます。
 

@@ -179,7 +179,7 @@ Por execução. `DEFAULT_STUDY_LIMITS` contém os padrões; um valor fora do int
 | `name`, `language`, `charter`, `charterHash` | O nome, o idioma, a `StudyCharter` congelada e o seu SHA-256 (hexadecimal), registrado em `study.started` e com cada emenda |
 | `amendments` | `StudyAmendment[]`: aceitas e recusadas, em ordem |
 | `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`. Retoma onde a última execução parou: o guardião primeiro julga o que essa execução deixou sem julgamento, uma passagem julgada mas não terminada apenas termina, e depois as passagens não completas são executadas. `restart` recomeça o estudo do zero: as passagens, os resultados, as pesquisas, o registro de deriva, a numeração e as execuções são apagados; a carta e as emendas permanecem. Um limite, uma política, um cancelamento ou um erro encerra a execução com o seu status e o relatório do que foi feito; ele só lança uma exceção para uma execução já em andamento, um `onEvent` que não pode ser atendido ou um armazenamento de eventos que falha. `onEvent` funciona como em `agent.run` |
-| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`. Classificada somente em relação à carta, nunca em relação às emendas anteriores, em uma execução própria (`mode: 'study-amendment'`) em que as políticas de orçamento são verificadas primeiro; só `refines` é aceita, e aparece em todos os prompts seguintes. `timeoutMs` (padrão 60 000) e `signal` limitam a classificação: quando o prazo passa ou o sinal é abortado, ou quando uma política a recusa, a emenda é recusada como `unclassified`. Lança um `ValidationError` para um texto vazio, um texto com mais de `MAX_AMENDMENT_LENGTH` (500 caracteres), ou depois que `MAX_AMENDMENTS` (10) emendas foram aceitas |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`. Classificada somente em relação à carta, nunca em relação às emendas anteriores (duas que se contradizem podem ser ambas aceitas), uma de cada vez, na ordem em que foram pedidas, em uma execução própria (`mode: 'study-amendment'`) em que as políticas de orçamento são verificadas primeiro; só `refines` é aceita, e aparece em todos os prompts seguintes. `timeoutMs` (padrão 60 000, contado a partir da sua vez) e `signal` limitam a classificação: quando o prazo passa ou o sinal é abortado, ou quando uma política a recusa, a emenda é recusada como `unclassified`. Lança um `ValidationError` para um texto vazio, um texto com mais de `MAX_AMENDMENT_LENGTH` (500 caracteres), ou quando chega a sua vez e `MAX_AMENDMENTS` (10) emendas já foram aceitas |
 | `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`. Preenche os campos 10 e 11 de uma ficha e registra `study.result_recorded` na execução que a escreveu; um `ValidationError` para uma ficha desconhecida ou um `result` vazio |
 | `report()` | `StudyReport`: o relatório tal como está, incluindo os resultados registrados desde a última execução |
 
@@ -220,7 +220,7 @@ interface StudyReport {
   revisableDecisions: StudyRevisableDecision[]; // D1…
   combinations: StudyCombination[];             // X1…
   capabilities: StudyCapability[];              // Y1…
-  architectures: StudyArchitecture[];           // A1…, capabilities first
+  architectures: StudyArchitecture[];           // A1…: new capabilities, existing ones, improvements
   noveltyClaims: StudyNoveltyClaim[];           // N1…
   experiments: StudyExperiment[];               // E1…
   cards: MechanismCard[];                       // M1…
@@ -241,7 +241,8 @@ interface StudyClaim {
   sources: string[];                                // results listed in the prompt that wrote it
   unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
   servesObjective: string;
-  toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
+  toVerify?: boolean;                               // prior art not assessed: a novelty, or a capability's assembly
+  priorArtReason?: StudyReason;                     // a capability that is not a novelty: why not checked, or assemblyExists
   priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
   unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
   runId: string;
@@ -260,15 +261,17 @@ interface StudyTrace {
 }
 ```
 
-Todo motivo do relatório é um `StudyReason`: o `statusReason` das afirmações e dos componentes, o `reason` das entradas do registro de deriva e das emendas, e o `kindReason` de uma arquitetura rebaixada. O dossiê apresenta o seu `code` no idioma do estudo (`studyLabels(language).reasons`); um texto que o guardião ou o modelo escreveu tem o código `judged`, em `params.text`. Os códigos (`StudyReasonCode`):
+Todo motivo do relatório é um `StudyReason`: o `statusReason` das afirmações e dos componentes, o `priorArtReason` de uma capacidade que não é uma novidade, o `reason` das entradas do registro de deriva e das emendas, e o `kindReason` de uma arquitetura rebaixada. O dossiê apresenta o seu `code` no idioma do estudo (`studyLabels(language).reasons`); um texto que o guardião ou o modelo escreveu tem o código `judged`, em `params.text`. Os códigos (`StudyReasonCode`):
 
 | Códigos | Por quê |
 | --- | --- |
 | `noSourceConfigured`, `citesUnlisted`, `citesNothing` | Uma afirmação ou um componente `established` rebaixado a `hypothesis`: sem fonte, ou sem nenhum id listado no seu prompt |
-| `noveltyNotSearchedYet`, `noveltyNoSource`, `noveltySearchBudget`, `noveltyNotSearched`, `noveltySearchFailed`, `noveltyNoResult`, `noveltyNotAssessed`, `noveltyUnsupported` | Por que uma novidade continua a verificar |
+| `priorArtNotSearchedYet`, `priorArtNoSource`, `priorArtSearchBudget`, `priorArtNotSearched`, `priorArtSearchFailed`, `priorArtNoResult`, `priorArtNotAssessed`, `priorArtUnsupported` | Por que o estado da técnica de uma novidade, ou da montagem de uma capacidade, continua a verificar (o seu texto em inglês começa com "To verify against prior art:") |
 | `priorArtExists` | Uma novidade rebaixada a `hypothesis`: o trabalho mais próximo já a realiza |
+| `assemblyExists` | Uma capacidade que não é uma novidade, cuja montagem já existe (no seu `priorArtReason`) |
 | `componentDocumented`, `componentUndocumented` | Um componente apresentado como novo |
-| `noServesObjective`, `invalidItem`, `notAnObject`, `notAUserLead`, `leadAlreadyJudged` | Um item recusado pelo schema |
+| `noServesObjective`, `invalidItem`, `notAnObject`, `notAUserLead` | Um item recusado pelo schema |
+| `leadAlreadyJudged` | Um veredito dado de novo sobre uma pista já julgada: descartado, não é deriva (`duplicates` de `study.passage_completed`) |
 | `designWithoutCapability` | Uma concepção sem nenhuma nova capacidade |
 | `amendmentUnclassified`, `amendmentCancelled`, `amendmentTimedOut`, `amendmentPolicy` | Uma emenda que não pôde ser classificada |
 | `judged` | As próprias palavras do guardião ou do modelo |
@@ -304,8 +307,8 @@ As outras entradas do relatório não são afirmações:
 | `StudyDriftEntry` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason` (`StudyReason`), `by` (`guardian`: fora do objetivo; `schema`: recusado antes, por exemplo sem `servesObjective`), `attempt` (2 em uma passagem refeita), `runId` |
 | `StudySearchResult` | `id` (`S1`…, mantido quando o mesmo resultado é encontrado de novo, até um reinício), `title`, `locator` (uma URL ou outro localizador), `date?`, `excerpt`, `tool`, `query`, `runId` |
 | `StudySearch` | `passage`, `purpose` (`research` ou `priorArt`), `tool`, `query`, `servesObjective`, `claims?`, `resultIds`, `error?`, `skipped?` (`maxSearches`), `runId` |
-| `StudyPassageState` | `passage`, `state` (`complete`; `partial`: julgada, mas não terminada, aguardando o seu ciclo ou com a sua pesquisa do estado da técnica interrompida; `unchecked`: itens que o guardião não julgou; `notRun`), `attempts` (2 depois de ser refeita), `reopenedBy`, `runId?` |
-| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noDesign`, `noCapability`, `minimumsNotMet`, `untracedAssembly`, `noveltiesToVerify`), `params?` (`limit`, `error`, `count`), `details?` (as passagens, os pares `passage.collection`, as pistas, as rupturas ou as arquiteturas em questão), `message` (em inglês; o dossiê apresenta o código no seu idioma) |
+| `StudyPassageState` | `passage`, `state` (`complete`; `partial`: julgada, mas não terminada, aguardando o seu ciclo ou com a sua pesquisa do estado da técnica interrompida; `unchecked`: itens que o guardião não julgou; `notRun`), `attempts` (2 depois de ser refeita), `keptAttempt?` e `discarded?` (`attempt`, `items`: uma passagem refeita descartada em favor de uma primeira tentativa melhor), `reopenedBy`, `runId?` |
+| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noDesign`, `noCapability`, `minimumsNotMet`, `untracedAssembly`, `passagesOutdated`, `capabilitiesToVerify`, `capabilitiesExist`, `noveltiesToVerify`), `params?` (`limit`, `error`, `count`), `details?` (as passagens, os pares `passage.collection`, as pistas, as rupturas ou as arquiteturas em questão), `message` (em inglês; o dossiê apresenta o código no seu idioma) |
 | `StudyStats` | Desde o último reinício: `runs` e `modelCalls` (execuções de `run()`, e as chamadas que o fornecedor respondeu nelas), `searches`, `searchesSkipped`, `results`, `items`, `rejected`, `byStatus` (por status), `downgraded` (afirmações cujo status o estudo rebaixou), `noveltiesToVerify`, `redos`, `loops`. E `amendments` (`count`, `modelCalls`): todas as emendas do estudo, contadas à parte |
 
 ### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}

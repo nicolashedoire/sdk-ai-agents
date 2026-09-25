@@ -112,7 +112,7 @@ await study.recordResult('M1', {
 
 겨냥하는 역량을 헌장에서 지정할 수 있으며(`capability`), 그러면 모든 프롬프트가 그것을 담습니다. 지정하지 않으면 `cross` 과정이 후보를 적어도 하나 제안해야 하며(`capabilities`, `Y1`…), 누구를 위한 것인지, 왜 오늘날 어려운지, 어떤 원리가 바뀔지를 함께 밝힙니다.
 
-감시자([감시자](#the-guardian) 참고)는 각 아키텍처의 메커니즘, 구성 요소, 결합을 보고, 두 가지를 따로 판단합니다. 목표에 기여하는지, 그리고 새로운 역량을 여는지입니다. 단지 더 빠르거나 더 싸다고 판단한 역량은 `improvement`가 되며, 모델이 무엇을 주장했는지 보여 주는 `declaredKind: 'capability'`, 그 이유를 밝히는 `kindReason`, 그리고 `study.capability_demoted` 이벤트가 따릅니다. 목표에 기여하는 개선은 남습니다. 역량들 뒤에 순위가 매겨질 뿐, 개선이라는 이유로 제거되는 일은 없습니다. 역량이 하나도 남지 않은 설계는 전체적으로 목표를 벗어난 것입니다. 이탈 기록에 남고 한 번 다시 수행되며, 다시 수행해도 역량이 없으면 보고서가 그렇다고 밝힙니다(주의 사항 `noCapability`). 감시자가 아키텍처를 하나도 남기지 않았다면 그것도 밝힙니다(주의 사항 `noDesign`). 보고서에서는 **역량이 먼저, 개선이 그다음**입니다.
+감시자([감시자](#the-guardian) 참고)는 각 아키텍처의 메커니즘, 구성 요소, 결합을 보고, 두 가지를 따로 판단합니다. 목표에 기여하는지, 그리고 새로운 역량을 여는지입니다. 단지 더 빠르거나 더 싸다고 판단한 역량은 `improvement`가 되며, 모델이 무엇을 주장했는지 보여 주는 `declaredKind: 'capability'`, 그 이유를 밝히는 `kindReason`, 그리고 `study.capability_demoted` 이벤트가 따릅니다. 목표에 기여하는 개선은 남습니다. 역량들 뒤에 순위가 매겨질 뿐, 개선이라는 이유로 제거되는 일은 없습니다. 역량이 하나도 남지 않은 설계는 전체적으로 목표를 벗어난 것입니다. 이탈 기록에 남고 한 번 다시 수행되며, 다시 수행해도 역량이 없으면 보고서가 그렇다고 밝힙니다(주의 사항 `noCapability`). 감시자가 아키텍처를 하나도 남기지 않았다면 그것도 밝힙니다(주의 사항 `noDesign`). 선행 기술 검색에서 그 결합이 이미 실현되어 있다고 드러난 역량은 역량으로 남지만, 더는 새로운 것이 아닙니다([선행 기술](#prior-art) 참고). 보고서에서는 **새로운 역량이 먼저, 그다음 결합이 이미 존재하는 역량, 마지막으로 개선**이 옵니다.
 
 ### 새로움은 결합에 있습니다 {#novelty-lies-in-the-assembly}
 
@@ -146,7 +146,7 @@ await study.recordResult('M1', {
 
 연구가 다른 과정을 위해 가져온 결과로는 충분하지 않습니다. 모델이 그 주장을 작성한 프롬프트에서 그 결과를 보았어야 합니다. 아키텍처의 구성 요소에도 같은 규칙이 적용됩니다. 연구가 읽을 수 없는 상태는 `hypothesis`로 간주되며, 더 강한 상태로 간주되는 일은 없습니다. **소스가 없으면 아무것도 확립될 수 없습니다.** 모든 주장은 기껏해야 가설이고, 어떤 신규 주장도 확인할 수 없으며, 보고서는 첫 번째 주의 사항(`noSources`)으로 그렇다고 밝힙니다.
 
-연구가 드는 모든 이유(상태를 낮춘 이유, 항목을 제거한 이유, 개정안을 거부한 이유)는 `StudyReason`입니다. `code`(예: `citesUnlisted`나 `noveltyNoResult`), 그 `params`, 그리고 같은 이유를 영어로 적은 것(`message`)으로 이루어집니다. 자료집은 이유를 연구의 언어로 씁니다. 감시자나 모델이 쓴 이유는 코드가 `judged`이며, 그 텍스트는 `params.text`에 있습니다.
+연구가 드는 모든 이유(상태를 낮춘 이유, 항목을 제거한 이유, 개정안을 거부한 이유)는 `StudyReason`입니다. `code`(예: `citesUnlisted`나 `priorArtNoResult`), 그 `params`, 그리고 같은 이유를 영어로 적은 것(`message`)으로 이루어집니다. 자료집은 이유를 연구의 언어로 씁니다. 감시자나 모델이 쓴 이유는 코드가 `judged`이며, 그 텍스트는 `params.text`에 있습니다.
 
 ### 선행 기술 {#prior-art}
 
@@ -155,9 +155,9 @@ await study.recordResult('M1', {
 - `novel` 또는 `partlyNovel`: 신규 주장은 신규로 남지만 더는 검증 대상이 아니며, `priorArt`(`closest`, `sources`, `verdict`)가 붙습니다.
 - `exists`: 그 아이디어는 이미 실현되어 있습니다. 신규 주장은 `hypothesis`가 되고, `statusReason`이 가장 가까운 작업을 밝힙니다.
 
-신규 주장이 아닌 아키텍처의 선행 기술도 기록되며, 그 상태는 바뀌지 않습니다. 연구는 상태를 낮출 뿐, 절대 올리지 않습니다.
+신규 주장이 아닌 역량의 선행 기술도 기록되며, 그 상태는 바뀌지 않습니다. 연구는 상태를 낮출 뿐, 절대 올리지 않습니다. 그 결합이 이미 존재하면, 그 역량은 `kind: 'capability'`를 유지하고, 그 `priorArtReason`이 그렇다고 밝히며(`assemblyExists`, 가장 가까운 작업 포함), 다른 역량들 뒤, 개선들 앞에 순위가 매겨집니다(주의 사항 `capabilitiesExist`).
 
-선행 기술을 검색하거나 평가할 수 없었던 신규 주장은 검증 대상으로 남으며, 그 `statusReason`이 이유를 밝힙니다. 소스가 없음(`noveltyNoSource`), 그 주장을 위한 검색이 요청되지 않음(`noveltyNotSearched`), 검색이 실패함(`noveltySearchFailed`) 또는 아무것도 찾지 못함(`noveltyNoResult`), 검색 예산이 바닥남(`noveltySearchBudget`), 결과가 평가되지 않음(`noveltyNotAssessed`), 또는 검사가 그 주장 자체의 결과를 하나도 인용하지 않음(`noveltyUnsupported`)입니다. 설계 이후에 주장된 신규 주장도 검증 대상으로 남습니다. 보고서는 그 수를 셉니다(주의 사항 `noveltiesToVerify`).
+선행 기술을 검색하거나 평가할 수 없었던 주장은 검증 대상(`toVerify`)으로 남으며, 그 이유가 함께 기록됩니다. 신규 주장이라면 그 `statusReason`에, 다른 상태의 역량이라면 그 `priorArtReason`에 기록됩니다. 이유는 다음과 같습니다. 검색이 아직 실행되지 않음(`priorArtNotSearchedYet`), 소스가 없음(`priorArtNoSource`), 그 주장을 위한 검색이 요청되지 않음(`priorArtNotSearched`), 검색이 실패함(`priorArtSearchFailed`) 또는 아무것도 찾지 못함(`priorArtNoResult`), 검색 예산이 바닥남(`priorArtSearchBudget`), 결과가 평가되지 않음(`priorArtNotAssessed`), 또는 검사가 그 주장 자체의 결과를 하나도 인용하지 않음(`priorArtUnsupported`)입니다. 설계 이후에 주장된 신규 주장도 검증 대상으로 남습니다. 보고서는 그 수를 셉니다(주의 사항 `noveltiesToVerify`와 `capabilitiesToVerify`).
 
 ## 여러분의 소스를 통한 조사 {#research-through-your-sources}
 
@@ -185,11 +185,11 @@ const study = sdk.createStudy({ name: 'browser', object, objective, sources });
 - **연구를 만들 때 검사됩니다.** 소스가 정의된 도구가 아니거나 텍스트 쿼리를 받지 않으면 `createStudy`가 `ValidationError`를 던집니다. 쿼리는 도구의 `query` 매개변수나 다른 흔한 이름(`q`, `search`, `keywords`…)에 들어가고, 그런 것이 없으면 유일한 필수 텍스트 매개변수에, 그것도 없으면 첫 번째 텍스트 매개변수에 들어갑니다.
 - **통제됩니다.** 모든 검색은 `sdk.executeTool`을 거쳐 실행되며, 연구의 `id`를 에이전트 id로, 소스만을 허용된 도구로 삼습니다. 허용 목록, 정책, 예산, 승인, 재시도, 트레이스가 여느 도구 호출처럼 적용되며, 도구 이벤트(`action.executing`, `policy.checked`, `tool.called`, `action.executed`)는 연구의 실행에 기록됩니다. 실패하거나 정책이 거부한 검색은 그 오류와 함께 기록되고, 연구는 계속됩니다.
 - **검색하는 때.** `historicalChoices` 전과 `changes` 전에, 모델이 그 과정에 필요한 검색을 요청합니다. `changes`의 경우에는 여러분의 단서 하나하나를 검증하고, 그 너머의 다른 도구를 찾고, 현재 최고의 구현을 찾고, 결합에 의한 혁신을 문서화하기 위한 검색입니다. `design` 뒤에는 신규 주장의 선행 기술을 검색합니다. 한 번에 요청되는 검색은 최대 여섯 개입니다.
-- **번호가 붙는 결과.** 연구는 결과의 형태(목록, `results`나 `items`처럼 목록을 담은 객체, JSON 텍스트, MCP 텍스트 파트, `Title:`, `Description:`, `URL:` 줄로 이루어진 블록 형식의 텍스트(MCP 검색 서버가 흔히 답하는 방식으로, 블록 하나가 결과 하나), 또는 일반 텍스트)와 상관없이 결과를 읽습니다. 제목, URL이나 다른 위치 정보, 주어진 경우 날짜, 그리고 발췌문을 각각 한 줄로 보관하며, 다시 시작하기 전까지는 연구 전체에 걸쳐 한 번만 번호를 매깁니다. 같은 결과를 위치 정보로 다시 찾으면 그 id가 유지됩니다. 검색마다 결과를 `limits.maxResultsPerSearch`개(기본값 5) 보관합니다.
-- **데이터로 제시됩니다.** 프롬프트는 인용할 수 있는 결과를 JSON 배열로, 구분 표시 `<<<UNTRUSTED-SEARCH-RESULTS`와 `UNTRUSTED-SEARCH-RESULTS>>>` 사이에 나열합니다. 그리고 모델에게 그 사이에 있는 것은 외부 소스에서 온 데이터일 뿐, 따라야 할 지시가 결코 아니라고 알려 줍니다. 이 단계를 위해 찾은 결과에는 발췌문이 함께 오고, 앞선 레코드가 인용하는 결과에는 id, 제목, 위치 정보가 함께 옵니다. 그 프롬프트에서 작성된 주장을 뒷받침할 수 있는 것은 거기에 나열된 id뿐입니다.
+- **번호가 붙는 결과.** 연구는 결과의 형태(목록, `results`나 `items`처럼 목록을 담은 객체, JSON 텍스트, MCP 텍스트 파트, `Title:`, `Description:`, `URL:` 줄로 이루어진 블록 형식의 텍스트(MCP 검색 서버가 흔히 답하는 방식으로, 블록 하나가 결과 하나이며, 블록 아래에 이어지는 글은 그 결과의 발췌문에 들어감), 또는 일반 텍스트)와 상관없이 결과를 읽습니다. "No results found" 같은 응답은 결과가 아닙니다. 제목, URL이나 다른 위치 정보, 주어진 경우 날짜, 그리고 발췌문을 각각 한 줄로 보관하며, 다시 시작하기 전까지는 연구 전체에 걸쳐 한 번만 번호를 매깁니다. 같은 결과를 위치 정보로 다시 찾으면 그 id가 유지됩니다. 검색마다 결과를 `limits.maxResultsPerSearch`개(기본값 5) 보관합니다.
+- **데이터로 제시됩니다.** 연구 바깥에서 온 모든 텍스트(검색 결과, 소스의 설명, 재수행에 전달되는 거부된 항목)는 레이블이 붙은 JSON 블록으로 모델에 전달되며, 이 블록은 `<<<UNTRUSTED-DATA-<id>` 줄과 `UNTRUSTED-DATA-<id>>>` 줄 사이에 놓입니다. id는 프롬프트마다 무작위로 정해지므로, 텍스트가 스스로 쓴 구분 표시로 자신의 블록을 닫을 수 없습니다. 그리고 모델에게 구분 표시 사이에 있는 것은 데이터일 뿐, 따라야 할 지시가 결코 아니라고 알려 줍니다. 이 단계를 위해 찾은 결과에는 발췌문이 함께 오고, 앞선 레코드가 인용하는 결과에는 id, 제목, 위치 정보가 함께 옵니다. 그 프롬프트에서 작성된 주장을 뒷받침할 수 있는 것은 거기에 나열된 id뿐입니다.
 - **상한이 있습니다.** `limits.maxSearches`(기본값은 실행당 20)가 검색 횟수를 제한합니다. 이를 다 쓰더라도 실행은 **멈추지 않습니다**. 검색 없이 계속 진행하며, 소스가 필요했던 주장은 가설로 남고, 신규 주장은 검증 대상으로 남으며, 보고서는 어느 과정이 검색하지 못했는지 밝힙니다(주의 사항 `searchesSkipped`).
 
-여러분의 단서는 진실이 아니라 검증할 예시입니다. `changes`는 단서 하나하나에 판정(`relevant`, `partlyRelevant` 또는 `notRelevant`, 이유 포함)을 내려야 하며, 하나를 빠뜨린 응답은 한 번 되돌려 보내집니다. 헌장이 단서에 번호를 매기고, 모델은 어떤 언어로 쓰든 각 단서를 그 번호로 지목합니다. 보고서는 단서를 헌장에 적힌 그대로 다시 씁니다. 단서 하나는 판정을 하나만 받습니다. 같은 단서에 대한 다른 판정은 거부됩니다(`leadAlreadyJudged`). `changes`가 실행된 뒤에도 판정이 없는 단서는 `unverifiedLeads`에 나열됩니다(주의 사항 `leadsNotVerified`). 연구가 스스로 찾은 도구는 `independentLeads`입니다.
+여러분의 단서는 진실이 아니라 검증할 예시입니다. `changes`는 단서 하나하나에 판정(`relevant`, `partlyRelevant` 또는 `notRelevant`, 이유 포함)을 내려야 하며, 하나를 빠뜨린 응답은 한 번 되돌려 보내집니다. 헌장이 단서에 번호를 매기고, 모델은 어떤 언어로 쓰든 각 단서를 그 번호로 지목합니다. 보고서는 단서를 헌장에 적힌 그대로 다시 씁니다. 단서 하나는 판정을 하나만 받습니다. 같은 단서에 다시 내려진 판정은 버려지고(`leadAlreadyJudged`), `study.passage_completed`에 중복으로 나열됩니다. 이것은 이탈이 아닙니다. `changes`가 실행된 뒤에도 판정이 없는 단서는 `unverifiedLeads`에 나열됩니다(주의 사항 `leadsNotVerified`). 연구가 스스로 찾은 도구는 `independentLeads`입니다.
 
 ## 목표 지키기 {#staying-on-the-objective}
 
@@ -250,8 +250,9 @@ Objective: A browser design whose every choice follows from the investigation
 각 과정이 끝나면 별도의 호출인 **감시자**가 헌장, 수락된 개정안, 그리고 그 과정의 항목만 봅니다. 과제도, 앞선 레코드도, 검색도 보지 않습니다. 감시자는 온도 0으로 실행되며, 각 항목을 따로따로 판단합니다. 목표에 맞는지 아닌지, 그리고 그 이유입니다. 설계에 대해서는 각 아키텍처의 메커니즘, 구성 요소, 결합도 보고, 그 아키텍처가 새로운 역량을 여는지 판단합니다([역량, 원리, 메커니즘](#capability-principle-mechanism) 참고).
 
 - 목표를 벗어난 항목은 제거되어 이유와 함께 **이탈 기록**에 남고(`by: 'guardian'`), `study.drift_rejected` 이벤트로 기록됩니다.
-- **실패 시 차단 방식입니다.** `onObjective`가 true 또는 false인 판정만 인정됩니다. 그런 판정을 받지 못한 항목은 `unchecked`로 남습니다. 보고서에는 표시된 채 남지만(주의 사항 `uncheckedItems`) 이후의 프롬프트에는 절대 들어가지 않으며, 다음 실행에서 감시자가 가장 먼저 그것을 판단합니다. 과정의 항목을 하나도 판단하지 못한 감시자는 실행을 실패시킵니다.
-- (감시자나 스키마가) 거부한 항목이 과정이 만든 것의 일정 비율, 즉 `driftThreshold`(기본값 3분의 1)를 넘으면, 그 과정은 어떤 항목이 왜 거부되었는지를 전달받고 **한 번 다시 수행됩니다**. 재수행은 그 자체로 하나의 단계이며, 예산 정책이 먼저 그것을 검사합니다. 두 시도 중 더 나은 쪽이 보관됩니다. 설계라면 새로운 역량을 겨냥하는 쪽, 그다음으로는 판단을 거친 뒤 각 컬렉션에 필요한 항목을 갖춘 쪽, 그다음으로는 보관된 항목이 더 많은 쪽이며, 둘이 같으면 재수행 쪽입니다. 첫 시도가 보관되었을 때는 `study.passage_completed`가 그렇다고 밝힙니다(`keptAttempt`). 이미 판정된 단서에 대한 두 번째 판정은 기록되지만, 재수행 여부를 정할 때 셈에 들어가지 않습니다.
+- **실패 시 차단 방식입니다.** `onObjective`가 true 또는 false인 판정만 인정됩니다. 그런 판정을 받지 못한 항목은 `unchecked`로 남습니다. 보고서에는 표시된 채 남지만(주의 사항 `uncheckedItems`) 이후의 프롬프트에는 절대 들어가지 않으며, 다음 실행에서 감시자가 가장 먼저 그것을 판단합니다. 과정의 항목을 하나도 판단하지 못한 감시자는 실행을 실패시킵니다. 수정을 쓸 수 없으면, 대신 첫 응답을 관대하게 읽습니다. 그 응답의 유효한 판정은 인정되고, 판정을 받지 못한 항목은 판단되지 않은 채로 남습니다(`study.model_called`의 `usedAttempt: 1`).
+- **뒤늦은 판단은 뒤따르는 과정에 전해집니다.** 다음 실행의 감시자가 이미 완료된 과정의 항목을 남기면, 그 항목 없이 실행된 과정들이 이를 따라잡습니다. 설계는 그 항목들의 선행 기술 검색을 받고, 그 항목들을 읽는 이후 과정들은 루프처럼 다시 실행됩니다(`limits.maxLoops`. `study.passage_started`에는 `outdated: true`가 붙습니다). 남은 루프가 없으면 그 과정들은 최신이 아닌 상태로 남고(주의 사항 `passagesOutdated`), 이후의 실행이 그 과정들을 다시 씁니다.
+- (감시자나 스키마가) 거부한 항목이 과정이 만든 것의 일정 비율, 즉 `driftThreshold`(기본값 3분의 1)를 넘으면, 그 과정은 어떤 항목이 왜 거부되었는지를 전달받고 **한 번 다시 수행됩니다**. 재수행은 그 자체로 하나의 단계이며, 예산 정책이 먼저 그것을 검사합니다. 두 시도 중 더 나은 쪽이 보관됩니다. 설계라면 새로운 역량을 겨냥하는 쪽, 그다음으로는 판단을 거친 뒤 각 컬렉션에 필요한 항목을 갖춘 쪽, 그다음으로는 보관된 항목이 더 많은 쪽이며, 둘이 같으면 재수행 쪽입니다. 감시자가 판단할 수 없는 재수행은 첫 시도를 그대로 둡니다. 첫 시도가 보관되었을 때는 `study.passage_completed`와 그 과정의 상태가 그렇다고 밝히고(`keptAttempt`), 버려진 재수행에 무엇이 담겼는지도 밝힙니다(`discarded`). 자료집도 이를 밝히며, 자료집의 이탈 기록에서는 각 항목이 몇 번째 시도에서 나왔는지 보여 줍니다.
 - 판단된 항목이 필요한 수보다 적게 남은 과정(예를 들어 아키텍처가 두 개 미만)은 그대로 보관되며, 보고서가 그렇다고 밝힙니다(주의 사항 `minimumsNotMet`).
 - 보고서는 모든 거부를 보관하고(`driftLog`), 거부와 재수행의 횟수를 `stats`에 셉니다.
 
@@ -274,7 +275,7 @@ amendment.reason;   // why: { code, params?, message }
 | `changesObjective` | 대상이나 목표를 바꿉니다 | 거부됩니다. 새로운 목표는 `sdk.createStudy`로 만드는 새로운 연구입니다 |
 | `unclassified` | 분류할 수 없었습니다. 오류(`amendmentUnclassified`), `timeoutMs` 경과(기본값 60 000 ms, `amendmentTimedOut`), `signal` 중단(`amendmentCancelled`), 또는 예산 정책의 호출 거부(`amendmentPolicy`) 때문입니다 | 거부됩니다. 목표가 우선입니다 |
 
-수락된 개정안과 거부된 개정안은 기록되며(`study.amendment_accepted`, `study.amendment_refused`), `study.amendments`와 보고서에 나열됩니다. 지시는 절대 소리 없이 쌓이지 않습니다. 하나하나 번호가 붙고, 목표에 종속되며, 눈에 보입니다. 개정안에는 한도도 있습니다. 텍스트가 500자보다 길거나(`MAX_AMENDMENT_LENGTH`), 연구가 이미 개정안을 10개 수락했다면(`MAX_AMENDMENTS`) `amend()`는 `ValidationError`를 던집니다. 그 이상이 필요하다면 헌장이 모든 것을 말해야 하며, 그것은 새로운 연구에서 할 일입니다.
+수락된 개정안과 거부된 개정안은 기록되며(`study.amendment_accepted`, `study.amendment_refused`), `study.amendments`와 보고서에 나열됩니다. 지시는 절대 소리 없이 쌓이지 않습니다. 하나하나 번호가 붙고, 목표에 종속되며, 눈에 보입니다. 각 개정안은 오직 헌장에만 비추어 판단되므로, 서로 모순되는 두 개정안이 둘 다 수락될 수도 있습니다. 각각이 헌장을 구체화하며, 그 뒤로 감시자는 이후의 모든 항목을 헌장과 그 개정안 모두에 비추어 판단합니다. 개정안은 요청된 순서대로 하나씩 분류되며, 각 개정안의 `timeoutMs`는 그 차례가 왔을 때부터 셉니다. 개정안에는 한도도 있습니다. 텍스트가 500자보다 길거나(`MAX_AMENDMENT_LENGTH`), 차례가 왔을 때 연구가 이미 개정안을 10개 수락한 상태라면(`MAX_AMENDMENTS`) `amend()`는 `ValidationError`를 던집니다. 따라서 동시에 이루어진 호출들이 함께 한도를 넘을 수는 없습니다. 그 이상이 필요하다면 헌장이 모든 것을 말해야 하며, 그것은 새로운 연구에서 할 일입니다.
 
 ### 이것이 효과가 있는 이유 {#why-this-works}
 
@@ -327,7 +328,7 @@ const second = await study.run();
 const fresh = await study.run({ restart: true });
 ```
 
-- **재개.** 멈추거나 실패하거나 취소된 실행은 `run()`을 다시 호출해 재개합니다. 먼저 감시자가 마지막 실행이 판단하지 않고 남긴 것을 판단합니다. 그다음 판단은 되었지만 끝나지 않은 과정은 마무리만 하고(선행 기술 검색이 중간에 끊긴 설계는 그 검색부터 재개되며, 그 `study.passage_completed`에는 `resumed: true`가 붙습니다), 이어서 완료되지 않은 과정들이 실행됩니다. 이미 완료된 과정은 보관됩니다. `study.started`는 할 일이 남은 첫 과정을 기록합니다(`resumeAt`).
+- **재개.** 멈추거나 실패하거나 취소된 실행은 `run()`을 다시 호출해 재개합니다. 먼저 감시자가 마지막 실행이 판단하지 않고 남긴 것을 판단하며, 감시자가 남긴 항목은 그 항목 없이 실행된 과정들에 전해집니다([감시자](#the-guardian) 참고). 그다음, 멈추기 전에 첫 시도가 판단된 과정은 받아야 했던 재수행을 실행에서와 같은 규칙에 따라 받습니다(`study.passage_started`에는 `redo: true`와 `resumed: true`가 붙습니다). 그렇지 않으면 마무리만 합니다(선행 기술 검색이 중간에 끊긴 설계는 그 검색부터 재개되며, 그 `study.passage_completed`에는 `resumed: true`가 붙습니다). 이어서 완료되지 않은 과정들이 실행됩니다. 이미 완료된 과정은 보관됩니다. `study.started`는 할 일이 남은 첫 과정을 기록합니다(`resumeAt`).
 - **다시 시작.** `restart: true`는 연구를 처음부터 다시 시작합니다. 과정, 결과(다시 `S1`부터 번호가 매겨짐), 검색, 이탈 기록, 항목의 번호 매기기, 실행을 지웁니다. 헌장과 개정안만 남습니다.
 - **한 번에 실행 하나.** 실행이 진행 중일 때 두 번째 `run()`을 호출하면 `ValidationError`를 던집니다. `amend()`는 실행 중에도 호출할 수 있습니다.
 - **메모리 안에서.** 연구의 상태는 `Study` 객체 안에 있고, 그 `id`는 프로세스마다 바뀝니다. 재개는 같은 객체에서 작동합니다. 이벤트는 감사를 위해 모든 과정의 항목, 모든 검색, 모든 판정을 기록하지만, SDK가 이벤트로부터 연구를 다시 만들어 내지는 않습니다.
@@ -349,7 +350,7 @@ const result = await study.run({
 const unsubscribe = sdk.subscribe(listener, { agentId: study.id });
 ```
 
-연구는 열두 가지 이벤트 유형을 기록합니다. `study.started`, `study.passage_started`, `study.passage_completed`, `study.search`, `study.model_called`, `study.drift_rejected`, `study.capability_demoted`, `study.amendment_accepted`, `study.amendment_refused`, `study.result_recorded`, `study.completed`, `study.failed`입니다. 그 데이터는 [이벤트 카탈로그](../reference/events#studies)에 나와 있습니다. 연구를 실행하면서 자신의 컨텍스트의 `onEvent`를 연구에 넘기는 도구는 MCP 클라이언트도 따라갈 수 있습니다. 그 도구의 [진행 알림](./mcp-deploy#progress-notifications)은 과정의 이름을 알려 주며(`passage changes started`, `search in changes`), 쿼리나 연구의 텍스트는 절대 알려 주지 않습니다.
+연구는 열두 가지 이벤트 유형을 기록합니다. `study.started`, `study.passage_started`, `study.passage_completed`, `study.search`, `study.model_called`, `study.drift_rejected`, `study.capability_demoted`, `study.amendment_accepted`, `study.amendment_refused`, `study.result_recorded`, `study.completed`, `study.failed`입니다. 그 데이터는 [이벤트 카탈로그](../reference/events#studies)에 나와 있습니다. 연구를 실행하면서 자신의 컨텍스트의 `onEvent`를 연구에 넘기는 도구는 MCP 클라이언트도 따라갈 수 있습니다. 그 도구의 [진행 알림](./mcp-deploy#progress-notifications)은 과정의 이름을 알려 주며(`passage changes started`, `search in changes`, 그다음 `report ready` 또는 `partial report ready`), 쿼리나 연구의 텍스트는 절대 알려 주지 않습니다.
 
 ## 전체 예제 {#a-complete-example}
 
@@ -429,7 +430,7 @@ await eventStore.destroy();
 ```ts
 const { report } = result;
 report.notices;       // read first: no sources, a stop, leads without a verdict…
-report.architectures; // capabilities first, then improvements
+report.architectures; // new capabilities, then existing ones, then improvements
 report.experiments;   // what would decide between the architectures
 report.cards;         // one mechanism card per main mechanism
 report.driftLog;      // what left the objective, and why
@@ -437,7 +438,7 @@ report.results;       // every result retrieved, S1, S2…
 report.stats;         // model calls, searches, items by status, rejections, redos, loops, amendments
 ```
 
-보고서에는 헌장과 그 해시, 개정안, 각 과정의 상태(`complete`, `partial`, `unchecked` 또는 `notRun`, 그리고 시도 횟수와 그 과정을 다시 연 과정), 과정들의 모든 컬렉션, 부품별로 묶은 세 가지 상태, 검색, 그리고 마지막으로 다시 시작한 이후의 `run()` 실행들(`runIds`)도 담깁니다. `stats.runs`와 `stats.modelCalls`는 그 실행들과, 그 안에서 벤더가 응답한 호출만 셉니다. 개정안은 따로 세며, 다시 시작해도 그 수는 유지됩니다(`stats.amendments`: 분류된 개정안 수와 그 모델 호출 수). 그 타입은 [SDK API 레퍼런스](../reference/sdk-api#studies)에 나열되어 있습니다.
+보고서에는 헌장과 그 해시, 개정안, 각 과정의 상태(`complete`, `partial`, `unchecked` 또는 `notRun`, 그리고 시도 횟수, 그 과정을 다시 연 과정, 버린 재수행이 있으면 그 재수행), 과정들의 모든 컬렉션, 부품별로 묶은 세 가지 상태, 검색, 그리고 마지막으로 다시 시작한 이후의 `run()` 실행들(`runIds`)도 담깁니다. `stats.runs`와 `stats.modelCalls`는 그 실행들과, 그 안에서 벤더가 응답한 호출만 셉니다. 개정안은 따로 세며, 다시 시작해도 그 수는 유지됩니다(`stats.amendments`: 분류된 개정안 수와 그 모델 호출 수). 그 타입은 [SDK API 레퍼런스](../reference/sdk-api#studies)에 나열되어 있습니다.
 
 **주의 사항**은 나머지를 믿기 전에 독자가 알아야 할 것을 알려 줍니다. 각 주의 사항에는 `code`, 그 `params`와 `details`, 그리고 같은 주의 사항을 영어로 적은 것(`message`)이 있습니다.
 
@@ -455,6 +456,9 @@ report.stats;         // model calls, searches, items by status, rejections, red
 | `minimumsNotMet` | 판단된 항목이 필요한 수보다 적게 남은 컬렉션(`details`: `passage.collection`) |
 | `untracedAssembly` | 구성 요소나 결합의 연결이 조사의 어떤 레코드도 인용하지 않는 아키텍처(`details`: 그 id) |
 | `noveltiesToVerify` | 아직 선행 기술과 대조해야 할 신규 주장 |
+| `capabilitiesToVerify` | 결합이 선행 기술과 대조되지 않은 역량(`details`: 그 id) |
+| `capabilitiesExist` | 결합이 이미 존재하는 역량. 다른 역량들 뒤에 순위가 매겨짐(`details`: 그 id) |
+| `passagesOutdated` | 감시자가 뒤늦게 판단한 항목보다 먼저 작성되었고, 아직 다시 작성되지 않은 과정 |
 
 ### 자료집 {#the-dossier}
 
@@ -467,7 +471,7 @@ report.stats;         // model calls, searches, items by status, rejections, red
 5. 각 부품의 세 가지 상태, 조합, 결합에 의한 혁신.
 6. 설계 방향: 각 아키텍처는 새로운 역량 또는 개선으로 표시되며(격하된 아키텍처라면 그 이유도 함께), 누구를 위한 것인지, 없앤 제약, 원리의 변화, 메커니즘, 각 부분의 출처를 밝힌 구성 요소 → 결합 → 역량 경로, 조건, 이점, 추가 비용, 반례, 사슬을 다루는 범위, 예측을 갖춥니다. 그다음 무엇이 새롭고 무엇이 새롭지 않은지.
 7. 실험, 그리고 메커니즘 카드.
-8. 이탈 기록, 소스, 통계.
+8. 이탈 기록(각 항목의 시도, 그리고 버려진 재수행), 소스, 통계.
 
 모든 주장은 자신의 상태와 인용한 결과(`S1, S3`), 그리고 인용했지만 그 프롬프트가 나열하지 않은 id를 보여 줍니다. 연구가 낮춘 상태는 모델이 무엇을 선언했고 왜 낮췄는지 밝히며, 신규 주장은 그 선행 기술을 보여 주거나 아직 검증 대상이라고 밝힙니다. http와 https 위치 정보만 링크가 됩니다. 자료집의 문구는 이 문서의 열한 개 언어로 준비되어 있습니다. 그 밖의 언어는 영어 레이블을 받지만, 모델은 여전히 그 언어로 텍스트를 씁니다. 보고서에 있는 각 주의 사항과 각 이유의 `message`는 영어이며, 자료집은 그 코드로부터 그것들을 자신의 언어로 씁니다.
 

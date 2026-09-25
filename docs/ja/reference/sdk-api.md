@@ -179,7 +179,7 @@ interface OutcomeEvaluator {
 | `name`、`language`、`charter`、`charterHash` | 名前、言語、凍結された `StudyCharter`、その SHA-256（16 進数）。ハッシュは `study.started` と各追加指示に記録される |
 | `amendments` | `StudyAmendment[]`：受け入れられたものと拒否されたもの、順番どおり |
 | `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`。最後の実行が止まったところから再開する：まず監視役がその実行が判定しないまま残したものを判定し、判定済みだが終わっていない工程は仕上げだけを行い、その後、完了していない工程が実行される。`restart` は研究を最初から始め直す：工程、結果、検索、逸脱ログ、番号付け、実行が消去され、憲章と追加指示は残る。制限、ポリシー、キャンセル、エラーは、その状態と行われたことのレポートとともに実行を終わらせる。例外を投げるのは、すでに実行が進行中の場合、処理できない `onEvent` の場合、イベントストアが失敗した場合だけ。`onEvent` は `agent.run` と同じように働く |
-| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`。それ以前の追加指示には決して照らさず、憲章だけに照らして、予算のポリシーがまず確認される専用の実行（`mode: 'study-amendment'`）の中で分類される。受け入れられるのは `refines` だけで、それ以降のすべてのプロンプトに示される。`timeoutMs`（デフォルトは 60 000）と `signal` が分類に上限を設ける：それらを過ぎたとき、またはポリシーが分類を拒否したとき、追加指示は `unclassified` として拒否される。空のテキスト、`MAX_AMENDMENT_LENGTH`（500 文字）より長いテキスト、またはすでに `MAX_AMENDMENTS`（10）の追加指示が受け入れられている場合は `ValidationError` を投げる |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`。それ以前の追加指示には決して照らさず（互いに矛盾する 2 つの追加指示がどちらも受け入れられることがある）、憲章だけに照らして、求められた順に 1 つずつ、予算のポリシーがまず確認される専用の実行（`mode: 'study-amendment'`）の中で分類される。受け入れられるのは `refines` だけで、それ以降のすべてのプロンプトに示される。`timeoutMs`（デフォルトは 60 000。その追加指示の順番が来たときから数える）と `signal` が分類に上限を設ける：それらを過ぎたとき、またはポリシーが分類を拒否したとき、追加指示は `unclassified` として拒否される。空のテキスト、`MAX_AMENDMENT_LENGTH`（500 文字）より長いテキスト、または順番が来たときにすでに `MAX_AMENDMENTS`（10）の追加指示が受け入れられている場合は `ValidationError` を投げる |
 | `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`。カードのフィールド 10 と 11 を埋め、そのカードを書いた実行に `study.result_recorded` を記録する。未知のカードや空の `result` には `ValidationError` |
 | `report()` | `StudyReport`：現時点のレポート。最後の実行以降に記録された結果も含む |
 
@@ -220,7 +220,7 @@ interface StudyReport {
   revisableDecisions: StudyRevisableDecision[]; // D1…
   combinations: StudyCombination[];             // X1…
   capabilities: StudyCapability[];              // Y1…
-  architectures: StudyArchitecture[];           // A1…, capabilities first
+  architectures: StudyArchitecture[];           // A1…: new capabilities, existing ones, improvements
   noveltyClaims: StudyNoveltyClaim[];           // N1…
   experiments: StudyExperiment[];               // E1…
   cards: MechanismCard[];                       // M1…
@@ -241,7 +241,8 @@ interface StudyClaim {
   sources: string[];                                // results listed in the prompt that wrote it
   unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
   servesObjective: string;
-  toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
+  toVerify?: boolean;                               // prior art not assessed: a novelty, or a capability's assembly
+  priorArtReason?: StudyReason;                     // a capability that is not a novelty: why not checked, or assemblyExists
   priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
   unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
   runId: string;
@@ -260,15 +261,17 @@ interface StudyTrace {
 }
 ```
 
-レポートのすべての理由は `StudyReason` です。主張と構成要素の `statusReason`、逸脱のエントリーと追加指示の `reason`、格下げされたアーキテクチャの `kindReason` がそうです。調査書はその `code` を研究の言語で表示します（`studyLabels(language).reasons`）。監視役やモデルが書いたテキストはコード `judged` を持ち、`params.text` に入ります。コード（`StudyReasonCode`）は次のとおりです。
+レポートのすべての理由は `StudyReason` です。主張と構成要素の `statusReason`、新規性ではない能力の `priorArtReason`、逸脱のエントリーと追加指示の `reason`、格下げされたアーキテクチャの `kindReason` がそうです。調査書はその `code` を研究の言語で表示します（`studyLabels(language).reasons`）。監視役やモデルが書いたテキストはコード `judged` を持ち、`params.text` に入ります。コード（`StudyReasonCode`）は次のとおりです。
 
 | コード | 理由 |
 | --- | --- |
 | `noSourceConfigured`、`citesUnlisted`、`citesNothing` | `hypothesis` に引き下げられた `established` の主張または構成要素：情報源がない、またはそのプロンプトに一覧された ID を引用していない |
-| `noveltyNotSearchedYet`、`noveltyNoSource`、`noveltySearchBudget`、`noveltyNotSearched`、`noveltySearchFailed`、`noveltyNoResult`、`noveltyNotAssessed`、`noveltyUnsupported` | 新規性がまだ確認すべきものである理由 |
+| `priorArtNotSearchedYet`、`priorArtNoSource`、`priorArtSearchBudget`、`priorArtNotSearched`、`priorArtSearchFailed`、`priorArtNoResult`、`priorArtNotAssessed`、`priorArtUnsupported` | 新規性の先行技術、または能力の組み立ての先行技術が、まだ確認すべきものである理由（その英語のテキストは「To verify against prior art:」で始まる） |
 | `priorArtExists` | `hypothesis` に引き下げられた新規性：最も近い成果がすでにそれを実現している |
+| `assemblyExists` | 新規性ではなく、組み立てがすでに存在する能力（その `priorArtReason` に入る） |
 | `componentDocumented`、`componentUndocumented` | 新しいものとして示された構成要素 |
-| `noServesObjective`、`invalidItem`、`notAnObject`、`notAUserLead`、`leadAlreadyJudged` | スキーマに拒否された項目 |
+| `noServesObjective`、`invalidItem`、`notAnObject`、`notAUserLead` | スキーマに拒否された項目 |
+| `leadAlreadyJudged` | すでに判定された手がかりにもう一度下された判定：捨てられるが、逸脱ではない（`study.passage_completed` の `duplicates`） |
 | `designWithoutCapability` | 新しい能力を 1 つも含まない設計 |
 | `amendmentUnclassified`、`amendmentCancelled`、`amendmentTimedOut`、`amendmentPolicy` | 分類できなかった追加指示 |
 | `judged` | 監視役またはモデル自身の言葉 |
@@ -304,8 +307,8 @@ interface StudyTrace {
 | `StudyDriftEntry` | `passage`、`collection`、`item`（`id?`、`statement?`、`servesObjective?`）、`reason`（`StudyReason`）、`by`（`guardian`：目的から外れている。`schema`：その前に拒否された。たとえば `servesObjective` がない）、`attempt`（やり直しでは 2）、`runId` |
 | `StudySearchResult` | `id`（`S1`…。同じ結果が再び見つかっても、リスタートまでは保たれる）、`title`、`locator`（URL またはその他の所在情報）、`date?`、`excerpt`、`tool`、`query`、`runId` |
 | `StudySearch` | `passage`、`purpose`（`research` または `priorArt`）、`tool`、`query`、`servesObjective`、`claims?`、`resultIds`、`error?`、`skipped?`（`maxSearches`）、`runId` |
-| `StudyPassageState` | `passage`、`state`（`complete`。`partial`：判定済みだが終わっていない。ループを待っているか、先行技術の検索が途中で打ち切られた。`unchecked`：監視役が判定していない項目がある。`notRun`）、`attempts`（やり直しの後は 2）、`reopenedBy`、`runId?` |
-| `StudyNotice` | `code`（`noSources`、`stopped`、`failed`、`cancelled`、`passagesNotRun`、`uncheckedItems`、`searchesSkipped`、`leadsNotVerified`、`analoguesNotDeconstructed`、`noDesign`、`noCapability`、`minimumsNotMet`、`untracedAssembly`、`noveltiesToVerify`）、`params?`（`limit`、`error`、`count`）、`details?`（対象となる工程、`passage.collection` の組、手がかり、ブレークスルー、またはアーキテクチャ）、`message`（英語。調査書はコードを自分の言語で表示する） |
+| `StudyPassageState` | `passage`、`state`（`complete`。`partial`：判定済みだが終わっていない。ループを待っているか、先行技術の検索が途中で打ち切られた。`unchecked`：監視役が判定していない項目がある。`notRun`）、`attempts`（やり直しの後は 2）、`keptAttempt?` と `discarded?`（`attempt`、`items`：より良い最初の試行のために破棄されたやり直し）、`reopenedBy`、`runId?` |
+| `StudyNotice` | `code`（`noSources`、`stopped`、`failed`、`cancelled`、`passagesNotRun`、`uncheckedItems`、`searchesSkipped`、`leadsNotVerified`、`analoguesNotDeconstructed`、`noDesign`、`noCapability`、`minimumsNotMet`、`untracedAssembly`、`passagesOutdated`、`capabilitiesToVerify`、`capabilitiesExist`、`noveltiesToVerify`）、`params?`（`limit`、`error`、`count`）、`details?`（対象となる工程、`passage.collection` の組、手がかり、ブレークスルー、またはアーキテクチャ）、`message`（英語。調査書はコードを自分の言語で表示する） |
 | `StudyStats` | 最後のリスタート以降：`runs` と `modelCalls`（`run()` の実行と、その中でベンダーが応答した呼び出し）、`searches`、`searchesSkipped`、`results`、`items`、`rejected`、`byStatus`（状態ごと）、`downgraded`（研究が状態を引き下げた主張）、`noveltiesToVerify`、`redos`、`loops`。そして `amendments`（`count`、`modelCalls`）：研究のすべての追加指示で、別に数えられる |
 
 ### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}

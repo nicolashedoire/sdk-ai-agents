@@ -179,7 +179,7 @@ interface OutcomeEvaluator {
 | `name`, `language`, `charter`, `charterHash` | नाम, भाषा, फ़्रीज़ किया गया `StudyCharter`, और उसका SHA-256 (hexadecimal), जो `study.started` में और हर संशोधन के साथ दर्ज होता है |
 | `amendments` | `StudyAmendment[]`: स्वीकार और अस्वीकार किए गए, क्रम से |
 | `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`। वहीं से फिर शुरू होता है जहाँ पिछला run रुका था: सबसे पहले संरक्षक वह परखता है जो उस run ने बिना परखे छोड़ा था, जो चरण परखा जा चुका है पर पूरा नहीं हुआ वह सिर्फ़ पूरा होता है, फिर अधूरे चरण चलते हैं। `restart` अध्ययन को नए सिरे से शुरू करता है: चरण, परिणाम, खोजें, भटकाव लॉग, क्रमांकन और runs साफ़ कर दिए जाते हैं; चार्टर और संशोधन बचे रहते हैं। कोई सीमा, नीति, रद्दीकरण या error run को उसकी स्थिति और अब तक किए गए काम की रिपोर्ट के साथ खत्म करता है; यह error सिर्फ़ तब फेंकता है जब कोई run पहले से चल रहा हो, `onEvent` सर्व न किया जा सके, या इवेंट स्टोर विफल हो। `onEvent` वैसे ही काम करता है जैसे `agent.run` के साथ |
-| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`। सिर्फ़ चार्टर के सामने वर्गीकृत किया जाता है, पहले के संशोधनों के सामने कभी नहीं, एक अलग run (`mode: 'study-amendment'`) में, जिसमें पहले बजट नीतियाँ जाँची जाती हैं; सिर्फ़ `refines` स्वीकार होता है, और वह बाद के हर prompt में दिखता है। `timeoutMs` (डिफ़ॉल्ट 60 000) और `signal` वर्गीकरण की सीमा तय करते हैं: उनके पार होने पर, या जब कोई नीति उसे ठुकरा दे, संशोधन `unclassified` के रूप में ठुकरा दिया जाता है। खाली टेक्स्ट पर, `MAX_AMENDMENT_LENGTH` (500 अक्षर) से लंबे टेक्स्ट पर, या `MAX_AMENDMENTS` (10) संशोधन स्वीकार हो जाने के बाद `ValidationError` फेंकता है |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`। सिर्फ़ चार्टर के सामने वर्गीकृत किया जाता है, पहले के संशोधनों के सामने कभी नहीं (एक-दूसरे का खंडन करने वाले दो संशोधन दोनों स्वीकार हो सकते हैं), एक-एक करके, माँगे गए क्रम में, एक अलग run (`mode: 'study-amendment'`) में, जिसमें पहले बजट नीतियाँ जाँची जाती हैं; सिर्फ़ `refines` स्वीकार होता है, और वह बाद के हर prompt में दिखता है। `timeoutMs` (डिफ़ॉल्ट 60 000, उसकी बारी आने से गिना जाता है) और `signal` वर्गीकरण की सीमा तय करते हैं: उनके पार होने पर, या जब कोई नीति उसे ठुकरा दे, संशोधन `unclassified` के रूप में ठुकरा दिया जाता है। खाली टेक्स्ट पर, `MAX_AMENDMENT_LENGTH` (500 अक्षर) से लंबे टेक्स्ट पर, या जब उसकी बारी आने तक `MAX_AMENDMENTS` (10) संशोधन स्वीकार हो चुके हों, `ValidationError` फेंकता है |
 | `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`। किसी कार्ड के फ़ील्ड 10 और 11 भरता है और उसे लिखने वाले run में `study.result_recorded` दर्ज करता है; अज्ञात कार्ड या खाली `result` पर `ValidationError` |
 | `report()` | `StudyReport`: रिपोर्ट अपनी मौजूदा हालत में, पिछले run के बाद दर्ज परिणामों समेत |
 
@@ -220,7 +220,7 @@ interface StudyReport {
   revisableDecisions: StudyRevisableDecision[]; // D1…
   combinations: StudyCombination[];             // X1…
   capabilities: StudyCapability[];              // Y1…
-  architectures: StudyArchitecture[];           // A1…, capabilities first
+  architectures: StudyArchitecture[];           // A1…: new capabilities, existing ones, improvements
   noveltyClaims: StudyNoveltyClaim[];           // N1…
   experiments: StudyExperiment[];               // E1…
   cards: MechanismCard[];                       // M1…
@@ -241,7 +241,8 @@ interface StudyClaim {
   sources: string[];                                // results listed in the prompt that wrote it
   unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
   servesObjective: string;
-  toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
+  toVerify?: boolean;                               // prior art not assessed: a novelty, or a capability's assembly
+  priorArtReason?: StudyReason;                     // a capability that is not a novelty: why not checked, or assemblyExists
   priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
   unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
   runId: string;
@@ -260,15 +261,17 @@ interface StudyTrace {
 }
 ```
 
-रिपोर्ट का हर कारण एक `StudyReason` है: दावों और घटकों का `statusReason`, भटकाव entries और संशोधनों का `reason`, और दर्जा घटाए गए आर्किटेक्चर का `kindReason`। डोज़ियर उसके `code` को अध्ययन की भाषा में लिखता है (`studyLabels(language).reasons`); संरक्षक या मॉडल द्वारा लिखे गए टेक्स्ट का कोड `judged` होता है, और टेक्स्ट `params.text` में। कोड (`StudyReasonCode`):
+रिपोर्ट का हर कारण एक `StudyReason` है: दावों और घटकों का `statusReason`, ऐसी क्षमता का `priorArtReason` जो नवीनता नहीं है, भटकाव entries और संशोधनों का `reason`, और दर्जा घटाए गए आर्किटेक्चर का `kindReason`। डोज़ियर उसके `code` को अध्ययन की भाषा में लिखता है (`studyLabels(language).reasons`); संरक्षक या मॉडल द्वारा लिखे गए टेक्स्ट का कोड `judged` होता है, और टेक्स्ट `params.text` में। कोड (`StudyReasonCode`):
 
 | कोड | क्यों |
 | --- | --- |
 | `noSourceConfigured`, `citesUnlisted`, `citesNothing` | `hypothesis` तक घटाया गया `established` दावा या घटक: कोई स्रोत नहीं, या उसके prompt में सूचीबद्ध कोई id नहीं |
-| `noveltyNotSearchedYet`, `noveltyNoSource`, `noveltySearchBudget`, `noveltyNotSearched`, `noveltySearchFailed`, `noveltyNoResult`, `noveltyNotAssessed`, `noveltyUnsupported` | किसी नवीनता की जाँच अभी क्यों बाकी है |
+| `priorArtNotSearchedYet`, `priorArtNoSource`, `priorArtSearchBudget`, `priorArtNotSearched`, `priorArtSearchFailed`, `priorArtNoResult`, `priorArtNotAssessed`, `priorArtUnsupported` | किसी नवीनता के, या किसी क्षमता के संयोजन के, पूर्व कार्य की जाँच अभी क्यों बाकी है (उनका अंग्रेज़ी टेक्स्ट "To verify against prior art:" से शुरू होता है) |
 | `priorArtExists` | `hypothesis` तक घटाई गई नवीनता: सबसे नज़दीकी काम पहले ही यह करता है |
+| `assemblyExists` | ऐसी क्षमता जो नवीनता नहीं है, और जिसका संयोजन पहले से मौजूद है (उसके `priorArtReason` में) |
 | `componentDocumented`, `componentUndocumented` | नया बताया गया घटक |
-| `noServesObjective`, `invalidItem`, `notAnObject`, `notAUserLead`, `leadAlreadyJudged` | स्कीमा द्वारा ठुकराया गया आइटम |
+| `noServesObjective`, `invalidItem`, `notAnObject`, `notAUserLead` | स्कीमा द्वारा ठुकराया गया आइटम |
+| `leadAlreadyJudged` | पहले ही परखे जा चुके सुराग पर दोबारा दिया गया फ़ैसला: छोड़ दिया जाता है, भटकाव नहीं है (`study.passage_completed` के `duplicates`) |
 | `designWithoutCapability` | बिना किसी नई क्षमता वाला डिज़ाइन |
 | `amendmentUnclassified`, `amendmentCancelled`, `amendmentTimedOut`, `amendmentPolicy` | ऐसा संशोधन जिसे वर्गीकृत नहीं किया जा सका |
 | `judged` | संरक्षक या मॉडल के अपने शब्द |
@@ -304,8 +307,8 @@ interface StudyTrace {
 | `StudyDriftEntry` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason` (`StudyReason`), `by` (`guardian`: उद्देश्य से भटका हुआ; `schema`: पहले ही ठुकराया गया, जैसे `servesObjective` के बिना), `attempt` (दोबारा करने पर 2), `runId` |
 | `StudySearchResult` | `id` (`S1`…, वही परिणाम दोबारा मिलने पर बना रहता है, नए सिरे से शुरू करने तक), `title`, `locator` (एक URL या कोई दूसरा पता), `date?`, `excerpt`, `tool`, `query`, `runId` |
 | `StudySearch` | `passage`, `purpose` (`research` या `priorArt`), `tool`, `query`, `servesObjective`, `claims?`, `resultIds`, `error?`, `skipped?` (`maxSearches`), `runId` |
-| `StudyPassageState` | `passage`, `state` (`complete`; `partial`: परखा गया पर पूरा नहीं हुआ, अपने चक्र के इंतज़ार में या अपनी पूर्व कार्य की खोज बीच में कट जाने के कारण; `unchecked`: वे आइटम जिन्हें संरक्षक ने नहीं परखा; `notRun`), `attempts` (दोबारा करने के बाद 2), `reopenedBy`, `runId?` |
-| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noDesign`, `noCapability`, `minimumsNotMet`, `untracedAssembly`, `noveltiesToVerify`), `params?` (`limit`, `error`, `count`), `details?` (संबंधित चरण, `passage.collection` जोड़े, सुराग, सफलताएँ या आर्किटेक्चर), `message` (अंग्रेज़ी में; डोज़ियर कोड को अपनी भाषा में लिखता है) |
+| `StudyPassageState` | `passage`, `state` (`complete`; `partial`: परखा गया पर पूरा नहीं हुआ, अपने चक्र के इंतज़ार में या अपनी पूर्व कार्य की खोज बीच में कट जाने के कारण; `unchecked`: वे आइटम जिन्हें संरक्षक ने नहीं परखा; `notRun`), `attempts` (दोबारा करने के बाद 2), `keptAttempt?` और `discarded?` (`attempt`, `items`: बेहतर पहले प्रयास के कारण छोड़ा गया दोबारा किया गया प्रयास), `reopenedBy`, `runId?` |
+| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noDesign`, `noCapability`, `minimumsNotMet`, `untracedAssembly`, `passagesOutdated`, `capabilitiesToVerify`, `capabilitiesExist`, `noveltiesToVerify`), `params?` (`limit`, `error`, `count`), `details?` (संबंधित चरण, `passage.collection` जोड़े, सुराग, सफलताएँ या आर्किटेक्चर), `message` (अंग्रेज़ी में; डोज़ियर कोड को अपनी भाषा में लिखता है) |
 | `StudyStats` | पिछली बार नए सिरे से शुरू करने के बाद से: `runs` और `modelCalls` (`run()` के runs, और उनमें वे कॉल जिनका विक्रेता ने जवाब दिया), `searches`, `searchesSkipped`, `results`, `items`, `rejected`, `byStatus` (हर स्थिति के लिए), `downgraded` (वे दावे जिनकी स्थिति अध्ययन ने घटाई), `noveltiesToVerify`, `redos`, `loops`। और `amendments` (`count`, `modelCalls`): अध्ययन का हर संशोधन, अलग गिना गया |
 
 ### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}

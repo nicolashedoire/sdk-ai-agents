@@ -179,7 +179,7 @@ interface OutcomeEvaluator {
 | `name`、`language`、`charter`、`charterHash` | 名称、语言、冻结的 `StudyCharter`，以及它的 SHA-256（十六进制），记录在 `study.started` 中，并随每条修正案一起记录 |
 | `amendments` | `StudyAmendment[]`：已接受和被拒绝的修正案，按顺序排列 |
 | `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`。从上一次运行停止的地方恢复：守护者首先评判那次运行留下的未评判内容，已评判但尚未结束的环节只做收尾，然后运行尚未完成的环节。`restart` 让研究从头开始：环节、结果、搜索、偏离日志、编号和各次运行都会被清除；章程和修正案保留下来。限制、策略、取消或错误会以相应的状态和已完成内容的报告结束运行；它只在以下情况抛出异常：已有运行在进行中、无法提供 `onEvent`，或者事件存储出错。`onEvent` 的用法与 `agent.run` 相同 |
-| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`。只对照章程进行分类，从不对照较早的修正案，分类在单独的运行中进行（`mode: 'study-amendment'`），并且会先检查预算策略；只有 `refines` 会被接受，并显示在此后的每个 prompt 中。`timeoutMs`（默认 60 000）和 `signal` 限定分类过程：超出它们，或者某个策略拒绝了分类时，修正案会以 `unclassified` 被拒绝。文本为空、文本超过 `MAX_AMENDMENT_LENGTH`（500 个字符），或者已经接受了 `MAX_AMENDMENTS`（10）条修正案时，抛出 `ValidationError` |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`。只对照章程进行分类，从不对照较早的修正案（两条相互矛盾的修正案可能都会被接受），按提出的顺序逐条分类，分类在单独的运行中进行（`mode: 'study-amendment'`），并且会先检查预算策略；只有 `refines` 会被接受，并显示在此后的每个 prompt 中。`timeoutMs`（默认 60 000，从轮到它时开始计算）和 `signal` 限定分类过程：超出它们，或者某个策略拒绝了分类时，修正案会以 `unclassified` 被拒绝。文本为空、文本超过 `MAX_AMENDMENT_LENGTH`（500 个字符），或者轮到它时已经接受了 `MAX_AMENDMENTS`（10）条修正案，抛出 `ValidationError` |
 | `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`。填写卡片的第 10 和第 11 个字段，并在写出这张卡片的那次运行中记录 `study.result_recorded`；卡片未知或 `result` 为空时抛出 `ValidationError` |
 | `report()` | `StudyReport`：报告当前的样子，包括上次运行以来记录的结果 |
 
@@ -220,7 +220,7 @@ interface StudyReport {
   revisableDecisions: StudyRevisableDecision[]; // D1…
   combinations: StudyCombination[];             // X1…
   capabilities: StudyCapability[];              // Y1…
-  architectures: StudyArchitecture[];           // A1…, capabilities first
+  architectures: StudyArchitecture[];           // A1…: new capabilities, existing ones, improvements
   noveltyClaims: StudyNoveltyClaim[];           // N1…
   experiments: StudyExperiment[];               // E1…
   cards: MechanismCard[];                       // M1…
@@ -241,7 +241,8 @@ interface StudyClaim {
   sources: string[];                                // results listed in the prompt that wrote it
   unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
   servesObjective: string;
-  toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
+  toVerify?: boolean;                               // prior art not assessed: a novelty, or a capability's assembly
+  priorArtReason?: StudyReason;                     // a capability that is not a novelty: why not checked, or assemblyExists
   priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
   unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
   runId: string;
@@ -260,15 +261,17 @@ interface StudyTrace {
 }
 ```
 
-报告中的每个原因都是一个 `StudyReason`：论断和组件的 `statusReason`、偏离条目和修正案的 `reason`，以及被降级架构的 `kindReason`。档案会用研究的语言呈现它的 `code`（`studyLabels(language).reasons`）；守护者或模型写下的文本，代码为 `judged`，文本在 `params.text` 中。这些代码（`StudyReasonCode`）如下：
+报告中的每个原因都是一个 `StudyReason`：论断和组件的 `statusReason`、不是创新点的能力的 `priorArtReason`、偏离条目和修正案的 `reason`，以及被降级架构的 `kindReason`。档案会用研究的语言呈现它的 `code`（`studyLabels(language).reasons`）；守护者或模型写下的文本，代码为 `judged`，文本在 `params.text` 中。这些代码（`StudyReasonCode`）如下：
 
 | 代码 | 原因 |
 | --- | --- |
 | `noSourceConfigured`、`citesUnlisted`、`citesNothing` | 被降为 `hypothesis` 的 `established` 论断或组件：没有来源，或者没有引用它的 prompt 中列出的任何 id |
-| `noveltyNotSearchedYet`、`noveltyNoSource`、`noveltySearchBudget`、`noveltyNotSearched`、`noveltySearchFailed`、`noveltyNoResult`、`noveltyNotAssessed`、`noveltyUnsupported` | 创新点为什么仍有待核查 |
+| `priorArtNotSearchedYet`、`priorArtNoSource`、`priorArtSearchBudget`、`priorArtNotSearched`、`priorArtSearchFailed`、`priorArtNoResult`、`priorArtNotAssessed`、`priorArtUnsupported` | 创新点或能力的组装的现有技术为什么仍有待核查（它们的英文文本以“To verify against prior art:”开头） |
 | `priorArtExists` | 被降为 `hypothesis` 的创新点：最接近的工作已经做到了 |
+| `assemblyExists` | 不是创新点、而组装已经存在的能力（在它的 `priorArtReason` 中） |
 | `componentDocumented`、`componentUndocumented` | 被说成是新的组件 |
-| `noServesObjective`、`invalidItem`、`notAnObject`、`notAUserLead`、`leadAlreadyJudged` | 被 schema 拒绝的条目 |
+| `noServesObjective`、`invalidItem`、`notAnObject`、`notAUserLead` | 被 schema 拒绝的条目 |
+| `leadAlreadyJudged` | 对已经评判过的线索再次给出的判定：被丢弃，不算偏离（`study.passage_completed` 的 `duplicates`） |
 | `designWithoutCapability` | 没有任何新能力的设计 |
 | `amendmentUnclassified`、`amendmentCancelled`、`amendmentTimedOut`、`amendmentPolicy` | 无法被分类的修正案 |
 | `judged` | 守护者或模型自己的话 |
@@ -304,8 +307,8 @@ interface StudyTrace {
 | `StudyDriftEntry` | `passage`、`collection`、`item`（`id?`、`statement?`、`servesObjective?`）、`reason`（`StudyReason`）、`by`（`guardian`：偏离目标；`schema`：在此之前就被拒绝，例如缺少 `servesObjective`）、`attempt`（重做时为 2）、`runId` |
 | `StudySearchResult` | `id`（`S1`……，再次找到同一结果时保持不变，直到重新开始为止）、`title`、`locator`（URL 或其他定位符）、`date?`、`excerpt`、`tool`、`query`、`runId` |
 | `StudySearch` | `passage`、`purpose`（`research` 或 `priorArt`）、`tool`、`query`、`servesObjective`、`claims?`、`resultIds`、`error?`、`skipped?`（`maxSearches`）、`runId` |
-| `StudyPassageState` | `passage`、`state`（`complete`；`partial`：已评判但尚未结束，在等待它的循环，或者它的现有技术搜索被中断了；`unchecked`：守护者尚未评判的条目；`notRun`）、`attempts`（重做后为 2）、`reopenedBy`、`runId?` |
-| `StudyNotice` | `code`（`noSources`、`stopped`、`failed`、`cancelled`、`passagesNotRun`、`uncheckedItems`、`searchesSkipped`、`leadsNotVerified`、`analoguesNotDeconstructed`、`noDesign`、`noCapability`、`minimumsNotMet`、`untracedAssembly`、`noveltiesToVerify`）、`params?`（`limit`、`error`、`count`）、`details?`（相关的环节、`passage.collection` 对、线索、突破或架构）、`message`（英文；档案会用它的语言呈现代码） |
+| `StudyPassageState` | `passage`、`state`（`complete`；`partial`：已评判但尚未结束，在等待它的循环，或者它的现有技术搜索被中断了；`unchecked`：守护者尚未评判的条目；`notRun`）、`attempts`（重做后为 2）、`keptAttempt?` 和 `discarded?`（`attempt`、`items`：因第一次尝试更好而被舍弃的重做）、`reopenedBy`、`runId?` |
+| `StudyNotice` | `code`（`noSources`、`stopped`、`failed`、`cancelled`、`passagesNotRun`、`uncheckedItems`、`searchesSkipped`、`leadsNotVerified`、`analoguesNotDeconstructed`、`noDesign`、`noCapability`、`minimumsNotMet`、`untracedAssembly`、`passagesOutdated`、`capabilitiesToVerify`、`capabilitiesExist`、`noveltiesToVerify`）、`params?`（`limit`、`error`、`count`）、`details?`（相关的环节、`passage.collection` 对、线索、突破或架构）、`message`（英文；档案会用它的语言呈现代码） |
 | `StudyStats` | 自上一次重新开始以来：`runs` 和 `modelCalls`（`run()` 的各次运行，以及其中提供商作出应答的调用）、`searches`、`searchesSkipped`、`results`、`items`、`rejected`、`byStatus`（按状态）、`downgraded`（被研究降低了状态的论断）、`noveltiesToVerify`、`redos`、`loops`。还有 `amendments`（`count`、`modelCalls`）：研究的每一条修正案，单独统计 |
 
 ### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}

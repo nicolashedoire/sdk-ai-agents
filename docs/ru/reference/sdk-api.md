@@ -179,7 +179,7 @@ interface OutcomeEvaluator {
 | `name`, `language`, `charter`, `charterHash` | Имя, язык, замороженный `StudyCharter` и его SHA-256 (в шестнадцатеричном виде), который записывается в `study.started` и с каждым дополнением |
 | `amendments` | `StudyAmendment[]`: принятые и отклонённые, по порядку |
 | `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`. Продолжает с того места, где остановился последний запуск: сначала страж оценивает то, что этот запуск оставил неоценённым; этап, который оценён, но не закончен, только заканчивается; затем выполняются незавершённые этапы. `restart` начинает исследование заново: этапы, результаты, поиски, журнал дрейфа, нумерация и запуски очищаются; устав и дополнения остаются. Лимит, политика, отмена или ошибка завершают запуск с соответствующим статусом и отчётом о том, что было сделано; исключение выбрасывается только для уже идущего запуска, для `onEvent`, который нельзя обслужить, или при сбое хранилища событий. `onEvent` работает так же, как с `agent.run` |
-| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`. Классифицируется только относительно устава, никогда относительно более ранних дополнений, в отдельном запуске (`mode: 'study-amendment'`), где сначала проверяются политики бюджета; принимается только `refines`, и тогда оно показывается в каждом последующем промпте. `timeoutMs` (по умолчанию 60 000) и `signal` ограничивают классификацию: если они срабатывают или политика её отклоняет, дополнение отклоняется как `unclassified`. Выбрасывает `ValidationError` для пустого текста, текста длиннее `MAX_AMENDMENT_LENGTH` (500 символов) или после того, как было принято `MAX_AMENDMENTS` (10) дополнений |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`. Классифицируется только относительно устава, никогда относительно более ранних дополнений (два противоречащих друг другу дополнения могут быть приняты оба), по одному в порядке запроса, в отдельном запуске (`mode: 'study-amendment'`), где сначала проверяются политики бюджета; принимается только `refines`, и тогда оно показывается в каждом последующем промпте. `timeoutMs` (по умолчанию 60 000, отсчитывается с момента, когда подходит его очередь) и `signal` ограничивают классификацию: если они срабатывают или политика её отклоняет, дополнение отклоняется как `unclassified`. Выбрасывает `ValidationError` для пустого текста, текста длиннее `MAX_AMENDMENT_LENGTH` (500 символов) или если, когда подходит его очередь, уже было принято `MAX_AMENDMENTS` (10) дополнений |
 | `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`. Заполняет поля 10 и 11 карточки и записывает `study.result_recorded` в запуск, который её написал; `ValidationError` для неизвестной карточки или пустого `result` |
 | `report()` | `StudyReport`: отчёт в текущем виде, включая результаты, записанные после последнего запуска |
 
@@ -220,7 +220,7 @@ interface StudyReport {
   revisableDecisions: StudyRevisableDecision[]; // D1…
   combinations: StudyCombination[];             // X1…
   capabilities: StudyCapability[];              // Y1…
-  architectures: StudyArchitecture[];           // A1…, capabilities first
+  architectures: StudyArchitecture[];           // A1…: new capabilities, existing ones, improvements
   noveltyClaims: StudyNoveltyClaim[];           // N1…
   experiments: StudyExperiment[];               // E1…
   cards: MechanismCard[];                       // M1…
@@ -241,7 +241,8 @@ interface StudyClaim {
   sources: string[];                                // results listed in the prompt that wrote it
   unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
   servesObjective: string;
-  toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
+  toVerify?: boolean;                               // prior art not assessed: a novelty, or a capability's assembly
+  priorArtReason?: StudyReason;                     // a capability that is not a novelty: why not checked, or assemblyExists
   priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
   unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
   runId: string;
@@ -260,15 +261,17 @@ interface StudyTrace {
 }
 ```
 
-Каждая причина в отчёте — это `StudyReason`: `statusReason` утверждений и компонентов, `reason` записей журнала дрейфа и дополнений, а также `kindReason` пониженной архитектуры. Досье выводит её `code` на языке исследования (`studyLabels(language).reasons`); у текста, который написал страж или модель, код `judged`, а сам текст — в `params.text`. Коды (`StudyReasonCode`):
+Каждая причина в отчёте — это `StudyReason`: `statusReason` утверждений и компонентов, `priorArtReason` возможности, которая не является новшеством, `reason` записей журнала дрейфа и дополнений, а также `kindReason` пониженной архитектуры. Досье выводит её `code` на языке исследования (`studyLabels(language).reasons`); у текста, который написал страж или модель, код `judged`, а сам текст — в `params.text`. Коды (`StudyReasonCode`):
 
 | Коды | Почему |
 | --- | --- |
 | `noSourceConfigured`, `citesUnlisted`, `citesNothing` | Утверждение или компонент `established` понижены до `hypothesis`: нет источника или нет ни одного идентификатора, перечисленного в его промпте |
-| `noveltyNotSearchedYet`, `noveltyNoSource`, `noveltySearchBudget`, `noveltyNotSearched`, `noveltySearchFailed`, `noveltyNoResult`, `noveltyNotAssessed`, `noveltyUnsupported` | Почему новшество всё ещё требует проверки |
+| `priorArtNotSearchedYet`, `priorArtNoSource`, `priorArtSearchBudget`, `priorArtNotSearched`, `priorArtSearchFailed`, `priorArtNoResult`, `priorArtNotAssessed`, `priorArtUnsupported` | Почему предшествующие работы для новшества или для сборки возможности всё ещё требуют проверки (их английский текст начинается с «To verify against prior art:») |
 | `priorArtExists` | Новшество понижено до `hypothesis`: наиболее близкая работа уже это делает |
+| `assemblyExists` | Возможность, которая не является новшеством и сборка которой уже существует (в её `priorArtReason`) |
 | `componentDocumented`, `componentUndocumented` | Компонент, представленный как новый |
-| `noServesObjective`, `invalidItem`, `notAnObject`, `notAUserLead`, `leadAlreadyJudged` | Элемент, отклонённый схемой |
+| `noServesObjective`, `invalidItem`, `notAnObject`, `notAUserLead` | Элемент, отклонённый схемой |
+| `leadAlreadyJudged` | Повторный вердикт по уже оценённому направлению: отбрасывается, это не дрейф (`duplicates` в `study.passage_completed`) |
 | `designWithoutCapability` | Проектирование без единой новой возможности |
 | `amendmentUnclassified`, `amendmentCancelled`, `amendmentTimedOut`, `amendmentPolicy` | Дополнение, которое не удалось классифицировать |
 | `judged` | Собственные слова стража или модели |
@@ -304,8 +307,8 @@ interface StudyTrace {
 | `StudyDriftEntry` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason` (`StudyReason`), `by` (`guardian`: вне цели; `schema`: отклонён раньше, например без `servesObjective`), `attempt` (2 при переделке), `runId` |
 | `StudySearchResult` | `id` (`S1`…, сохраняется, когда тот же результат найден снова, до перезапуска), `title`, `locator` (URL или другой указатель), `date?`, `excerpt`, `tool`, `query`, `runId` |
 | `StudySearch` | `passage`, `purpose` (`research` или `priorArt`), `tool`, `query`, `servesObjective`, `claims?`, `resultIds`, `error?`, `skipped?` (`maxSearches`), `runId` |
-| `StudyPassageState` | `passage`, `state` (`complete`; `partial`: оценён, но не закончен — ждёт завершения своего цикла или его поиск предшествующих работ был прерван; `unchecked`: элементы, которые страж не оценил; `notRun`), `attempts` (2 после переделки), `reopenedBy`, `runId?` |
-| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noDesign`, `noCapability`, `minimumsNotMet`, `untracedAssembly`, `noveltiesToVerify`), `params?` (`limit`, `error`, `count`), `details?` (затронутые этапы, пары `passage.collection`, направления, прорывы или архитектуры), `message` (по-английски; досье выводит код на своём языке) |
+| `StudyPassageState` | `passage`, `state` (`complete`; `partial`: оценён, но не закончен — ждёт завершения своего цикла или его поиск предшествующих работ был прерван; `unchecked`: элементы, которые страж не оценил; `notRun`), `attempts` (2 после переделки), `keptAttempt?` и `discarded?` (`attempt`, `items`: переделка, отброшенная ради лучшей первой попытки), `reopenedBy`, `runId?` |
+| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noDesign`, `noCapability`, `minimumsNotMet`, `untracedAssembly`, `passagesOutdated`, `capabilitiesToVerify`, `capabilitiesExist`, `noveltiesToVerify`), `params?` (`limit`, `error`, `count`), `details?` (затронутые этапы, пары `passage.collection`, направления, прорывы или архитектуры), `message` (по-английски; досье выводит код на своём языке) |
 | `StudyStats` | С последнего перезапуска: `runs` и `modelCalls` (запуски `run()` и вызовы в них, на которые ответил поставщик), `searches`, `searchesSkipped`, `results`, `items`, `rejected`, `byStatus` (по статусам), `downgraded` (утверждения, статус которых исследование понизило), `noveltiesToVerify`, `redos`, `loops`. А также `amendments` (`count`, `modelCalls`): все дополнения исследования, учтённые отдельно |
 
 ### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}
