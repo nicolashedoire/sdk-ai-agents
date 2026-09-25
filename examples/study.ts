@@ -6,8 +6,10 @@
  * Bitcoin as a breakthrough by assembly: prior techniques that, together, opened a capability.
  *
  * Run: OPENAI_API_KEY=... npm run example:study
- *   SEARCH_MCP    command of an MCP search server, e.g. "npx -y @modelcontextprotocol/server-brave-search".
- *                 Without a source, nothing can be established: every claim stays a hypothesis.
+ *   The study searches the Web with the SDK's web tools, no setup needed: web_search
+ *   (DuckDuckGo), arxiv_search and wikipedia_search.
+ *   SEARCH_MCP    command of an MCP search server to search with as well, e.g.
+ *                 "npx -y @modelcontextprotocol/server-brave-search".
  *   SEARCH_ENV    names of the variables the server needs, comma-separated, e.g. BRAVE_API_KEY:
  *                 it gets those and a minimal environment, never your model key.
  *   SEARCH_TOOLS  the server's tools to search with, comma-separated (all of them by default)
@@ -18,7 +20,7 @@
  */
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { FileEventStore, createSDK } from '../src/index.js';
+import { FileEventStore, createSDK, webTools } from '../src/index.js';
 import { connectMcpServer, type McpConnection } from '../src/mcp.js';
 
 const eventStore = new FileEventStore(join(import.meta.dirname, 'events'));
@@ -30,9 +32,11 @@ const sdk = createSDK({
   pricing: { 'gpt-4o': { inputPerMillion: 2.5, outputPerMillion: 10 } },
 });
 
-// The study searches only with the tools you give it, run through the governed pipeline.
+// The study searches only with the tools you give it, run through the governed pipeline:
+// the web tools (DuckDuckGo needs no key), and the tools of an MCP search server if you name one.
+const web = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] });
 const search = process.env.SEARCH_MCP ? await connectSearch(process.env.SEARCH_MCP) : undefined;
-const sources = (search?.tools ?? []).map((tool) => sdk.defineTool(tool).name);
+const sources = [...web, ...(search?.tools ?? [])].map((tool) => sdk.defineTool(tool).name);
 
 const study = sdk.createStudy({
   name: 'navigateur',

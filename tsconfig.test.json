@@ -89,6 +89,7 @@
     "src/__tests__/web-pdf.test.ts",
     "src/__tests__/web-sources.test.ts",
     "src/__tests__/web-safety.test.ts",
+    "src/__tests__/web-study.test.ts",
     "examples/cognitive-agent.ts",
     "examples/mcp-server.ts",
     "examples/mcp-openapi.ts",
@@ -98,7 +99,8 @@
     "examples/mcp-http.ts",
     "examples/mcp-approvals.ts",
     "examples/rule-discovery.ts",
-    "examples/study.ts"
+    "examples/study.ts",
+    "examples/web-research.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }
