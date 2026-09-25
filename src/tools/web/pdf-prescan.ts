@@ -517,7 +517,7 @@ export function prescanPdf(
       // Raw: pdf.js does not check the checksum, so neither does the measure. Z_SYNC_FLUSH: a
       // truncated stream gives what it holds, as pdf.js reads it.
       return zlib.inflateRawSync(data.subarray(2), {
-        maxOutputLength: room + 1,
+        maxOutputLength: outputCap(room),
         finishFlush: zlib.constants.Z_SYNC_FLUSH,
       });
     } catch (error) {
@@ -526,9 +526,18 @@ export function prescanPdf(
     }
   }
 
+  /**
+   * The output limit zlib is given: one byte past `room`, never past 2 GiB. Node.js 20 refuses a
+   * `maxOutputLength` above its largest buffer (4 GiB) with an error that would read as damaged
+   * data; a stream that fills 2 GiB is past any budget the measure can hold anyway.
+   */
+  function outputCap(room: number): number {
+    return Math.min(room + 1, 2 ** 31 - 1);
+  }
+
   function brotli(data: Uint8Array, room: number): Uint8Array | 'too-much' | 'damaged' {
     try {
-      return zlib.brotliDecompressSync(data, { maxOutputLength: room + 1 });
+      return zlib.brotliDecompressSync(data, { maxOutputLength: outputCap(room) });
     } catch (error) {
       const code = typeof error === 'object' && error !== null ? Reflect.get(error, 'code') : '';
       return code === 'ERR_BUFFER_TOO_LARGE' ? 'too-much' : 'damaged';
