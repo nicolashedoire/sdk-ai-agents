@@ -283,6 +283,75 @@ describe('web tools safety', () => {
     });
   });
 
+  describe('the whole call has a deadline (callTimeoutMs)', () => {
+    it('ends a slow redirect chain across origins, however fast each hop', async () => {
+      const servers = [server, other, new WebServer(), new WebServer(), new WebServer(), new WebServer()];
+      await Promise.all(servers.slice(2).map((extra) => extra.start()));
+      try {
+        servers.forEach((current, index) => {
+          const next = servers[index + 1];
+          current.on('/hop', (_request, response) => {
+            // Each hop answers within timeoutMs; together they take 2.4 s.
+            setTimeout(() => {
+              if (next) response.writeHead(302, { location: `${next.url}/hop` }).end();
+              else response.writeHead(200, { 'content-type': 'text/html' }).end('<p>End</p>');
+            }, 400);
+          });
+        });
+        const started = Date.now();
+
+        await expect(
+          fetchUrl(`${server.url}/hop`, {
+            allowPrivateNetwork: true,
+            robots: false,
+            timeoutMs: 1_000,
+            callTimeoutMs: 1_000,
+          })
+        ).rejects.toThrow('web_fetch did not finish within 1000 ms (callTimeoutMs)');
+        expect(Date.now() - started).toBeLessThan(1_500);
+      } finally {
+        await Promise.all(servers.slice(2).map((extra) => extra.stop()));
+      }
+    });
+
+    it('ends a wait for the pacing of a host', async () => {
+      server.on('/page', reply('<p>x</p>'));
+      const tool = fetchTool({ allowPrivateNetwork: [server.host], robots: false, hostIntervalMs: 5_000, callTimeoutMs: 300 });
+      await tool.handler(tool.schema.parse({ url: `${server.url}/page?a` }));
+      const started = Date.now();
+
+      await expect(tool.handler(tool.schema.parse({ url: `${server.url}/page?b` }))).rejects.toThrow(
+        'web_fetch did not finish within 300 ms'
+      );
+      expect(Date.now() - started).toBeLessThan(800);
+    });
+
+    it('ends a wait for a slow robots.txt', async () => {
+      server.on('/robots.txt', (_request, response) => {
+        setTimeout(() => response.writeHead(404).end(), 2_000);
+      });
+      server.on('/page', reply('<p>x</p>'));
+      const started = Date.now();
+
+      await expect(fetchUrl(`${server.url}/page`, { allowPrivateNetwork: [server.host], callTimeoutMs: 300 })).rejects.toThrow(
+        'web_fetch did not finish within 300 ms'
+      );
+      expect(Date.now() - started).toBeLessThan(800);
+    });
+
+    it('bounds the searches too', async () => {
+      server.on('/search', (_request, response) => {
+        setTimeout(() => response.writeHead(200, { 'content-type': 'application/json' }).end('{"results":[]}'), 2_000);
+      });
+      const [search] = webTools({ include: ['web_search'], search: searxng({ baseUrl: server.url }), callTimeoutMs: 300, cache: false });
+      if (!search) throw new Error('no web_search');
+
+      await expect(search.handler(search.schema.parse({ query: 'x' }))).rejects.toThrow(
+        'web_search did not finish within 300 ms'
+      );
+    });
+  });
+
   describe('robots.txt (RFC 9309)', () => {
     const allowed = (): WebToolsOptions => ({ allowPrivateNetwork: [server.host] });
 

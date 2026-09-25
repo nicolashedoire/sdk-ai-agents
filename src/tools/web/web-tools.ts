@@ -6,7 +6,7 @@ import { GuardedHttpClient, type WebLookup } from './guarded-http.js';
 import { HostPacer } from './politeness.js';
 import { duckDuckGo } from './providers/duckduckgo.js';
 import { normalizeUrl, toWebResults, type WebResult } from './results.js';
-import { RobotsPolicy } from './robots.js';
+import { RobotsPolicy, untilAborted } from './robots.js';
 import { type CircuitBreakerOptions, type ProviderFailure, SearchChain } from './search-chain.js';
 import type { SearchProvider } from './search-provider.js';
 import { type ArxivOptions, type ArxivResult, searchArxiv } from './sources/arxiv.js';
@@ -23,7 +23,7 @@ import {
   type WikipediaResult,
 } from './sources/wikipedia.js';
 import { TtlCache } from './web-cache.js';
-import { isRetryableWebError } from './web-errors.js';
+import { isRetryableWebError, WebTimeoutError } from './web-errors.js';
 import { fetchPage, type WebFetchOutput } from './web-fetch.js';
 
 export type WebToolName =
@@ -54,8 +54,18 @@ export interface WebToolsOptions {
   language?: string;
   /** Sent with every request. Default `sdk-ai-agents (+https://github.com/nicolashedoire/sdk-ai-agents)`. */
   userAgent?: string;
-  /** Per request (one hop of a redirect chain). Default 15 000 ms. */
+  /**
+   * Per request: one hop of a redirect chain, connection, headers and body. Default 15 000 ms.
+   * A call makes several requests (robots.txt, redirects), so it can take several times this:
+   * `callTimeoutMs` bounds the whole call.
+   */
   timeoutMs?: number;
+  /**
+   * The whole call, whatever it waits for: robots.txt, pacing, every redirect, the body and
+   * the extraction of the page or PDF. Past it, everything is aborted and the call fails with
+   * a `WebTimeoutError`. Default 60 000 ms.
+   */
+  callTimeoutMs?: number;
   /** Largest body read (decoded), for pages and APIs. Default 2 000 000 bytes. */
   maxResponseBytes?: number;
   /** Redirects followed, each checked again. Default 5. */
@@ -247,30 +257,32 @@ export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
           args.freshness,
           language,
         ]);
-        return runtime.cached(key, async (): Promise<WebSearchOutput> => {
-          const answer = await chain.search(
-            {
+        return runtime.call('web_search', context?.signal, (call) =>
+          runtime.cached(key, async (): Promise<WebSearchOutput> => {
+            const answer = await chain.search(
+              {
+                query: args.query,
+                maxResults,
+                ...(args.site ? { site: args.site } : {}),
+                ...(args.freshness ? { freshness: args.freshness } : {}),
+                ...(language ? { language } : {}),
+                signal: call.signal,
+              },
+              runtime.http
+            );
+            return {
               query: args.query,
-              maxResults,
-              ...(args.site ? { site: args.site } : {}),
-              ...(args.freshness ? { freshness: args.freshness } : {}),
-              ...(language ? { language } : {}),
-              ...(context?.signal ? { signal: context.signal } : {}),
-            },
-            runtime.http
-          );
-          return {
-            query: args.query,
-            provider: answer.provider,
-            results: toWebResults(answer.hits, {
-              source: answer.provider,
-              max: maxResults,
-              ...(args.site ? { site: args.site } : {}),
-            }),
-            ...(answer.errors.length > 0 ? { errors: answer.errors } : {}),
-            untrusted: true,
-          };
-        });
+              provider: answer.provider,
+              results: toWebResults(answer.hits, {
+                source: answer.provider,
+                max: maxResults,
+                ...(args.site ? { site: args.site } : {}),
+              }),
+              ...(answer.errors.length > 0 ? { errors: answer.errors } : {}),
+              untrusted: true,
+            };
+          })
+        );
       },
     });
   }
@@ -291,17 +303,20 @@ export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
         const maxChars = args.maxChars ?? 12_000;
         const robots = runtime.robots;
         const key = JSON.stringify(['web_fetch', normalizeUrl(args.url) ?? args.url, format]);
-        const page = await runtime.cached(key, () =>
-          fetchPage(runtime.http, args.url, {
-            format,
-            maxBytes: options.maxResponseBytes ?? 2_000_000,
-            maxPdfBytes: options.maxPdfBytes ?? 10_000_000,
-            maxPdfPages: options.maxPdfPages ?? 30,
-            hostIntervalMs: options.hostIntervalMs ?? 1_000,
-            ...(options.language ? { language: options.language } : {}),
-            ...(context?.signal ? { signal: context.signal } : {}),
-            ...(robots ? { admit: (url: URL) => robots.admit(url, context?.signal) } : {}),
-          })
+        const page = await runtime.call('web_fetch', context?.signal, (call) =>
+          runtime.cached(key, () =>
+            fetchPage(runtime.http, args.url, {
+              format,
+              maxBytes: options.maxResponseBytes ?? 2_000_000,
+              maxPdfBytes: options.maxPdfBytes ?? 10_000_000,
+              maxPdfPages: options.maxPdfPages ?? 30,
+              hostIntervalMs: options.hostIntervalMs ?? 1_000,
+              ...(options.language ? { language: options.language } : {}),
+              signal: call.signal,
+              deadline: call.deadline,
+              ...(robots ? { admit: (url: URL) => robots.admit(url, call.signal) } : {}),
+            })
+          )
         );
         const cut = page.content.length > maxChars;
         return {
@@ -334,7 +349,9 @@ export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
       metadata: SEARCH_METADATA,
       ...retry,
       handler: (args: z.infer<Schema>, context) =>
-        runtime.cached(JSON.stringify([name, args]), () => search(args, context?.signal)),
+        runtime.call(name, context?.signal, (call) =>
+          runtime.cached(JSON.stringify([name, args]), () => search(args, call.signal))
+        ),
     });
   };
   source(
@@ -406,6 +423,15 @@ interface WebRuntime {
   robots?: RobotsPolicy;
   /** The cached value for `key`, else `load()`'s, cached once it succeeds. */
   cached<T>(key: string, load: () => Promise<T>): Promise<T>;
+  /**
+   * Runs one call under its deadline: `callTimeoutMs`, or the caller's signal, aborts all of
+   * it, and the call ends then even if something it waits for does not stop at once.
+   */
+  call<T>(
+    tool: string,
+    callerSignal: AbortSignal | undefined,
+    run: (call: { signal: AbortSignal; deadline: number }) => Promise<T>
+  ): Promise<T>;
 }
 
 function createRuntime(options: WebToolsOptions): WebRuntime {
@@ -431,9 +457,36 @@ function createRuntime(options: WebToolsOptions): WebRuntime {
     options.cache === false
       ? undefined
       : new TtlCache<unknown>(options.cache?.ttlMs ?? 600_000, options.cache?.maxEntries ?? 200);
+  const callTimeoutMs = options.callTimeoutMs ?? 60_000;
   return {
     http,
     ...(robots ? { robots } : {}),
+    async call<T>(
+      tool: string,
+      callerSignal: AbortSignal | undefined,
+      run: (call: { signal: AbortSignal; deadline: number }) => Promise<T>
+    ): Promise<T> {
+      const controller = new AbortController();
+      const timer = setTimeout(
+        () =>
+          controller.abort(
+            new WebTimeoutError(`${tool} did not finish within ${callTimeoutMs} ms (callTimeoutMs)`)
+          ),
+        callTimeoutMs
+      );
+      const onAbort = () => controller.abort(callerSignal?.reason);
+      if (callerSignal?.aborted) onAbort();
+      else callerSignal?.addEventListener('abort', onAbort, { once: true });
+      try {
+        return await untilAborted(
+          run({ signal: controller.signal, deadline: Date.now() + callTimeoutMs }),
+          controller.signal
+        );
+      } finally {
+        clearTimeout(timer);
+        callerSignal?.removeEventListener('abort', onAbort);
+      }
+    },
     async cached<T>(key: string, load: () => Promise<T>): Promise<T> {
       const hit = cache?.get(key);
       // A copy: a caller that changes its result must not change the cache.

@@ -6,8 +6,8 @@ import {
   type WebResponse,
 } from './guarded-http.js';
 import { stripInvisible } from './html-entities.js';
-import { extractPage, type PageFormat } from './html-to-markdown.js';
-import { pdfText } from './pdf-text.js';
+import { EXTRACT_BUDGET_MS, extractPage, type PageFormat } from './html-to-markdown.js';
+import { PDF_TIMEOUT_MS, pdfText } from './pdf-text.js';
 import { isoDate } from './results.js';
 import { WebRequestRefusedError } from './web-errors.js';
 
@@ -44,6 +44,8 @@ export interface FetchSettings {
   hostIntervalMs: number;
   language?: string;
   signal?: AbortSignal;
+  /** When the call must be over (`Date.now()` time): bounds the extraction and the PDF reader. */
+  deadline?: number;
   /** Checks each hop (robots.txt) and may lengthen its pacing (Crawl-delay). */
   admit?: (url: URL) => Promise<{ minIntervalMs?: number } | undefined>;
 }
@@ -110,6 +112,7 @@ export async function fetchPage(
     if (response.truncated) throw tooLarge(response.url, settings.maxPdfBytes);
     const pdf = await pdfText(response.body, {
       maxPages: settings.maxPdfPages,
+      timeoutMs: remaining(settings.deadline, PDF_TIMEOUT_MS),
       ...(settings.signal ? { signal: settings.signal } : {}),
     });
     return {
@@ -130,7 +133,11 @@ export async function fetchPage(
   }
   const base = { url, finalUrl: response.url, contentType, truncated: response.truncated };
   if (HTML_TYPES.has(contentType)) {
-    const page = extractPage(htmlText(response), { url: response.url, format: settings.format });
+    const page = extractPage(htmlText(response), {
+      url: response.url,
+      format: settings.format,
+      budgetMs: remaining(settings.deadline, EXTRACT_BUDGET_MS),
+    });
     return { ...base, ...page };
   }
   const date = isoDate(response.headers['last-modified']);
@@ -146,6 +153,11 @@ function tooLarge(url: string, maxBytes: number): WebRequestRefusedError {
     `${url} is a PDF larger than ${maxBytes} bytes (maxPdfBytes): refused`,
     'too-large'
   );
+}
+
+/** The time left before `deadline`, at most `cap` and at least 1 ms. */
+function remaining(deadline: number | undefined, cap: number): number {
+  return deadline === undefined ? cap : Math.max(1, Math.min(cap, deadline - Date.now()));
 }
 
 /** `text/html; charset=utf-8` → `text/html`. */
