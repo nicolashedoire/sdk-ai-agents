@@ -355,6 +355,39 @@ export type {
 } from './tools/postgres-read-only.js';
 export { assertSingleQuery } from './tools/sql-statement-guard.js';
 export type { SqlDialect } from './tools/sql-statement-guard.js';
+// Web research: search (DuckDuckGo by default, SearXNG, Brave, Tavily, Serper)
+export { DEFAULT_USER_AGENT, webTools } from './tools/web/web-tools.js';
+export type { WebSearchOutput, WebToolName, WebToolsOptions } from './tools/web/web-tools.js';
+export { duckDuckGo } from './tools/web/providers/duckduckgo.js';
+export type { DuckDuckGoOptions } from './tools/web/providers/duckduckgo.js';
+export { searxng } from './tools/web/providers/searxng.js';
+export type { SearxngOptions } from './tools/web/providers/searxng.js';
+export { brave } from './tools/web/providers/brave.js';
+export type { KeyedProviderOptions } from './tools/web/providers/brave.js';
+export { tavily } from './tools/web/providers/tavily.js';
+export { serper } from './tools/web/providers/serper.js';
+export type {
+  Freshness,
+  SearchHit,
+  SearchProvider,
+  SearchRequest,
+} from './tools/web/search-provider.js';
+export type { CircuitBreakerOptions, ProviderFailure } from './tools/web/search-chain.js';
+export type {
+  ResponseHead,
+  WebClient,
+  WebRequestInit,
+  WebResponse,
+} from './tools/web/guarded-http.js';
+export { normalizeUrl } from './tools/web/results.js';
+export type { WebResult } from './tools/web/results.js';
+export {
+  SearchThrottledError,
+  WebHttpError,
+  WebRequestRefusedError,
+  WebTimeoutError,
+} from './tools/web/web-errors.js';
+export type { WebRefusalReason } from './tools/web/web-errors.js';
 export { cognitiveAgentTool, governedAgentTool } from './tools/agent-tools.js';
 export type {
   AgentToolOptions,
