@@ -256,7 +256,7 @@ describe('web_search', () => {
           query: 'layout',
         })
       ).rejects.toThrow(
-        "no search provider answered: searxng: SearXNG's engines did not answer: google timeout; searxng: SearXNG refused the JSON format (HTTP 403): enable `formats: [html, json]` in its settings.yml"
+        'no search provider answered: searxng: SearXNG\'s engines did not answer (its answer, untrusted: "google timeout"); searxng: SearXNG refused the JSON format (HTTP 403): enable `formats: [html, json]` in its settings.yml'
       );
     });
   });
@@ -422,7 +422,7 @@ describe('web_search', () => {
       await expect(
         search(searchTool({ search: [ddg(), searxng({ baseUrl: backup.url })] }), { query: 'layout' })
       ).rejects.toThrow(
-        'no search provider answered: duckduckgo: DuckDuckGo returned HTTP 503: Service unavailable; searxng: SearXNG returned HTTP 500: {"error":"boom"}'
+        'no search provider answered: duckduckgo: DuckDuckGo returned HTTP 503 (its answer, untrusted: "Service unavailable"); searxng: SearXNG returned HTTP 500 (its answer, untrusted: "{\\"error\\":\\"boom\\"}")'
       );
     });
 

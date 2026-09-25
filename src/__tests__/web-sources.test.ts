@@ -93,7 +93,7 @@ describe('arxiv_search, wikipedia_search, github_search', () => {
       server.on('/api/query', reply(fixture('arxiv-error.xml'), { type: 'application/atom+xml' }));
 
       await expect(call('arxiv_search', { query: 'x' }, arxiv())).rejects.toThrow(
-        'arXiv refused the query: max_results must be non-negative'
+        'arXiv refused the query (its answer, untrusted: "max_results must be non-negative")'
       );
     });
 
@@ -209,7 +209,7 @@ describe('arxiv_search, wikipedia_search, github_search', () => {
       server.on('/w/api.php', replyJson({ error: { code: 'nosrsearch', info: 'The "srsearch" parameter must be set.' } }));
 
       await expect(call('wikipedia_search', { query: 'x' }, { wikipedia: { baseUrl: server.url } })).rejects.toThrow(
-        'Wikipedia refused the search: The "srsearch" parameter must be set.'
+        'Wikipedia refused the search (its answer, untrusted: "The \\"srsearch\\" parameter must be set.")'
       );
     });
   });

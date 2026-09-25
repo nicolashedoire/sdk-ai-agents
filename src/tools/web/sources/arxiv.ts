@@ -1,5 +1,5 @@
 import { bodyText, ensureOk, type WebClient } from '../guarded-http.js';
-import { decodeEntities, stripInvisible } from '../html-entities.js';
+import { decodeEntities, quoteUntrusted, stripInvisible } from '../html-entities.js';
 import { isoDate, oneLine } from '../results.js';
 import { trimBase } from '../search-provider.js';
 import { WebHttpError } from '../web-errors.js';
@@ -96,7 +96,7 @@ export function parseArxivFeed(xml: string): ArxivResult[] {
     const idUrl = field(entry, 'id');
     if (/\/api\/errors/.test(idUrl)) {
       throw new Error(
-        `arXiv refused the query: ${field(entry, 'summary') || field(entry, 'title')}`
+        `arXiv refused the query ${quoteUntrusted(clean(field(entry, 'summary') || field(entry, 'title')))}`
       );
     }
     const arxivId = /arxiv\.org\/abs\/(.+?)(?:v\d+)?$/.exec(idUrl)?.[1];

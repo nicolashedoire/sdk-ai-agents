@@ -4,6 +4,7 @@ import https from 'node:https';
 import { isIP, type LookupFunction } from 'node:net';
 import type { Readable } from 'node:stream';
 import zlib from 'node:zlib';
+import { quoteUntrusted } from './html-entities.js';
 import { nonPublicKind } from './ip-ranges.js';
 import type { HostPacer } from './politeness.js';
 import { WebHttpError, WebRequestRefusedError, WebTimeoutError } from './web-errors.js';
@@ -468,9 +469,9 @@ export function decodeText(bytes: Uint8Array, charset: string, truncated: boolea
 /** Throws a `WebHttpError` for a non-2xx answer, with the start of its body. */
 export function ensureOk(response: WebResponse, label: string): void {
   if (response.status >= 200 && response.status < 300) return;
-  const detail = bodyText(response).replace(/\s+/g, ' ').trim().slice(0, 200);
+  const detail = bodyText(response).trim();
   throw new WebHttpError(
-    `${label} returned HTTP ${response.status}${detail ? `: ${detail}` : ''}`,
+    `${label} returned HTTP ${response.status}${detail ? ` ${quoteUntrusted(detail)}` : ''}`,
     response.status
   );
 }

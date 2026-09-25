@@ -241,7 +241,7 @@ describe('web_fetch', () => {
       server.on('/gone', reply('Not here', { status: 404, type: 'text/plain' }));
 
       await expect(fetchPage({ url: `${server.url}/gone` })).rejects.toThrow(
-        `GET ${server.url}/gone returned HTTP 404: Not here`
+        `GET ${server.url}/gone returned HTTP 404 (its answer, untrusted: "Not here")`
       );
     });
 

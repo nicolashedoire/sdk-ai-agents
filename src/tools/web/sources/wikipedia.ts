@@ -1,5 +1,5 @@
 import { ensureOk, jsonBody, type WebClient } from '../guarded-http.js';
-import { htmlToLine } from '../html-entities.js';
+import { htmlToLine, quoteUntrusted, stripInvisible } from '../html-entities.js';
 import { isRecord, listOf, text } from '../json-fields.js';
 import { isoDate, oneLine } from '../results.js';
 import { trimBase } from '../search-provider.js';
@@ -65,7 +65,7 @@ export async function searchWikipedia(
   const body = jsonBody(response, 'Wikipedia');
   if (isRecord(body) && isRecord(body.error)) {
     throw new Error(
-      `Wikipedia refused the search: ${text(body.error.info) ?? text(body.error.code) ?? 'error'}`
+      `Wikipedia refused the search ${quoteUntrusted(text(body.error.info) ?? text(body.error.code) ?? 'error')}`
     );
   }
   const query = isRecord(body) ? body.query : undefined;
@@ -76,7 +76,7 @@ export async function searchWikipedia(
     return [
       {
         id: `wikipedia:${language}:${text(page.pageid) ?? title}`,
-        title: oneLine(title, 300),
+        title: oneLine(stripInvisible(title), 300),
         url: `${origin}/wiki/${articlePath(title)}`,
         ...(date ? { date } : {}),
         excerpt: oneLine(htmlToLine(text(page.snippet) ?? ''), 600),

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { stripInvisible } from './html-entities.js';
 
 /** A search result, shaped to be cited: a study numbers it by its `url`. */
 export interface WebResult {
@@ -136,10 +137,10 @@ export function toWebResults(
     const date = hit.date ? isoDate(hit.date) : undefined;
     results.push({
       id: webResultId(url),
-      title: oneLine(hit.title, 300) || url,
+      title: oneLine(stripInvisible(hit.title), 300) || url,
       url,
       ...(date ? { date } : {}),
-      excerpt: oneLine(hit.excerpt, 600),
+      excerpt: oneLine(stripInvisible(hit.excerpt), 600),
       source: hit.source ?? options.source,
     });
     if (results.length >= options.max) break;

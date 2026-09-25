@@ -1,5 +1,5 @@
 import { bodyText, jsonBody, type WebClient, type WebResponse } from '../guarded-http.js';
-import { stripInvisible } from '../html-entities.js';
+import { quoteUntrusted, stripInvisible } from '../html-entities.js';
 import { isRecord, listOf, text } from '../json-fields.js';
 import { isoDate, oneLine } from '../results.js';
 import { trimBase } from '../search-provider.js';
@@ -98,7 +98,7 @@ function ensureGithubOk(response: WebResponse, withToken: boolean): void {
     );
   }
   throw new WebHttpError(
-    `GitHub returned HTTP ${response.status}${message ? `: ${message}` : ''}`,
+    `GitHub returned HTTP ${response.status}${message ? ` ${quoteUntrusted(message)}` : ''}`,
     response.status
   );
 }
@@ -113,7 +113,7 @@ function repository(item: Record<string, unknown>): GithubResult[] {
   return [
     {
       id: `github:${name}`,
-      title: name,
+      title: oneLine(stripInvisible(name), 300),
       url,
       ...(date ? { date } : {}),
       excerpt: line(text(item.description) ?? ''),
@@ -135,7 +135,7 @@ function codeFile(item: Record<string, unknown>): GithubResult[] {
   return [
     {
       id: `github:${repo}/${path}`,
-      title: `${repo}: ${path}`,
+      title: oneLine(stripInvisible(`${repo}: ${path}`), 300),
       url,
       excerpt: line(fragments.join(' … ')),
       source: 'github',
@@ -154,7 +154,7 @@ function issue(item: Record<string, unknown>): GithubResult[] {
   return [
     {
       id: repo && number ? `github:${repo}#${number}` : `github:${url}`,
-      title: oneLine(title, 300),
+      title: oneLine(stripInvisible(title), 300),
       url,
       ...(date ? { date } : {}),
       excerpt: line(text(item.body) ?? ''),

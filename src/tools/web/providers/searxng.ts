@@ -1,5 +1,5 @@
 import { ensureOk, jsonBody } from '../guarded-http.js';
-import { htmlToLine } from '../html-entities.js';
+import { htmlToLine, quoteUntrusted } from '../html-entities.js';
 import { siteHost } from '../results.js';
 import {
   configuredOrigin,
@@ -81,7 +81,9 @@ export function searxng(options: SearxngOptions): SearchProvider {
           .map((entry) => (Array.isArray(entry) ? entry.map(String).join(' ') : String(entry)))
           .filter(Boolean);
         if (failed.length > 0) {
-          throw new SearchThrottledError(`SearXNG's engines did not answer: ${failed.join(', ')}`);
+          throw new SearchThrottledError(
+            `SearXNG's engines did not answer ${quoteUntrusted(failed.join(', '))}`
+          );
         }
       }
       return results;

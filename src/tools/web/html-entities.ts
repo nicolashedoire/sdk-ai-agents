@@ -256,16 +256,29 @@ export function decodeEntities(text: string): string {
 
 /**
  * Invisible characters that can hide text from a reader but not from a model: zero-width
- * spaces and joiners, bidirectional controls, the BOM, soft hyphens, and C0/C1 controls other
- * than tab and line feed.
+ * spaces and joiners, bidirectional controls, the BOM, soft hyphens, C0/C1 controls other
+ * than tab and line feed, the Tags block (U+E0000–E007F, which spells ASCII invisibly),
+ * variation selectors (U+FE00–FE0F, U+E0100–E01EF), and the Hangul and other fillers that
+ * render as nothing.
  */
 const INVISIBLE =
   // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what it removes.
-  /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff\ufff9-\ufffb]/g;
+  // biome-ignore lint/suspicious/noMisleadingCharacterClass: each code point is removed on its own, combining marks included.
+  /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0\ufff9-\ufffb\u{e0000}-\u{e007f}\u{e0100}-\u{e01ef}]/gu;
 
 /** Removes the invisible characters that could smuggle text past a human reader. */
 export function stripInvisible(text: string): string {
   return text.replace(INVISIBLE, '');
+}
+
+/**
+ * Text from a remote server quoted in an error message: invisible characters removed, on one
+ * line, at most `max` characters, and said to be untrusted.
+ */
+export function quoteUntrusted(text: string, max = 120): string {
+  const line = stripInvisible(text).replace(/\s+/g, ' ').trim();
+  const cut = line.length > max ? `${line.slice(0, max - 1)}…` : line;
+  return `(its answer, untrusted: ${JSON.stringify(cut)})`;
 }
 
 /** HTML fragment (a search snippet) to one line of plain text. */
