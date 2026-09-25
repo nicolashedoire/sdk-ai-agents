@@ -29,6 +29,16 @@ export function asksForStreamUsage(baseURL: string, includeStreamUsage?: boolean
   return includeStreamUsage ?? OPENAI_API.test(baseURL);
 }
 
+/**
+ * Whether a streamed request refused with a 400 or 422 is sent once more without
+ * `stream_options`, in case the server refused the field. OpenAI's own API takes it: there, a
+ * refusal is about something else (a context too long, a bad parameter), and sending the
+ * request again would only fail again. Other servers get the second try.
+ */
+export function retriesStreamWithoutUsage(baseURL: string): boolean {
+  return !OPENAI_API.test(baseURL);
+}
+
 /** How the OpenAI provider shapes its requests, for OpenAI models and compatible servers. */
 export interface OpenAIRequestOptions {
   /**
@@ -86,6 +96,8 @@ export class OpenAIProvider implements LLMProvider {
   private reasoningEffort?: OpenAIReasoningEffort;
   /** Streamed requests ask for their usage; off for good once the server refused the field. */
   private streamUsage: boolean;
+  /** Whether a refused streamed request is tried once more without `stream_options`. */
+  private readonly retryWithoutStreamUsage: boolean;
   /** Models the API refused to stream (an organization not verified for them). */
   private readonly unstreamable = new Set<string>();
 
@@ -110,6 +122,7 @@ export class OpenAIProvider implements LLMProvider {
     this.reasoningModels = options.reasoningModels;
     this.reasoningEffort = options.reasoningEffort;
     this.streamUsage = asksForStreamUsage(this.client.baseURL, options.includeStreamUsage);
+    this.retryWithoutStreamUsage = retriesStreamWithoutUsage(this.client.baseURL);
   }
 
   async generateCompletion(request: LLMRequest): Promise<LLMResponse> {
@@ -122,7 +135,14 @@ export class OpenAIProvider implements LLMProvider {
 
       // The signal cancels the HTTP request itself: the answer is not waited for.
       const completion = request.onTextDelta
-        ? await this.streamCompletion(body, request.onTextDelta, request.abortSignal)
+        ? await this.streamCompletion(body, request.onTextDelta, request.abortSignal, (cut) =>
+            this.reportDiscarded(
+              request,
+              body,
+              cut,
+              'The answer stream broke off before any answer'
+            )
+          )
         : await this.complete(body, request.abortSignal);
 
       if (request.abortSignal?.aborted) {
@@ -133,19 +153,7 @@ export class OpenAIProvider implements LLMProvider {
       if (!message) {
         // Billed all the same: the caller is told what it cost before this call fails. A
         // stream reports its usage in its last chunk, when asked for.
-        if (completion.usage) {
-          request.onDiscardedAnswer?.({
-            provider: 'openai',
-            // The model that answered, else the one the request body named.
-            model: completion.model || request.model || this.defaultModel,
-            usage: {
-              promptTokens: completion.usage.prompt_tokens,
-              completionTokens: completion.usage.completion_tokens,
-              totalTokens: completion.usage.total_tokens,
-            },
-            reason: 'No response from LLM',
-          });
-        }
+        this.reportDiscarded(request, body, completion, 'No response from LLM');
         throw new Error('No response from LLM');
       }
 
@@ -178,6 +186,31 @@ export class OpenAIProvider implements LLMProvider {
     }
   }
 
+  /**
+   * Tells the caller about an answer the vendor billed, with the usage it reported, that gives
+   * nothing to use: priced on the model that answered and the one the request named, as the
+   * answers that are used are (a request that named none asked for no name).
+   */
+  private reportDiscarded(
+    request: LLMRequest,
+    body: ChatCompletionBody,
+    completion: Pick<Completion, 'model' | 'usage'>,
+    reason: string
+  ): void {
+    if (!completion.usage) return;
+    request.onDiscardedAnswer?.({
+      provider: 'openai',
+      model: completion.model || body.model,
+      ...(request.model ? { requestedModel: request.model } : {}),
+      usage: {
+        promptTokens: completion.usage.prompt_tokens,
+        completionTokens: completion.usage.completion_tokens,
+        totalTokens: completion.usage.total_tokens,
+      },
+      reason,
+    });
+  }
+
   /** The answer in one response. */
   private async complete(
     body: ChatCompletionBody,
@@ -198,11 +231,12 @@ export class OpenAIProvider implements LLMProvider {
   private async streamCompletion(
     body: ChatCompletionBody,
     onTextDelta: (delta: string) => void,
-    signal: AbortSignal | undefined
+    signal: AbortSignal | undefined,
+    onUsageOnly: (cut: Pick<Completion, 'model' | 'usage'>) => void
   ): Promise<Completion> {
     if (!this.unstreamable.has(body.model)) {
       try {
-        return await this.readStream(body, onTextDelta, signal);
+        return await this.readStream(body, onTextDelta, signal, onUsageOnly);
       } catch (error) {
         if (!refusesStreaming(error)) throw error;
         this.unstreamable.add(body.model);
@@ -216,12 +250,13 @@ export class OpenAIProvider implements LLMProvider {
   /**
    * Sends the streamed request. A 400 or 422 to a request with `stream_options` may be the
    * server refusing the field, whatever its body says: the request is sent once more without
-   * it, and when that one is accepted, the field is never sent again.
+   * it, and when that one is accepted, the field is never sent again. Not on OpenAI's own API,
+   * which takes the field (see `retriesStreamWithoutUsage`).
    */
   private async openStream(
     body: ChatCompletionBody,
     signal: AbortSignal
-  ): Promise<AsyncIterable<OpenAI.ChatCompletionChunk>> {
+  ): Promise<{ stream: AsyncIterable<OpenAI.ChatCompletionChunk>; withUsage: boolean }> {
     const send = (withUsage: boolean) =>
       this.client.chat.completions.create(
         {
@@ -234,13 +269,13 @@ export class OpenAIProvider implements LLMProvider {
     // Read once: a concurrent request may turn it off meanwhile.
     const withUsage = this.streamUsage;
     try {
-      return await send(withUsage);
+      return { stream: await send(withUsage), withUsage };
     } catch (error) {
-      if (!withUsage || !isRequestRefusal(error)) throw error;
+      if (!withUsage || !this.retryWithoutStreamUsage || !isRequestRefusal(error)) throw error;
       const stream = await send(false);
       // Taken without the field: its answers carry no usage from now on.
       this.streamUsage = false;
-      return stream;
+      return { stream, withUsage: false };
     }
   }
 
@@ -248,12 +283,16 @@ export class OpenAIProvider implements LLMProvider {
    * Reads the stream, passing each piece of text on as it arrives, and assembles what the
    * non-streaming API returns: the text, the tool calls (their pieces joined by index), the
    * model and the usage (sent in a last chunk when asked for). The client's timeout ends when
-   * the answer starts: a stream that then sends nothing for as long is cut here.
+   * the answer starts: a stream that then sends nothing for as long is cut here. A stream that
+   * breaks off or stalls after the whole answer (its finish reason, and its usage when asked
+   * for) gave that answer; one that gave only its usage reports it through `onUsageOnly`
+   * before it fails, as a billed answer with nothing to use.
    */
   private async readStream(
     body: ChatCompletionBody,
     onTextDelta: (delta: string) => void,
-    signal: AbortSignal | undefined
+    signal: AbortSignal | undefined,
+    onUsageOnly: (cut: Pick<Completion, 'model' | 'usage'>) => void
   ): Promise<Completion> {
     const reading = new AbortController();
     const cancel = () => reading.abort();
@@ -277,50 +316,74 @@ export class OpenAIProvider implements LLMProvider {
     let finishReason: string | null = null;
     const toolCalls = new Map<string, { rank: number; call: CompletionToolCall }>();
     let lastCall: string | undefined;
+    let withUsage = false;
+    /** Set when the connection broke off: what came before may still be the whole answer. */
+    let brokenOff: { error: unknown } | undefined;
 
     try {
-      const stream = await this.openStream(body, reading.signal);
+      const opened = await this.openStream(body, reading.signal);
+      withUsage = opened.withUsage;
       awaitNextEvent();
-      for await (const chunk of stream) {
-        awaitNextEvent();
-        if (chunk.model) model = chunk.model;
-        if (chunk.usage) usage = chunk.usage;
-        // The SDK asks for one answer: the choice of index 0, as without streaming.
-        const choice = chunk.choices?.find((candidate) => candidate.index === 0);
-        if (!choice) continue;
-        answered = true;
-        const { delta } = choice;
-        if (delta.content) {
-          content = (content ?? '') + delta.content;
-          onTextDelta(delta.content);
+      try {
+        for await (const chunk of opened.stream) {
+          awaitNextEvent();
+          if (chunk.model) model = chunk.model;
+          if (chunk.usage) usage = chunk.usage;
+          // The SDK asks for one answer: the choice of index 0, as without streaming.
+          const choice = chunk.choices?.find((candidate) => candidate.index === 0);
+          if (!choice) continue;
+          answered = true;
+          const { delta } = choice;
+          if (delta.content) {
+            content = (content ?? '') + delta.content;
+            onTextDelta(delta.content);
+          }
+          for (const piece of delta.tool_calls ?? []) {
+            // Compatible servers may leave out `index`: a new id then starts a new call, and a
+            // piece with neither continues the last one.
+            const index: number | undefined = piece.index;
+            const key =
+              index !== undefined ? `#${index}` : piece.id ? `id ${piece.id}` : (lastCall ?? '#0');
+            const entry = toolCalls.get(key) ?? {
+              rank: index ?? toolCalls.size,
+              call: { function: { name: '', arguments: '' } },
+            };
+            toolCalls.set(key, entry);
+            lastCall = key;
+            if (piece.id) entry.call.id = piece.id;
+            if (piece.function?.name) entry.call.function.name = piece.function.name;
+            if (piece.function?.arguments) {
+              entry.call.function.arguments += piece.function.arguments;
+            }
+          }
+          if (choice.finish_reason) finishReason = choice.finish_reason;
         }
-        for (const piece of delta.tool_calls ?? []) {
-          // Compatible servers may leave out `index`: a new id then starts a new call, and a
-          // piece with neither continues the last one.
-          const index: number | undefined = piece.index;
-          const key =
-            index !== undefined ? `#${index}` : piece.id ? `id ${piece.id}` : (lastCall ?? '#0');
-          const entry = toolCalls.get(key) ?? {
-            rank: index ?? toolCalls.size,
-            call: { function: { name: '', arguments: '' } },
-          };
-          toolCalls.set(key, entry);
-          lastCall = key;
-          if (piece.id) entry.call.id = piece.id;
-          if (piece.function?.name) entry.call.function.name = piece.function.name;
-          if (piece.function?.arguments) entry.call.function.arguments += piece.function.arguments;
-        }
-        if (choice.finish_reason) finishReason = choice.finish_reason;
+      } catch (error) {
+        brokenOff = { error };
       }
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener('abort', cancel);
     }
 
-    if (stalled) {
-      throw new OpenAI.APIConnectionTimeoutError({
-        message: `The answer stream sent nothing for ${idleMs} ms`,
-      });
+    // The answer ended (its finish reason came) with its usage when asked for: a stream broken
+    // off or stalled after that, before `[DONE]`, still gave the whole answer.
+    // A server that sent the finish reason before the last piece of a tool call's arguments
+    // gave no whole answer: arguments that do not parse are the call cut short.
+    const whole =
+      answered &&
+      finishReason !== null &&
+      (!withUsage || Boolean(usage)) &&
+      [...toolCalls.values()].every(({ call }) => isWholeJson(call.function.arguments));
+    if ((stalled || brokenOff) && !whole) {
+      // Only the usage came: billed all the same, the caller is told before the call fails.
+      if (!answered && usage && !signal?.aborted) onUsageOnly({ model, usage });
+      if (stalled) {
+        throw new OpenAI.APIConnectionTimeoutError({
+          message: `The answer stream sent nothing for ${idleMs} ms`,
+        });
+      }
+      throw brokenOff?.error;
     }
     // A cancelled stream ends early without an error: the caller sees the abort.
     if (signal?.aborted || !answered) {
@@ -523,5 +586,16 @@ function toOpenAIMessage(message: LLMMessage): OpenAI.ChatCompletionMessageParam
         : { role: 'assistant', content: message.content };
     case 'tool':
       return { role: 'tool', tool_call_id: message.toolCallId, content: message.content };
+  }
+}
+
+/** Tool call arguments that arrived whole: none at all, or a JSON value that parses. */
+function isWholeJson(text: string): boolean {
+  if (text.trim() === '') return true;
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
   }
 }

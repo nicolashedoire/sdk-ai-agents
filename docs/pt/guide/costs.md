@@ -38,16 +38,18 @@ const sdk = createSDK({
 });
 ```
 
-As chaves são ids exatos de modelo ou prefixos terminados em `*`. Os provedores muitas vezes respondem com um id versionado (`gpt-4o-2024-08-06`) quando você pediu `gpt-4o`: o SDK registra os dois e procura primeiro o id devolvido, depois o nome solicitado — as chaves exatas antes dos prefixos, com o prefixo mais longo prevalecendo. Cuidado com os prefixos: `gpt-4o*` também corresponde a `gpt-4o-mini`, a menos que `gpt-4o-mini*` exista.
+As chaves são ids exatos de modelo ou prefixos terminados em `*`. Os provedores muitas vezes respondem com um id versionado (`gpt-4o-2024-08-06`) quando você pediu `gpt-4o`: o SDK registra os dois e procura primeiro o id devolvido, depois o nome solicitado — as chaves exatas antes dos prefixos, com o prefixo mais longo prevalecendo. Cuidado com os prefixos: `gpt-4o*` também corresponde a `gpt-4o-mini`, a menos que `gpt-4o-mini*` exista. Cada chamada é precificada pelos seus próprios nomes, incluindo uma resposta que um provedor descartou: as chamadas de um modelo pedido com outro nome, ou sem nenhum, têm uma linha própria.
 
 ## Custos desconhecidos {#unknown-costs}
 
 O SDK nunca inventa um preço, nem uma contagem de tokens. O custo de uma chamada é desconhecido em dois casos, e o relatório diz isso:
 
 - **o modelo dela não tem preço**: as chamadas e os tokens continuam sendo contabilizados, o modelo é listado em `unpricedModels`, essas chamadas em `unpricedCalls`, e a linha dele não tem `costUsd`;
-- **ela não informou nenhuma contagem de tokens** — nem de entrada nem de saída, como com um provedor que não devolve o consumo, ou só um total: ela é contada em `unmeteredCalls` (e no `unmeteredCalls` da sua linha), e o modelo em `unmeteredModels`. Ela nunca é tomada como zero token, e uma linha em que nenhuma chamada os informou também não tem `costUsd`.
+- **ela não informou ao mesmo tempo os tokens de entrada e de saída** — como com um provedor que não devolve o consumo, só um total, ou só um dos dois: ela é contada em `unmeteredCalls` (e no `unmeteredCalls` da sua linha), e o modelo em `unmeteredModels`. Ela nunca é tomada como zero token, e uma linha em que nenhuma chamada os informou também não tem `costUsd`.
 
-Uma chamada sem contagem de tokens conta como não medida mesmo que o modelo tenha preço, como nos orçamentos. Assim que o custo de alguma chamada é desconhecido, o relatório é marcado com `complete: false` e `totalUsd` soma apenas as chamadas cujo custo é conhecido: é um mínimo, não o custo da execução.
+Uma chamada sem as duas contagens conta como não medida mesmo que o modelo tenha preço, como nos orçamentos. Assim que o custo de alguma chamada é desconhecido, o relatório é marcado com `complete: false` e `totalUsd` soma apenas as chamadas cujo custo é conhecido: é um mínimo, não o custo da execução.
+
+Os tokens de uma chamada medida são os seus tokens de entrada e de saída, qualquer que seja o total que o fornecedor também informe. Os de uma chamada não medida são o maior entre o seu total e os tokens de entrada ou de saída que ela informou, nunca menos do que ela disse ter usado: eles contam como tokens (no `unmeteredTokens` da linha, nos orçamentos e no `maxTokens` de uma execução), nunca como custo. Um valor que não é um número maior ou igual a 0 (`null`, um número negativo) é lido como ausente, e não esconde os outros.
 
 ## Chamadas que falham {#failed-calls}
 
@@ -65,8 +67,8 @@ Uma tentativa que falhou sem resposta — um erro HTTP, um tempo esgotado, uma c
 | Evento | Origem | Campos |
 | --- | --- | --- |
 | `intention.generated` | Raciocínio nativo, seleção de ferramentas | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
-| `provider.answer_discarded` | Uma resposta que o provedor não pôde usar | `provider`, `model`, `usage` |
-| `cognition.thought` | Operações cognitivas, incluindo correções e tentativas que falharam | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls` |
+| `provider.answer_discarded` | Uma resposta que o provedor não pôde usar | `provider`, `model`, `requestedModel`, `usage` |
+| `cognition.thought` | Operações cognitivas, incluindo correções e tentativas que falharam (uma tentativa anterior respondida, por meio de um provedor de reserva, por outro modelo que não o da última é registrada como um `provider.answer_discarded` quando informou o seu consumo) | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.unmeteredTokens` |
 | `cognition.operation_failed` | Uma operação interrompida por uma parada ou um tempo limite depois de tentativas cobradas | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev e outros backends de decisões tipadas, incluindo respostas rejeitadas | `model`, `usage.inputTokens`, `usage.outputTokens` |
 
@@ -78,4 +80,4 @@ Como o consumo fica nos eventos, você também pode calcular os custos por conta
 
 O custo é só um lado; as políticas também podem limitar **etapas, tokens e chamadas de ferramentas** por agente, ferramenta e período — veja [Agentes governados](./governed-agents). Um `budgetLimit` com `maxCost` recusa as chamadas de ferramenta de um agente assim que as suas chamadas ao modelo custaram mais que o limite no período, com os preços acima, e também a etapa seguinte de um agente cognitivo (veja [Limites e políticas](./cognitive-agents#limits-and-policies)): uma chamada ao modelo já iniciada nunca é interrompida, e com `toolName` só essa ferramenta é recusada. Se um modelo não tem preço, ou uma chamada não informa os seus tokens, o limite não pode ser verificado e essas chamadas de ferramenta e essas etapas são recusadas. Um `maxCost` que não seja um número finito ≥ 0 (uma string como `'0.5'` lida de um arquivo de configuração, `NaN`, um valor negativo, `Infinity`, `null`) é recusado assim que a política é aplicada, com um `ValidationError`.
 
-Os orçamentos contam as chamadas ao modelo que `getRunCost` lê, tal como as lê — incluindo as [chamadas que falham](#failed-calls), e uma chamada sem contagem de tokens como uma chamada de custo desconhecido: as etapas de raciocínio de um agente governado; os pensamentos de um agente cognitivo (incluindo correções e tentativas que falharam), as suas seleções de ferramenta, as suas decisões tipadas e as suas operações interrompidas depois de tentativas cobradas; nos dois casos, as respostas que o provedor não pôde usar; e as decisões tipadas tomadas com `sdk.decisions`, incluindo as respostas rejeitadas. Um limite com `agentId` conta as chamadas ao modelo desse agente — e as chamadas de `sdk.decisions` que o nomeiam com `agentId`; sem `agentId`, conta todas, incluindo as decisões tipadas tomadas sem agente. Um orçamento nunca recusa uma chamada de `sdk.decisions`: ele recusa chamadas de ferramenta e as etapas dos agentes cognitivos.
+Os orçamentos contam as chamadas ao modelo que `getRunCost` lê, tal como as lê — incluindo as [chamadas que falham](#failed-calls), e uma chamada sem as suas duas contagens de tokens como uma chamada de custo desconhecido: as etapas de raciocínio de um agente governado; os pensamentos de um agente cognitivo (incluindo correções e tentativas que falharam), as suas seleções de ferramenta, as suas decisões tipadas e as suas operações interrompidas depois de tentativas cobradas; nos dois casos, as respostas que o provedor não pôde usar; e as decisões tipadas tomadas com `sdk.decisions`, incluindo as respostas rejeitadas. Um limite com `agentId` conta as chamadas ao modelo desse agente — e as chamadas de `sdk.decisions` que o nomeiam com `agentId`; sem `agentId`, conta todas, incluindo as decisões tipadas tomadas sem agente. Um orçamento nunca recusa uma chamada de `sdk.decisions`: ele recusa chamadas de ferramenta e as etapas dos agentes cognitivos.

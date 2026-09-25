@@ -36,7 +36,7 @@ Das SDK ruft OpenAI über Chat Completions auf, wo Modelle ab GPT-5.4 Tools nur 
 | `defaultModel` | `gpt-5.4` | Modell einer Anfrage, die keines nennt, und eines Fallbacks, der das Modell des Agenten nicht anbietet |
 | `reasoningModels` | Am Namen erkannt | `true` oder `false`: Alle Modelle dieses Anbieters sind Reasoning-Modelle bzw. keines ist eines. Eine Liste: Diese Namen sind es (Azure-Deployments, Gateway-Aliase), die übrigen werden am Namen erkannt |
 | `reasoningEffort` | Der des Modells | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` oder `max`, unverändert nur an Reasoning-Modelle gesendet. Jedes Modell akzeptiert einige dieser Werte, die API lehnt die übrigen ab |
-| `includeStreamUsage` | Bei der eigenen API von OpenAI | `true`: Bei einer gestreamten Antwort wird ihr Verbrauch angefordert (`stream_options`), sodass ihre Kosten gezählt werden; `false`: nicht. Standardmäßig bei `https://api.openai.com/v1` und regionalen Hosts wie `https://eu.api.openai.com/v1` (aus `baseURL` oder `OPENAI_BASE_URL`), da ein kompatibler Server das Feld ablehnen (die Anfrage wird dann ohne das Feld erneut gesendet) oder ignorieren kann, und ein gestreamter Aufruf ohne Verbrauchsangabe gilt als nicht gemessen. Mit einem Kostenbudget auf einem kompatiblen Server, der den Verbrauch meldet (die v1-API von Azure OpenAI tut das), setzen Sie `true` |
+| `includeStreamUsage` | Bei der eigenen API von OpenAI | `true`: Bei einer gestreamten Antwort wird ihr Verbrauch angefordert (`stream_options`), sodass ihre Kosten gezählt werden; `false`: nicht. Standardmäßig bei `https://api.openai.com/v1` und regionalen Hosts wie `https://eu.api.openai.com/v1` (aus `baseURL` oder `OPENAI_BASE_URL`), da ein kompatibler Server das Feld ablehnen (die Anfrage wird dann ohne das Feld erneut gesendet, außer an die eigene API von OpenAI, die es annimmt) oder ignorieren kann, und ein gestreamter Aufruf ohne Verbrauchsangabe gilt als nicht gemessen. Mit einem Kostenbudget auf einem kompatiblen Server, der den Verbrauch meldet (die v1-API von Azure OpenAI tut das), setzen Sie `true` |
 | `nativeToolMessages` | `true` | `false` für einen kompatiblen Server, der in der Konversation weder `tool_calls` des Assistenten noch `tool`-Nachrichten akzeptiert: Frühere Tool-Aufrufe und ihre Ergebnisse werden dann als Text gesendet, während die Tools weiter angeboten und die Tool-Aufrufe der Antworten weiter gelesen werden. `false` beim primären Anbieter oder bei einem beliebigen Fallback gilt für die ganze Kette |
 
 Diese Optionen gehören in `providerConfig.openai` oder in die `config` eines OpenAI-Fallbacks. Ein Fallback eines anderen Herstellers übernimmt aus `providerConfig.openai` jede Option, die seine `config` nicht setzt; ein Fallback desselben Herstellers wie der primäre Anbieter übernimmt keine. Ein Agent oder ein Lauf setzt seinen eigenen Aufwand in `providerSettings.openai.reasoningEffort`: Der des Laufs hat Vorrang, dann der des Agenten, dann der des Anbieters. Ein kognitiver Agent wendet ihn nur auf die Tool-Auswahl an; seine Gedanken, die keine Tools anbieten, nehmen seine Option `reasoningEffort`.
@@ -180,6 +180,7 @@ interface ModelCostLine {
   unmeteredCalls?: number;
   inputTokens: number;
   outputTokens: number;
+  unmeteredTokens?: number;
   costUsd?: number;
 }
 ```
@@ -189,8 +190,8 @@ interface ModelCostLine {
 | `totalUsd` | Kosten der Aufrufe mit bekannten Kosten; nur eine Untergrenze, wenn `complete` `false` ist |
 | `complete` | `false`, wenn die Kosten einiger Aufrufe unbekannt sind: `unpricedCalls` oder `unmeteredCalls` über 0 |
 | `unpricedModels`, `unpricedCalls` | Modelle ohne Preis in `pricing` und ihre Aufrufe, die ihre Tokens gemeldet haben |
-| `unmeteredModels`, `unmeteredCalls` | Modelle der Aufrufe, die keine Anzahl von Eingabe- oder Ausgabe-Tokens gemeldet haben, und diese Aufrufe |
-| `lines` | Eine pro Modell und Quelle: Aufrufe, Tokens der Aufrufe, die sie gemeldet haben, `unmeteredCalls`, falls vorhanden, `costUsd`, wenn das Modell einen Preis hat und Aufrufe der Zeile ihre Tokens gemeldet haben; `model` ist `(unknown)` für einen Aufruf, der keinen Modellnamen aufgezeichnet hat |
+| `unmeteredModels`, `unmeteredCalls` | Modelle der Aufrufe, die nicht sowohl ihre Eingabe- als auch ihre Ausgabe-Tokens gemeldet haben, und diese Aufrufe |
+| `lines` | Eine pro Modell, angefragtem Modell und Quelle: Aufrufe, Tokens der gemessenen Aufrufe, `unmeteredCalls`, falls vorhanden, `unmeteredTokens` für deren Tokens, `costUsd`, wenn das Modell einen Preis hat und Aufrufe der Zeile gemessen sind; `model` ist `(unknown)` für einen Aufruf, der keinen Modellnamen aufgezeichnet hat |
 
 ## Traces, Replay und Tests {#traces-replay-and-testing}
 

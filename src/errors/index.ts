@@ -152,10 +152,13 @@ export interface ModelUsage {
   /** Number of model calls behind this usage (repairs included). */
   calls: number;
   /**
-   * Calls among `calls` that reported no input/output token counts: their tokens are not in
-   * `promptTokens`/`completionTokens`, and their cost is unknown. Absent when there are none.
+   * Calls among `calls` that did not report both their input and output token counts: their
+   * tokens are not in `promptTokens`/`completionTokens`, and their cost is unknown. Absent
+   * when there are none.
    */
   unmeteredCalls?: number;
+  /** Tokens of those calls (see `tokensOfCall`). Absent when there are none. */
+  unmeteredTokens?: number;
 }
 
 export class ThoughtGenerationError extends SDKError {

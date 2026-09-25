@@ -235,6 +235,7 @@ describe('billed calls that fail', () => {
       expect(ofType(events, 'provider.answer_discarded')[0]?.data).toEqual({
         provider: 'openai',
         model: 'gpt-4o',
+        requestedModel: 'gpt-4o',
         usage: { promptTokens: 30, completionTokens: 0, totalTokens: 30 },
         reason: 'No response from LLM',
       });
@@ -398,6 +399,7 @@ describe('billed calls that fail', () => {
       expect(discarded[0]?.data).toEqual({
         provider: 'openai',
         model: 'gpt-4o',
+        requestedModel: 'gpt-4o',
         usage: { promptTokens: 1_000, completionTokens: 0, totalTokens: 1_000 },
         reason: 'No response from LLM',
       });

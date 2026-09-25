@@ -36,7 +36,7 @@ The SDK calls OpenAI through Chat Completions, where GPT-5.4 and later models ca
 | `defaultModel` | `gpt-5.4` | Model of a request that names none, and of a fallback that does not serve the agent's model |
 | `reasoningModels` | Detected from the name | `true` or `false`: every model of this provider is, or is not, a reasoning model. A list: these names are (Azure deployments, gateway aliases), the others are detected |
 | `reasoningEffort` | The model's | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`, sent as given to reasoning models only. Each model accepts some of these values, and the API refuses the others |
-| `includeStreamUsage` | On OpenAI's own API | `true`: a streamed answer is asked for its usage (`stream_options`), so its cost is counted; `false`: it is not. By default on `https://api.openai.com/v1` and regional hosts such as `https://eu.api.openai.com/v1` (from `baseURL` or `OPENAI_BASE_URL`), since a compatible server may refuse the field (the request is then sent again without it) or ignore it, and a streamed call without usage counts as unmetered. With a cost budget on a compatible server that reports the usage (the Azure OpenAI v1 API does), set `true` |
+| `includeStreamUsage` | On OpenAI's own API | `true`: a streamed answer is asked for its usage (`stream_options`), so its cost is counted; `false`: it is not. By default on `https://api.openai.com/v1` and regional hosts such as `https://eu.api.openai.com/v1` (from `baseURL` or `OPENAI_BASE_URL`), since a compatible server may refuse the field (the request is then sent again without it, except to OpenAI's own API, which takes it) or ignore it, and a streamed call without usage counts as unmetered. With a cost budget on a compatible server that reports the usage (the Azure OpenAI v1 API does), set `true` |
 | `nativeToolMessages` | `true` | `false` for a compatible server that does not accept assistant `tool_calls` and `tool` messages in the conversation: earlier tool calls and results are then sent as plain text, while tools are still offered and the tool calls of replies still read. `false` on the primary or on any fallback applies to the whole chain |
 
 These options go in `providerConfig.openai` or in the `config` of an OpenAI fallback. A fallback of another vendor takes each option its `config` does not set from `providerConfig.openai`; a fallback of the primary's vendor takes none. An agent or a run sets its own effort in `providerSettings.openai.reasoningEffort`: the run's wins, then the agent's, then the provider's. A cognitive agent applies it to tool selection only; its thoughts, which offer no tools, take its `reasoningEffort` option.
@@ -180,6 +180,7 @@ interface ModelCostLine {
   unmeteredCalls?: number;
   inputTokens: number;
   outputTokens: number;
+  unmeteredTokens?: number;
   costUsd?: number;
 }
 ```
@@ -189,8 +190,8 @@ interface ModelCostLine {
 | `totalUsd` | Cost of the calls whose cost is known; only a lower bound when `complete` is `false` |
 | `complete` | `false` when the cost of some calls is unknown: `unpricedCalls` or `unmeteredCalls` above 0 |
 | `unpricedModels`, `unpricedCalls` | Models without a price in `pricing`, and their calls that reported their tokens |
-| `unmeteredModels`, `unmeteredCalls` | Models of the calls that reported no input or output token counts, and those calls |
-| `lines` | One per model and source: calls, tokens of the calls that reported them, `unmeteredCalls` when there are any, `costUsd` when the model has a price and some of the line's calls reported their tokens; `model` is `(unknown)` for a call that recorded no model name |
+| `unmeteredModels`, `unmeteredCalls` | Models of the calls that did not report both their input and output token counts, and those calls |
+| `lines` | One per model, model asked for and source: calls, tokens of the metered calls, `unmeteredCalls` when there are any, `unmeteredTokens` for the tokens of those, `costUsd` when the model has a price and some of the line's calls are metered; `model` is `(unknown)` for a call that recorded no model name |
 
 ## Traces, replay and testing
 

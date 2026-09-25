@@ -38,16 +38,18 @@ const sdk = createSDK({
 });
 ```
 
-键可以是精确的模型 id，也可以是以 `*` 结尾的前缀。提供商返回的往往是带版本的 id（`gpt-4o-2024-08-06`），而你请求的是 `gpt-4o`：SDK 会把两者都记录下来，先查找返回的 id，再查找请求的名称——精确键优先于前缀，最长的前缀胜出。使用前缀时要小心：除非存在 `gpt-4o-mini*`，否则 `gpt-4o*` 也会匹配 `gpt-4o-mini`。
+键可以是精确的模型 id，也可以是以 `*` 结尾的前缀。提供商返回的往往是带版本的 id（`gpt-4o-2024-08-06`），而你请求的是 `gpt-4o`：SDK 会把两者都记录下来，先查找返回的 id，再查找请求的名称——精确键优先于前缀，最长的前缀胜出。使用前缀时要小心：除非存在 `gpt-4o-mini*`，否则 `gpt-4o*` 也会匹配 `gpt-4o-mini`。每次调用都按它自己的名称计价，包括提供商丢弃的应答：以另一个名称或不带名称请求的模型的调用，各自单独成一行。
 
 ## 未知的成本 {#unknown-costs}
 
 SDK 从不编造价格，也不编造 token 数。调用的成本在两种情况下是未知的，报告会明确指出：
 
 - **它的模型没有价格**：它的调用次数和 token 数仍然会被计数，模型列在 `unpricedModels` 中，这些调用计入 `unpricedCalls`，它所在的行没有 `costUsd`；
-- **它没有报告 token 数**——既没有输入 token 数也没有输出 token 数，例如提供商不返回用量，或者只返回一个总数：它会计入 `unmeteredCalls`（以及它所在行的 `unmeteredCalls`），它的模型列在 `unmeteredModels` 中。它永远不会被当作 0 个 token；如果某一行的调用都没有报告 token 数，这一行同样没有 `costUsd`。
+- **它没有同时报告输入和输出 token 数**——例如提供商不返回用量，只返回一个总数，或者只返回其中一个：它会计入 `unmeteredCalls`（以及它所在行的 `unmeteredCalls`），它的模型列在 `unmeteredModels` 中。它永远不会被当作 0 个 token；如果某一行的调用都没有报告 token 数，这一行同样没有 `costUsd`。
 
-没有 token 数的调用即使模型有价格，也会像预算中那样被算作未计量调用。只要有任何调用的成本未知，报告就会被标记为 `complete: false`，而 `totalUsd` 只累加成本已知的调用：它只是一个下限，而不是这次运行的成本。
+没有同时报告这两个数的调用即使模型有价格，也会像预算中那样被算作未计量调用。只要有任何调用的成本未知，报告就会被标记为 `complete: false`，而 `totalUsd` 只累加成本已知的调用：它只是一个下限，而不是这次运行的成本。
+
+已计量调用的 token 数是它的输入和输出 token 数，无论厂商是否另外给出总数。未计量调用的 token 数取它的总数与它报告的输入或输出 token 数中较大的一个，绝不少于它自己报告用掉的数量：这些 token 会被计入（该行的 `unmeteredTokens`、预算和运行的 `maxTokens`），但从不计为成本。不是大于或等于 0 的数的值（`null`、负数）按缺失处理，也不会掩盖其他值。
 
 ## 失败的调用 {#failed-calls}
 
@@ -65,8 +67,8 @@ SDK 从不编造价格，也不编造 token 数。调用的成本在两种情况
 | 事件 | 来源 | 字段 |
 | --- | --- | --- |
 | `intention.generated` | 原生推理、工具选择 | `model`、`requestedModel`、`usage.promptTokens`、`usage.completionTokens` |
-| `provider.answer_discarded` | 提供商无法使用的应答 | `provider`、`model`、`usage` |
-| `cognition.thought` | 认知操作，包括修复和失败的尝试 | `model`、`requestedModel`、`usage.calls`、`usage.unmeteredCalls` |
+| `provider.answer_discarded` | 提供商无法使用的应答 | `provider`、`model`、`requestedModel`、`usage` |
+| `cognition.thought` | 认知操作，包括修复和失败的尝试（通过后备提供商由不同于最后一次尝试的模型回答的较早尝试，如果报告了用量，记录为 `provider.answer_discarded`） | `model`、`requestedModel`、`usage.calls`、`usage.unmeteredCalls`、`usage.unmeteredTokens` |
 | `cognition.operation_failed` | 在已计费的尝试之后被停止或超时打断的操作 | `model`、`requestedModel`、`usage` |
 | `decision.evaluated` | Jev 以及其他类型化决策后端，包括被拒绝的答案 | `model`、`usage.inputTokens`、`usage.outputTokens` |
 
@@ -78,4 +80,4 @@ SDK 从不编造价格，也不编造 token 数。调用的成本在两种情况
 
 成本只是一个方面；策略还可以按智能体、工具和时间段为**步数、token 数和工具调用次数**设置上限——参见[受治理智能体](./governed-agents)。带 `maxCost` 的 `budgetLimit` 会在某个智能体该时间段内模型调用的花费（按上面的价格计算）超过上限后，拒绝它的工具调用，对认知智能体还会拒绝它的下一步（参见[限制与策略](./cognitive-agents#limits-and-policies)）：已经开始的模型调用从不被中断，带 `toolName` 时只拒绝该工具。如果某个模型没有价格，或某次调用没有报告 token 数，就无法检查该上限，这些工具调用和步骤会被拒绝。如果 `maxCost` 不是有限且 ≥ 0 的数字（例如从配置文件读取的字符串 `'0.5'`、`NaN`、负数金额、`Infinity`、`null`），策略在应用时就会以 `ValidationError` 被拒绝。
 
-预算统计 `getRunCost` 读取的模型调用，读取方式与它相同——包括[失败的调用](#failed-calls)，没有 token 数的调用则算作成本未知的调用：受治理智能体的推理步骤；认知智能体的思维（包括修复和失败的尝试）、工具选择、类型化决策，以及在已计费的尝试之后被打断的操作；两者中提供商无法使用的应答；以及用 `sdk.decisions` 做出的类型化决策，包括被拒绝的答案。带 `agentId` 的上限统计该智能体的模型调用——以及用 `agentId` 指明它的 `sdk.decisions` 调用；不带 `agentId` 的上限统计全部调用，包括不指明智能体做出的类型化决策。预算从不拒绝 `sdk.decisions` 的调用：它拒绝的是工具调用和认知智能体的步骤。
+预算统计 `getRunCost` 读取的模型调用，读取方式与它相同——包括[失败的调用](#failed-calls)，没有同时报告输入和输出 token 数的调用则算作成本未知的调用：受治理智能体的推理步骤；认知智能体的思维（包括修复和失败的尝试）、工具选择、类型化决策，以及在已计费的尝试之后被打断的操作；两者中提供商无法使用的应答；以及用 `sdk.decisions` 做出的类型化决策，包括被拒绝的答案。带 `agentId` 的上限统计该智能体的模型调用——以及用 `agentId` 指明它的 `sdk.decisions` 调用；不带 `agentId` 的上限统计全部调用，包括不指明智能体做出的类型化决策。预算从不拒绝 `sdk.decisions` 的调用：它拒绝的是工具调用和认知智能体的步骤。

@@ -1,6 +1,6 @@
 import type { TypedAnswer, TypedQuestions } from '../decisions/typed-decisions.js';
 import type { CognitiveOperation } from './cognitive-operations.js';
-import { activeHypotheses, openUnknowns, type MentalState } from './mental-state.js';
+import { type MentalState, activeHypotheses, openUnknowns } from './mental-state.js';
 import type { ThinkerProfile } from './thinker-profile.js';
 
 export interface ControllerInput {
@@ -24,7 +24,7 @@ export interface DecisionEvaluationRecord {
   questions: TypedQuestions;
   /** Empty when the answer was rejected (see `error`). */
   answers: Record<string, TypedAnswer>;
-  /** Absent when the backend reported no token counts: the call's cost is then unknown. */
+  /** Absent when the backend reported no usable token counts: the call's cost is then unknown. */
   usage?: { inputTokens: number; outputTokens: number };
   /** Why the answer was rejected, for a call the backend billed although its answer was unusable. */
   error?: string;

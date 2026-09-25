@@ -369,7 +369,7 @@ describe('run budget policies', () => {
         const result = await agent?.run({ message: 'Look it up' });
 
         // gpt-4 has a price, but without input and output counts the cost is unknown.
-        expect(result?.error?.message).toContain('reported no token counts');
+        expect(result?.error?.message).toContain('without input and output token counts');
         expect(lookups).toBe(0);
         await env.dispose();
       }

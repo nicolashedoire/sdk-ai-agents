@@ -90,7 +90,8 @@ export class AnthropicProvider implements LLMProvider {
    * assembles the message the non-streaming API returns: text, thinking blocks with their
    * signature, and the usage of `message_start` and `message_delta`; tool inputs are parsed
    * here from their JSON pieces. The client's timeout ends when the answer starts: a stream
-   * that then sends nothing for as long is cut here.
+   * that then sends nothing for as long is cut here. A stream that breaks off after its
+   * `message_stop` gave the whole answer: it is returned.
    */
   private async streamMessage(
     params: Anthropic.MessageCreateParamsNonStreaming,
@@ -137,6 +138,12 @@ export class AnthropicProvider implements LLMProvider {
     try {
       return withToolInputs(await stream.finalMessage(), inputs);
     } catch (error) {
+      // The whole message arrived (`message_stop`) before the stream broke off or stalled: it
+      // is the answer, and its usage is the one the vendor billed.
+      const whole = stopped && !signal?.aborted ? stream.receivedMessages.at(-1) : undefined;
+      if (whole) {
+        return withToolInputs(whole, inputs);
+      }
       if (stalled) {
         throw new Anthropic.APIConnectionTimeoutError({
           message: `The answer stream sent nothing for ${idleMs} ms`,

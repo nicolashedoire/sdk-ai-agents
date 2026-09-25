@@ -16,6 +16,7 @@ import type { Tool } from './types/tool.js';
 import { computeConfigHash } from './utils/config-hash.js';
 import { DEFAULT_MAX_STEPS, DEFAULT_TIMEOUT_MS } from './utils/constants.js';
 import { generateEventId, generateRunId } from './utils/id.js';
+import { tokensOfUsage } from './utils/usage-tokens.js';
 
 /** Answer to a call the model made alongside the one that ran. */
 const NOT_RUN = 'Not run: one tool runs per step. Call it again if it is still needed.';
@@ -235,9 +236,7 @@ export class AgentImpl {
    * (tool arguments that are not valid JSON) and an answer a provider discarded are counted.
    */
   private async recordModelCall(state: RunState, call: AnsweredModelCall): Promise<void> {
-    const { usage } = call;
-    state.tokensUsed +=
-      usage?.totalTokens ?? (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0);
+    state.tokensUsed += tokensOfUsage(call.usage);
     await this.policyEngine.recordModelUsage(this.agent.id, call);
   }
 

@@ -35,7 +35,7 @@ interface Event {
 | `tool.retry` | `toolName`, `retry`, `delayMs`, `error` |
 | `provider.fallback` | `primaryProvider`, `usedProvider`, `attemptedProviders` |
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
-| `provider.answer_discarded` | `provider`, `model`, `usage`, `reason` — ऐसा जवाब जिसका बिल vendor ने बनाया और उपयोग भी बताया, पर प्रदाता उसे इस्तेमाल नहीं कर सका (बिना किसी choice वाला OpenAI जवाब); लागत में गिना जाता है, और नियंत्रित एजेंटों के लिए हर अवधि के बजट में भी |
+| `provider.answer_discarded` | `provider`, `model`, `requestedModel?`, `usage`, `reason` — ऐसा जवाब जिसका बिल vendor ने बनाया और उपयोग भी बताया, पर प्रदाता उसे इस्तेमाल नहीं कर सका (बिना किसी choice वाला OpenAI जवाब); लागत में और हर अवधि के बजट में गिना जाता है |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, सर्व की गई सामग्री का `sha256` (सामग्री खुद सहेजी नहीं जाती) |
 
 `tool.failed`, `intention.rejected` और `error.occurred` टाइप `EventType` का हिस्सा हैं, लेकिन SDK इन्हें कभी दर्ज नहीं करता: विफल टूल कॉल एक `action.failed` इवेंट होती है, किसी नीति द्वारा ठुकराई गई कॉल एक `policy.violated` इवेंट, और मंज़ूरी में अस्वीकार की गई कॉल एक `approval.rejected` इवेंट।
@@ -46,7 +46,7 @@ interface Event {
 | --- | --- |
 | `cognition.started` | `schemaVersion` (2; पुराने runs में अनुपस्थित), `goal`, `context?`, `observations` (समस्या के साथ दिए गए), `commitRules`, `knowledge?` (`scope`, पहले के runs से याद किए गए `items`, स्टोर विफल होने पर `error?`), `profile`, `controller`, `assessor`, `evaluator?`, `allowedTools`, `limits` |
 | `cognition.operation_selected` | `step`, `operation`, `controller`, `available`, `stepsRemaining`, `forced?` (इंजन ने निर्णय थोपा), `confidence?`, `probabilities?`, `rationale?`, `fallbackFrom?` |
-| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — वे कॉल जिन्होंने tokens की गिनती नहीं बताई) |
+| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — वे कॉल जिन्होंने इनपुट और आउटपुट tokens दोनों नहीं बताए, `unmeteredTokens?` — उनके tokens) |
 | `cognition.operation_failed` | `step`, `operation`, `error`, `recovery?` — और बिल हो चुके प्रयासों के बाद रोक या समय-सीमा से बीच में रुके ऑपरेशन के लिए `model?`, `requestedModel?`, `usage?` भी |
 | `cognition.evaluated` | `step`, `predictionId`, `hypothesisId`, `evaluator` (`id`, `version`), `verdict`, `observed?`, `summary?`, `context?`, `metrics?`, `causeCandidates?`, `reason?`, `durationMs` — किसी पूर्वानुमान के परीक्षण की पूरी रिपोर्ट |
 | `cognition.concluded` | `decision`, `status` (`committed`, `provisional`, `abstain`), `confidence`, `steps`, `evidenceRevision`, `hypotheses`, `predictions` |

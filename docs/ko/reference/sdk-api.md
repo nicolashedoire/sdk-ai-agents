@@ -36,7 +36,7 @@ SDK는 Chat Completions로 OpenAI를 호출하는데, Chat Completions에서 GPT
 | `defaultModel` | `gpt-5.4` | 모델을 지정하지 않은 요청, 그리고 에이전트의 모델을 지원하지 않는 폴백이 쓰는 모델 |
 | `reasoningModels` | 이름으로 판별 | `true` 또는 `false`: 이 프로바이더의 모든 모델이 추론 모델이거나, 모두 아닙니다. 목록: 목록의 이름은 추론 모델이고(Azure 배포, 게이트웨이 별칭), 나머지는 이름으로 판별합니다 |
 | `reasoningEffort` | 모델의 기본값 | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` 중 하나이며 추론 모델에만 그대로 보냅니다. 모델마다 이 중 일부 값만 받으며, API는 나머지를 거부합니다 |
-| `includeStreamUsage` | OpenAI 자체 API에서 켜짐 | `true`: 스트리밍된 답변에 사용량을 요청하므로(`stream_options`) 그 비용이 집계됩니다. `false`: 요청하지 않습니다. 기본적으로 `https://api.openai.com/v1`과 `https://eu.api.openai.com/v1` 같은 지역 호스트(`baseURL` 또는 `OPENAI_BASE_URL`에서 가져옴)에서 켜집니다. 호환 서버는 이 필드를 거부하거나(그러면 이 필드 없이 요청을 다시 보냅니다) 무시할 수 있고, 사용량이 없는 스트리밍 호출은 측정되지 않은 호출로 집계되기 때문입니다. 사용량을 보고하는 호환 서버(Azure OpenAI v1 API가 그렇습니다)에서 비용 예산을 쓴다면 `true`로 설정하세요 |
+| `includeStreamUsage` | OpenAI 자체 API에서 켜짐 | `true`: 스트리밍된 답변에 사용량을 요청하므로(`stream_options`) 그 비용이 집계됩니다. `false`: 요청하지 않습니다. 기본적으로 `https://api.openai.com/v1`과 `https://eu.api.openai.com/v1` 같은 지역 호스트(`baseURL` 또는 `OPENAI_BASE_URL`에서 가져옴)에서 켜집니다. 호환 서버는 이 필드를 거부하거나(그러면 이 필드 없이 요청을 다시 보냅니다. 단 이 필드를 받는 OpenAI 자체 API에는 다시 보내지 않습니다) 무시할 수 있고, 사용량이 없는 스트리밍 호출은 측정되지 않은 호출로 집계되기 때문입니다. 사용량을 보고하는 호환 서버(Azure OpenAI v1 API가 그렇습니다)에서 비용 예산을 쓴다면 `true`로 설정하세요 |
 | `nativeToolMessages` | `true` | 대화 안의 어시스턴트 `tool_calls`와 `tool` 메시지를 받지 않는 호환 서버에는 `false`: 이전 도구 호출과 결과를 텍스트로 보내며, 도구는 계속 제공되고 응답의 도구 호출도 계속 읽습니다. 기본 프로바이더나 어떤 폴백에서든 `false`이면 체인 전체에 적용됩니다 |
 
 이 옵션들은 `providerConfig.openai`나 OpenAI 폴백의 `config`에 넣습니다. 다른 벤더의 폴백은 자기 `config`가 정하지 않은 옵션을 `providerConfig.openai`에서 가져오고, 기본 프로바이더와 같은 벤더의 폴백은 아무것도 가져오지 않습니다. 에이전트나 실행은 `providerSettings.openai.reasoningEffort`로 자체 노력 수준을 정합니다. 실행의 값이 가장 우선하고, 그다음이 에이전트, 마지막이 프로바이더의 값입니다. 인지 에이전트는 이를 도구 선택에만 적용하며, 도구를 제공하지 않는 사고에는 에이전트의 `reasoningEffort` 옵션을 씁니다.
@@ -180,6 +180,7 @@ interface ModelCostLine {
   unmeteredCalls?: number;
   inputTokens: number;
   outputTokens: number;
+  unmeteredTokens?: number;
   costUsd?: number;
 }
 ```
@@ -189,8 +190,8 @@ interface ModelCostLine {
 | `totalUsd` | 비용을 아는 호출의 비용. `complete`가 `false`이면 하한일 뿐입니다 |
 | `complete` | 일부 호출의 비용을 알 수 없을 때, 즉 `unpricedCalls`나 `unmeteredCalls`가 0보다 클 때 `false` |
 | `unpricedModels`, `unpricedCalls` | `pricing`에 가격이 없는 모델과, 그중 토큰 수를 보고한 호출 |
-| `unmeteredModels`, `unmeteredCalls` | 입력 토큰 수도 출력 토큰 수도 보고하지 않은 호출의 모델과 그 호출 |
-| `lines` | 모델과 출처마다 한 줄: 호출 수, 토큰 수를 보고한 호출의 토큰, 있으면 `unmeteredCalls`, 모델에 가격이 있고 그 줄의 호출 중 토큰 수를 보고한 것이 있으면 `costUsd`. 모델 이름을 기록하지 않은 호출의 `model`은 `(unknown)`입니다 |
+| `unmeteredModels`, `unmeteredCalls` | 입력 토큰 수와 출력 토큰 수를 모두 보고하지는 않은 호출의 모델과 그 호출 |
+| `lines` | 모델, 요청한 모델, 출처마다 한 줄: 호출 수, 계량된 호출의 토큰, 있으면 `unmeteredCalls`, 그 호출들의 토큰인 `unmeteredTokens`, 모델에 가격이 있고 그 줄의 호출 중 계량된 것이 있으면 `costUsd`. 모델 이름을 기록하지 않은 호출의 `model`은 `(unknown)`입니다 |
 
 ## 트레이스, 리플레이, 테스트 {#traces-replay-and-testing}
 

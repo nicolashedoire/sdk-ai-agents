@@ -1,4 +1,5 @@
-import { ThoughtGenerationError, type ModelUsage } from '../errors/index.js';
+import { type ModelUsage, ThoughtGenerationError } from '../errors/index.js';
+import { FallbackProvider } from '../providers/fallback-provider.js';
 import type {
   DiscardedAnswer,
   LLMProvider,
@@ -6,15 +7,16 @@ import type {
   LLMResponse,
   OpenAIReasoningEffort,
 } from '../providers/llm-provider.js';
+import { tokensOfCall } from '../utils/usage-tokens.js';
 import type { MentalState } from './mental-state.js';
 import { unassessedHypotheses } from './patch-admission.js';
 import type { ThinkerProfile } from './thinker-profile.js';
-import { ALLOWED_FIELDS, REQUIRED_FIELD, type GeneratedOperation } from './thought-fields.js';
-import { thoughtPatchSchema, type ThoughtPatch } from './thought-patch.js';
+import { ALLOWED_FIELDS, type GeneratedOperation, REQUIRED_FIELD } from './thought-fields.js';
+import { type ThoughtPatch, thoughtPatchSchema } from './thought-patch.js';
 import {
+  type ToolObservation,
   buildOperationPrompt,
   buildSystemPrompt,
-  type ToolObservation,
 } from './thought-prompts.js';
 
 export interface ThoughtRequest {
@@ -87,8 +89,9 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
         }),
       },
     ];
-    const usage: ModelUsage = { promptTokens: 0, completionTokens: 0, calls: 0 };
-    let model: string | undefined;
+    // Every answered attempt, with the names it is priced on: a fallback may have answered a
+    // repair with another model, or its own default model.
+    const attempts: AnsweredAttempt[] = [];
     // Kept apart from the thought's usage: their model may not be the one that answered.
     const discarded: DiscardedAnswer[] = [];
     const onDiscardedAnswer = (answer: DiscardedAnswer) => {
@@ -100,7 +103,7 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       let response: LLMResponse;
       try {
-        response = await this.provider.generateCompletion({
+        const answered = await this.complete({
           ...(request.runId ? { runId: request.runId } : {}),
           model: this.options.model,
           messages: [...messages],
@@ -112,34 +115,36 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
           ...(request.abortSignal ? { abortSignal: request.abortSignal } : {}),
           onDiscardedAnswer,
         });
+        response = answered.response;
+        attempts.push(answered);
       } catch (error) {
         // Keep the tokens of earlier attempts: they were billed even if this call failed.
-        if (usage.calls === 0 && discarded.length === 0) throw error;
+        if (attempts.length === 0 && discarded.length === 0) throw error;
+        const settled = settleAttempts(attempts, discarded);
         throw new ThoughtGenerationError(
           request.operation,
           error instanceof Error ? error.message : String(error),
           {
             originalError: error instanceof Error ? error : new Error(String(error)),
-            ...(usage.calls > 0 ? { usage } : {}),
-            ...(discarded.length > 0 ? { discarded } : {}),
-            requestedModel: this.options.model,
-            ...(model ? { model } : {}),
+            ...(settled.usage.calls > 0 ? { usage: settled.usage } : {}),
+            ...(settled.discarded.length > 0 ? { discarded: settled.discarded } : {}),
+            ...(settled.requestedModel ? { requestedModel: settled.requestedModel } : {}),
+            ...(settled.model ? { model: settled.model } : {}),
           }
         );
       }
-      addUsage(usage, response.usage);
-      model = response.model;
 
       const content = response.content ?? '';
       const parsed = checkCompleteness(request, parseThought(request.operation, content));
       if (parsed.ok) {
+        const settled = settleAttempts(attempts, discarded);
         return {
           patch: parsed.patch,
           ignoredFields: parsed.ignoredFields,
           model: response.model,
-          requestedModel: this.options.model,
-          usage,
-          ...(discarded.length > 0 ? { discarded } : {}),
+          ...(settled.requestedModel ? { requestedModel: settled.requestedModel } : {}),
+          usage: settled.usage,
+          ...(settled.discarded.length > 0 ? { discarded: settled.discarded } : {}),
         };
       }
       lastError = parsed.error;
@@ -152,27 +157,102 @@ export class LLMThoughtGenerator implements ThoughtGenerator {
       );
     }
 
+    const settled = settleAttempts(attempts, discarded);
     throw new ThoughtGenerationError(request.operation, lastError, {
-      usage,
-      ...(discarded.length > 0 ? { discarded } : {}),
-      model: model ?? this.options.model,
-      requestedModel: this.options.model,
+      usage: settled.usage,
+      ...(settled.discarded.length > 0 ? { discarded: settled.discarded } : {}),
+      model: settled.model ?? this.options.model,
+      ...(settled.requestedModel ? { requestedModel: settled.requestedModel } : {}),
     });
+  }
+
+  /**
+   * One call to the provider, and the model it asked for. A fallback chain may send a fallback
+   * its own default model instead of this generator's: that is what the answer is priced on.
+   */
+  private async complete(request: LLMRequest): Promise<AnsweredAttempt> {
+    if (this.provider instanceof FallbackProvider) {
+      const result = await this.provider.generateCompletionWithFallback(request);
+      return {
+        response: result.response,
+        provider: result.usedProvider,
+        ...(result.requestedModel ? { requestedModel: result.requestedModel } : {}),
+      };
+    }
+    const response = await this.provider.generateCompletion(request);
+    return {
+      response,
+      provider: this.provider.getProviderName(),
+      ...(request.model ? { requestedModel: request.model } : {}),
+    };
   }
 }
 
+/** An attempt a provider answered, and the names its tokens are priced on. */
+interface AnsweredAttempt {
+  response: LLMResponse;
+  provider: string;
+  requestedModel?: string;
+}
+
 /**
- * Adds one call to the usage. A call that reported no input/output token counts is counted
- * as unmetered: its cost is unknown, not zero.
+ * The usage of a thought's attempts, priced on the names of the last one. An earlier attempt
+ * answered under other names (a repair a fallback answered) is not added to it: it is
+ * reported with the discarded answers, priced on its own names, as its reply was not used.
+ */
+function settleAttempts(
+  attempts: AnsweredAttempt[],
+  discarded: DiscardedAnswer[]
+): {
+  usage: ModelUsage;
+  discarded: DiscardedAnswer[];
+  model?: string;
+  requestedModel?: string;
+} {
+  const last = attempts.at(-1);
+  const usage: ModelUsage = { promptTokens: 0, completionTokens: 0, calls: 0 };
+  const apart: DiscardedAnswer[] = [];
+  for (const attempt of attempts) {
+    const { model, usage: reported } = attempt.response;
+    const sameNames =
+      model === last?.response.model && attempt.requestedModel === last?.requestedModel;
+    if (!sameNames && reported) {
+      apart.push({
+        provider: attempt.provider,
+        model,
+        ...(attempt.requestedModel ? { requestedModel: attempt.requestedModel } : {}),
+        usage: reported,
+        reason: 'Its reply could not be used, and another model answered the repair',
+      });
+    } else {
+      addUsage(usage, reported);
+    }
+  }
+  return {
+    usage,
+    discarded: [...discarded, ...apart],
+    ...(last?.response.model ? { model: last.response.model } : {}),
+    ...(last?.requestedModel ? { requestedModel: last.requestedModel } : {}),
+  };
+}
+
+/**
+ * Adds one call to the usage. A call that did not report both its input and output token
+ * counts is counted as unmetered: its cost is unknown, not zero (see `tokensOfCall`).
  */
 function addUsage(usage: ModelUsage, reported: LLMResponse['usage']): void {
   usage.calls += 1;
-  if (reported?.promptTokens === undefined && reported?.completionTokens === undefined) {
+  const tokens = tokensOfCall(reported);
+  if (!tokens.metered) {
     usage.unmeteredCalls = (usage.unmeteredCalls ?? 0) + 1;
+    // Its tokens still count (see `tokensOfUsage`), not as a cost.
+    if (tokens.unmeteredTokens > 0) {
+      usage.unmeteredTokens = (usage.unmeteredTokens ?? 0) + tokens.unmeteredTokens;
+    }
     return;
   }
-  usage.promptTokens += reported.promptTokens ?? 0;
-  usage.completionTokens += reported.completionTokens ?? 0;
+  usage.promptTokens += tokens.inputTokens;
+  usage.completionTokens += tokens.outputTokens;
 }
 
 /**

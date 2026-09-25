@@ -35,7 +35,7 @@ interface Event {
 | `tool.retry` | `toolName`, `retry`, `delayMs`, `error` |
 | `provider.fallback` | `primaryProvider`, `usedProvider`, `attemptedProviders` |
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
-| `provider.answer_discarded` | `provider`, `model`, `usage`, `reason` — una respuesta facturada por el fabricante, con el consumo del que informó, que el proveedor no pudo usar (una respuesta de OpenAI sin ninguna opción); se cuenta en los costes y, en los agentes gobernados, en los presupuestos por periodo |
+| `provider.answer_discarded` | `provider`, `model`, `requestedModel?`, `usage`, `reason` — una respuesta facturada por el fabricante, con el consumo del que informó, que el proveedor no pudo usar (una respuesta de OpenAI sin ninguna opción); se cuenta en los costes y en los presupuestos por periodo |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` del contenido servido (el propio contenido no se guarda) |
 
 `tool.failed`, `intention.rejected` y `error.occurred` forman parte del tipo `EventType`, pero el SDK nunca los registra: una llamada a herramienta que falla es un evento `action.failed`; una rechazada por una política, un evento `policy.violated`, y una rechazada en la aprobación, un evento `approval.rejected`.
@@ -46,7 +46,7 @@ interface Event {
 | --- | --- |
 | `cognition.started` | `schemaVersion` (2; ausente en las ejecuciones más antiguas), `goal`, `context?`, `observations` (dadas con el problema), `commitRules`, `knowledge?` (`scope`, `items` recuperados de ejecuciones anteriores, `error?` cuando falló el almacén), `profile`, `controller`, `assessor`, `evaluator?`, `allowedTools`, `limits` |
 | `cognition.operation_selected` | `step`, `operation`, `controller`, `available`, `stepsRemaining`, `forced?` (el motor impuso una decisión), `confidence?`, `probabilities?`, `rationale?`, `fallbackFrom?` |
-| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — llamadas que no informaron de ningún número de tokens) |
+| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — llamadas que no informaron a la vez de sus tokens de entrada y de salida, `unmeteredTokens?` — sus tokens) |
 | `cognition.operation_failed` | `step`, `operation`, `error`, `recovery?` — y además `model?`, `requestedModel?`, `usage?` para una operación interrumpida por una parada o un tiempo límite tras intentos facturados |
 | `cognition.evaluated` | `step`, `predictionId`, `hypothesisId`, `evaluator` (`id`, `version`), `verdict`, `observed?`, `summary?`, `context?`, `metrics?`, `causeCandidates?`, `reason?`, `durationMs` — el informe completo de una prueba de predicción |
 | `cognition.concluded` | `decision`, `status` (`committed`, `provisional`, `abstain`), `confidence`, `steps`, `evidenceRevision`, `hypotheses`, `predictions` |

@@ -212,7 +212,7 @@ describe("budgets per period count a cognitive run's calls as its cost report do
 
     expect(result.status).toBe('failed');
     expect(result.error?.message).toContain(
-      'Cost budget cannot be checked: 1 model call(s) reported no token counts'
+      'Cost budget cannot be checked: 1 model call(s) without input and output token counts'
     );
   });
 
@@ -322,8 +322,13 @@ describe("budgets per period count a cognitive run's calls as its cost report do
 
     expect(result.status).toBe('completed');
     const cost = await expectBudgetsToMatchRunCost(result.runId, agent.id);
-    // The cost report cannot read such a usage: each thought is a call of unknown cost.
-    expect(cost.unmeteredCalls).toBe(provider.requests.length);
+    // A count that is not a whole number above 0 counts one call; the tokens the thought
+    // reported are read all the same (the whole usage used to be dropped).
+    expect(cost.unmeteredCalls).toBe(0);
+    expect(cost.lines.reduce((calls, line) => calls + line.calls, 0)).toBe(
+      provider.requests.length
+    );
+    expect(cost.totalUsd).toBeGreaterThan(0);
   });
 
   it("refuses again, in a replay, a call the discarded answers put over the run's tokens", async () => {

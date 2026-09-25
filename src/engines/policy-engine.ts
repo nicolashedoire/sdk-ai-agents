@@ -1,21 +1,22 @@
+import { DEFAULT_PRICING, type PricingTable, costOf, findModelPrice } from '../costs/pricing.js';
+import { ValidationError } from '../errors/index.js';
+import { ConditionEvaluator } from '../evaluators/condition-evaluator.js';
+import type { BudgetTracker } from '../managers/budget-tracker.js';
+import type { LLMResponse } from '../providers/llm-provider.js';
+import type { IEventStore } from '../stores/event-store.js';
+import type { PolicyAuditEntry } from '../types/audit.js';
 import type {
-  Policy,
-  PolicyContext,
-  PolicyValidationResult,
-  PolicyRule,
   BudgetLimit,
   ConditionExpression,
+  Policy,
+  PolicyContext,
+  PolicyRule,
   PolicyType,
+  PolicyValidationResult,
 } from '../types/policy.js';
 import type { Intention } from '../types/run.js';
-import type { BudgetTracker } from '../managers/budget-tracker.js';
-import type { PolicyAuditEntry } from '../types/audit.js';
-import type { IEventStore } from '../stores/event-store.js';
-import { ConditionEvaluator } from '../evaluators/condition-evaluator.js';
-import { ValidationError } from '../errors/index.js';
 import { generateEventId } from '../utils/id.js';
-import { costOf, DEFAULT_PRICING, findModelPrice, type PricingTable } from '../costs/pricing.js';
-import type { LLMResponse } from '../providers/llm-provider.js';
+import { tokensOfCall, tokensOfUsage } from '../utils/usage-tokens.js';
 
 /**
  * Rule conditions that name a built-in check rather than a field to evaluate. They must not
@@ -60,7 +61,9 @@ export class PolicyEngine {
    * model that answered (or of the model requested). Counted for `agentId` (a governed or
    * cognitive agent, or the agent a typed decision names) and for limits that name no agent;
    * a call without an agent counts only for those. `calls` is the number of model calls
-   * behind the usage (a cognitive thought and its repairs), 1 by default.
+   * behind the usage (a cognitive thought and its repairs): a whole number above 0, else 1.
+   * Its tokens and whether its cost is known follow `tokensOfCall`, as `getRunCost` counts
+   * them: a call that did not report both its input and output tokens has an unknown cost.
    */
   async recordModelUsage(
     agentId: string | undefined,
@@ -73,12 +76,13 @@ export class PolicyEngine {
   ): Promise<void> {
     if (!this.budgetTracker) return;
     const { usage } = call;
-    const input = usage?.promptTokens;
-    const output = usage?.completionTokens;
-    const tokens = usage?.totalTokens ?? (input ?? 0) + (output ?? 0);
-    const calls = call.calls ?? 1;
-    // Without input or output counts (none at all, or a total alone) the cost is unknown.
-    if (input === undefined && output === undefined) {
+    const counted = tokensOfCall(usage);
+    const tokens = tokensOfUsage(usage);
+    // A count a caller got wrong (NaN, 0, a fraction) still counts the call it came with.
+    const calls =
+      call.calls !== undefined && Number.isInteger(call.calls) && call.calls > 0 ? call.calls : 1;
+    // Without both input and output counts (none, a total alone, one side) the cost is unknown.
+    if (!counted.metered) {
       await this.budgetTracker.recordModelUsage(agentId, { tokens, uncosted: 'no-usage', calls });
       return;
     }
@@ -86,7 +90,7 @@ export class PolicyEngine {
     await this.budgetTracker.recordModelUsage(
       agentId,
       price
-        ? { tokens, costUsd: costOf(price, input ?? 0, output ?? 0) }
+        ? { tokens, costUsd: costOf(price, counted.inputTokens, counted.outputTokens) }
         : { tokens, uncosted: 'no-price', calls }
     );
   }

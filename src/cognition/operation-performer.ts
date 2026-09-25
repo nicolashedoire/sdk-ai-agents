@@ -109,6 +109,7 @@ export class OperationPerformer {
       await this.deps.recorder.record(runId, 'provider.answer_discarded', {
         provider: answer.provider,
         model: answer.model,
+        ...(answer.requestedModel ? { requestedModel: answer.requestedModel } : {}),
         usage: answer.usage,
         reason: answer.reason,
       });

@@ -1,8 +1,8 @@
+import { truncate } from '../utils/truncate.js';
 import { knowledgeFindings } from './knowledge-findings.js';
 import { toRecalledKnowledge } from './knowledge-records.js';
 import type { KnowledgeStore } from './knowledge-store.js';
 import type { MentalState } from './mental-state.js';
-import { truncate } from '../utils/truncate.js';
 import { toError } from './operation-outcome.js';
 import type { RecalledKnowledgeRecord } from './thought-patch.js';
 

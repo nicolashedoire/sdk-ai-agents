@@ -35,7 +35,7 @@ interface Event {
 | `tool.retry` | `toolName`, `retry`, `delayMs`, `error` |
 | `provider.fallback` | `primaryProvider`, `usedProvider`, `attemptedProviders` |
 | `provider.retry` | `provider`, `model`, `retry`, `delayMs`, `error` |
-| `provider.answer_discarded` | `provider`, `model`, `usage`, `reason` — ответ, оплаченный у поставщика и с сообщённым расходом, который провайдер не смог использовать (ответ OpenAI без единого варианта); учитывается в затратах, а у управляемых агентов — и в бюджетах по периодам |
+| `provider.answer_discarded` | `provider`, `model`, `requestedModel?`, `usage`, `reason` — ответ, оплаченный у поставщика и с сообщённым расходом, который провайдер не смог использовать (ответ OpenAI без единого варианта); учитывается в затратах и в бюджетах по периодам |
 | `resource.read` | `uri`, `mimeType?`, `bytes`, `sha256` отданного содержимого (само содержимое не хранится) |
 
 `tool.failed`, `intention.rejected` и `error.occurred` входят в тип `EventType`, но SDK никогда их не записывает: неудачный вызов инструмента — это событие `action.failed`, отклонённый политикой — событие `policy.violated`, а отклонённый при одобрении — событие `approval.rejected`.
@@ -46,7 +46,7 @@ interface Event {
 | --- | --- |
 | `cognition.started` | `schemaVersion` (2; отсутствует в более старых запусках), `goal`, `context?`, `observations` (переданные вместе с задачей), `commitRules`, `knowledge?` (`scope`, `items`, вспомненные из предыдущих запусков, `error?`, если хранилище дало сбой), `profile`, `controller`, `assessor`, `evaluator?`, `allowedTools`, `limits` |
 | `cognition.operation_selected` | `step`, `operation`, `controller`, `available`, `stepsRemaining`, `forced?` (движок навязал решение), `confidence?`, `probabilities?`, `rationale?`, `fallbackFrom?` |
-| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — вызовы, не сообщившие число токенов) |
+| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — вызовы, не сообщившие и входные, и выходные токены, `unmeteredTokens?` — их токены) |
 | `cognition.operation_failed` | `step`, `operation`, `error`, `recovery?` — а также `model?`, `requestedModel?`, `usage?` для операции, прерванной остановкой или тайм-аутом после оплаченных попыток |
 | `cognition.evaluated` | `step`, `predictionId`, `hypothesisId`, `evaluator` (`id`, `version`), `verdict`, `observed?`, `summary?`, `context?`, `metrics?`, `causeCandidates?`, `reason?`, `durationMs` — полный отчёт о проверке предсказания |
 | `cognition.concluded` | `decision`, `status` (`committed`, `provisional`, `abstain`), `confidence`, `steps`, `evidenceRevision`, `hypotheses`, `predictions` |

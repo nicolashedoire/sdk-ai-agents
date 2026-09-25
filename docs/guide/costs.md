@@ -38,16 +38,18 @@ const sdk = createSDK({
 });
 ```
 
-Keys are exact model ids or prefixes ending with `*`. Providers often answer with a versioned id (`gpt-4o-2024-08-06`) while you asked for `gpt-4o`: the SDK records both and looks up the returned id first, then the requested name — exact keys before prefixes, the longest prefix winning. Be careful with prefixes: `gpt-4o*` also matches `gpt-4o-mini` unless `gpt-4o-mini*` exists.
+Keys are exact model ids or prefixes ending with `*`. Providers often answer with a versioned id (`gpt-4o-2024-08-06`) while you asked for `gpt-4o`: the SDK records both and looks up the returned id first, then the requested name — exact keys before prefixes, the longest prefix winning. Be careful with prefixes: `gpt-4o*` also matches `gpt-4o-mini` unless `gpt-4o-mini*` exists. Each call is priced on its own names, an answer a provider discarded included: calls of a model asked for under another name, or under none, have a line of their own.
 
 ## Unknown costs
 
 The SDK never invents a price, nor a token count. The cost of a call is unknown in two cases, and the report says so:
 
 - **its model has no price**: its calls and tokens are still counted, the model is listed in `unpricedModels`, those calls in `unpricedCalls`, and its line has no `costUsd`;
-- **it reported no token counts** — neither input nor output tokens, as with a provider that returns no usage, or only a total: it is counted in `unmeteredCalls` (and in its line's `unmeteredCalls`), and its model in `unmeteredModels`. It is never taken as zero tokens, and a line none of whose calls reported them has no `costUsd` either.
+- **it did not report both its input and its output tokens** — as with a provider that returns no usage, only a total, or one of the two: it is counted in `unmeteredCalls` (and in its line's `unmeteredCalls`), and its model in `unmeteredModels`. It is never taken as zero tokens, and a line none of whose calls reported them has no `costUsd` either.
 
-A call without token counts is unmetered even when its model has a price, as budgets count it. When the cost of any call is unknown, the report is marked `complete: false` and `totalUsd` only adds up the calls whose cost is known: a lower bound, not the cost of the run.
+A call without both counts is unmetered even when its model has a price, as budgets count it. When the cost of any call is unknown, the report is marked `complete: false` and `totalUsd` only adds up the calls whose cost is known: a lower bound, not the cost of the run.
+
+The tokens of a metered call are its input and output tokens, whatever total the vendor also gives. Those of an unmetered call are the largest of its total and the input or output tokens it reported, never fewer than it said it used: they count as tokens (in the line's `unmeteredTokens`, in budgets and in a run's `maxTokens`), never as a cost. A count that is not a number of 0 or more (`null`, a negative number) is read as missing, and does not hide the others.
 
 ## Failed calls
 
@@ -65,8 +67,8 @@ An attempt that failed without an answer — an HTTP error, a timeout, a lost co
 | Event | Source | Fields |
 | --- | --- | --- |
 | `intention.generated` | Native reasoning, tool selection | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
-| `provider.answer_discarded` | An answer the provider could not use | `provider`, `model`, `usage` |
-| `cognition.thought` | Cognitive operations, repairs and failed attempts included | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls` |
+| `provider.answer_discarded` | An answer the provider could not use | `provider`, `model`, `requestedModel`, `usage` |
+| `cognition.thought` | Cognitive operations, repairs and failed attempts included (an earlier attempt answered by another model than the last one, through a fallback, is recorded as a `provider.answer_discarded` when it reported its usage) | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.unmeteredTokens` |
 | `cognition.operation_failed` | An operation cut short by a stop or a timeout after billed attempts | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev and other typed-decision backends, rejected answers included | `model`, `usage.inputTokens`, `usage.outputTokens` |
 
@@ -78,4 +80,4 @@ Because usage lives in events, you can also compute costs yourself with `compute
 
 Cost is only one side; policies can also cap **steps, tokens and tool calls** per agent, tool and period — see [Governed agents](./governed-agents). A `budgetLimit` with `maxCost` refuses an agent's tool calls once its model calls have cost more than the cap in the period, priced as above, and a cognitive agent's next step as well (see [Limits and policies](./cognitive-agents#limits-and-policies)): a model call already started is never interrupted, and with `toolName` only that tool is refused. When a model has no price, or a call reports no token counts, the cap cannot be checked and those tool calls and steps are refused. A `maxCost` that is not a finite number ≥ 0 (a string such as `'0.5'` read from a config file, `NaN`, a negative amount, `Infinity`, `null`) is refused when the policy is applied, with a `ValidationError`.
 
-Budgets count the model calls `getRunCost` reads, as it reads them — the [failed calls](#failed-calls) included, and a call without token counts as a call whose cost is unknown: a governed agent's reasoning steps; a cognitive agent's thoughts (repairs and failed attempts included), tool selections, typed decisions and operations cut short after billed attempts; the answers a provider discarded, in both; and the typed decisions made with `sdk.decisions`, rejected answers included. A cap with `agentId` counts that agent's model calls — and the `sdk.decisions` calls that name it with `agentId`; one without counts them all, typed decisions made without an agent included. A budget never refuses a call of `sdk.decisions`: it refuses tool calls and the steps of cognitive agents.
+Budgets count the model calls `getRunCost` reads, as it reads them — the [failed calls](#failed-calls) included, and a call without both token counts as a call whose cost is unknown: a governed agent's reasoning steps; a cognitive agent's thoughts (repairs and failed attempts included), tool selections, typed decisions and operations cut short after billed attempts; the answers a provider discarded, in both; and the typed decisions made with `sdk.decisions`, rejected answers included. A cap with `agentId` counts that agent's model calls — and the `sdk.decisions` calls that name it with `agentId`; one without counts them all, typed decisions made without an agent included. A budget never refuses a call of `sdk.decisions`: it refuses tool calls and the steps of cognitive agents.
