@@ -146,7 +146,7 @@ Every item of a study is a **claim**: a statement with a status, the results it 
 
 A result the study retrieved for another passage is not enough: the model must have seen it in the prompt that wrote the claim. The same rule holds for the components of an architecture. A status the study cannot read counts as `hypothesis`, never as a stronger one. **Without sources, nothing can be established**: every claim is at best a hypothesis, no novelty can be checked, and the report says so in its first notice (`noSources`).
 
-Every reason the study gives — why a status was lowered, why an item was removed, why an amendment was refused — is a `StudyReason`: a `code` (such as `citesUnlisted` or `noveltyNoResult`), its `params`, and the same reason in English (`message`). The dossier writes it in the study's language; a reason the guardian or the model wrote has the code `judged`, its text in `params.text`.
+Every reason the study gives — why a status was lowered, why an item was removed, why an amendment was refused — is a `StudyReason`: a `code` (such as `citesUnlisted` or `priorArtNoResult`), its `params`, and the same reason in English (`message`). The dossier writes it in the study's language; a reason the guardian or the model wrote has the code `judged`, its text in `params.text`.
 
 ### Prior art
 
