@@ -1,15 +1,16 @@
 import { z } from 'zod';
 import { DecisionClientError, ValidationError } from '../errors/index.js';
+import { type FetchLike, defaultFetch, parseRetryAfter } from '../utils/http.js';
+import { tokenCount } from '../utils/usage-tokens.js';
 import {
-  assertValidQuestions,
-  parseAnswers,
   type DecisionRequest,
   type DecisionResponse,
   type DecisionUsage,
   type TypedDecisionClient,
   type TypedQuestions,
+  assertValidQuestions,
+  parseAnswers,
 } from './typed-decisions.js';
-import { defaultFetch, parseRetryAfter, type FetchLike } from '../utils/http.js';
 
 export type { FetchLike, HttpResponseLike } from '../utils/http.js';
 
@@ -48,9 +49,8 @@ export const JEV_DEFAULT_MODEL = 'jev-latest';
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504, 529]);
 const MAX_ERROR_DETAIL_LENGTH = 500;
 
-const usageSchema = z
-  .object({ input_tokens: z.number().optional(), output_tokens: z.number().optional() })
-  .optional();
+// Read field by field (see `toDecisionUsage`): a malformed usage never rejects the answer.
+const usageSchema = z.unknown();
 
 const evaluationResponseSchema = z.object({
   model: z.string(),
@@ -284,12 +284,17 @@ function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-/** Token counts as reported, or undefined when neither input nor output tokens were given. */
-function toDecisionUsage(usage: z.infer<typeof usageSchema>): DecisionUsage | undefined {
-  if (usage?.input_tokens === undefined && usage?.output_tokens === undefined) {
-    return undefined;
-  }
-  return { inputTokens: usage.input_tokens ?? 0, outputTokens: usage.output_tokens ?? 0 };
+/**
+ * Token counts as reported, each read on its own (see `tokenCount`). Jev bills input tokens
+ * only: a usage with them is its whole cost, and output tokens it left out count 0. Without
+ * input tokens the cost is unknown: undefined, as for any model call that did not report both
+ * sides (see `tokensOfCall`).
+ */
+function toDecisionUsage(usage: unknown): DecisionUsage | undefined {
+  const fields = usage && typeof usage === 'object' ? (usage as Record<string, unknown>) : {};
+  const inputTokens = tokenCount(fields.input_tokens);
+  if (inputTokens === undefined) return undefined;
+  return { inputTokens, outputTokens: tokenCount(fields.output_tokens) ?? 0 };
 }
 
 function describeErrorBody(text: string): string {

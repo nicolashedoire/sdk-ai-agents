@@ -105,8 +105,9 @@ export interface DecisionResponse<Q extends TypedQuestions> {
   model: string;
   answers: TypedAnswers<Q>;
   /**
-   * Tokens the call used. Absent when the backend reported no input/output token counts: the
-   * cost of the call is then unknown (`sdk.getRunCost` counts it as unmetered), not zero.
+   * Tokens the call used. Absent when the backend did not report the token counts its cost is
+   * priced on (Jev: its input tokens): the cost of the call is then unknown (`sdk.getRunCost`
+   * counts it as unmetered), not zero.
    */
   usage?: DecisionUsage;
 }

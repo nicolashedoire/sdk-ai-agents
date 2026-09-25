@@ -68,7 +68,7 @@ SDK が価格やトークン数をでっち上げることは決してありま�
 | --- | --- | --- |
 | `intention.generated` | ネイティブの推論、ツールの選択 | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
 | `provider.answer_discarded` | プロバイダーが使えなかった応答 | `provider`, `model`, `requestedModel`, `usage` |
-| `cognition.thought` | 認知オペレーション（修復と失敗した試行も含む。フォールバックを通じて最後の試行とは別のモデルが答えた試行は `provider.answer_discarded` として記録される） | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.unmeteredTokens` |
+| `cognition.thought` | 認知オペレーション（修復と失敗した試行も含む。フォールバックを通じて最後の試行とは別のモデルが答えたそれ以前の試行は、使用量を報告していれば `provider.answer_discarded` として記録される） | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.unmeteredTokens` |
 | `cognition.operation_failed` | 課金された試行の後、停止やタイムアウトで打ち切られたオペレーション | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev とその他の型付き決定のバックエンド（拒否された回答も含む） | `model`, `usage.inputTokens`, `usage.outputTokens` |
 
@@ -80,4 +80,4 @@ SDK が価格やトークン数をでっち上げることは決してありま�
 
 コストは一つの側面にすぎません。ポリシーを使えば、エージェント、ツール、期間ごとに、**ステップ数、トークン数、ツール呼び出しの回数** に上限を設けることもできます。[ガバナンス付きエージェント](./governed-agents) を参照してください。`maxCost` を指定した `budgetLimit` は、期間内のモデル呼び出しの費用が上限を超えると、上記の料金に基づき、エージェントのツール呼び出しを拒否し、認知エージェントであれば次のステップも拒否します（[制限とポリシー](./cognitive-agents#limits-and-policies) を参照）。すでに始まったモデル呼び出しが中断されることはなく、`toolName` を指定するとそのツールだけが拒否されます。料金のないモデルがある場合や、トークン数を報告しない呼び出しがある場合は上限を確認できないため、それらのツール呼び出しとステップは拒否されます。有限で 0 以上の数値ではない `maxCost`（設定ファイルから読み込んだ `'0.5'` のような文字列、`NaN`、負の金額、`Infinity`、`null`）は、ポリシーの適用時に `ValidationError` で拒否されます。
 
-予算は、`getRunCost` が読むモデル呼び出しを、それと同じように数えます。[失敗した呼び出し](#failed-calls) も含み、トークン数のない呼び出しはコストが不明な呼び出しとして数えます。対象は、ガバナンス付きエージェントの推論ステップ、認知エージェントの思考（修復と失敗した試行も含む）、ツールの選択、型付き決定、課金された試行の後で打ち切られたオペレーション、どちらの場合もプロバイダーが使えなかった応答、そして `sdk.decisions` で行った型付き決定（拒否された回答も含む）です。`agentId` を指定した上限は、そのエージェントのモデル呼び出しと、`agentId` でそのエージェントを指定した `sdk.decisions` の呼び出しを数えます。指定しない上限は、エージェントなしで行った型付き決定も含め、すべてを数えます。予算が `sdk.decisions` の呼び出しを拒否することはありません。拒否するのはツール呼び出しと認知エージェントのステップです。
+予算は、`getRunCost` が読むモデル呼び出しを、それと同じように数えます。[失敗した呼び出し](#failed-calls) も含み、入力と出力の両方のトークン数がそろっていない呼び出しはコストが不明な呼び出しとして数えます。対象は、ガバナンス付きエージェントの推論ステップ、認知エージェントの思考（修復と失敗した試行も含む）、ツールの選択、型付き決定、課金された試行の後で打ち切られたオペレーション、どちらの場合もプロバイダーが使えなかった応答、そして `sdk.decisions` で行った型付き決定（拒否された回答も含む）です。`agentId` を指定した上限は、そのエージェントのモデル呼び出しと、`agentId` でそのエージェントを指定した `sdk.decisions` の呼び出しを数えます。指定しない上限は、エージェントなしで行った型付き決定も含め、すべてを数えます。予算が `sdk.decisions` の呼び出しを拒否することはありません。拒否するのはツール呼び出しと認知エージェントのステップです。

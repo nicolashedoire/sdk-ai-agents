@@ -68,7 +68,7 @@ SDK는 가격도, 토큰 수도 절대 지어내지 않습니다. 호출의 비�
 | --- | --- | --- |
 | `intention.generated` | 네이티브 추론, 도구 선택 | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
 | `provider.answer_discarded` | 프로바이더가 쓸 수 없었던 응답 | `provider`, `model`, `requestedModel`, `usage` |
-| `cognition.thought` | 인지 연산(수정과 실패한 시도 포함. 폴백을 통해 마지막 시도와 다른 모델이 답한 시도는 `provider.answer_discarded`로 기록됨) | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.unmeteredTokens` |
+| `cognition.thought` | 인지 연산(수정과 실패한 시도 포함. 폴백을 통해 마지막 시도와 다른 모델이 답한 그 이전 시도는 사용량을 보고했다면 `provider.answer_discarded`로 기록됨) | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.unmeteredTokens` |
 | `cognition.operation_failed` | 청구된 시도 뒤에 중지나 타임아웃으로 중단된 연산 | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev와 그 밖의 타입 지정 결정 백엔드(거부된 답 포함) | `model`, `usage.inputTokens`, `usage.outputTokens` |
 
@@ -80,4 +80,4 @@ SDK는 가격도, 토큰 수도 절대 지어내지 않습니다. 호출의 비�
 
 비용은 한 측면일 뿐입니다. 정책으로 에이전트, 도구, 기간별로 **단계, 토큰, 도구 호출**에 상한을 둘 수도 있습니다. [통제형 에이전트](./governed-agents)를 보세요. `maxCost`를 지정한 `budgetLimit`은 기간 내 모델 호출 비용이 한도를 넘으면 위의 가격을 기준으로 에이전트의 도구 호출을 거부하고, 인지 에이전트라면 다음 단계도 거부합니다([한도와 정책](./cognitive-agents#limits-and-policies) 참고). 이미 시작된 모델 호출은 중단되지 않으며, `toolName`을 지정하면 그 도구만 거부합니다. 가격이 없는 모델이 있거나 토큰 수를 보고하지 않는 호출이 있으면 한도를 확인할 수 없으므로 그 도구 호출과 단계가 거부됩니다. 0 이상의 유한한 숫자가 아닌 `maxCost`(설정 파일에서 읽은 `'0.5'` 같은 문자열, `NaN`, 음수 금액, `Infinity`, `null`)는 정책을 적용할 때 `ValidationError`로 거부됩니다.
 
-예산은 `getRunCost`가 읽는 모델 호출을 같은 방식으로 셉니다. [실패한 호출](#failed-calls)도 포함하며, 토큰 수가 없는 호출은 비용을 알 수 없는 호출로 셉니다. 통제형 에이전트의 추론 단계, 인지 에이전트의 사고(수정과 실패한 시도 포함), 도구 선택, 타입 지정 결정, 청구된 시도 뒤에 중단된 연산, 두 경우 모두 프로바이더가 쓸 수 없었던 응답, 그리고 `sdk.decisions`로 내린 타입 지정 결정(거부된 답 포함)입니다. `agentId`를 지정한 한도는 그 에이전트의 모델 호출과, `agentId`로 그 에이전트를 지정한 `sdk.decisions` 호출을 셉니다. 지정하지 않은 한도는 에이전트 없이 내린 타입 지정 결정까지 포함해 모두를 셉니다. 예산은 `sdk.decisions` 호출을 거부하지 않습니다. 거부하는 것은 도구 호출과 인지 에이전트의 단계입니다.
+예산은 `getRunCost`가 읽는 모델 호출을 같은 방식으로 셉니다. [실패한 호출](#failed-calls)도 포함하며, 입력과 출력 토큰 수를 모두 갖추지 않은 호출은 비용을 알 수 없는 호출로 셉니다. 통제형 에이전트의 추론 단계, 인지 에이전트의 사고(수정과 실패한 시도 포함), 도구 선택, 타입 지정 결정, 청구된 시도 뒤에 중단된 연산, 두 경우 모두 프로바이더가 쓸 수 없었던 응답, 그리고 `sdk.decisions`로 내린 타입 지정 결정(거부된 답 포함)입니다. `agentId`를 지정한 한도는 그 에이전트의 모델 호출과, `agentId`로 그 에이전트를 지정한 `sdk.decisions` 호출을 셉니다. 지정하지 않은 한도는 에이전트 없이 내린 타입 지정 결정까지 포함해 모두를 셉니다. 예산은 `sdk.decisions` 호출을 거부하지 않습니다. 거부하는 것은 도구 호출과 인지 에이전트의 단계입니다.

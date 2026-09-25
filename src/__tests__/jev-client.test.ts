@@ -61,6 +61,24 @@ describe('JevClient', () => {
     expect(response.usage).toEqual({ inputTokens: 318, outputTokens: 34 });
   });
 
+  it('reads each token count on its own, and needs the input tokens Jev bills', async () => {
+    server.reply(
+      { status: 200, body: { ...ANSWERS, usage: { input_tokens: null, output_tokens: 3 } } },
+      { status: 200, body: { ...ANSWERS, usage: { output_tokens: 34 } } },
+      { status: 200, body: { ...ANSWERS, usage: { input_tokens: 318, output_tokens: -1 } } }
+    );
+    const client = new JevClient({ apiKey: 'ts-key', baseUrl, sleep });
+    const evaluate = () => client.evaluate({ state: { ticket: 'Refund' }, questions: QUESTIONS });
+
+    // Before: a null count rejected the whole answer ("Unexpected response shape"), and output
+    // tokens alone gave a usage priced at $0 as if complete.
+    const nullInput = await evaluate();
+    expect(nullInput.answers.department.choice).toBe('billing');
+    expect(nullInput).not.toHaveProperty('usage');
+    expect(await evaluate()).not.toHaveProperty('usage');
+    expect((await evaluate()).usage).toEqual({ inputTokens: 318, outputTokens: 0 });
+  });
+
   it('retries overloads and rate limits, honoring retry-after', async () => {
     server.reply(
       { status: 529, body: { error: 'overloaded' } },
