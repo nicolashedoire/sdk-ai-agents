@@ -422,11 +422,11 @@ function createRuntime(options: WebToolsOptions): WebRuntime {
       : {}),
     ...(options.lookup ? { lookup: options.lookup } : {}),
   });
-  const userAgent = options.userAgent ?? DEFAULT_USER_AGENT;
+  // Read unpaced, so a site's robots.txt never delays the first page read from it.
   const robots =
     options.robots === false
       ? undefined
-      : new RobotsPolicy(http, userAgent.split(/[\s/]/)[0] || 'sdk-ai-agents');
+      : new RobotsPolicy(http.unpaced(), Math.max(timeoutMs, 10_000));
   const cache =
     options.cache === false
       ? undefined

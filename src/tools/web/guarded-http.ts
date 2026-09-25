@@ -105,7 +105,23 @@ export class GuardedHttpClient implements WebClient {
       options.lookup ?? ((hostname) => dns.lookup(hostname, { all: true, verbatim: true }));
   }
 
-  async request(rawUrl: string, init: WebRequestInit = {}): Promise<WebResponse> {
+  request(rawUrl: string, init: WebRequestInit = {}): Promise<WebResponse> {
+    return this.perform(rawUrl, init, true);
+  }
+
+  /**
+   * A client whose requests neither wait for the host's pacing nor count as its last request:
+   * for robots.txt, which must not delay the page it is read for.
+   */
+  unpaced(): WebClient {
+    return { request: (url, init) => this.perform(url, init ?? {}, false) };
+  }
+
+  private async perform(
+    rawUrl: string,
+    init: WebRequestInit,
+    paced: boolean
+  ): Promise<WebResponse> {
     let url = httpUrl(rawUrl);
     const configuredOrigin = init.configuredEndpoint ? url.origin : undefined;
     let method = init.method ?? 'GET';
@@ -116,7 +132,7 @@ export class GuardedHttpClient implements WebClient {
       checkLiteralAddress(url, privateAllowed);
       const admitted = await init.admit?.(url);
       const interval = Math.max(init.minIntervalMs ?? 0, admitted?.minIntervalMs ?? 0);
-      await this.options.pacer.wait(url.host, interval, init.signal);
+      if (paced) await this.options.pacer.wait(url.host, interval, init.signal);
       const answer = await this.send(url, method, headers, body, init, privateAllowed);
       if (answer.location === undefined) return answer.response;
       if (hop >= this.options.maxRedirects) {

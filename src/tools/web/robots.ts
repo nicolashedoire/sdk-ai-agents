@@ -2,12 +2,29 @@ import { bodyText, type WebClient } from './guarded-http.js';
 import { TtlCache } from './web-cache.js';
 import { WebRequestRefusedError } from './web-errors.js';
 
+/**
+ * The product token robots.txt rules are matched against, whatever user agent is sent: a site
+ * writes its rules for `sdk-ai-agents`, and a browser-like user agent is never taken for
+ * `Mozilla`.
+ */
+export const ROBOTS_PRODUCT_TOKEN = 'sdk-ai-agents';
+
+/** Rules with a longer path are ignored: no real site needs them, and they cost time. */
+export const MAX_ROBOTS_PATTERN_LENGTH = 2_048;
+/** Rules past this many in one file are ignored. */
+export const MAX_ROBOTS_RULES = 10_000;
+/** A path is matched on its first characters only. */
+const MAX_MATCHED_PATH_LENGTH = 4_096;
+
 /** A rule of a robots.txt group. */
 interface RobotsRule {
   allow: boolean;
   /** The path pattern, percent-encoding normalised; `*` and a final `$` are special. */
   pattern: string;
-  matcher: RegExp;
+  /** The pattern cut at each `*` (a `**` gives an empty part), the final `$` removed. */
+  parts: string[];
+  /** The pattern ends with `$`: the path must end where the pattern does. */
+  anchored: boolean;
 }
 
 /** A group: the user agents it names, its rules, its `Crawl-delay`. */
@@ -27,14 +44,17 @@ export interface RobotsVerdict {
 }
 
 /**
- * Parses a robots.txt file (RFC 9309): groups start with `user-agent` lines, then hold
- * `allow` and `disallow` rules; `crawl-delay` (not in the RFC, but widely used) is read too.
- * Lines outside a group, unknown fields and comments are ignored.
+ * Parses a robots.txt file (RFC 9309): a group starts with one or more `user-agent` lines
+ * and holds the `allow` and `disallow` rules that follow; `crawl-delay` (not in the RFC, but
+ * widely used) is read too. Other lines (`sitemap`, unknown fields, comments) belong to no
+ * group and do not end one. Rules longer than 2,048 characters, and past 10,000 rules, are
+ * ignored.
  */
 export function parseRobots(text: string): RobotsGroup[] {
   const groups: RobotsGroup[] = [];
   let current: RobotsGroup | undefined;
   let inAgents = false;
+  let rules = 0;
   for (const raw of text.split(/\r\n|\r|\n/)) {
     const line = raw.replace(/#.*$/, '').trim();
     const field = /^([A-Za-z-]+)\s*:\s*(.*)$/.exec(line);
@@ -51,17 +71,29 @@ export function parseRobots(text: string): RobotsGroup[] {
       inAgents = true;
       continue;
     }
+    if (key !== 'allow' && key !== 'disallow' && key !== 'crawl-delay') continue;
     inAgents = false;
     if (!current) continue;
-    if (key === 'allow' || key === 'disallow') {
-      // An empty `disallow` allows everything: it adds no rule.
-      if (value === '') continue;
-      const pattern = normalizePattern(value);
-      current.rules.push({ allow: key === 'allow', pattern, matcher: patternMatcher(pattern) });
-    } else if (key === 'crawl-delay') {
+    if (key === 'crawl-delay') {
       const seconds = Number(value);
       if (Number.isFinite(seconds) && seconds >= 0) current.crawlDelayMs = seconds * 1_000;
+      continue;
     }
+    // An empty `disallow` allows everything: it adds no rule.
+    if (value === '' || value.length > MAX_ROBOTS_PATTERN_LENGTH || rules >= MAX_ROBOTS_RULES) {
+      continue;
+    }
+    rules++;
+    const pattern = normalizePath(
+      value.startsWith('/') || value.startsWith('*') ? value : `/${value}`
+    );
+    const anchored = pattern.endsWith('$');
+    current.rules.push({
+      allow: key === 'allow',
+      pattern,
+      parts: (anchored ? pattern.slice(0, -1) : pattern).split('*'),
+      anchored,
+    });
   }
   return groups;
 }
@@ -83,17 +115,19 @@ export function robotsVerdict(
     .map((group) => group.crawlDelayMs)
     .filter((delay): delay is number => delay !== undefined);
   const crawlDelayMs = delays.length > 0 ? Math.max(...delays) : undefined;
-  const target = normalizePath(path);
+  const target = normalizePath(path.slice(0, MAX_MATCHED_PATH_LENGTH));
   let best: RobotsRule | undefined;
   if (target !== '/robots.txt') {
-    for (const rule of applicable.flatMap((group) => group.rules)) {
-      if (!rule.matcher.test(target)) continue;
-      if (
-        !best ||
-        rule.pattern.length > best.pattern.length ||
-        (rule.pattern.length === best.pattern.length && rule.allow && !best.allow)
-      ) {
-        best = rule;
+    for (const group of applicable) {
+      for (const rule of group.rules) {
+        if (!ruleMatches(rule, target)) continue;
+        if (
+          !best ||
+          rule.pattern.length > best.pattern.length ||
+          (rule.pattern.length === best.pattern.length && rule.allow && !best.allow)
+        ) {
+          best = rule;
+        }
       }
     }
   }
@@ -105,31 +139,56 @@ export function robotsVerdict(
   };
 }
 
+/**
+ * Whether a rule matches a path, in linear time: the part before the first `*` must start the
+ * path, and each next part is found at its earliest place after the previous one (the earliest
+ * place leaves the most room for the rest, so it is never wrong). A final `$` asks for the
+ * last part at the very end. No backtracking: a pattern such as `/*a*a*a*a*b` costs one scan.
+ */
+function ruleMatches(rule: RobotsRule, path: string): boolean {
+  const { parts, anchored } = rule;
+  const first = parts[0] ?? '';
+  if (!path.startsWith(first)) return false;
+  if (parts.length === 1) return !anchored || path.length === first.length;
+  let position = first.length;
+  const last = parts.length - 1;
+  for (let index = 1; index < last; index++) {
+    const part = parts[index] ?? '';
+    if (part === '') continue;
+    const found = path.indexOf(part, position);
+    if (found === -1) return false;
+    position = found + part.length;
+  }
+  const tail = parts[last] ?? '';
+  if (!anchored) return tail === '' || path.indexOf(tail, position) !== -1;
+  return path.length - tail.length >= position && path.endsWith(tail);
+}
+
 /** `sdk-ai-agents` matches `sdk-ai-agents` and `sdk-ai-agents/1.0`, whatever the case. */
 function agentMatches(agent: string, token: string): boolean {
   return agent !== '*' && agent.split('/')[0]?.trim() === token;
 }
 
-/** Percent-encodes what a URL path would, and writes existing escapes in upper case. */
-function normalizePattern(pattern: string): string {
-  const withSlash = pattern.startsWith('/') || pattern.startsWith('*') ? pattern : `/${pattern}`;
-  return normalizePath(withSlash);
-}
+const UNRESERVED = /^[A-Za-z0-9\-._~]$/;
 
-function normalizePath(path: string): string {
-  return path
-    .replace(/%[0-9a-fA-F]{2}/g, (sequence) => sequence.toUpperCase())
-    .replace(/[^\x21-\x7e]/g, (char) => encodeURIComponent(char));
-}
-
-/** A rule's pattern as a regular expression: a prefix, `*` any run, a final `$` the end. */
-function patternMatcher(pattern: string): RegExp {
-  const anchored = pattern.endsWith('$');
-  const body = (anchored ? pattern.slice(0, -1) : pattern)
-    .split('*')
-    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
-    .join('.*');
-  return new RegExp(`^${body}${anchored ? '$' : ''}`);
+/**
+ * A path or a rule written as RFC 9309 (§2.2.2) compares them: an escape of an unreserved
+ * character is decoded (`%2D` is `-`, `%7E` is `~`), other escapes are kept in upper case
+ * (`%2f` is `%2F`, never `/`), and characters outside printable US-ASCII are percent-encoded
+ * in UTF-8.
+ */
+export function normalizePath(path: string): string {
+  return path.replace(/%([0-9a-fA-F]{2})|[^\x21-\x7e]/gu, (match, hex: string | undefined) => {
+    if (hex !== undefined) {
+      const char = String.fromCharCode(Number.parseInt(hex, 16));
+      return UNRESERVED.test(char) ? char : `%${hex.toUpperCase()}`;
+    }
+    try {
+      return encodeURIComponent(match);
+    } catch {
+      return '%EF%BF%BD';
+    }
+  });
 }
 
 /**
@@ -138,15 +197,24 @@ function patternMatcher(pattern: string): RegExp {
  * reached mean everything is disallowed, and are asked again after a minute. Redirects the
  * client does not follow (more than it allows, to http, to another scheme) count as "no
  * robots.txt".
+ *
+ * The file is read with its own time limit, not with a caller's: one caller that gives up
+ * does not fail the others waiting for the same file. It is read without pacing, so it never
+ * delays the page it was read for.
  */
 export class RobotsPolicy {
   private readonly rules = new TtlCache<RobotsGroup[]>(86_400_000, 500);
   private readonly unreachable = new TtlCache<string>(60_000, 500);
   private readonly pending = new Map<string, Promise<RobotsGroup[] | string>>();
 
+  /**
+   * @param client an unpaced client, whose requests do not count as the host's last one
+   * @param loadTimeoutMs how long reading one robots.txt may take, redirects included
+   */
   constructor(
     private readonly client: WebClient,
-    private readonly productToken: string
+    private readonly loadTimeoutMs: number,
+    private readonly productToken = ROBOTS_PRODUCT_TOKEN
   ) {}
 
   async verdict(url: URL, signal?: AbortSignal): Promise<RobotsVerdict> {
@@ -177,13 +245,13 @@ export class RobotsPolicy {
     if (known !== undefined) return Promise.resolve(known);
     let loading = this.pending.get(origin);
     if (!loading) {
-      loading = this.load(origin, signal).finally(() => this.pending.delete(origin));
+      loading = this.load(origin).finally(() => this.pending.delete(origin));
       this.pending.set(origin, loading);
     }
-    return loading;
+    return untilAborted(loading, signal);
   }
 
-  private async load(origin: string, signal?: AbortSignal): Promise<RobotsGroup[] | string> {
+  private async load(origin: string): Promise<RobotsGroup[] | string> {
     let status: number;
     let text = '';
     try {
@@ -191,12 +259,11 @@ export class RobotsPolicy {
         headers: { accept: 'text/plain' },
         // RFC 9309: at least 500 KiB are parsed.
         maxBytes: 512_000,
-        ...(signal ? { signal } : {}),
+        signal: AbortSignal.timeout(this.loadTimeoutMs),
       });
       status = response.status;
       if (status >= 200 && status < 300) text = bodyText(response);
     } catch (error) {
-      if (signal?.aborted) throw error;
       if (error instanceof WebRequestRefusedError) {
         // A private address is refused for the page too: say so, rather than blame robots.txt.
         if (error.reason === 'private-address') throw error;
@@ -226,4 +293,29 @@ export class RobotsPolicy {
     this.unreachable.set(origin, reason);
     return reason;
   }
+}
+
+/** The promise's outcome, or the signal's reason as soon as it aborts. */
+export function untilAborted<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(abortReason(signal));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(abortReason(signal));
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      }
+    );
+  });
+}
+
+function abortReason(signal: AbortSignal): Error {
+  const reason: unknown = signal.reason;
+  return reason instanceof Error ? reason : new Error('The request was cancelled');
 }
