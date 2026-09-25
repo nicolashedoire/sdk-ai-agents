@@ -489,7 +489,7 @@ A listener is `(event: Event) => unknown`. It gets one event at a time, in the o
 
 ## Tool sources
 
-Each returns ready-made `ToolDefinition`s: pass them to `sdk.defineTool`, to an agent, or directly to an MCP server's `tools`. See [An MCP server for anything](../guide/mcp-recipes).
+Each returns ready-made `ToolDefinition`s: pass them through `sdk.defineTool` before giving them to an agent (agents take `Tool[]`), or directly to an MCP server's `tools`. See [Tools](../guide/tools) and [An MCP server for anything](../guide/mcp-recipes).
 
 | Function | Returns | |
 | --- | --- | --- |

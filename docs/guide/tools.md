@@ -49,8 +49,8 @@ const refundOrder = sdk.defineTool({
 | Field | |
 | --- | --- |
 | `name`, `description` | What the model sees and decides from. Use letters, digits, `_` and `-`, up to 64 characters: model APIs and MCP clients may refuse other names. |
-| `schema` | The arguments, as a zod schema; `.describe()` texts are shown to the model. A call that does not match is refused before anything else. |
-| `handler(params, context?)` | Your code. `context` holds `runId`, `agentId`, and `signal`, aborted when the caller gives up. |
+| `schema` | The arguments, as a zod schema; `.describe()` texts are shown to the model. A call that does not match is refused before any policy, approval or budget. |
+| `handler(params, context?)` | Your code. `context` holds `runId`, `agentId`, `signal` (aborted when the caller gives up) and `onEvent` (set when the caller watches the call live). |
 | `metadata` | `riskLevel` (`low`, `medium`, `high`), `requiresApproval`, `readOnly`, `category`: see [How calls are governed](#how-calls-are-governed). None by default. |
 | `retry` | `{ maxRetries, initialDelayMs? (200), maxDelayMs? (5,000), retryOn? }`, for idempotent tools only. |
 | `version` | `1.0.0` by default. It is part of the agent's configuration hash, so runs before and after a change can be [compared](../reference/sdk-api#comparisons-and-impact). |
@@ -65,8 +65,8 @@ Each source returns tool definitions, ready for `sdk.defineTool` (`connectMcpSer
 | Source | The agent can | Tool names | Risk, read-only | Needs | Details |
 | --- | --- | --- | --- | --- | --- |
 | `folderTools({ root })` | List, read and search the text files of one folder, never outside it | `list_files`, `read_file`, `search_files` | low, read-only | A folder | [A folder of documents](./mcp-recipes#a-folder-of-documents) |
-| `databaseTools({ database })` | List the tables, describe one, run one `SELECT` (100 rows by default) | `list_tables`, `describe_table`, `query` | medium, read-only | `sqliteReadOnly(db)` (`node:sqlite` or `better-sqlite3`) or `postgresReadOnly({ pool })` (`pg`) | [A read-only database](./mcp-recipes#a-read-only-database) |
-| `await openApiTools({ spec })` | Call a web API, one tool per operation; only `GET` unless listed in `include` | The `operationId`, else method and path (`get_pets_petId`) | `GET`: low, read-only. Others: high, approval required | An OpenAPI 3 description (URL, file or object) | [A web API](./mcp-recipes#a-web-api-from-its-openapi-description) |
+| `databaseTools({ database })` | List the tables, describe one, run one read-only query: `SELECT`, `WITH … SELECT` or `VALUES` (at most 100 rows by default) | `list_tables`, `describe_table`, `query` | medium, read-only | `sqliteReadOnly(db)` (`node:sqlite` or `better-sqlite3`) or `postgresReadOnly({ pool })` (`pg`) | [A read-only database](./mcp-recipes#a-read-only-database) |
+| `await openApiTools({ spec })` | Call a web API, one tool per operation: the `GET` operations by default; `include` replaces them with the operations it lists, the only way to get writes | The `operationId`, else method and path (`get_pets_petId`) | `GET`: low, read-only. Others: high, approval required | An OpenAPI 3 description (URL, file or object) | [A web API](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | Search the Web, read a page or a PDF, search arXiv, Wikipedia and GitHub | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` | `web_fetch` medium, the others low; all read-only | Nothing to start (DuckDuckGo); `unpdf` for PDFs; a GitHub token to search code | [Web research](./web-research) |
 | `governedAgentTool(agent)`, `cognitiveAgentTool(agent)` | Ask another agent: a governed agent answers a `message`, a cognitive agent reasons about a `problem` and returns its decision | `ask_<agent name>` | medium, not marked read-only | An agent, so a model key | [An agent](./mcp-recipes#an-agent-your-reasoning-twin) |
 | `await connectMcpServer({ name, transport })` | Use the tools of any MCP server | The server's names, after `toolPrefix` | None set: `metadata` applies to every imported tool | `@sdk-ai-agents/core/mcp` and `@modelcontextprotocol/sdk`; `close()` when done | [Use the tools of an MCP server](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
@@ -120,7 +120,7 @@ A call goes through these steps, in this order, and stops at the first refusal:
 1. **The caller's tools.** A tool the caller was not given is refused: an agent's tools, a study's sources, an MCP server's list, or `allowedTools`. `executeTool` without `allowedTools` can run any registered tool.
 2. **The arguments**, checked against the schema, before anyone is asked anything.
 3. **The policies**: every global policy and every policy of the agent (see [Governed agents](./governed-agents#_3-policies)).
-4. **The approval**, when the tool or a policy asks for one.
+4. **The approval**, when the tool or a policy asks for one. A call that any policy refuses is refused without asking for an approval: an approval never overrides a deny, an allowlist or a budget.
 5. **The budget**: the call is counted when it starts, whatever its outcome.
 6. **The tool runs**, with its retries.
 
@@ -152,7 +152,7 @@ The list is taken when the policy is defined: define the tools first.
 
 ### Approvals
 
-A call waits for a human when the tool has `requiresApproval: true` (the default of `openApiTools` for write operations) or a policy rule says `require_approval`. It appears in `sdk.getPendingApprovals()`; `sdk.approveAction(id, who, reason?)` lets it run, `sdk.rejectAction(id, who, reason?)` refuses it. If the caller gives up first (a stopped run, an aborted `signal`, `approvalTimeoutMs`, 50 s by default on MCP servers), the approval is cancelled and the tool never runs. See [Approvals](./mcp-deploy#approvals-a-human-says-yes-first).
+A call waits for a human when the tool has `requiresApproval: true` (the default of `openApiTools` for write operations) or a policy rule says `require_approval`. It appears in `sdk.getPendingApprovals()`; `sdk.approveAction(id, who, reason?)` lets it run, `sdk.rejectAction(id, who, reason?)` refuses it. A call that any policy refuses is refused without asking for an approval: an approval never overrides a deny, an allowlist or a budget. If the caller gives up first (a stopped run, an aborted `signal`, `approvalTimeoutMs`, 50 s by default on MCP servers), the approval is cancelled and the tool never runs. See [Approvals](./mcp-deploy#approvals-a-human-says-yes-first).
 
 ### Read-only tools
 
@@ -182,7 +182,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-`maxTokens` and `maxCost` count the model calls, and refuse the tool calls once spent. See [API costs](./costs#budgets).
+A `budgetLimit` can also cap `maxTokens` and `maxCost`, counted on the model calls: once the period's usage exceeds a cap, tool calls are refused, and `maxCost` also refuses them as soon as a call's cost is unknown (a model without a price, a call without token counts). See [API costs](./costs#budgets).
 
 ### Untrusted output
 
@@ -208,7 +208,7 @@ A call made with `executeTool` is a run of its own, unless you give `runId`: `ru
 | --- | --- |
 | My own code or service | `sdk.defineTool` |
 | Documents in a folder | `folderTools` |
-| Answers from a SQL database, without any risk of writing | `databaseTools` with `sqliteReadOnly` or `postgresReadOnly` |
+| Answers from a SQL database, read-only | `databaseTools` with `sqliteReadOnly` or `postgresReadOnly`; for PostgreSQL, also connect with a role that can only read |
 | A web API that publishes an OpenAPI description | `openApiTools` |
 | A web API without one | `sdk.defineTool`, with `fetch` in the handler |
 | The Web, papers, encyclopedia articles, code on GitHub | `webTools` |
