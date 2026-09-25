@@ -36,7 +36,14 @@ export const SIDEBAR = [
   },
   {
     group: 'connect',
-    pages: ['guide/typed-decisions', 'guide/mcp', 'guide/mcp-first-server', 'guide/mcp-recipes', 'guide/mcp-deploy'],
+    pages: [
+      'guide/typed-decisions',
+      'guide/web-research',
+      'guide/mcp',
+      'guide/mcp-first-server',
+      'guide/mcp-recipes',
+      'guide/mcp-deploy',
+    ],
   },
   {
     group: 'operate',

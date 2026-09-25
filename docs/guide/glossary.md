@@ -123,7 +123,7 @@ Every term used in this documentation, explained without jargon, with a link to 
 | **OpenAPI** | A standard, machine-readable description of a web API: its addresses, parameters and answers, often published as `openapi.json`. From it, the SDK makes one tool per operation. See [A web API](./mcp-recipes#a-web-api-from-its-openapi-description). |
 | **JSON Schema** | A description of the shape of some data — here, of a tool's arguments — that models and MCP applications read to call the tool correctly. The SDK writes it from your Zod schema or from the OpenAPI description. |
 | **Read-only** | Can look, cannot change. The folder and database sources are read-only by construction; web APIs are read-only by default (only `GET` operations). |
-| **Tool source** | A function that builds ready-made tools from a system: `openApiTools`, `folderTools`, `databaseTools`, `cognitiveAgentTool`. Serve them over MCP in one line, or give them to your own agents. See [An MCP server for anything](./mcp-recipes). |
+| **Tool source** | A function that builds ready-made tools from a system: `openApiTools`, `folderTools`, `databaseTools`, `cognitiveAgentTool`, `webTools`. Serve them over MCP in one line, or give them to your own agents. See [An MCP server for anything](./mcp-recipes) and [Web research](./web-research). |
 
 ## Operating in production
 
