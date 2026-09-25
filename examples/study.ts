@@ -6,9 +6,10 @@
  * Bitcoin as a breakthrough by assembly: prior techniques that, together, opened a capability.
  *
  * Run: OPENAI_API_KEY=... npm run example:study
- *   SEARCH_MCP    command of an MCP search server, e.g. "npx -y @modelcontextprotocol/server-brave-search"
- *                 (with the key it needs, e.g. BRAVE_API_KEY). Without a source, nothing can be
- *                 established: every claim stays a hypothesis.
+ *   SEARCH_MCP    command of an MCP search server, e.g. "npx -y @modelcontextprotocol/server-brave-search".
+ *                 Without a source, nothing can be established: every claim stays a hypothesis.
+ *   SEARCH_ENV    names of the variables the server needs, comma-separated, e.g. BRAVE_API_KEY:
+ *                 it gets those and a minimal environment, never your model key.
  *   SEARCH_TOOLS  the server's tools to search with, comma-separated (all of them by default)
  *   MODEL         the model of every call (gpt-4o by default)
  *
@@ -18,6 +19,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FileEventStore, createSDK } from '../src/index.js';
+import { getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { connectMcpServer, type McpConnection } from '../src/mcp.js';
 
 const eventStore = new FileEventStore(join(import.meta.dirname, 'events'));
@@ -63,6 +65,7 @@ const file = join(import.meta.dirname, 'study-navigateur.md');
 writeFileSync(file, result.markdown);
 const { stats } = result.report;
 console.log(`\nStatus: ${result.status}${result.stoppedBy ? ` (${result.stoppedBy})` : ''}`);
+if (result.error) console.error(`Why: ${result.error.message}`);
 console.log(
   `${stats.items} items: ${stats.byStatus.established} established, ${stats.byStatus.hypothesis} hypotheses, ${stats.byStatus.novelty} novelties (${stats.noveltiesToVerify} to verify); ${stats.rejected} rejected`
 );
@@ -79,15 +82,25 @@ console.log('Cost:', await sdk.getRunCost(result.runId));
 await search?.close();
 // Write pending events and stop the store's flush timer so the process can exit.
 await eventStore.destroy();
+// A study that did not complete leaves a partial dossier: the exit code says so.
+if (result.status !== 'completed') process.exitCode = 1;
 
 /** Connects to an MCP search server started by `command` (its tools become study sources). */
 async function connectSearch(command: string): Promise<McpConnection> {
   const [program = '', ...args] = command.split(' ').filter(Boolean);
   const include = process.env.SEARCH_TOOLS?.split(',').map((name) => name.trim());
-  // The server gets this process's environment: its API key comes from there.
-  const env = Object.fromEntries(
-    Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)
-  );
+  // The server gets a minimal environment and only the variables named in SEARCH_ENV: never
+  // this process's other secrets (the model key among them).
+  const needed = (process.env.SEARCH_ENV ?? '').split(',').map((name) => name.trim());
+  const env = {
+    ...getDefaultEnvironment(),
+    ...Object.fromEntries(
+      needed.flatMap((name) => {
+        const value = name ? process.env[name] : undefined;
+        return value === undefined ? [] : [[name, value]];
+      })
+    ),
+  };
   return connectMcpServer({
     name: 'search',
     transport: { type: 'stdio', command: program, args, env },
