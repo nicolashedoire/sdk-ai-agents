@@ -32,7 +32,7 @@ A última passagem dele concebe experimentos; ela não os executa. Depois de exe
 
 ## As sete passagens {#the-seven-passages}
 
-Uma execução percorre as sete passagens do método, em ordem. Cada uma produz itens de alguns tipos (as suas **coleções**), e cada item recebe um id que nunca é reutilizado: `O1`, `P2`, `A1`…
+Uma execução percorre as sete passagens do método, em ordem. Cada uma produz itens de alguns tipos (as suas **coleções**), e cada item recebe um id que nunca é reutilizado, até um reinício: `O1`, `P2`, `A1`…
 
 | # | Passagem | O que faz | O que guarda |
 | --- | --- | --- | --- |
@@ -41,10 +41,10 @@ Uma execução percorre as sete passagens do método, em ordem. Cada uma produz 
 | 3 | `historicalChoices` | Pesquisa os motivos documentados das escolhas da sua época: hardware, ferramentas, usos, conhecimentos, custos, compatibilidade. Um motivo plausível sem documento continua sendo uma hipótese | `historicalChoices` (`H`) |
 | 4 | `changes` | Pesquisa o que surgiu ou se tornou utilizável desde então, no domínio do objeto e em outros, cada avanço com o seu mecanismo, data, evidências, condições de uso e disponibilidade. Dá um veredito sobre cada uma das suas pistas, procura outras ferramentas matemáticas e técnicas além delas, lista as melhores realizações atuais (a referência do que é "melhor") e desconstrói as rupturas por montagem | `advances` (`V`), `leadVerdicts` (`L`), `independentLeads` (`I`), `references` (`R`), `analogues` (`B`) |
 | 5 | `cross` | Cruza passado e presente: quais restrições permanecem, quais se enfraqueceram, quais exigências são novas. Deduz as decisões que se tornaram revisáveis, propõe combinações A + B (o que A permite a B fazer, o que elas precisam trocar, quanto isso custa em conversões e sincronização) e nomeia novas capacidades candidatas | `constraints` (`K`), `revisableDecisions` (`D`), `combinations` (`X`), `capabilities` (`Y`) |
-| 6 | `design` | Concebe pelo menos duas arquiteturas, pelo menos uma delas visando uma nova capacidade, cada uma cobrindo a cadeia completa, com o seu mecanismo, condições, benefício, custo adicional, um contraexemplo possível e as suas predições. Dá os três estados de cada peça principal e diz o que é novo e o que não é. Depois, pesquisa o estado da técnica das novidades | `architectures` (`A`), `threeStates` (`T`), `noveltyClaims` (`N`) |
+| 6 | `design` | Concebe pelo menos duas arquiteturas, pelo menos uma delas visando uma nova capacidade, cada uma cobrindo a cadeia completa, com o seu mecanismo, condições, benefício, custo adicional, um contraexemplo possível e as suas predições. Dá os três estados de cada peça principal e diz o que é novo e o que não é. Depois, pesquisa o estado da técnica das novidades e da montagem de cada capacidade | `architectures` (`A`), `threeStates` (`T`), `noveltyClaims` (`N`) |
 | 7 | `confront` | Concebe os experimentos que permitiriam decidir entre as arquiteturas e testar a cadeia completa: protocolo, medidas, critérios e o resultado esperado para cada arquitetura. Preenche uma ficha de mecanismo para cada mecanismo principal | `experiments` (`E`), `cards` (`M`) |
 
-Os resultados que as pesquisas devolvem também são numerados: `S1`, `S2`… Cada passagem recebe os itens das passagens anteriores de que precisa, como registros JSON compactos.
+Os resultados que as pesquisas devolvem também são numerados: `S1`, `S2`… Cada passagem recebe os itens das passagens anteriores de que precisa, como registros JSON compactos: apenas os itens que o guardião julgou (veja [O guardião](#the-guardian)).
 
 ### Um ciclo, não uma linha {#a-loop-not-a-line}
 
@@ -56,7 +56,7 @@ flowchart LR
   X -.->|reabre| C
 ```
 
-As passagens formam um ciclo. Quando uma incógnita bloqueia uma passagem — a concepção precisa saber como uma peça realmente funciona, por exemplo —, ela pode pedir para **reabrir** uma passagem anterior sobre esse ponto. A passagem anterior é executada de novo com esse foco e acrescenta itens aos que já tinha, e depois a passagem que pediu é executada de novo com eles. `limits.maxLoops` limita as reaberturas de uma execução (1 por padrão, 0 para não permitir nenhuma); uma passagem que foi ela mesma reaberta não pode reabrir outra.
+As passagens formam um ciclo. Quando uma incógnita bloqueia uma passagem — a concepção precisa saber como uma peça realmente funciona, por exemplo —, ela pode pedir para **reabrir** uma passagem anterior sobre esse ponto. A passagem anterior é executada de novo com esse foco e acrescenta aos itens que já tinha apenas o que essa incógnita exige: ela não tem nenhum mínimo a cumprir, e não precisa dar de novo nenhum veredito sobre as pistas nem nenhuma ruptura. Depois, a passagem que pediu é executada de novo com eles; até que isso aconteça, ela não está completa (o seu estado é `partial`), e a pesquisa do estado da técnica da concepção espera pela versão final dela. `limits.maxLoops` limita as reaberturas de uma execução (1 por padrão, 0 para não permitir nenhuma); uma passagem que foi ela mesma reaberta não pode reabrir outra.
 
 ### Três estados de cada peça {#three-states-of-each-piece}
 
@@ -112,7 +112,7 @@ Cada arquitetura declara o seu `kind`: `capability`, ou `improvement` quando ela
 
 Você pode nomear na carta a capacidade que visa (`capability`); todo prompt passa então a trazê-la. Sem ela, a passagem `cross` precisa propor pelo menos uma candidata (`capabilities`, `Y1`…), dizendo para quem ela é, por que é difícil hoje e qual princípio mudaria.
 
-O guardião (veja [O guardião](#the-guardian)) também julga cada arquitetura: uma capacidade que ele considera apenas mais rápida ou mais barata se torna uma `improvement`, com `declaredKind: 'capability'` para mostrar o que o modelo afirmou. Uma concepção que fica sem nenhuma capacidade está fora do objetivo como um todo: ela é anotada no registro de deriva e refeita uma vez; se a nova versão ainda não tiver nenhuma, o relatório diz isso (aviso `noCapability`). No relatório, **as capacidades vêm primeiro, as melhorias depois**.
+O guardião (veja [O guardião](#the-guardian)) vê o mecanismo, os componentes e a montagem de cada arquitetura, e julga duas coisas separadamente: se ela serve ao objetivo, e se ela abre uma nova capacidade. Uma capacidade que ele considera apenas mais rápida ou mais barata se torna uma `improvement`, com `declaredKind: 'capability'` para mostrar o que o modelo afirmou, `kindReason` para dizer por quê, e um evento `study.capability_demoted`. Uma melhoria que serve ao objetivo permanece: ela vem depois das capacidades, e nunca é removida por ser uma melhoria. Uma concepção que fica sem nenhuma capacidade está fora do objetivo como um todo: ela é anotada no registro de deriva e refeita uma vez; se a nova versão ainda não tiver nenhuma, o relatório diz isso (aviso `noCapability`), e se o guardião não manteve nenhuma arquitetura, ele também diz isso (aviso `noDesign`). No relatório, **as capacidades vêm primeiro, as melhorias depois**.
 
 ### A novidade está na montagem {#novelty-lies-in-the-assembly}
 
@@ -120,10 +120,11 @@ As rupturas raramente vêm de uma técnica sem precedente. Com mais frequência,
 
 - uma arquitetura lista os seus **componentes** (`components`): técnicas anteriores, cada uma com o seu enunciado, data e fontes, cada uma com um status verificado como o de qualquer afirmação;
 - a sua **montagem** (`assembly`) diz o que cada componente dá aos outros, o que eles trocam e quanto isso custa;
-- um componente **nunca é uma novidade**: um componente apresentado como novo é `established` se um resultado que o estudo recuperou o documenta, e uma `hypothesis` caso contrário, com o motivo;
-- o status da própria arquitetura é o da sua montagem e da sua capacidade. Quando ela afirma uma novidade, o seu estado da técnica é pesquisado **como uma combinação**: o estudo procura trabalhos que já juntam os mesmos componentes para produzir a mesma capacidade, não cada peça separadamente.
+- um componente **nunca é uma novidade**: um componente apresentado como novo é `established` se um resultado listado no seu prompt o documenta, e uma `hypothesis` caso contrário, com o motivo;
+- cada componente e cada ligação da montagem dizem de quais registros da investigação vêm (`from`): avanços (`V`), pistas independentes (`I`), referências (`R`), rupturas (`B`), decisões revisáveis (`D`), combinações (`X`) e capacidades candidatas (`Y`), entre os que o prompt da concepção listou. O código verifica isso: os ids que o prompt não listou vão para `unknownFrom`, e uma parte que não cita nenhum dos registros listados é marcada como `untraced` — ela não decorre da investigação —, com o aviso `untracedAssembly`;
+- o status da própria arquitetura é o da sua montagem e da sua capacidade. O estado da técnica da montagem de **cada capacidade**, qualquer que seja o status que o modelo lhe deu, é pesquisado **como uma combinação**: o estudo procura trabalhos que já juntam os mesmos componentes para produzir a mesma capacidade, não cada peça separadamente.
 
-O dossiê mostra o caminho de cada arquitetura: componentes (com os seus status) → montagem (com o seu status) → capacidade.
+O dossiê mostra o caminho de cada arquitetura: componentes (com os seus status e a sua origem) → montagem (com o seu status) → capacidade.
 
 ### Rupturas por montagem {#breakthroughs-by-assembly}
 
@@ -131,7 +132,7 @@ A passagem `changes` também desconstrói rupturas do passado, em qualquer domí
 
 Para cada ruptura, o estudo registra as técnicas anteriores que ela montou (pelo menos duas, com as suas datas), a restrição que ela removeu, a capacidade que se abriu e o **padrão** da montagem. As passagens `cross` e `design` recebem esses padrões e podem reutilizá-los. Cada ruptura é uma afirmação como qualquer outra: `established` somente com um resultado que o estudo recuperou.
 
-As rupturas que você nomeia em `analogues` precisam, cada uma, ser desconstruídas. Uma resposta que esquece uma delas é devolvida uma vez; se ainda faltar alguma, o relatório a lista em `undeconstructedAnalogues`, com o aviso `analoguesNotDeconstructed`. O estudo pode acrescentar outras rupturas que tenha encontrado.
+As rupturas que você nomeia em `analogues` precisam, cada uma, ser desconstruídas. A carta as numera, e o modelo nomeia a que desconstrói pelo seu número (`named`), de modo que a correspondência se mantém qualquer que seja o idioma em que o modelo escreve. Uma resposta que esquece uma delas é devolvida uma vez; se ainda faltar alguma, o relatório a lista em `undeconstructedAnalogues`, com o aviso `analoguesNotDeconstructed`. O estudo pode acrescentar outras rupturas que tenha encontrado.
 
 ## Estabelecida, hipótese, novidade {#established-hypothesis-novelty}
 
@@ -139,20 +140,24 @@ Cada item de um estudo é uma **afirmação**: um enunciado com um status, os re
 
 | Status | O que exige | O que o estudo faz caso contrário |
 | --- | --- | --- |
-| `established` | Cita pelo menos um resultado **que este estudo recuperou** das suas fontes | Ela se torna uma `hypothesis`. `declaredStatus` guarda o status que o modelo deu e `statusReason` diz por quê; os ids que ela citou e que o estudo nunca recuperou são mantidos à parte em `unretrievedSources` e não sustentam nada |
+| `established` | Cita pelo menos um resultado **listado no prompt que a escreveu** | Ela se torna uma `hypothesis`. `declaredStatus` guarda o status que o modelo deu e `statusReason` diz por quê; os ids que ela citou e que o seu prompt não listou são mantidos à parte em `unlistedSources` e não sustentam nada |
 | `hypothesis` | Nada: plausível, não documentada aqui | — |
 | `novelty` | Uma ideia que ainda não existe, e uma **pesquisa do seu estado da técnica** | Ela continua sendo uma novidade a verificar (`toVerify: true`), com o motivo, até que o seu estado da técnica tenha sido pesquisado e avaliado |
 
-Um status que o estudo não consegue ler conta como `hypothesis`, nunca como um status mais forte. **Sem fontes, nada pode ser estabelecido**: toda afirmação é no máximo uma hipótese, nenhuma novidade pode ser verificada, e o relatório diz isso no seu primeiro aviso (`noSources`).
+Um resultado que o estudo recuperou para outra passagem não basta: o modelo precisa tê-lo visto no prompt que escreveu a afirmação. A mesma regra vale para os componentes de uma arquitetura. Um status que o estudo não consegue ler conta como `hypothesis`, nunca como um status mais forte. **Sem fontes, nada pode ser estabelecido**: toda afirmação é no máximo uma hipótese, nenhuma novidade pode ser verificada, e o relatório diz isso no seu primeiro aviso (`noSources`).
+
+Cada motivo que o estudo dá — por que um status foi rebaixado, por que um item foi removido, por que uma emenda foi recusada — é um `StudyReason`: um `code` (como `citesUnlisted` ou `noveltyNoResult`), os seus `params` e o mesmo motivo em inglês (`message`). O dossiê o escreve no idioma do estudo; um motivo que o guardião ou o modelo escreveu tem o código `judged`, com o seu texto em `params.text`.
 
 ### Estado da técnica {#prior-art}
 
-Depois da concepção, o estudo pesquisa o estado da técnica de cada novidade ainda a verificar, tanto as da concepção quanto as das passagens anteriores. O modelo escolhe as pesquisas (para uma arquitetura: a combinação dos seus componentes e a capacidade), o estudo as executa, e depois uma chamada separada nomeia o trabalho existente mais próximo entre os resultados e dá um veredito:
+Depois da concepção final, o estudo pesquisa o estado da técnica de cada novidade ainda a verificar, tanto as da concepção quanto as das passagens anteriores, e da montagem de cada arquitetura que visa uma capacidade, qualquer que seja o seu status. O modelo escolhe pesquisas para cada afirmação (para uma arquitetura: a combinação dos seus componentes e a capacidade), o estudo as executa, e depois uma chamada separada nomeia o trabalho existente mais próximo e dá um veredito. **O estado da técnica de uma afirmação se apoia apenas nos resultados das suas próprias pesquisas**, e em pelo menos um deles:
 
-- `novel` ou `partlyNovel`: a afirmação continua sendo uma novidade, não mais a verificar, com o seu `priorArt` (`closest`, `sources`, `verdict`);
-- `exists`: a ideia já foi feita; a afirmação se torna uma `hypothesis`, e `statusReason` nomeia o trabalho mais próximo.
+- `novel` ou `partlyNovel`: uma novidade continua sendo uma novidade, não mais a verificar, com o seu `priorArt` (`closest`, `sources`, `verdict`);
+- `exists`: a ideia já foi feita; uma novidade se torna uma `hypothesis`, e `statusReason` nomeia o trabalho mais próximo.
 
-Uma novidade cujo estado da técnica não pôde ser pesquisado ou avaliado — sem fonte, com o orçamento de pesquisas esgotado, sem nenhuma pesquisa pedida para ela, ou uma novidade afirmada depois da concepção — continua a verificar, e diz por quê. O relatório as conta (aviso `noveltiesToVerify`).
+O estado da técnica de uma arquitetura que não é uma novidade também é registrado, e o seu status não muda: o estudo rebaixa status, nunca os eleva.
+
+Uma novidade cujo estado da técnica não pôde ser pesquisado ou avaliado continua a verificar, e o seu `statusReason` diz por quê: nenhuma fonte (`noveltyNoSource`), nenhuma pesquisa pedida para ela (`noveltyNotSearched`), as suas pesquisas falharam (`noveltySearchFailed`) ou não encontraram nada (`noveltyNoResult`), o orçamento de pesquisas se esgotou (`noveltySearchBudget`), os seus resultados não foram avaliados (`noveltyNotAssessed`), ou a verificação não citou nenhum dos seus próprios resultados (`noveltyUnsupported`). Uma novidade afirmada depois da concepção também continua a verificar. O relatório as conta (aviso `noveltiesToVerify`).
 
 ## Pesquisar por meio das suas fontes {#research-through-your-sources}
 
@@ -180,10 +185,11 @@ const study = sdk.createStudy({ name: 'browser', object, objective, sources });
 - **Verificadas quando o estudo é criado.** `createStudy` lança um `ValidationError` quando uma fonte não é uma ferramenta definida, ou não aceita nenhuma consulta em texto. A consulta vai no parâmetro `query` da ferramenta, ou em outro nome comum (`q`, `search`, `keywords`…), senão no seu único parâmetro de texto obrigatório, senão no seu primeiro parâmetro de texto.
 - **Governadas.** Cada pesquisa passa por `sdk.executeTool`, sob o `id` do estudo como id de agente e com as fontes como as suas únicas ferramentas permitidas: allowlists, políticas, orçamentos, aprovações, novas tentativas e traces se aplicam como a qualquer chamada de ferramenta, e os eventos da ferramenta (`action.executing`, `policy.checked`, `tool.called`, `action.executed`) são registrados na execução do estudo. Uma pesquisa que falha, ou que uma política recusa, é registrada com o seu erro, e o estudo continua.
 - **Quando ele pesquisa.** Antes de `historicalChoices` e antes de `changes`, o modelo pede as pesquisas de que a passagem precisa — para `changes`: verificar cada uma das suas pistas, encontrar outras ferramentas além delas, encontrar as melhores realizações atuais e documentar as rupturas por montagem. Depois de `design`, ele pesquisa o estado da técnica das novidades. No máximo seis pesquisas são pedidas de uma vez.
-- **Resultados numerados.** O estudo lê os resultados qualquer que seja o formato deles (uma lista, um objeto que contém uma lista, como `results` ou `items`, texto JSON, partes de texto MCP, texto simples), guarda um título, uma URL ou outro localizador, uma data quando houver e um trecho, e os numera uma única vez para todo o estudo: o mesmo resultado encontrado de novo, pelo seu localizador, mantém o seu id. Ele guarda `limits.maxResultsPerSearch` resultados de cada pesquisa (5 por padrão).
+- **Resultados numerados.** O estudo lê os resultados qualquer que seja o formato deles (uma lista, um objeto que contém uma lista, como `results` ou `items`, texto JSON, partes de texto MCP, texto escrito como blocos de linhas `Title:`, `Description:` e `URL:` — um resultado por bloco, como os servidores de pesquisa MCP costumam responder — ou texto simples). Ele guarda um título, uma URL ou outro localizador, uma data quando houver e um trecho, cada um em uma linha, e os numera uma única vez para todo o estudo, até um reinício: o mesmo resultado encontrado de novo, pelo seu localizador, mantém o seu id. Ele guarda `limits.maxResultsPerSearch` resultados de cada pesquisa (5 por padrão).
+- **Mostrados como dados.** Um prompt lista os resultados que ele pode citar como um array JSON entre os marcadores `<<<UNTRUSTED-SEARCH-RESULTS` e `UNTRUSTED-SEARCH-RESULTS>>>`, e o modelo é avisado de que o que está entre eles são dados vindos de fontes externas, nunca instruções a seguir. Os resultados encontrados para esta etapa vêm com o seu trecho; os resultados que os registros anteriores citam vêm com o seu id, título e localizador. Só os ids listados ali podem sustentar uma afirmação escrita a partir desse prompt.
 - **Limitadas.** `limits.maxSearches` (20 por execução por padrão) limita as pesquisas. Depois que esse número se esgota, a execução **não para**: ela continua sem pesquisar, as afirmações que precisavam de uma fonte continuam sendo hipóteses, as novidades continuam a verificar, e o relatório diz quais passagens não puderam pesquisar (aviso `searchesSkipped`).
 
-As suas pistas são exemplos a verificar, não verdades: `changes` precisa dar um veredito a cada uma — `relevant`, `partlyRelevant` ou `notRelevant`, com os motivos —, e uma resposta que esquece uma delas é devolvida uma vez. Uma pista ainda sem veredito é listada em `unverifiedLeads` (aviso `leadsNotVerified`). As ferramentas que o estudo encontra por conta própria são `independentLeads`.
+As suas pistas são exemplos a verificar, não verdades: `changes` precisa dar um veredito a cada uma — `relevant`, `partlyRelevant` ou `notRelevant`, com os motivos —, e uma resposta que esquece uma delas é devolvida uma vez. A carta numera as pistas, e o modelo nomeia cada uma pelo seu número, qualquer que seja o idioma em que escreve; o relatório reescreve a pista tal como a carta a escreve. Uma pista recebe um único veredito: outro veredito sobre ela é recusado (`leadAlreadyJudged`). Uma pista ainda sem veredito depois que `changes` foi executada é listada em `unverifiedLeads` (aviso `leadsNotVerified`). As ferramentas que o estudo encontra por conta própria são `independentLeads`.
 
 ## Manter-se no objetivo {#staying-on-the-objective}
 
@@ -199,8 +205,8 @@ Um estudo nunca mantém uma conversa. Cada chamada ao modelo é construída a pa
 
 - a carta, e as emendas aceitas abaixo dela;
 - a tarefa da passagem;
-- os registros compactos das passagens anteriores de que ela precisa (JSON, não transcrições);
-- os resultados de pesquisa que ela pode citar.
+- os registros compactos das passagens anteriores de que ela precisa (JSON, não transcrições), e apenas os itens que o guardião julgou;
+- os resultados de pesquisa que ela pode citar, marcados como dados.
 
 Nenhuma resposta anterior chega a um prompt. Até a correção de uma resposta que não pôde ser usada é reconstruída a partir da carta: ela diz por que a resposta foi recusada, nunca o que ela era. Nada se acumula de uma chamada para outra, então nada dilui o objetivo.
 
@@ -213,20 +219,27 @@ STUDY CHARTER (immutable, sha256 3f5a9c0e1b2d4f67)
 Object: The Web browser, from 1990 to 2026
 Question: If we had to meet today’s needs with the knowledge and techniques available today, how would we organise this object? Which change of principle would make possible something difficult today, not only faster?
 Objective: A browser design whose every choice follows from the investigation
-…
+The user’s leads (examples to verify, not truths):
+1. vectorisation
+2. weights
+3. ReLU
+New capability aimed at: none named; propose candidates: what a change of principle would make possible that is difficult today, not only faster.
+Breakthroughs by assembly to deconstruct as analogues:
+1. Bitcoin
 Accepted amendments (subordinate to the objective):
 1. Examine memory safety too
 
-(the task of the passage, the records of earlier passages, the results it may cite)
+(the role — researcher or guardian — then the task, the records of earlier passages, the results it may cite)
 
 REMINDER
 This step must produce: at least two architectures, at least one aiming at a new capability, …
 Out of scope: anything that serves neither the objective nor the needs.
+The aim is a new capability, not only a speed-up: none named; propose candidates: what a change of principle would make possible that is difficult today, not only faster.
 Write every text value in English (en). Reply with the JSON object only.
 Objective: A browser design whose every choice follows from the investigation
 ```
 
-A carta, incluindo o objetivo, é a primeira coisa que o modelo lê, e o objetivo é a última.
+A carta, incluindo o objetivo, é a primeira coisa que o modelo lê, e o objetivo é a última. Logo antes dele, cada lembrete retoma o alvo: a capacidade nomeada na carta, ou o pedido de candidatas quando ela não nomeia nenhuma.
 
 ### Cada item diz a que serve {#every-item-says-what-it-serves}
 
@@ -234,36 +247,38 @@ Todo item precisa trazer `servesObjective`: em uma frase, qual parte do objetivo
 
 ### O guardião {#the-guardian}
 
-Depois de cada passagem, uma chamada separada — **o guardião** — vê apenas a carta, as emendas aceitas e os itens dessa passagem: nem a tarefa, nem os registros anteriores, nem as pesquisas. Ele roda com temperatura 0 e julga cada item: no objetivo ou não, e por quê. Para a concepção, ele também julga se cada arquitetura abre uma nova capacidade (veja [Capacidade, princípio, mecanismo](#capability-principle-mechanism)).
+Depois de cada passagem, uma chamada separada — **o guardião** — vê apenas a carta, as emendas aceitas e os itens dessa passagem: nem a tarefa, nem os registros anteriores, nem as pesquisas. Ele roda com temperatura 0 e julga cada item individualmente: no objetivo ou não, e por quê. Para a concepção, ele também vê o mecanismo, os componentes e a montagem de cada arquitetura, e julga se ela abre uma nova capacidade (veja [Capacidade, princípio, mecanismo](#capability-principle-mechanism)).
 
 - Um item fora do objetivo é removido e anotado no **registro de deriva** (`by: 'guardian'`), com o motivo, e registrado como um evento `study.drift_rejected`.
-- Quando os itens rejeitados (pelo guardião ou pelo schema) passam de uma certa parcela do que a passagem produziu — `driftThreshold`, um terço por padrão —, a passagem é **refeita uma vez**, sabendo quais itens foram rejeitados e por quê. Os itens da passagem refeita substituem os da primeira tentativa.
+- **Na dúvida, ele bloqueia.** Só conta um veredito com um `onObjective` verdadeiro ou falso. Um item que fica sem veredito continua `unchecked`: ele permanece no relatório, sinalizado (aviso `uncheckedItems`), mas nunca chega a um prompt seguinte, e a próxima execução faz o guardião julgá-lo primeiro. Um guardião que não julga nenhum dos itens de uma passagem faz a execução falhar.
+- Quando os itens rejeitados (pelo guardião ou pelo schema) passam de uma certa parcela do que a passagem produziu — `driftThreshold`, um terço por padrão —, a passagem é **refeita uma vez**, sabendo quais itens foram rejeitados e por quê. A passagem refeita é uma etapa própria, que as políticas de orçamento verificam primeiro. A melhor das duas tentativas é mantida: para a concepção, a que visa uma nova capacidade; depois, a que tem, uma vez julgada, os itens de que cada coleção precisa; depois, a que tem mais itens mantidos; a passagem refeita, quando elas empatam. `study.passage_completed` diz quando a primeira foi mantida (`keptAttempt`). Um segundo veredito sobre uma pista já julgada é anotado, mas não conta para refazer a passagem.
+- Uma passagem que fica com menos itens julgados do que precisa (menos de duas arquiteturas, por exemplo) é mantida como está, e o relatório diz isso (aviso `minimumsNotMet`).
 - O relatório guarda cada rejeição (`driftLog`) e conta, em `stats`, as rejeições e as passagens refeitas.
 
 ### Emendas {#amendments}
 
-Você pode acrescentar uma instrução depois que o estudo foi criado. Ela nunca entra sem ser notada: o guardião a classifica em relação à carta, em uma execução própria.
+Você pode acrescentar uma instrução depois que o estudo foi criado. Ela nunca entra sem ser notada: o guardião a classifica somente em relação à carta — nunca em relação às emendas anteriores, de modo que as emendas não podem se apoiar umas nas outras —, em uma execução própria (`mode: 'study-amendment'`), em que as políticas de orçamento são verificadas primeiro.
 
 ```ts
-const amendment = await study.amend('Examine memory safety too');
+const amendment = await study.amend('Examine memory safety too', { timeoutMs: 30_000 });
 amendment.verdict;  // 'refines' | 'conflicts' | 'changesObjective' | 'unclassified'
 amendment.accepted; // true only when it refines the objective
 amendment.number;   // 1, 2… for an accepted amendment
-amendment.reason;   // why
+amendment.reason;   // why: { code, params?, message }
 ```
 
 | Veredito | Significado | Resultado |
 | --- | --- | --- |
 | `refines` | Ela detalha ou restringe o trabalho, ou acrescenta uma necessidade, dentro do objetivo e do escopo | Aceita, numerada e mostrada abaixo da carta em todos os prompts seguintes — incluindo os de uma execução em andamento |
-| `conflicts` | Ela contradiz a carta, o escopo ou uma emenda aceita | Recusada, com o motivo; ela nunca chega a um prompt |
+| `conflicts` | Ela contradiz a carta ou o seu escopo | Recusada, com o motivo; ela nunca chega a um prompt |
 | `changesObjective` | Ela muda o objeto ou o objetivo | Recusada: um novo objetivo é um novo estudo, criado com `sdk.createStudy` |
-| `unclassified` | A classificação dela falhou | Recusada: o objetivo vem primeiro |
+| `unclassified` | Ela não pôde ser classificada: um erro (`amendmentUnclassified`), o seu `timeoutMs` passou (60 000 ms por padrão, `amendmentTimedOut`), o seu `signal` foi abortado (`amendmentCancelled`) ou uma política de orçamento recusou a chamada (`amendmentPolicy`) | Recusada: o objetivo vem primeiro |
 
-As emendas aceitas e recusadas são registradas (`study.amendment_accepted`, `study.amendment_refused`) e listadas em `study.amendments` e no relatório. As instruções nunca se acumulam em silêncio: cada uma é numerada, subordinada ao objetivo e visível.
+As emendas aceitas e recusadas são registradas (`study.amendment_accepted`, `study.amendment_refused`) e listadas em `study.amendments` e no relatório. As instruções nunca se acumulam em silêncio: cada uma é numerada, subordinada ao objetivo e visível. Elas também são limitadas: `amend()` lança um `ValidationError` para um texto com mais de 500 caracteres (`MAX_AMENDMENT_LENGTH`), ou depois que o estudo aceitou 10 emendas (`MAX_AMENDMENTS`) — além disso, é a carta que deveria dizer tudo, em um novo estudo.
 
 ### Por que isso funciona {#why-this-works}
 
-A deriva vem de um contexto que cresce: respostas anteriores, instruções empilhadas e discussões paralelas acabam pesando mais que o objetivo. Um estudo elimina esse crescimento. O modelo nunca relê as próprias respostas anteriores, então não pode ser arrastado pela própria deriva. As instruções não se acumulam: só existem emendas aceitas, cada uma numerada e subordinada a uma carta que não pode mudar. A carta abre cada prompt e o objetivo o fecha, onde um modelo presta mais atenção. Todo item precisa se justificar em relação ao objetivo, o que torna fácil identificar um item que se desviou. E um juiz com uma visão estreita — a carta e os itens, nada mais — pega o que ainda escapa, enquanto o registro de deriva mostra a você o que ele removeu e por quê.
+A deriva vem de um contexto que cresce: respostas anteriores, instruções empilhadas e discussões paralelas acabam pesando mais que o objetivo. Um estudo elimina esse crescimento. O modelo nunca relê as próprias respostas anteriores, então não pode ser arrastado pela própria deriva. As instruções não se acumulam: só existem emendas aceitas, poucas, curtas, cada uma numerada e julgada em relação a uma carta que não pode mudar, nunca umas em relação às outras. A carta abre cada prompt e o objetivo o fecha, onde um modelo presta mais atenção. Todo item precisa se justificar em relação ao objetivo, o que torna fácil identificar um item que se desviou. Os resultados de pesquisa são marcados como dados, então uma página que diz "ignore as suas instruções" é uma citação, não uma ordem. E um juiz com uma visão estreita — a carta e os itens, nada mais — pega o que ainda escapa, bloqueando na dúvida: o que ele não julgou não vai adiante. O registro de deriva mostra a você o que ele removeu e por quê.
 
 Nada disso torna a deriva impossível: o guardião também é um modelo, e pode errar nos dois sentidos. Isso torna a deriva improvável, limitada (cada passagem é refeita no máximo uma vez) e auditável.
 
@@ -279,7 +294,7 @@ Nada disso torna a deriva impossível: o guardião também é um modelo, e pode 
 
 Os limites se aplicam a cada execução. Outras configurações: `driftThreshold` (1/3), `temperature` das passagens e dos pedidos de pesquisa (0,4; o guardião, as emendas e a verificação do estado da técnica rodam a 0), `maxTokens`, `model` (o padrão do provedor quando omitido) e `llmProvider` (um provedor para este estudo em vez do provedor do SDK). Uma configuração fora do intervalo permitido lança um `ValidationError` quando o estudo é criado.
 
-Uma execução que para **guarda tudo o que fez**: as passagens já feitas, os itens da passagem em andamento (os que o guardião ainda não tinha julgado são marcados como `unchecked`, aviso `uncheckedItems`), e um relatório e um dossiê que dizem o que não foi executado.
+Uma execução que para **guarda tudo o que fez**: as passagens já feitas, os itens da passagem em andamento (os que o guardião ainda não tinha julgado são marcados como `unchecked`, mantidos fora de todos os prompts seguintes, aviso `uncheckedItems`), e um relatório e um dossiê que dizem o que não foi executado.
 
 Uma execução sem correções nem passagens refeitas faz 14 chamadas ao modelo sem fontes — cada passagem e a sua verificação pelo guardião — e até 18 com fontes: as pesquisas pedidas antes de `historicalChoices` e de `changes`, e a pesquisa do estado da técnica das novidades (as suas consultas, depois a sua verificação). Cada correção acrescenta uma chamada, cada passagem refeita pelo menos duas (a passagem e a sua verificação de novo), cada reabertura pelo menos quatro (a passagem reaberta e a que pediu, cada uma com a sua verificação).
 
@@ -290,7 +305,7 @@ Cada chamada ao modelo de um estudo é registrada como um evento `study.model_ca
 - em `sdk.getRunCost(result.runId)`, e uma emenda na sua própria execução: `sdk.getRunCost(amendment.runId)` (veja [Custos de API](./costs));
 - nos orçamentos por período, sob o `id` do estudo: `sdk.getBudgetUsage({ agentId: study.id, period: 'all' })` dá os tokens, o custo e as chamadas de ferramenta de todas as suas execuções.
 
-As políticas de orçamento e de timeout do SDK (`defaultPolicies`, `defineGlobalPolicy`) são verificadas **antes de cada passagem**, como as de um agente cognitivo antes de cada etapa (veja [Limites e políticas](./cognitive-agents#limits-and-policies)): `maxSteps` conta as passagens já executadas, `maxTokens` os tokens das chamadas ao modelo da execução, `maxDuration` o tempo desde o início da execução, e um `budgetLimit` com `maxTokens` ou `maxCost` o seu orçamento por período. Uma política que recusa registra `policy.violated` com a `passage`, e a execução para: `stopped`, `stoppedBy: 'policy'`. As pesquisas, como chamadas de ferramenta, também passam pelas políticas.
+As políticas de orçamento e de timeout do SDK (`defaultPolicies`, `defineGlobalPolicy`) são verificadas **antes de cada etapa** de um estudo, como as de um agente cognitivo antes de cada uma das suas etapas (veja [Limites e políticas](./cognitive-agents#limits-and-policies)). Uma etapa é uma passagem executada, uma passagem refeita, uma passagem reaberta, a verificação pelo guardião do que uma execução parada deixou sem julgamento, o fim de uma passagem que uma execução retoma, ou a classificação de uma emenda. `maxSteps` conta as etapas já realizadas, `maxTokens` os tokens das chamadas ao modelo da execução, `maxDuration` o tempo desde o início da execução, e um `budgetLimit` com `maxTokens` ou `maxCost` o seu orçamento por período. Uma política que recusa registra `policy.violated` com a `passage`, e a execução para: `stopped`, `stoppedBy: 'policy'`; uma emenda, por sua vez, é recusada (`amendmentPolicy`). As pesquisas, como chamadas de ferramenta, também passam pelas políticas.
 
 ## Execuções, retomada e cancelamento {#runs-resume-and-cancellation}
 
@@ -298,7 +313,7 @@ As políticas de orçamento e de timeout do SDK (`defaultPolicies`, `defineGloba
 | --- | --- | --- |
 | `completed` | Todas as passagens foram executadas | `study.completed`, `run.completed` |
 | `stopped` | Um limite ou uma política encerrou a execução (`stoppedBy`) | `study.failed`, `run.failed` |
-| `failed` | Um erro a encerrou, como uma resposta que não pôde ser usada mesmo depois da sua correção, ou uma concepção com menos de duas arquiteturas válidas (`error`) | `study.failed`, `run.failed` |
+| `failed` | Um erro a encerrou, como uma resposta que não pôde ser usada mesmo depois da sua correção, uma concepção com menos de duas arquiteturas válidas, ou um guardião que não deu nenhum veredito válido sobre nenhum item de uma passagem (`error`) | `study.failed`, `run.failed` |
 | `cancelled` | O seu `signal` foi abortado | `study.failed`, `run.cancelled` |
 
 ```ts
@@ -308,11 +323,12 @@ const first = await study.run({ signal: controller.signal });
 // Later: resume at the first passage not complete, with what was done kept.
 const second = await study.run();
 
-// Or run every passage again.
+// Or start the study over: only the charter and the amendments stay.
 const fresh = await study.run({ restart: true });
 ```
 
-- **Retomada.** `run()` começa na primeira passagem que não está completa, então uma execução parada, com falha ou cancelada pode ser retomada chamando `run()` de novo. As passagens já completas são mantidas; `study.started` registra onde a execução foi retomada (`resumeAt`). `restart: true` executa todas as passagens de novo (os ids continuam de onde estavam: `O3` vem depois de `O2`).
+- **Retomada.** Uma execução parada, com falha ou cancelada é retomada chamando `run()` de novo. O guardião primeiro julga o que a última execução deixou sem julgamento; uma passagem julgada mas não terminada então apenas termina — uma concepção cuja pesquisa do estado da técnica foi interrompida é retomada nessa pesquisa, e o seu `study.passage_completed` diz `resumed: true` — e as passagens não completas são executadas. As passagens já completas são mantidas; `study.started` registra a primeira passagem com trabalho pendente (`resumeAt`).
+- **Reinício.** `restart: true` recomeça o estudo do zero: ele apaga as passagens, os resultados (numerados de novo a partir de `S1`), as pesquisas, o registro de deriva, a numeração dos itens e as execuções. Só a carta e as emendas permanecem.
 - **Uma execução por vez.** Um segundo `run()` enquanto uma execução está em andamento lança um `ValidationError`. `amend()` pode ser chamado durante uma execução.
 - **Em memória.** O estado de um estudo vive no seu objeto `Study`, e o seu `id` muda de um processo para outro: a retomada funciona sobre o mesmo objeto. Os eventos registram os itens de cada passagem, cada pesquisa e cada veredito para auditoria, mas o SDK não reconstrói um estudo a partir deles.
 - **Relatório.** `result.report` é uma cópia feita quando a execução terminou; `study.report()` devolve o relatório tal como está, com os resultados registrados desde então.
@@ -333,7 +349,7 @@ const result = await study.run({
 const unsubscribe = sdk.subscribe(listener, { agentId: study.id });
 ```
 
-Um estudo registra onze tipos de evento: `study.started`, `study.passage_started`, `study.passage_completed`, `study.search`, `study.model_called`, `study.drift_rejected`, `study.amendment_accepted`, `study.amendment_refused`, `study.result_recorded`, `study.completed` e `study.failed`. O [catálogo de eventos](../reference/events#studies) dá os dados deles.
+Um estudo registra doze tipos de evento: `study.started`, `study.passage_started`, `study.passage_completed`, `study.search`, `study.model_called`, `study.drift_rejected`, `study.capability_demoted`, `study.amendment_accepted`, `study.amendment_refused`, `study.result_recorded`, `study.completed` e `study.failed`. O [catálogo de eventos](../reference/events#studies) dá os dados deles. Uma ferramenta que executa um estudo e lhe passa o `onEvent` do seu contexto também é acompanhada por um cliente MCP: as suas [notificações de progresso](./mcp-deploy#progress-notifications) nomeiam as passagens (`passage changes started`, `search in changes`), nunca uma consulta ou um texto do estudo.
 
 ## Um exemplo completo {#a-complete-example}
 
@@ -399,7 +415,7 @@ await search.close();
 await eventStore.destroy();
 ```
 
-O próprio exemplo aceita o comando de qualquer servidor de pesquisa MCP: execute-o com `OPENAI_API_KEY=… SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" BRAVE_API_KEY=… npm run example:study` (`SEARCH_TOOLS` escolhe algumas das ferramentas do servidor, `MODEL` o modelo). Ele escreve o dossiê em `examples/study-navigateur.md`. Sem `SEARCH_MCP`, ele roda sem fontes: tudo continua sendo hipótese, e o dossiê diz isso em primeiro lugar.
+O próprio exemplo aceita o comando de qualquer servidor de pesquisa MCP: execute-o com `OPENAI_API_KEY=… SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=… npm run example:study`. `SEARCH_ENV` nomeia as variáveis de que o servidor precisa: ele recebe essas variáveis e um ambiente mínimo, nunca a sua chave do modelo. `SEARCH_TOOLS` escolhe algumas das ferramentas do servidor, `MODEL` o modelo. Ele escreve o dossiê em `examples/study-navigateur.md`, mostra por que uma execução não foi concluída e, nesse caso, termina com o código 1. Sem `SEARCH_MCP`, ele roda sem fontes: tudo continua sendo hipótese, e o dossiê diz isso em primeiro lugar.
 
 O que esperar do dossiê:
 
@@ -418,23 +434,26 @@ report.experiments;   // what would decide between the architectures
 report.cards;         // one mechanism card per main mechanism
 report.driftLog;      // what left the objective, and why
 report.results;       // every result retrieved, S1, S2…
-report.stats;         // model calls, searches, items by status, rejections, redos, loops
+report.stats;         // model calls, searches, items by status, rejections, redos, loops, amendments
 ```
 
-O relatório também contém a carta e o seu hash, as emendas, o estado de cada passagem (`complete`, `partial`, `unchecked` ou `notRun`, com as suas tentativas e as passagens que a reabriram), todas as coleções das passagens, os três estados agrupados por peça, as pesquisas e as execuções do estudo (`runIds`, incluindo as execuções das emendas). A [referência da API do SDK](../reference/sdk-api#studies) lista os seus tipos.
+O relatório também contém a carta e o seu hash, as emendas, o estado de cada passagem (`complete`, `partial`, `unchecked` ou `notRun`, com as suas tentativas e as passagens que a reabriram), todas as coleções das passagens, os três estados agrupados por peça, as pesquisas e as execuções de `run()` desde o último reinício (`runIds`). `stats.runs` e `stats.modelCalls` contam essas execuções, e apenas as chamadas que o fornecedor respondeu; as emendas são contadas à parte, e um reinício as mantém (`stats.amendments`: quantas foram classificadas, e as suas chamadas ao modelo). A [referência da API do SDK](../reference/sdk-api#studies) lista os seus tipos.
 
-Os **avisos** dizem o que o leitor precisa saber antes de confiar no resto:
+Os **avisos** dizem o que o leitor precisa saber antes de confiar no resto. Cada um tem um `code`, os seus `params` e `details`, e o mesmo aviso em inglês (`message`):
 
 | Código | Significado |
 | --- | --- |
 | `noSources` | O estudo não tinha nenhuma fonte: nada pôde ser estabelecido, e nenhuma novidade foi verificada |
 | `stopped`, `failed`, `cancelled` | Como a última execução terminou; o relatório guarda o que foi feito |
 | `passagesNotRun` | Passagens que a última execução não alcançou |
-| `uncheckedItems` | Itens que o guardião não julgou, porque a execução parou antes |
+| `uncheckedItems` | Itens que o guardião não julgou (a execução parou antes, ou ele não lhes deu nenhum veredito válido): mantidos fora de todos os prompts seguintes, e julgados primeiro pela próxima execução |
 | `searchesSkipped` | O orçamento de pesquisas se esgotou, e em quais passagens |
-| `leadsNotVerified` | Pistas sem veredito |
-| `analoguesNotDeconstructed` | Rupturas nomeadas que não foram desconstruídas |
+| `leadsNotVerified` | Pistas sem veredito, depois que `changes` foi executada |
+| `analoguesNotDeconstructed` | Rupturas nomeadas que não foram desconstruídas, depois que `changes` foi executada |
+| `noDesign` | A concepção não manteve nenhuma arquitetura |
 | `noCapability` | Nenhuma arquitetura visa uma nova capacidade: só melhorias |
+| `minimumsNotMet` | Coleções que ficaram com menos itens julgados do que precisam (`details`: `passage.collection`) |
+| `untracedAssembly` | Arquiteturas com um componente ou uma ligação da montagem que não cita nenhum registro da investigação (`details`: os seus ids) |
 | `noveltiesToVerify` | Novidades ainda a verificar em relação ao estado da técnica |
 
 ### O dossiê {#the-dossier}
@@ -446,16 +465,16 @@ Os **avisos** dizem o que o leitor precisa saber antes de confiar no resto:
 3. o princípio do método, e o estado de cada passagem;
 4. os itens de cada passagem: observações, peças e a cadeia completa, escolhas históricas, avanços, vereditos sobre as pistas, pistas independentes, referências atuais, restrições, decisões revisáveis e capacidades candidatas;
 5. os três estados de cada peça, as combinações e as rupturas por montagem;
-6. as pistas de concepção: cada arquitetura rotulada como nova capacidade ou melhoria, com para quem, a restrição removida, a mudança de princípio, o mecanismo, o caminho componentes → montagem → capacidade, as suas condições, benefício, custo adicional, contraexemplo, cobertura da cadeia e predições; depois, o que é novo e o que não é;
+6. as pistas de concepção: cada arquitetura rotulada como nova capacidade ou melhoria (e, para uma arquitetura rebaixada, por quê), com para quem, a restrição removida, a mudança de princípio, o mecanismo, o caminho componentes → montagem → capacidade com a origem de cada parte, as suas condições, benefício, custo adicional, contraexemplo, cobertura da cadeia e predições; depois, o que é novo e o que não é;
 7. os experimentos, e as fichas de mecanismo;
 8. o registro de deriva, as fontes e as estatísticas.
 
-Cada afirmação mostra o seu status e os resultados que cita (`S1, S3`); um status que o estudo rebaixou diz o que o modelo declarou e por quê; uma novidade mostra o seu estado da técnica, ou que ainda está a verificar. As palavras do dossiê existem nos onze idiomas desta documentação; outro idioma recebe rótulos em inglês, enquanto o modelo continua escrevendo os seus textos nesse idioma. A `message` de cada aviso no relatório está em inglês; o dossiê a escreve no seu próprio idioma.
+Cada afirmação mostra o seu status e os resultados que cita (`S1, S3`), e os ids que ela citou e que o seu prompt não listou; um status que o estudo rebaixou diz o que o modelo declarou e por quê; uma novidade mostra o seu estado da técnica, ou que ainda está a verificar. Só os localizadores http e https se tornam links. As palavras do dossiê existem nos onze idiomas desta documentação; outro idioma recebe rótulos em inglês, enquanto o modelo continua escrevendo os seus textos nesse idioma. A `message` de cada aviso e de cada motivo no relatório está em inglês; o dossiê os escreve no seu próprio idioma, a partir dos seus códigos.
 
 ## O que um estudo não faz {#what-a-study-does-not-do}
 
 - **Ele não constrói, não executa e não mede nada.** As suas predições são predições até que você execute os experimentos.
 - **Ele só sabe o que as suas fontes devolvem.** O SDK não tem uma pesquisa na Web própria; sem fontes, toda afirmação é uma hipótese.
-- **Uma citação é verificada, não o seu conteúdo.** O código verifica que um resultado citado por uma afirmação `established` foi recuperado por este estudo, não que o resultado diz o que a afirmação diz. O dossiê lista cada fonte com o seu link: leia-as.
+- **Uma citação é verificada, não o seu conteúdo.** O código verifica que um resultado citado por uma afirmação `established` foi listado no prompt que a escreveu, não que o resultado diz o que a afirmação diz. O dossiê lista cada fonte com o seu link: leia-as.
 - **O guardião e a verificação do estado da técnica são julgamentos de um modelo.** O registro de deriva e as notas sobre o estado da técnica os mostram, para que você possa discordar.
-- **O que ele lê não é confiável.** Os resultados de pesquisa podem conter instruções dirigidas ao modelo (prompt injection). Um estudo só pode chamar as suas fontes, passando pelas políticas, e o texto do modelo e das fontes é escapado no dossiê; os status e as regras de deriva são garantidos em código, não pelo prompt.
+- **O que ele lê não é confiável.** Os resultados de pesquisa podem conter instruções dirigidas ao modelo (prompt injection). Eles chegam ao modelo marcados como dados, um estudo só pode chamar as suas fontes, passando pelas políticas, e o texto do modelo e das fontes é escapado no dossiê; os status e as regras de deriva são garantidos em código, não pelo prompt. A marcação reduz o risco; ela não o elimina.

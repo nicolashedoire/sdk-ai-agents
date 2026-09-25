@@ -60,18 +60,19 @@ interface Event {
 
 | 类型 | 数据 |
 | --- | --- |
-| `study.started` | `name`、`charter`（`object`、`question`、`objective`、`needs`、`leads`、`scope`、`capability?`、`analogues`）、`charterHash`（SHA-256）、`language`、`model?`、`sources`（工具名称）、`limits`、`driftThreshold`、`amendments`（已接受的修正案：`number`、`text`）、`resumeAt?`（恢复的运行从哪个环节开始） |
+| `study.started` | `name`、`charter`（`object`、`question`、`objective`、`needs`、`leads`、`scope`、`capability?`、`analogues`）、`charterHash`（SHA-256）、`language`、`model?`、`sources`（工具名称）、`limits`、`driftThreshold`、`amendments`（已接受的修正案：`number`、`text`）、`resumeAt?`（运行恢复时：第一个还有工作要做的环节） |
 | `study.passage_started` | `passage`、`number`（1 到 7）、`amendments`（生效中的已接受修正案的编号），以及当后面的环节重开它时的 `reopenedBy?`、`focus?`、`reason?` |
-| `study.passage_completed` | `passage`、`attempts`（守护者让它重做时为 2）、`items`（每一项都带有它的 `collection`、`id`、`statement`、`status`、`sources`、`servesObjective`、论断的其他字段以及它自己的字段）、`reopenedBy?`、`reopen?`（`passage`、`focus`、`reason`：它要求重开的较早环节） |
+| `study.passage_completed` | `passage`、`attempts`（守护者让它重做时为 2）、`keptAttempt?`（第一次尝试比重做更好并被保留时为 1）、`items`（每一项都带有它的 `collection`、`id`、`statement`、`status`、`sources`、`servesObjective`、论断的其他字段以及它自己的字段）、`reopenedBy?`、`reopen?`（`passage`、`focus`、`reason`：它要求重开的较早环节；在它再次运行之前，它尚未完成）、`resumed?`（某次运行恢复了它，只为让它收尾） |
 | `study.search` | `passage`、`purpose`（`research`，或者针对创新点现有技术的 `priorArt`）、`tool`、`query`、`servesObjective`、`claims?`（它要查找的创新点）、`resultIds`、`results`（`id`、`title`、`locator`、`date?`）、`error?`（搜索失败）、`skipped?`（`maxSearches`：未执行） |
 | `study.model_called` | `purpose`（`passage`、`queries`、`check`、`priorArtQueries`、`priorArtCheck`、`amendment`）、`passage?`、`model?`、`requestedModel?`、`usage`（`promptTokens`、`completionTokens`、`calls`、`unmeteredCalls?`、`unmeteredTokens?`：一次调用及其修复记为一个事件）、`failed?`（回复无法使用的原因）——计入成本和按周期的预算 |
-| `study.drift_rejected` | `passage`、`collection`、`item`（`id?`、`statement?`、`servesObjective?`）、`reason`、`by`（`guardian`：被判定偏离目标；`schema`：在此之前就被拒绝，例如缺少 `servesObjective`）、`attempt`（重做时为 2） |
-| `study.amendment_accepted` / `study.amendment_refused` | `number?`（仅限已接受的）、`text`、`verdict`（`refines`、`conflicts`、`changesObjective`、`unclassified`）、`accepted`、`reason`、`charterHash`——记录在修正案自己的运行中 |
+| `study.drift_rejected` | `passage`、`collection`、`item`（`id?`、`statement?`、`servesObjective?`）、`reason`（`code`、`params?`、`message`）、`by`（`guardian`：被判定偏离目标；`schema`：在此之前就被拒绝，例如缺少 `servesObjective`）、`attempt`（重做时为 2） |
+| `study.capability_demoted` | `passage`、`item`（架构的 id）、`name`、`reason`（`code`、`params?`、`message`）：守护者判定只是更快或更便宜的能力，现在成为改进 |
+| `study.amendment_accepted` / `study.amendment_refused` | `number?`（仅限已接受的）、`text`、`verdict`（`refines`、`conflicts`、`changesObjective`、`unclassified`）、`accepted`、`reason`（`code`、`params?`、`message`；对于 `unclassified`：`amendmentUnclassified`、`amendmentTimedOut`、`amendmentCancelled` 或 `amendmentPolicy`）、`charterHash`——记录在修正案自己的运行中 |
 | `study.result_recorded` | `card`、`resultAndError`（`result`、`error?`）、`conclusionAndMemory?`——在写出这张卡片的那次运行结束之后追加到该运行中 |
-| `study.completed` | `status`、`passages`（`passage`、`state`）、`stats` |
-| `study.failed` | `status`（`stopped`、`failed` 或 `cancelled`）、`stoppedBy?`、`error`、`passages`、`stats`、`partial: true`——随后是 `run.failed` 或 `run.cancelled` |
+| `study.completed` | `status`、`passages`（`passage`、`state`）、这次运行的 `stats`（提供商作出应答的 `modelCalls`、`searches`、`searchesSkipped`、`redos`、`loops`、`steps`） |
+| `study.failed` | `status`（`stopped`、`failed` 或 `cancelled`）、`stoppedBy?`、`error`、`passages`、这次运行的 `stats`、`partial: true`——随后是 `run.failed` 或 `run.cancelled` |
 
-对于研究，`getRunCost` 和预算读取的就是 `study.model_called`。比较两次运行时，研究事件按环节配对（`study.model_called` 按用途和环节配对），`study.model_called` 的 `usage` 不参与比较。
+对于研究，`getRunCost` 和预算读取的就是 `study.model_called`。比较两次运行时，研究事件按环节配对（`study.model_called` 按用途和环节配对），`study.model_called` 的 `usage` 不参与比较。修正案的运行包含 `run.started`、预算策略拒绝分类时的 `policy.violated`、提供商作出应答时的 `study.model_called`、修正案的事件以及 `run.completed`。
 
 ## 运维 {#operations}
 

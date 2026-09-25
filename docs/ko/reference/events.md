@@ -60,18 +60,19 @@ interface Event {
 
 | 유형 | 데이터 |
 | --- | --- |
-| `study.started` | `name`, `charter`(`object`, `question`, `objective`, `needs`, `leads`, `scope`, `capability?`, `analogues`), `charterHash`(SHA-256), `language`, `model?`, `sources`(도구 이름), `limits`, `driftThreshold`, `amendments`(수락된 개정안: `number`, `text`), `resumeAt?`(재개된 실행이 시작하는 과정) |
+| `study.started` | `name`, `charter`(`object`, `question`, `objective`, `needs`, `leads`, `scope`, `capability?`, `analogues`), `charterHash`(SHA-256), `language`, `model?`, `sources`(도구 이름), `limits`, `driftThreshold`, `amendments`(수락된 개정안: `number`, `text`), `resumeAt?`(실행이 재개될 때: 할 일이 남은 첫 과정) |
 | `study.passage_started` | `passage`, `number`(1부터 7까지), `amendments`(효력이 있는 수락된 개정안의 번호), 그리고 나중 과정이 이 과정을 다시 연 경우 `reopenedBy?`, `focus?`, `reason?` |
-| `study.passage_completed` | `passage`, `attempts`(감시자가 다시 수행하게 했으면 2), `items`(각각 `collection`, `id`, `statement`, `status`, `sources`, `servesObjective`, 주장의 다른 필드와 고유 필드를 가짐), `reopenedBy?`, `reopen?`(`passage`, `focus`, `reason`: 다시 열어 달라고 요청하는 앞선 과정) |
+| `study.passage_completed` | `passage`, `attempts`(감시자가 다시 수행하게 했으면 2), `keptAttempt?`(첫 시도가 재수행보다 나아서 보관되었으면 1), `items`(각각 `collection`, `id`, `statement`, `status`, `sources`, `servesObjective`, 주장의 다른 필드와 고유 필드를 가짐), `reopenedBy?`, `reopen?`(`passage`, `focus`, `reason`: 다시 열어 달라고 요청하는 앞선 과정. 이 과정은 다시 실행될 때까지 완료되지 않음), `resumed?`(실행이 이 과정을 마무리하기 위해서만 재개함) |
 | `study.search` | `passage`, `purpose`(`research`, 또는 신규 주장의 선행 기술이면 `priorArt`), `tool`, `query`, `servesObjective`, `claims?`(찾고 있는 신규 주장), `resultIds`, `results`(`id`, `title`, `locator`, `date?`), `error?`(검색 실패), `skipped?`(`maxSearches`: 실행되지 않음) |
 | `study.model_called` | `purpose`(`passage`, `queries`, `check`, `priorArtQueries`, `priorArtCheck`, `amendment`), `passage?`, `model?`, `requestedModel?`, `usage`(`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?`, `unmeteredTokens?`: 호출과 그 수정에 이벤트 하나), `failed?`(응답을 쓸 수 없었던 이유) — 비용과 기간별 예산에 집계됩니다 |
-| `study.drift_rejected` | `passage`, `collection`, `item`(`id?`, `statement?`, `servesObjective?`), `reason`, `by`(`guardian`: 목표를 벗어났다고 판단됨. `schema`: 그 전에 거부됨, 예를 들어 `servesObjective`가 없음), `attempt`(재수행에서는 2) |
-| `study.amendment_accepted` / `study.amendment_refused` | `number?`(수락된 경우만), `text`, `verdict`(`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason`, `charterHash` — 개정안 자체의 실행에 기록됩니다 |
+| `study.drift_rejected` | `passage`, `collection`, `item`(`id?`, `statement?`, `servesObjective?`), `reason`(`code`, `params?`, `message`), `by`(`guardian`: 목표를 벗어났다고 판단됨. `schema`: 그 전에 거부됨, 예를 들어 `servesObjective`가 없음), `attempt`(재수행에서는 2) |
+| `study.capability_demoted` | `passage`, `item`(아키텍처의 id), `name`, `reason`(`code`, `params?`, `message`): 감시자가 단지 더 빠르거나 더 싸다고 판단해 이제 개선이 된 역량 |
+| `study.amendment_accepted` / `study.amendment_refused` | `number?`(수락된 경우만), `text`, `verdict`(`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason`(`code`, `params?`, `message`. `unclassified`이면 `amendmentUnclassified`, `amendmentTimedOut`, `amendmentCancelled` 또는 `amendmentPolicy`), `charterHash` — 개정안 자체의 실행에 기록됩니다 |
 | `study.result_recorded` | `card`, `resultAndError`(`result`, `error?`), `conclusionAndMemory?` — 카드를 작성한 실행에, 그 실행이 끝난 뒤 덧붙여집니다 |
-| `study.completed` | `status`, `passages`(`passage`, `state`), `stats` |
-| `study.failed` | `status`(`stopped`, `failed` 또는 `cancelled`), `stoppedBy?`, `error`, `passages`, `stats`, `partial: true` — 그다음 `run.failed` 또는 `run.cancelled` |
+| `study.completed` | `status`, `passages`(`passage`, `state`), 이 실행의 `stats`(벤더가 응답한 `modelCalls`, `searches`, `searchesSkipped`, `redos`, `loops`, `steps`) |
+| `study.failed` | `status`(`stopped`, `failed` 또는 `cancelled`), `stoppedBy?`, `error`, `passages`, 이 실행의 `stats`, `partial: true` — 그다음 `run.failed` 또는 `run.cancelled` |
 
-`study.model_called`는 `getRunCost`와 예산이 연구에 대해 읽는 이벤트입니다. 두 실행을 비교할 때 연구 이벤트는 과정별로 짝지어지며(`study.model_called`는 목적과 과정별로), `study.model_called`의 `usage`는 비교되지 않습니다.
+`study.model_called`는 `getRunCost`와 예산이 연구에 대해 읽는 이벤트입니다. 두 실행을 비교할 때 연구 이벤트는 과정별로 짝지어지며(`study.model_called`는 목적과 과정별로), `study.model_called`의 `usage`는 비교되지 않습니다. 개정안의 실행에는 `run.started`, 예산 정책이 분류를 거부했을 때의 `policy.violated`, 벤더가 응답했을 때의 `study.model_called`, 개정안의 이벤트, `run.completed`가 담깁니다.
 
 ## 운영 {#operations}
 

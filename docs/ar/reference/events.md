@@ -60,18 +60,19 @@ interface Event {
 
 | النوع | البيانات |
 | --- | --- |
-| `study.started` | `name`، و`charter` (`object`، `question`، `objective`، `needs`، `leads`، `scope`، `capability?`، `analogues`)، و`charterHash` (SHA-256)، و`language`، و`model?`، و`sources` (أسماء الأدوات)، و`limits`، و`driftThreshold`، و`amendments` (المقبولة منها: `number`، `text`)، و`resumeAt?` (المرحلة التي يبدأ منها تشغيل مُستأنَف) |
+| `study.started` | `name`، و`charter` (`object`، `question`، `objective`، `needs`، `leads`، `scope`، `capability?`، `analogues`)، و`charterHash` (SHA-256)، و`language`، و`model?`، و`sources` (أسماء الأدوات)، و`limits`، و`driftThreshold`، و`amendments` (المقبولة منها: `number`، `text`)، و`resumeAt?` (حين يُستأنَف تشغيل: أول مرحلة بقي فيها عمل) |
 | `study.passage_started` | `passage`، و`number` (من 1 إلى 7)، و`amendments` (أرقام التعديلات المقبولة السارية)، و`reopenedBy?` و`focus?` و`reason?` حين تكون مرحلة لاحقة قد أعادت فتحها |
-| `study.passage_completed` | `passage`، و`attempts` (2 حين أعادها الحارس)، و`items` (كلٌّ منها مع `collection`، و`id`، و`statement`، و`status`، و`sources`، و`servesObjective`، وحقول الادعاء الأخرى، وحقوله الخاصة)، و`reopenedBy?`، و`reopen?` (`passage`، `focus`، `reason`: المرحلة السابقة التي تطلب إعادة فتحها) |
+| `study.passage_completed` | `passage`، و`attempts` (2 حين أعادها الحارس)، و`keptAttempt?` (1 حين كانت المحاولة الأولى أفضل من الإعادة فاحتُفظ بها)، و`items` (كلٌّ منها مع `collection`، و`id`، و`statement`، و`status`، و`sources`، و`servesObjective`، وحقول الادعاء الأخرى، وحقوله الخاصة)، و`reopenedBy?`، و`reopen?` (`passage`، `focus`، `reason`: المرحلة السابقة التي تطلب إعادة فتحها؛ ولا تكون مكتملة إلى أن تُشغَّل من جديد)، و`resumed?` (استأنفها تشغيلٌ لإتمامها فقط) |
 | `study.search` | `passage`، و`purpose` (`research`، أو `priorArt` للأعمال السابقة لادعاءات الجِدّة)، و`tool`، و`query`، و`servesObjective`، و`claims?` (ادعاءات الجِدّة التي يبحث عنها)، و`resultIds`، و`results` (`id`، `title`، `locator`، `date?`)، و`error?` (فشل البحث)، و`skipped?` (`maxSearches`: لم يُجرَ) |
 | `study.model_called` | `purpose` (`passage`، `queries`، `check`، `priorArtQueries`، `priorArtCheck`، `amendment`)، و`passage?`، و`model?`، و`requestedModel?`، و`usage` (`promptTokens`، `completionTokens`، `calls`، `unmeteredCalls?`، `unmeteredTokens?`: حدث واحد للاستدعاء وإصلاحه)، و`failed?` (سبب تعذّر استخدام الرد) — يُحتسَب في التكاليف وفي الميزانيات لكل فترة |
-| `study.drift_rejected` | `passage`، و`collection`، و`item` (`id?`، `statement?`، `servesObjective?`)، و`reason`، و`by` (`guardian`: حُكم عليه بأنه خارج عن الهدف؛ `schema`: رُفض قبل ذلك، مثلًا لغياب `servesObjective`)، و`attempt` (2 في الإعادة) |
-| `study.amendment_accepted` / `study.amendment_refused` | `number?` (للمقبول فقط)، و`text`، و`verdict` (`refines`، `conflicts`، `changesObjective`، `unclassified`)، و`accepted`، و`reason`، و`charterHash` — في التشغيل الخاص بالتعديل |
+| `study.drift_rejected` | `passage`، و`collection`، و`item` (`id?`، `statement?`، `servesObjective?`)، و`reason` (`code`، `params?`، `message`)، و`by` (`guardian`: حُكم عليه بأنه خارج عن الهدف؛ `schema`: رُفض قبل ذلك، مثلًا لغياب `servesObjective`)، و`attempt` (2 في الإعادة) |
+| `study.capability_demoted` | `passage`، و`item` (معرّف البنية)، و`name`، و`reason` (`code`، `params?`، `message`): قدرة حكم عليها الحارس بأنها مجرد أسرع أو أرخص، فصارت الآن تحسينًا |
+| `study.amendment_accepted` / `study.amendment_refused` | `number?` (للمقبول فقط)، و`text`، و`verdict` (`refines`، `conflicts`، `changesObjective`، `unclassified`)، و`accepted`، و`reason` (`code`، `params?`، `message`؛ ولـ `unclassified`: `amendmentUnclassified` أو `amendmentTimedOut` أو `amendmentCancelled` أو `amendmentPolicy`)، و`charterHash` — في التشغيل الخاص بالتعديل |
 | `study.result_recorded` | `card`، و`resultAndError` (`result`، `error?`)، و`conclusionAndMemory?` — يُلحَق بالتشغيل الذي كتب البطاقة، بعد نهايته |
-| `study.completed` | `status`، و`passages` (`passage`، `state`)، و`stats` |
-| `study.failed` | `status` (`stopped` أو `failed` أو `cancelled`)، و`stoppedBy?`، و`error`، و`passages`، و`stats`، و`partial: true` — ثم `run.failed`، أو `run.cancelled` |
+| `study.completed` | `status`، و`passages` (`passage`، `state`)، و`stats` لهذا التشغيل (`modelCalls` التي أجاب عنها المزوّد، `searches`، `searchesSkipped`، `redos`، `loops`، `steps`) |
+| `study.failed` | `status` (`stopped` أو `failed` أو `cancelled`)، و`stoppedBy?`، و`error`، و`passages`، و`stats` لهذا التشغيل، و`partial: true` — ثم `run.failed`، أو `run.cancelled` |
 
-`study.model_called` هو ما يقرؤه `getRunCost` والميزانيات بالنسبة إلى الدراسة. وحين يُقارَن تشغيلان، تُطابَق أحداث الدراسة بحسب المرحلة (و`study.model_called` بحسب الغرض والمرحلة)، ولا يُقارَن `usage` الخاص بـ `study.model_called`.
+`study.model_called` هو ما يقرؤه `getRunCost` والميزانيات بالنسبة إلى الدراسة. وحين يُقارَن تشغيلان، تُطابَق أحداث الدراسة بحسب المرحلة (و`study.model_called` بحسب الغرض والمرحلة)، ولا يُقارَن `usage` الخاص بـ `study.model_called`. ويحتوي تشغيل التعديل على `run.started`، و`policy.violated` حين ترفض سياسةُ ميزانية التصنيفَ، و`study.model_called` حين يجيب المزوّد، وحدث التعديل، و`run.completed`.
 
 ## العمليات التشغيلية {#operations}
 

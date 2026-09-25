@@ -175,15 +175,15 @@ interface OutcomeEvaluator {
 
 | メンバー | |
 | --- | --- |
-| `id` | `study_…`。研究ごとに新しくなる。そのイベントの `metadata.agentId` であり、その予算とツール呼び出しのエージェント ID |
+| `id` | `study_…`。研究ごとに新しくなる。そのイベントの `metadata.agentId` であり、その予算、ポリシー、ツール呼び出しのエージェント ID |
 | `name`、`language`、`charter`、`charterHash` | 名前、言語、凍結された `StudyCharter`、その SHA-256（16 進数）。ハッシュは `study.started` と各追加指示に記録される |
 | `amendments` | `StudyAmendment[]`：受け入れられたものと拒否されたもの、順番どおり |
-| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`。完了していない最初の工程から、`restart` を指定した場合は最初の工程から、工程を実行する。制限、ポリシー、キャンセル、エラーは、その状態と行われたことのレポートとともに実行を終わらせる。例外を投げるのは、すでに実行が進行中の場合、処理できない `onEvent` の場合、イベントストアが失敗した場合だけ。`onEvent` は `agent.run` と同じように働く |
-| `amend(text)` | `Promise<StudyAmendment>`。それ専用の実行（`mode: 'study-amendment'`）で憲章に照らして分類される。受け入れられるのは `refines` だけで、それ以降のすべてのプロンプトに示される |
+| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`。最後の実行が止まったところから再開する：まず監視役がその実行が判定しないまま残したものを判定し、判定済みだが終わっていない工程は仕上げだけを行い、その後、完了していない工程が実行される。`restart` は研究を最初から始め直す：工程、結果、検索、逸脱ログ、番号付け、実行が消去され、憲章と追加指示は残る。制限、ポリシー、キャンセル、エラーは、その状態と行われたことのレポートとともに実行を終わらせる。例外を投げるのは、すでに実行が進行中の場合、処理できない `onEvent` の場合、イベントストアが失敗した場合だけ。`onEvent` は `agent.run` と同じように働く |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`。それ以前の追加指示には決して照らさず、憲章だけに照らして、予算のポリシーがまず確認される専用の実行（`mode: 'study-amendment'`）の中で分類される。受け入れられるのは `refines` だけで、それ以降のすべてのプロンプトに示される。`timeoutMs`（デフォルトは 60 000）と `signal` が分類に上限を設ける：それらを過ぎたとき、またはポリシーが分類を拒否したとき、追加指示は `unclassified` として拒否される。空のテキスト、`MAX_AMENDMENT_LENGTH`（500 文字）より長いテキスト、またはすでに `MAX_AMENDMENTS`（10）の追加指示が受け入れられている場合は `ValidationError` を投げる |
 | `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`。カードのフィールド 10 と 11 を埋め、そのカードを書いた実行に `study.result_recorded` を記録する。未知のカードや空の `result` には `ValidationError` |
 | `report()` | `StudyReport`：現時点のレポート。最後の実行以降に記録された結果も含む |
 
-`Study` と `StudyEnvironment`（研究が SDK から使うもの：プロバイダー、イベントストア、リアルタイムのイベント、ポリシーエンジン、ガバナンス付きツール）は、独自の構成のためにエクスポートされています。
+研究は `sdk.createStudy` で作成します。`Study` クラスはその型のためにエクスポートされており、研究を組み立てる材料は内部のものです。`MAX_AMENDMENTS` と `MAX_AMENDMENT_LENGTH` もエクスポートされており、`amend` のオプションの型である `StudyAmendOptions` も同様です。
 
 ### `StudyResult` {#studyresult}
 
@@ -228,7 +228,7 @@ interface StudyReport {
   searches: StudySearch[];
   driftLog: StudyDriftEntry[];
   stats: StudyStats;
-  runIds: string[];                             // runs and amendment runs, oldest first
+  runIds: string[];                             // runs of run() since the last restart, oldest first
 }
 
 interface StudyClaim {
@@ -237,16 +237,41 @@ interface StudyClaim {
   statement: string;
   status: 'established' | 'hypothesis' | 'novelty'; // after the study's checks
   declaredStatus?: StudyClaimStatus;                // the model's, when the study changed it
-  statusReason?: string;
-  sources: string[];                                // results retrieved in this study
-  unretrievedSources?: string[];                    // cited, never retrieved: they support nothing
+  statusReason?: StudyReason;
+  sources: string[];                                // results listed in the prompt that wrote it
+  unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
   servesObjective: string;
   toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
   priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
-  unchecked?: boolean;                              // the guardian had not judged it when the run stopped
+  unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
   runId: string;
 }
+
+interface StudyReason {
+  code: StudyReasonCode;
+  params?: Record<string, string>;
+  message: string;                                  // the same reason, in English
+}
+
+interface StudyTrace {
+  from: string[];                                   // records of the investigation it comes from
+  unknownFrom?: string[];                           // cited, not listed in the design's prompt
+  untraced?: boolean;                               // it cites none of the listed records
+}
 ```
+
+レポートのすべての理由は `StudyReason` です。主張と構成要素の `statusReason`、逸脱のエントリーと追加指示の `reason`、格下げされたアーキテクチャの `kindReason` がそうです。調査書はその `code` を研究の言語で表示します（`studyLabels(language).reasons`）。監視役やモデルが書いたテキストはコード `judged` を持ち、`params.text` に入ります。コード（`StudyReasonCode`）は次のとおりです。
+
+| コード | 理由 |
+| --- | --- |
+| `noSourceConfigured`、`citesUnlisted`、`citesNothing` | `hypothesis` に引き下げられた `established` の主張または構成要素：情報源がない、またはそのプロンプトに一覧された ID を引用していない |
+| `noveltyNotSearchedYet`、`noveltyNoSource`、`noveltySearchBudget`、`noveltyNotSearched`、`noveltySearchFailed`、`noveltyNoResult`、`noveltyNotAssessed`、`noveltyUnsupported` | 新規性がまだ確認すべきものである理由 |
+| `priorArtExists` | `hypothesis` に引き下げられた新規性：最も近い成果がすでにそれを実現している |
+| `componentDocumented`、`componentUndocumented` | 新しいものとして示された構成要素 |
+| `noServesObjective`、`invalidItem`、`notAnObject`、`notAUserLead`、`leadAlreadyJudged` | スキーマに拒否された項目 |
+| `designWithoutCapability` | 新しい能力を 1 つも含まない設計 |
+| `amendmentUnclassified`、`amendmentCancelled`、`amendmentTimedOut`、`amendmentPolicy` | 分類できなかった追加指示 |
+| `judged` | 監視役またはモデル自身の言葉 |
 
 すべての項目は、それぞれ独自のフィールドを持つ `StudyClaim` です。
 
@@ -260,12 +285,12 @@ interface StudyClaim {
 | `StudyLeadVerdict` | `lead`（憲章に書かれたとおり）、`verdict`（`relevant`、`partlyRelevant`、`notRelevant`）、`reasons` |
 | `StudyIndependentLead` | `tool`、`kind`（`mathematical`、`technical`、`other`）、`piece?` |
 | `StudyReference` | `name`、`piece?`、`date?` |
-| `StudyAnalogue` | `breakthrough`、`domain?`、`date?`、`components`（2 つ以上の `{ name, date? }`）、`liftedConstraint`、`capability`、`pattern` |
+| `StudyAnalogue` | `breakthrough`、`named?`（それが分解する、憲章のブレークスルーの番号）、`domain?`、`date?`、`components`（2 つ以上の `{ name, date? }`）、`liftedConstraint`、`capability`、`pattern` |
 | `StudyConstraint` | `constraint`、`state`（`remains`、`weakened`、`newRequirement`）、`piece?` |
 | `StudyRevisableDecision` | `decision`、`because`（変わった条件）、`opens` |
 | `StudyCombination` | `a`、`b`、`enables`（A によって B が何をできるようになるか）、`exchange`、`cost`、`changes`（`representation`、`distribution`、`responsibilities`） |
 | `StudyCapability` | `capability`、`forWhom`、`hardToday`、`principle?` |
-| `StudyArchitecture` | `name`、`kind`（`capability` または `improvement`）、`declaredKind?`、`capability`（`what`、`forWhom`、`liftedConstraint`）、`principleChange?`（`principle`：`representation`、`distribution`、`responsibility`、`trust`、`verification`、`other` のいずれか。`change`）、`mechanism`、`components`（`StudyComponent[]`：`name`、`statement`、`date?`、`status`、`declaredStatus?`、`statusReason?`、`sources`、`unretrievedSources?`）、`assembly`（`component`、`gives`、`exchanges`、`cost`）、`conditions`、`benefit`、`addedCost`、`counterexample`、`chain`（`stage`、`how`）、`uncoveredStages`（連鎖全体のうち、そのアーキテクチャが扱わない段階。研究がチェックしたもの）、`predictions` |
+| `StudyArchitecture` | `name`、`kind`（`capability` または `improvement`）、`declaredKind?` と `kindReason?`（より速い、あるいは安いだけだと監視役が判断した能力）、`capability`（`what`、`forWhom`、`liftedConstraint`）、`principleChange?`（`principle`：`representation`、`distribution`、`responsibility`、`trust`、`verification`、`other` のいずれか。`change`）、`mechanism`、`components`（`StudyComponent[]`：`name`、`statement`、`date?`、`status`、`declaredStatus?`、`statusReason?`、`sources`、`unlistedSources?`、そして `StudyTrace`）、`assembly`（`component`、`gives`、`exchanges`、`cost`、そして `StudyTrace`）、`conditions`、`benefit`、`addedCost`、`counterexample`、`chain`（`stage`、`how`）、`uncoveredStages`（連鎖全体のうち、そのアーキテクチャが扱わない段階。研究がチェックしたもの）、`predictions` |
 | `StudyThreeState` | `piece`、`state`（`atItsTime`、`currentBest`、`proposal`）、`architecture?` |
 | `StudyNoveltyClaim` | `architecture?` |
 | `StudyExperiment` | `name`、`architectures`、`protocol`、`measures`、`criteria`、`expected`（`architecture`、`result`）、`wholeChain` |
@@ -275,13 +300,13 @@ interface StudyClaim {
 
 | 型 | フィールド |
 | --- | --- |
-| `StudyAmendment` | `number?`（受け入れられたものだけ。1 から）、`text`、`verdict`（`refines`、`conflicts`、`changesObjective`、`unclassified`）、`accepted`、`reason`、`runId` |
-| `StudyDriftEntry` | `passage`、`collection`、`item`（`id?`、`statement?`、`servesObjective?`）、`reason`、`by`（`guardian`：目的から外れている。`schema`：その前に拒否された。たとえば `servesObjective` がない）、`attempt`（やり直しでは 2）、`runId` |
-| `StudySearchResult` | `id`（`S1`…。同じ結果が再び見つかっても保たれる）、`title`、`locator`（URL またはその他の所在情報）、`date?`、`excerpt`、`tool`、`query`、`runId` |
+| `StudyAmendment` | `number?`（受け入れられたものだけ。1 から）、`text`、`verdict`（`refines`、`conflicts`、`changesObjective`、`unclassified`）、`accepted`、`reason`（`StudyReason`）、`runId` |
+| `StudyDriftEntry` | `passage`、`collection`、`item`（`id?`、`statement?`、`servesObjective?`）、`reason`（`StudyReason`）、`by`（`guardian`：目的から外れている。`schema`：その前に拒否された。たとえば `servesObjective` がない）、`attempt`（やり直しでは 2）、`runId` |
+| `StudySearchResult` | `id`（`S1`…。同じ結果が再び見つかっても、リスタートまでは保たれる）、`title`、`locator`（URL またはその他の所在情報）、`date?`、`excerpt`、`tool`、`query`、`runId` |
 | `StudySearch` | `passage`、`purpose`（`research` または `priorArt`）、`tool`、`query`、`servesObjective`、`claims?`、`resultIds`、`error?`、`skipped?`（`maxSearches`）、`runId` |
-| `StudyPassageState` | `passage`、`state`（`complete`、`partial`：判定済みだが、その終わりの前に実行が止まった、`unchecked`：項目がまだ判定されていない、`notRun`）、`attempts`（やり直しの後は 2）、`reopenedBy`、`runId?` |
-| `StudyNotice` | `code`（`noSources`、`stopped`、`failed`、`cancelled`、`passagesNotRun`、`uncheckedItems`、`searchesSkipped`、`leadsNotVerified`、`analoguesNotDeconstructed`、`noCapability`、`noveltiesToVerify`）、`message`（英語）、`details?` |
-| `StudyStats` | `runs`、`modelCalls`、`searches`、`searchesSkipped`、`results`、`items`、`rejected`、`byStatus`（状態ごと）、`downgraded`（研究が状態を引き下げた主張）、`noveltiesToVerify`、`redos`、`loops`。研究のすべての実行が対象 |
+| `StudyPassageState` | `passage`、`state`（`complete`。`partial`：判定済みだが終わっていない。ループを待っているか、先行技術の検索が途中で打ち切られた。`unchecked`：監視役が判定していない項目がある。`notRun`）、`attempts`（やり直しの後は 2）、`reopenedBy`、`runId?` |
+| `StudyNotice` | `code`（`noSources`、`stopped`、`failed`、`cancelled`、`passagesNotRun`、`uncheckedItems`、`searchesSkipped`、`leadsNotVerified`、`analoguesNotDeconstructed`、`noDesign`、`noCapability`、`minimumsNotMet`、`untracedAssembly`、`noveltiesToVerify`）、`params?`（`limit`、`error`、`count`）、`details?`（対象となる工程、`passage.collection` の組、手がかり、ブレークスルー、またはアーキテクチャ）、`message`（英語。調査書はコードを自分の言語で表示する） |
+| `StudyStats` | 最後のリスタート以降：`runs` と `modelCalls`（`run()` の実行と、その中でベンダーが応答した呼び出し）、`searches`、`searchesSkipped`、`results`、`items`、`rejected`、`byStatus`（状態ごと）、`downgraded`（研究が状態を引き下げた主張）、`noveltiesToVerify`、`redos`、`loops`。そして `amendments`（`count`、`modelCalls`）：研究のすべての追加指示で、別に数えられる |
 
 ### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}
 

@@ -175,15 +175,15 @@ interface OutcomeEvaluator {
 
 | العضو | |
 | --- | --- |
-| `id` | `study_…`، جديد لكل دراسة: `metadata.agentId` لأحداثها، ومعرّف الوكيل لميزانياتها واستدعاءات أدواتها |
+| `id` | `study_…`، جديد لكل دراسة: `metadata.agentId` لأحداثها، ومعرّف الوكيل لميزانياتها وسياساتها واستدعاءات أدواتها |
 | `name`، `language`، `charter`، `charterHash` | الاسم، واللغة، و`StudyCharter` المُجمَّد، وبصمته SHA-256 (بالنظام الست عشري)، المسجَّلة في `study.started` ومع كل تعديل |
 | `amendments` | `StudyAmendment[]`: المقبولة والمرفوضة، بالترتيب |
-| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`. يشغّل المراحل بدءًا من أول مرحلة غير مكتملة، أو من الأولى مع `restart`. ينهي الحدُّ أو السياسةُ أو الإلغاءُ أو الخطأُ التشغيلَ بحالته وبتقرير ما أُنجِز؛ ولا يرمي إلا لتشغيل جارٍ بالفعل، أو لـ `onEvent` يتعذّر تقديمه، أو لمخزن أحداث يفشل. ويعمل `onEvent` كما مع `agent.run` |
-| `amend(text)` | `Promise<StudyAmendment>`. يُصنَّف مقابل الميثاق في تشغيل خاص به (`mode: 'study-amendment'`)؛ ولا يُقبَل إلا `refines`، ويظهر في كل موجّه لاحق |
+| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`. يستأنف من حيث توقّف آخر تشغيل: يحكم الحارس أولًا على ما تركه ذلك التشغيل دون حكم، والمرحلة التي حُكم عليها ولم تنتهِ لا تفعل سوى أن تنتهي، ثم تُشغَّل المراحل غير المكتملة. ويعيد `restart` بدء الدراسة من أولها: تُمحى المراحل، والنتائج، وعمليات البحث، وسجلّ الانحراف، والترقيم، وعمليات التشغيل؛ ويبقى الميثاق والتعديلات. ينهي الحدُّ أو السياسةُ أو الإلغاءُ أو الخطأُ التشغيلَ بحالته وبتقرير ما أُنجِز؛ ولا يرمي إلا لتشغيل جارٍ بالفعل، أو لـ `onEvent` يتعذّر تقديمه، أو لمخزن أحداث يفشل. ويعمل `onEvent` كما مع `agent.run` |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`. يُصنَّف مقابل الميثاق وحده، لا مقابل التعديلات السابقة أبدًا، في تشغيل خاص به (`mode: 'study-amendment'`) تُفحَص فيه سياسات الميزانية أولًا؛ ولا يُقبَل إلا `refines`، ويظهر في كل موجّه لاحق. ويحدّ `timeoutMs` (الافتراضي 60 000) و`signal` التصنيفَ: فإذا تجاوزهما، أو إذا رفضته سياسة، رُفض التعديل بوصفه `unclassified`. ويرمي `ValidationError` لنص فارغ، أو لنص أطول من `MAX_AMENDMENT_LENGTH` (500 حرف)، أو بعد قبول `MAX_AMENDMENTS` (10) تعديلات |
 | `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`. يملأ الحقلين 10 و11 من بطاقة ويسجّل `study.result_recorded` في التشغيل الذي كتبها؛ و`ValidationError` لبطاقة مجهولة أو لـ `result` فارغ |
 | `report()` | `StudyReport`: التقرير كما هو الآن، بما فيه النتائج المسجَّلة منذ آخر تشغيل |
 
-يُصدَّر `Study` و`StudyEnvironment` (ما تستخدمه الدراسة من حزمة SDK: مزوّدها، ومخزن أحداثها، وأحداثها المباشرة، ومحرّك سياساتها، وأدواتها الخاضعة للحوكمة) لعمليات الإعداد المخصّصة.
+تُنشأ الدراسة بـ `sdk.createStudy`: يُصدَّر الصنف `Study` من أجل نوعه، أما ما تُبنى به الدراسة فداخلي. وتُصدَّر `MAX_AMENDMENTS` و`MAX_AMENDMENT_LENGTH`، وكذلك `StudyAmendOptions`، نوع خيارات `amend`.
 
 ### `StudyResult` {#studyresult}
 
@@ -228,7 +228,7 @@ interface StudyReport {
   searches: StudySearch[];
   driftLog: StudyDriftEntry[];
   stats: StudyStats;
-  runIds: string[];                             // runs and amendment runs, oldest first
+  runIds: string[];                             // runs of run() since the last restart, oldest first
 }
 
 interface StudyClaim {
@@ -237,16 +237,41 @@ interface StudyClaim {
   statement: string;
   status: 'established' | 'hypothesis' | 'novelty'; // after the study's checks
   declaredStatus?: StudyClaimStatus;                // the model's, when the study changed it
-  statusReason?: string;
-  sources: string[];                                // results retrieved in this study
-  unretrievedSources?: string[];                    // cited, never retrieved: they support nothing
+  statusReason?: StudyReason;
+  sources: string[];                                // results listed in the prompt that wrote it
+  unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
   servesObjective: string;
   toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
   priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
-  unchecked?: boolean;                              // the guardian had not judged it when the run stopped
+  unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
   runId: string;
 }
+
+interface StudyReason {
+  code: StudyReasonCode;
+  params?: Record<string, string>;
+  message: string;                                  // the same reason, in English
+}
+
+interface StudyTrace {
+  from: string[];                                   // records of the investigation it comes from
+  unknownFrom?: string[];                           // cited, not listed in the design's prompt
+  untraced?: boolean;                               // it cites none of the listed records
+}
 ```
+
+كل سبب في التقرير هو `StudyReason`: `statusReason` للادعاءات والمكوّنات، و`reason` لمدخلات سجلّ الانحراف وللتعديلات، و`kindReason` للبنية التي خُفِّض نوعها. ويعرض الملف البحثي `code` الخاص به بلغة الدراسة (`studyLabels(language).reasons`)؛ والنص الذي كتبه الحارس أو النموذج رمزه `judged`، في `params.text`. الرموز (`StudyReasonCode`):
+
+| الرموز | السبب |
+| --- | --- |
+| `noSourceConfigured`، `citesUnlisted`، `citesNothing` | ادعاء أو مكوّن `established` خُفِّض إلى `hypothesis`: لا مصدر، أو لا معرّف مُدرَجًا في موجّهه |
+| `noveltyNotSearchedYet`، `noveltyNoSource`، `noveltySearchBudget`، `noveltyNotSearched`، `noveltySearchFailed`، `noveltyNoResult`، `noveltyNotAssessed`، `noveltyUnsupported` | لماذا ما زالت الجِدّة للتحقّق |
+| `priorArtExists` | جِدّة خُفِّضت إلى `hypothesis`: أقرب عمل ينجزها من قبل |
+| `componentDocumented`، `componentUndocumented` | مكوّن مقدَّم على أنه جديد |
+| `noServesObjective`، `invalidItem`، `notAnObject`، `notAUserLead`، `leadAlreadyJudged` | عنصر رفضه المخطط |
+| `designWithoutCapability` | تصميم بلا أي قدرة جديدة |
+| `amendmentUnclassified`، `amendmentCancelled`، `amendmentTimedOut`، `amendmentPolicy` | تعديل تعذّر تصنيفه |
+| `judged` | كلمات الحارس أو النموذج نفسها |
 
 كل عنصر `StudyClaim` له حقوله الخاصة:
 
@@ -260,12 +285,12 @@ interface StudyClaim {
 | `StudyLeadVerdict` | `lead` (كما يكتبه الميثاق)، و`verdict` (`relevant`، `partlyRelevant`، `notRelevant`)، و`reasons` |
 | `StudyIndependentLead` | `tool`، و`kind` (`mathematical`، `technical`، `other`)، و`piece?` |
 | `StudyReference` | `name`، و`piece?`، و`date?` |
-| `StudyAnalogue` | `breakthrough`، و`domain?`، و`date?`، و`components` (اثنان أو أكثر من `{ name, date? }`)، و`liftedConstraint`، و`capability`، و`pattern` |
+| `StudyAnalogue` | `breakthrough`، و`named?` (رقم اختراق الميثاق الذي يفكّكه)، و`domain?`، و`date?`، و`components` (اثنان أو أكثر من `{ name, date? }`)، و`liftedConstraint`، و`capability`، و`pattern` |
 | `StudyConstraint` | `constraint`، و`state` (`remains`، `weakened`، `newRequirement`)، و`piece?` |
 | `StudyRevisableDecision` | `decision`، و`because` (الشرط الذي تغيّر)، و`opens` |
 | `StudyCombination` | `a`، و`b`، و`enables` (ما يتيحه A لـ B)، و`exchange`، و`cost`، و`changes` (`representation`، `distribution`، `responsibilities`) |
 | `StudyCapability` | `capability`، و`forWhom`، و`hardToday`، و`principle?` |
-| `StudyArchitecture` | `name`، و`kind` (`capability` أو `improvement`)، و`declaredKind?`، و`capability` (`what`، `forWhom`، `liftedConstraint`)، و`principleChange?` (`principle`: `representation` أو `distribution` أو `responsibility` أو `trust` أو `verification` أو `other`؛ `change`)، و`mechanism`، و`components` (`StudyComponent[]`: `name`، `statement`، `date?`، `status`، `declaredStatus?`، `statusReason?`، `sources`، `unretrievedSources?`)، و`assembly` (`component`، `gives`، `exchanges`، `cost`)، و`conditions`، و`benefit`، و`addedCost`، و`counterexample`، و`chain` (`stage`، `how`)، و`uncoveredStages` (حلقات السلسلة الكاملة التي تتركها البنية، كما تحقّقت منها الدراسة)، و`predictions` |
+| `StudyArchitecture` | `name`، و`kind` (`capability` أو `improvement`)، و`declaredKind?` و`kindReason?` (قدرة حكم عليها الحارس بأنها مجرد أسرع أو أرخص)، و`capability` (`what`، `forWhom`، `liftedConstraint`)، و`principleChange?` (`principle`: `representation` أو `distribution` أو `responsibility` أو `trust` أو `verification` أو `other`؛ `change`)، و`mechanism`، و`components` (`StudyComponent[]`: `name`، `statement`، `date?`، `status`، `declaredStatus?`، `statusReason?`، `sources`، `unlistedSources?`، و`StudyTrace`)، و`assembly` (`component`، `gives`، `exchanges`، `cost`، و`StudyTrace`)، و`conditions`، و`benefit`، و`addedCost`، و`counterexample`، و`chain` (`stage`، `how`)، و`uncoveredStages` (حلقات السلسلة الكاملة التي تتركها البنية، كما تحقّقت منها الدراسة)، و`predictions` |
 | `StudyThreeState` | `piece`، و`state` (`atItsTime`، `currentBest`، `proposal`)، و`architecture?` |
 | `StudyNoveltyClaim` | `architecture?` |
 | `StudyExperiment` | `name`، و`architectures`، و`protocol`، و`measures`، و`criteria`، و`expected` (`architecture`، `result`)، و`wholeChain` |
@@ -275,13 +300,13 @@ interface StudyClaim {
 
 | النوع | الحقول |
 | --- | --- |
-| `StudyAmendment` | `number?` (للمقبول فقط، بدءًا من 1)، و`text`، و`verdict` (`refines`، `conflicts`، `changesObjective`، `unclassified`)، و`accepted`، و`reason`، و`runId` |
-| `StudyDriftEntry` | `passage`، و`collection`، و`item` (`id?`، `statement?`، `servesObjective?`)، و`reason`، و`by` (`guardian`: خارج عن الهدف؛ `schema`: رُفض قبل ذلك، مثلًا لغياب `servesObjective`)، و`attempt` (2 في الإعادة)، و`runId` |
-| `StudySearchResult` | `id` (`S1`…، ويُحتفَظ به حين يُعثَر على النتيجة نفسها مرة أخرى)، و`title`، و`locator` (رابط URL أو محدِّد موقع آخر)، و`date?`، و`excerpt`، و`tool`، و`query`، و`runId` |
+| `StudyAmendment` | `number?` (للمقبول فقط، بدءًا من 1)، و`text`، و`verdict` (`refines`، `conflicts`، `changesObjective`، `unclassified`)، و`accepted`، و`reason` (`StudyReason`)، و`runId` |
+| `StudyDriftEntry` | `passage`، و`collection`، و`item` (`id?`، `statement?`، `servesObjective?`)، و`reason` (`StudyReason`)، و`by` (`guardian`: خارج عن الهدف؛ `schema`: رُفض قبل ذلك، مثلًا لغياب `servesObjective`)، و`attempt` (2 في الإعادة)، و`runId` |
+| `StudySearchResult` | `id` (`S1`…، ويُحتفَظ به حين يُعثَر على النتيجة نفسها مرة أخرى، حتى إعادة البدء)، و`title`، و`locator` (رابط URL أو محدِّد موقع آخر)، و`date?`، و`excerpt`، و`tool`، و`query`، و`runId` |
 | `StudySearch` | `passage`، و`purpose` (`research` أو `priorArt`)، و`tool`، و`query`، و`servesObjective`، و`claims?`، و`resultIds`، و`error?`، و`skipped?` (`maxSearches`)، و`runId` |
-| `StudyPassageState` | `passage`، و`state` (`complete`، و`partial`: حُكم عليها لكن التشغيل توقّف قبل نهايتها، و`unchecked`: عناصر لم يُحكَم عليها بعد، و`notRun`)، و`attempts` (2 بعد إعادة)، و`reopenedBy`، و`runId?` |
-| `StudyNotice` | `code` (`noSources`، `stopped`، `failed`، `cancelled`، `passagesNotRun`، `uncheckedItems`، `searchesSkipped`، `leadsNotVerified`، `analoguesNotDeconstructed`، `noCapability`، `noveltiesToVerify`)، و`message` (بالإنجليزية)، و`details?` |
-| `StudyStats` | `runs`، و`modelCalls`، و`searches`، و`searchesSkipped`، و`results`، و`items`، و`rejected`، و`byStatus` (لكل حالة)، و`downgraded` (الادعاءات التي خفّضت الدراسة حالتها)، و`noveltiesToVerify`، و`redos`، و`loops` — لكل عمليات تشغيل الدراسة |
+| `StudyPassageState` | `passage`، و`state` (`complete`؛ و`partial`: حُكم عليها لكنها لم تنتهِ، إذ تنتظر دورتها أو قُطع بحثها عن الأعمال السابقة؛ و`unchecked`: عناصر لم يحكم عليها الحارس؛ و`notRun`)، و`attempts` (2 بعد إعادة)، و`reopenedBy`، و`runId?` |
+| `StudyNotice` | `code` (`noSources`، `stopped`، `failed`، `cancelled`، `passagesNotRun`، `uncheckedItems`، `searchesSkipped`، `leadsNotVerified`، `analoguesNotDeconstructed`، `noDesign`، `noCapability`، `minimumsNotMet`، `untracedAssembly`، `noveltiesToVerify`)، و`params?` (`limit`، `error`، `count`)، و`details?` (المراحل، أو أزواج `passage.collection`، أو الخيوط، أو الاختراقات، أو البنى المعنية)، و`message` (بالإنجليزية؛ ويعرض الملف البحثي الرمز بلغته) |
+| `StudyStats` | منذ آخر إعادة بدء: `runs` و`modelCalls` (عمليات تشغيل `run()`، والاستدعاءات التي أجاب عنها المزوّد فيها)، و`searches`، و`searchesSkipped`، و`results`، و`items`، و`rejected`، و`byStatus` (لكل حالة)، و`downgraded` (الادعاءات التي خفّضت الدراسة حالتها)، و`noveltiesToVerify`، و`redos`، و`loops`. و`amendments` (`count`، `modelCalls`): كل تعديلات الدراسة، مَعدودةً على حدة |
 
 ### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}
 

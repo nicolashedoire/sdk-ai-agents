@@ -175,15 +175,15 @@ Par exécution. `DEFAULT_STUDY_LIMITS` contient les valeurs par défaut ; une v
 
 | Membre | |
 | --- | --- |
-| `id` | `study_…`, nouveau pour chaque étude : le `metadata.agentId` de ses événements et l'id d'agent de ses budgets et de ses appels d'outils |
+| `id` | `study_…`, nouveau pour chaque étude : le `metadata.agentId` de ses événements et l'id d'agent de ses budgets, de ses politiques et de ses appels d'outils |
 | `name`, `language`, `charter`, `charterHash` | Le nom, la langue, la `StudyCharter` figée, et son SHA-256 (en hexadécimal), enregistré dans `study.started` et avec chaque amendement |
 | `amendments` | `StudyAmendment[]` : acceptés et refusés, dans l'ordre |
-| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`. Exécute les passages à partir du premier qui n'est pas terminé, ou à partir du premier avec `restart`. Une limite, une politique, une annulation ou une erreur met fin à l'exécution avec son statut et le rapport de ce qui a été fait ; il ne lève une exception que pour une exécution déjà en cours, un `onEvent` qui ne peut pas être servi, ou un magasin d'événements qui échoue. `onEvent` fonctionne comme avec `agent.run` |
-| `amend(text)` | `Promise<StudyAmendment>`. Classé par rapport à la charte dans une exécution à part (`mode: 'study-amendment'`) ; seul `refines` est accepté, et apparaît alors dans chaque prompt suivant |
+| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`. Reprend là où la dernière exécution s'est arrêtée : le gardien juge d'abord ce que cette exécution a laissé sans jugement, un passage jugé mais non terminé ne fait que se terminer, puis les passages non terminés s'exécutent. `restart` recommence l'étude depuis le début : les passages, les résultats, les recherches, le journal de dérive, la numérotation et les exécutions sont effacés ; la charte et les amendements restent. Une limite, une politique, une annulation ou une erreur met fin à l'exécution avec son statut et le rapport de ce qui a été fait ; il ne lève une exception que pour une exécution déjà en cours, un `onEvent` qui ne peut pas être servi, ou un magasin d'événements qui échoue. `onEvent` fonctionne comme avec `agent.run` |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`. Classé par rapport à la charte seule, jamais par rapport aux amendements précédents, dans une exécution à part (`mode: 'study-amendment'`) où les politiques de budget sont vérifiées d'abord ; seul `refines` est accepté, et apparaît alors dans chaque prompt suivant. `timeoutMs` (60 000 par défaut) et `signal` bornent la classification : au-delà, ou quand une politique la refuse, l'amendement est refusé comme `unclassified`. Lève une `ValidationError` pour un texte vide, un texte de plus de `MAX_AMENDMENT_LENGTH` (500 caractères), ou une fois que `MAX_AMENDMENTS` (10) amendements ont été acceptés |
 | `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`. Remplit les champs 10 et 11 d'une fiche et enregistre `study.result_recorded` dans l'exécution qui l'a écrite ; une `ValidationError` pour une fiche inconnue ou un `result` vide |
 | `report()` | `StudyReport` : le rapport tel qu'il est, résultats enregistrés depuis la dernière exécution compris |
 
-`Study` et `StudyEnvironment` (ce qu'une étude utilise du SDK : son fournisseur, son magasin d'événements, ses événements en direct, son moteur de politiques et ses outils gouvernés) sont exportés pour les configurations sur mesure.
+Une étude se crée avec `sdk.createStudy` : la classe `Study` est exportée pour son type, et ce avec quoi elle est construite est interne. `MAX_AMENDMENTS` et `MAX_AMENDMENT_LENGTH` sont exportés, de même que `StudyAmendOptions`, le type des options de `amend`.
 
 ### `StudyResult` {#studyresult}
 
@@ -228,7 +228,7 @@ interface StudyReport {
   searches: StudySearch[];
   driftLog: StudyDriftEntry[];
   stats: StudyStats;
-  runIds: string[];                             // runs and amendment runs, oldest first
+  runIds: string[];                             // runs of run() since the last restart, oldest first
 }
 
 interface StudyClaim {
@@ -237,16 +237,41 @@ interface StudyClaim {
   statement: string;
   status: 'established' | 'hypothesis' | 'novelty'; // after the study's checks
   declaredStatus?: StudyClaimStatus;                // the model's, when the study changed it
-  statusReason?: string;
-  sources: string[];                                // results retrieved in this study
-  unretrievedSources?: string[];                    // cited, never retrieved: they support nothing
+  statusReason?: StudyReason;
+  sources: string[];                                // results listed in the prompt that wrote it
+  unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
   servesObjective: string;
   toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
   priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
-  unchecked?: boolean;                              // the guardian had not judged it when the run stopped
+  unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
   runId: string;
 }
+
+interface StudyReason {
+  code: StudyReasonCode;
+  params?: Record<string, string>;
+  message: string;                                  // the same reason, in English
+}
+
+interface StudyTrace {
+  from: string[];                                   // records of the investigation it comes from
+  unknownFrom?: string[];                           // cited, not listed in the design's prompt
+  untraced?: boolean;                               // it cites none of the listed records
+}
 ```
+
+Chaque raison du rapport est une `StudyReason` : le `statusReason` des affirmations et des composants, la `reason` des entrées du journal de dérive et des amendements, et le `kindReason` d'une architecture rétrogradée. Le dossier rend son `code` dans la langue de l'étude (`studyLabels(language).reasons`) ; un texte écrit par le gardien ou par le modèle a le code `judged`, dans `params.text`. Les codes (`StudyReasonCode`) :
+
+| Codes | Pourquoi |
+| --- | --- |
+| `noSourceConfigured`, `citesUnlisted`, `citesNothing` | Une affirmation ou un composant `established` abaissé en `hypothesis` : aucune source, ou aucun id listé dans son prompt |
+| `noveltyNotSearchedYet`, `noveltyNoSource`, `noveltySearchBudget`, `noveltyNotSearched`, `noveltySearchFailed`, `noveltyNoResult`, `noveltyNotAssessed`, `noveltyUnsupported` | Pourquoi une nouveauté reste à vérifier |
+| `priorArtExists` | Une nouveauté abaissée en `hypothesis` : les travaux les plus proches le font déjà |
+| `componentDocumented`, `componentUndocumented` | Un composant présenté comme nouveau |
+| `noServesObjective`, `invalidItem`, `notAnObject`, `notAUserLead`, `leadAlreadyJudged` | Un élément refusé par le schéma |
+| `designWithoutCapability` | Une conception sans aucune capacité nouvelle |
+| `amendmentUnclassified`, `amendmentCancelled`, `amendmentTimedOut`, `amendmentPolicy` | Un amendement qui n'a pas pu être classé |
+| `judged` | Les propres mots du gardien ou du modèle |
 
 Chaque élément est une `StudyClaim` avec des champs qui lui sont propres :
 
@@ -260,12 +285,12 @@ Chaque élément est une `StudyClaim` avec des champs qui lui sont propres :
 | `StudyLeadVerdict` | `lead` (tel que la charte l'écrit), `verdict` (`relevant`, `partlyRelevant`, `notRelevant`), `reasons` |
 | `StudyIndependentLead` | `tool`, `kind` (`mathematical`, `technical`, `other`), `piece?` |
 | `StudyReference` | `name`, `piece?`, `date?` |
-| `StudyAnalogue` | `breakthrough`, `domain?`, `date?`, `components` (au moins deux `{ name, date? }`), `liftedConstraint`, `capability`, `pattern` |
+| `StudyAnalogue` | `breakthrough`, `named?` (le numéro de la rupture de la charte qu'elle déconstruit), `domain?`, `date?`, `components` (au moins deux `{ name, date? }`), `liftedConstraint`, `capability`, `pattern` |
 | `StudyConstraint` | `constraint`, `state` (`remains`, `weakened`, `newRequirement`), `piece?` |
 | `StudyRevisableDecision` | `decision`, `because` (la condition qui a changé), `opens` |
 | `StudyCombination` | `a`, `b`, `enables` (ce que A permet à B), `exchange`, `cost`, `changes` (`representation`, `distribution`, `responsibilities`) |
 | `StudyCapability` | `capability`, `forWhom`, `hardToday`, `principle?` |
-| `StudyArchitecture` | `name`, `kind` (`capability` ou `improvement`), `declaredKind?`, `capability` (`what`, `forWhom`, `liftedConstraint`), `principleChange?` (`principle` : `representation`, `distribution`, `responsibility`, `trust`, `verification` ou `other` ; `change`), `mechanism`, `components` (`StudyComponent[]` : `name`, `statement`, `date?`, `status`, `declaredStatus?`, `statusReason?`, `sources`, `unretrievedSources?`), `assembly` (`component`, `gives`, `exchanges`, `cost`), `conditions`, `benefit`, `addedCost`, `counterexample`, `chain` (`stage`, `how`), `uncoveredStages` (les étapes de la chaîne complète qu'elle laisse de côté, d'après la vérification de l'étude), `predictions` |
+| `StudyArchitecture` | `name`, `kind` (`capability` ou `improvement`), `declaredKind?` et `kindReason?` (une capacité que le gardien a jugée seulement plus rapide ou moins chère), `capability` (`what`, `forWhom`, `liftedConstraint`), `principleChange?` (`principle` : `representation`, `distribution`, `responsibility`, `trust`, `verification` ou `other` ; `change`), `mechanism`, `components` (`StudyComponent[]` : `name`, `statement`, `date?`, `status`, `declaredStatus?`, `statusReason?`, `sources`, `unlistedSources?`, et une `StudyTrace`), `assembly` (`component`, `gives`, `exchanges`, `cost`, et une `StudyTrace`), `conditions`, `benefit`, `addedCost`, `counterexample`, `chain` (`stage`, `how`), `uncoveredStages` (les étapes de la chaîne complète qu'elle laisse de côté, d'après la vérification de l'étude), `predictions` |
 | `StudyThreeState` | `piece`, `state` (`atItsTime`, `currentBest`, `proposal`), `architecture?` |
 | `StudyNoveltyClaim` | `architecture?` |
 | `StudyExperiment` | `name`, `architectures`, `protocol`, `measures`, `criteria`, `expected` (`architecture`, `result`), `wholeChain` |
@@ -275,13 +300,13 @@ Les autres entrées du rapport ne sont pas des affirmations :
 
 | Type | Champs |
 | --- | --- |
-| `StudyAmendment` | `number?` (amendements acceptés seulement, à partir de 1), `text`, `verdict` (`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason`, `runId` |
-| `StudyDriftEntry` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason`, `by` (`guardian` : hors de l'objectif ; `schema` : refusé avant, par exemple sans `servesObjective`), `attempt` (2 quand le passage est refait), `runId` |
-| `StudySearchResult` | `id` (`S1`…, conservé quand le même résultat est retrouvé), `title`, `locator` (une URL ou un autre localisateur), `date?`, `excerpt`, `tool`, `query`, `runId` |
+| `StudyAmendment` | `number?` (amendements acceptés seulement, à partir de 1), `text`, `verdict` (`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason` (`StudyReason`), `runId` |
+| `StudyDriftEntry` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason` (`StudyReason`), `by` (`guardian` : hors de l'objectif ; `schema` : refusé avant, par exemple sans `servesObjective`), `attempt` (2 quand le passage est refait), `runId` |
+| `StudySearchResult` | `id` (`S1`…, conservé quand le même résultat est retrouvé, jusqu'à un redémarrage), `title`, `locator` (une URL ou un autre localisateur), `date?`, `excerpt`, `tool`, `query`, `runId` |
 | `StudySearch` | `passage`, `purpose` (`research` ou `priorArt`), `tool`, `query`, `servesObjective`, `claims?`, `resultIds`, `error?`, `skipped?` (`maxSearches`), `runId` |
-| `StudyPassageState` | `passage`, `state` (`complete`, `partial` : jugé, mais l'exécution s'est arrêtée avant sa fin, `unchecked` : éléments pas encore jugés, `notRun`), `attempts` (2 une fois le passage refait), `reopenedBy`, `runId?` |
-| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noCapability`, `noveltiesToVerify`), `message` (en anglais), `details?` |
-| `StudyStats` | `runs`, `modelCalls`, `searches`, `searchesSkipped`, `results`, `items`, `rejected`, `byStatus` (par statut), `downgraded` (affirmations dont l'étude a abaissé le statut), `noveltiesToVerify`, `redos`, `loops` — pour toutes les exécutions de l'étude |
+| `StudyPassageState` | `passage`, `state` (`complete` ; `partial` : jugé mais non terminé, en attente de sa boucle ou avec sa recherche de l'existant interrompue ; `unchecked` : éléments que le gardien n'a pas jugés ; `notRun`), `attempts` (2 une fois le passage refait), `reopenedBy`, `runId?` |
+| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noDesign`, `noCapability`, `minimumsNotMet`, `untracedAssembly`, `noveltiesToVerify`), `params?` (`limit`, `error`, `count`), `details?` (les passages, les paires `passage.collection`, les pistes, les ruptures ou les architectures concernés), `message` (en anglais ; le dossier rend le code dans sa langue) |
+| `StudyStats` | Depuis le dernier redémarrage : `runs` et `modelCalls` (les exécutions de `run()`, et les appels auxquels l'éditeur y a répondu), `searches`, `searchesSkipped`, `results`, `items`, `rejected`, `byStatus` (par statut), `downgraded` (affirmations dont l'étude a abaissé le statut), `noveltiesToVerify`, `redos`, `loops`. Et `amendments` (`count`, `modelCalls`) : tous les amendements de l'étude, comptés à part |
 
 ### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}
 

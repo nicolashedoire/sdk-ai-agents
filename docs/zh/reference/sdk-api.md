@@ -175,15 +175,15 @@ interface OutcomeEvaluator {
 
 | 成员 | |
 | --- | --- |
-| `id` | `study_…`，每项研究都是新的：它的事件的 `metadata.agentId`，也是它的预算和工具调用所用的智能体 id |
+| `id` | `study_…`，每项研究都是新的：它的事件的 `metadata.agentId`，也是它的预算、策略和工具调用所用的智能体 id |
 | `name`、`language`、`charter`、`charterHash` | 名称、语言、冻结的 `StudyCharter`，以及它的 SHA-256（十六进制），记录在 `study.started` 中，并随每条修正案一起记录 |
 | `amendments` | `StudyAmendment[]`：已接受和被拒绝的修正案，按顺序排列 |
-| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`。从第一个尚未完成的环节开始运行各环节，使用 `restart` 时则从第一个环节开始。限制、策略、取消或错误会以相应的状态和已完成内容的报告结束运行；它只在以下情况抛出异常：已有运行在进行中、无法提供 `onEvent`，或者事件存储出错。`onEvent` 的用法与 `agent.run` 相同 |
-| `amend(text)` | `Promise<StudyAmendment>`。在单独的运行中（`mode: 'study-amendment'`）对照章程进行分类；只有 `refines` 会被接受，并显示在此后的每个 prompt 中 |
+| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`。从上一次运行停止的地方恢复：守护者首先评判那次运行留下的未评判内容，已评判但尚未结束的环节只做收尾，然后运行尚未完成的环节。`restart` 让研究从头开始：环节、结果、搜索、偏离日志、编号和各次运行都会被清除；章程和修正案保留下来。限制、策略、取消或错误会以相应的状态和已完成内容的报告结束运行；它只在以下情况抛出异常：已有运行在进行中、无法提供 `onEvent`，或者事件存储出错。`onEvent` 的用法与 `agent.run` 相同 |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`。只对照章程进行分类，从不对照较早的修正案，分类在单独的运行中进行（`mode: 'study-amendment'`），并且会先检查预算策略；只有 `refines` 会被接受，并显示在此后的每个 prompt 中。`timeoutMs`（默认 60 000）和 `signal` 限定分类过程：超出它们，或者某个策略拒绝了分类时，修正案会以 `unclassified` 被拒绝。文本为空、文本超过 `MAX_AMENDMENT_LENGTH`（500 个字符），或者已经接受了 `MAX_AMENDMENTS`（10）条修正案时，抛出 `ValidationError` |
 | `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`。填写卡片的第 10 和第 11 个字段，并在写出这张卡片的那次运行中记录 `study.result_recorded`；卡片未知或 `result` 为空时抛出 `ValidationError` |
 | `report()` | `StudyReport`：报告当前的样子，包括上次运行以来记录的结果 |
 
-`Study` 和 `StudyEnvironment`（研究从 SDK 中使用的东西：它的提供商、事件存储、实时事件、策略引擎和受治理的工具）都已导出，供自定义配置使用。
+研究用 `sdk.createStudy` 创建：`Study` 类导出只是为了提供它的类型，构建它所用的东西属于内部实现。`MAX_AMENDMENTS` 和 `MAX_AMENDMENT_LENGTH` 已导出，`amend` 的选项的类型 `StudyAmendOptions` 也已导出。
 
 ### `StudyResult` {#studyresult}
 
@@ -228,7 +228,7 @@ interface StudyReport {
   searches: StudySearch[];
   driftLog: StudyDriftEntry[];
   stats: StudyStats;
-  runIds: string[];                             // runs and amendment runs, oldest first
+  runIds: string[];                             // runs of run() since the last restart, oldest first
 }
 
 interface StudyClaim {
@@ -237,16 +237,41 @@ interface StudyClaim {
   statement: string;
   status: 'established' | 'hypothesis' | 'novelty'; // after the study's checks
   declaredStatus?: StudyClaimStatus;                // the model's, when the study changed it
-  statusReason?: string;
-  sources: string[];                                // results retrieved in this study
-  unretrievedSources?: string[];                    // cited, never retrieved: they support nothing
+  statusReason?: StudyReason;
+  sources: string[];                                // results listed in the prompt that wrote it
+  unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
   servesObjective: string;
   toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
   priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
-  unchecked?: boolean;                              // the guardian had not judged it when the run stopped
+  unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
   runId: string;
 }
+
+interface StudyReason {
+  code: StudyReasonCode;
+  params?: Record<string, string>;
+  message: string;                                  // the same reason, in English
+}
+
+interface StudyTrace {
+  from: string[];                                   // records of the investigation it comes from
+  unknownFrom?: string[];                           // cited, not listed in the design's prompt
+  untraced?: boolean;                               // it cites none of the listed records
+}
 ```
+
+报告中的每个原因都是一个 `StudyReason`：论断和组件的 `statusReason`、偏离条目和修正案的 `reason`，以及被降级架构的 `kindReason`。档案会用研究的语言呈现它的 `code`（`studyLabels(language).reasons`）；守护者或模型写下的文本，代码为 `judged`，文本在 `params.text` 中。这些代码（`StudyReasonCode`）如下：
+
+| 代码 | 原因 |
+| --- | --- |
+| `noSourceConfigured`、`citesUnlisted`、`citesNothing` | 被降为 `hypothesis` 的 `established` 论断或组件：没有来源，或者没有引用它的 prompt 中列出的任何 id |
+| `noveltyNotSearchedYet`、`noveltyNoSource`、`noveltySearchBudget`、`noveltyNotSearched`、`noveltySearchFailed`、`noveltyNoResult`、`noveltyNotAssessed`、`noveltyUnsupported` | 创新点为什么仍有待核查 |
+| `priorArtExists` | 被降为 `hypothesis` 的创新点：最接近的工作已经做到了 |
+| `componentDocumented`、`componentUndocumented` | 被说成是新的组件 |
+| `noServesObjective`、`invalidItem`、`notAnObject`、`notAUserLead`、`leadAlreadyJudged` | 被 schema 拒绝的条目 |
+| `designWithoutCapability` | 没有任何新能力的设计 |
+| `amendmentUnclassified`、`amendmentCancelled`、`amendmentTimedOut`、`amendmentPolicy` | 无法被分类的修正案 |
+| `judged` | 守护者或模型自己的话 |
 
 每个条目都是一个 `StudyClaim`，并带有它自己的字段：
 
@@ -260,12 +285,12 @@ interface StudyClaim {
 | `StudyLeadVerdict` | `lead`（按章程中的写法）、`verdict`（`relevant`、`partlyRelevant`、`notRelevant`）、`reasons` |
 | `StudyIndependentLead` | `tool`、`kind`（`mathematical`、`technical`、`other`）、`piece?` |
 | `StudyReference` | `name`、`piece?`、`date?` |
-| `StudyAnalogue` | `breakthrough`、`domain?`、`date?`、`components`（两个或更多 `{ name, date? }`）、`liftedConstraint`、`capability`、`pattern` |
+| `StudyAnalogue` | `breakthrough`、`named?`（它所拆解的章程中那项突破的编号）、`domain?`、`date?`、`components`（两个或更多 `{ name, date? }`）、`liftedConstraint`、`capability`、`pattern` |
 | `StudyConstraint` | `constraint`、`state`（`remains`、`weakened`、`newRequirement`）、`piece?` |
 | `StudyRevisableDecision` | `decision`、`because`（改变了的条件）、`opens` |
 | `StudyCombination` | `a`、`b`、`enables`（A 让 B 能做什么）、`exchange`、`cost`、`changes`（`representation`、`distribution`、`responsibilities`） |
 | `StudyCapability` | `capability`、`forWhom`、`hardToday`、`principle?` |
-| `StudyArchitecture` | `name`、`kind`（`capability` 或 `improvement`）、`declaredKind?`、`capability`（`what`、`forWhom`、`liftedConstraint`）、`principleChange?`（`principle`：`representation`、`distribution`、`responsibility`、`trust`、`verification` 或 `other`；`change`）、`mechanism`、`components`（`StudyComponent[]`：`name`、`statement`、`date?`、`status`、`declaredStatus?`、`statusReason?`、`sources`、`unretrievedSources?`）、`assembly`（`component`、`gives`、`exchanges`、`cost`）、`conditions`、`benefit`、`addedCost`、`counterexample`、`chain`（`stage`、`how`）、`uncoveredStages`（经研究检查，它遗漏的完整链条阶段）、`predictions` |
+| `StudyArchitecture` | `name`、`kind`（`capability` 或 `improvement`）、`declaredKind?` 和 `kindReason?`（守护者判定只是更快或更便宜的能力）、`capability`（`what`、`forWhom`、`liftedConstraint`）、`principleChange?`（`principle`：`representation`、`distribution`、`responsibility`、`trust`、`verification` 或 `other`；`change`）、`mechanism`、`components`（`StudyComponent[]`：`name`、`statement`、`date?`、`status`、`declaredStatus?`、`statusReason?`、`sources`、`unlistedSources?`，以及一个 `StudyTrace`）、`assembly`（`component`、`gives`、`exchanges`、`cost`，以及一个 `StudyTrace`）、`conditions`、`benefit`、`addedCost`、`counterexample`、`chain`（`stage`、`how`）、`uncoveredStages`（经研究检查，它遗漏的完整链条阶段）、`predictions` |
 | `StudyThreeState` | `piece`、`state`（`atItsTime`、`currentBest`、`proposal`）、`architecture?` |
 | `StudyNoveltyClaim` | `architecture?` |
 | `StudyExperiment` | `name`、`architectures`、`protocol`、`measures`、`criteria`、`expected`（`architecture`、`result`）、`wholeChain` |
@@ -275,13 +300,13 @@ interface StudyClaim {
 
 | 类型 | 字段 |
 | --- | --- |
-| `StudyAmendment` | `number?`（仅限已接受的，从 1 开始）、`text`、`verdict`（`refines`、`conflicts`、`changesObjective`、`unclassified`）、`accepted`、`reason`、`runId` |
-| `StudyDriftEntry` | `passage`、`collection`、`item`（`id?`、`statement?`、`servesObjective?`）、`reason`、`by`（`guardian`：偏离目标；`schema`：在此之前就被拒绝，例如缺少 `servesObjective`）、`attempt`（重做时为 2）、`runId` |
-| `StudySearchResult` | `id`（`S1`……，再次找到同一结果时保持不变）、`title`、`locator`（URL 或其他定位符）、`date?`、`excerpt`、`tool`、`query`、`runId` |
+| `StudyAmendment` | `number?`（仅限已接受的，从 1 开始）、`text`、`verdict`（`refines`、`conflicts`、`changesObjective`、`unclassified`）、`accepted`、`reason`（`StudyReason`）、`runId` |
+| `StudyDriftEntry` | `passage`、`collection`、`item`（`id?`、`statement?`、`servesObjective?`）、`reason`（`StudyReason`）、`by`（`guardian`：偏离目标；`schema`：在此之前就被拒绝，例如缺少 `servesObjective`）、`attempt`（重做时为 2）、`runId` |
+| `StudySearchResult` | `id`（`S1`……，再次找到同一结果时保持不变，直到重新开始为止）、`title`、`locator`（URL 或其他定位符）、`date?`、`excerpt`、`tool`、`query`、`runId` |
 | `StudySearch` | `passage`、`purpose`（`research` 或 `priorArt`）、`tool`、`query`、`servesObjective`、`claims?`、`resultIds`、`error?`、`skipped?`（`maxSearches`）、`runId` |
-| `StudyPassageState` | `passage`、`state`（`complete`；`partial`：已评判，但运行在它结束之前停止了；`unchecked`：条目尚未评判；`notRun`）、`attempts`（重做后为 2）、`reopenedBy`、`runId?` |
-| `StudyNotice` | `code`（`noSources`、`stopped`、`failed`、`cancelled`、`passagesNotRun`、`uncheckedItems`、`searchesSkipped`、`leadsNotVerified`、`analoguesNotDeconstructed`、`noCapability`、`noveltiesToVerify`）、`message`（英文）、`details?` |
-| `StudyStats` | `runs`、`modelCalls`、`searches`、`searchesSkipped`、`results`、`items`、`rejected`、`byStatus`（按状态）、`downgraded`（被研究降低了状态的论断）、`noveltiesToVerify`、`redos`、`loops`——涵盖研究的所有运行 |
+| `StudyPassageState` | `passage`、`state`（`complete`；`partial`：已评判但尚未结束，在等待它的循环，或者它的现有技术搜索被中断了；`unchecked`：守护者尚未评判的条目；`notRun`）、`attempts`（重做后为 2）、`reopenedBy`、`runId?` |
+| `StudyNotice` | `code`（`noSources`、`stopped`、`failed`、`cancelled`、`passagesNotRun`、`uncheckedItems`、`searchesSkipped`、`leadsNotVerified`、`analoguesNotDeconstructed`、`noDesign`、`noCapability`、`minimumsNotMet`、`untracedAssembly`、`noveltiesToVerify`）、`params?`（`limit`、`error`、`count`）、`details?`（相关的环节、`passage.collection` 对、线索、突破或架构）、`message`（英文；档案会用它的语言呈现代码） |
+| `StudyStats` | 自上一次重新开始以来：`runs` 和 `modelCalls`（`run()` 的各次运行，以及其中提供商作出应答的调用）、`searches`、`searchesSkipped`、`results`、`items`、`rejected`、`byStatus`（按状态）、`downgraded`（被研究降低了状态的论断）、`noveltiesToVerify`、`redos`、`loops`。还有 `amendments`（`count`、`modelCalls`）：研究的每一条修正案，单独统计 |
 
 ### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}
 

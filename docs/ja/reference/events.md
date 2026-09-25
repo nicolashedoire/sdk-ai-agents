@@ -60,18 +60,19 @@ interface Event {
 
 | 種類 | データ |
 | --- | --- |
-| `study.started` | `name`、`charter`（`object`、`question`、`objective`、`needs`、`leads`、`scope`、`capability?`、`analogues`）、`charterHash`（SHA-256）、`language`、`model?`、`sources`（ツール名）、`limits`、`driftThreshold`、`amendments`（受け入れられたもの：`number`、`text`）、`resumeAt?`（再開された実行が始まる工程） |
+| `study.started` | `name`、`charter`（`object`、`question`、`objective`、`needs`、`leads`、`scope`、`capability?`、`analogues`）、`charterHash`（SHA-256）、`language`、`model?`、`sources`（ツール名）、`limits`、`driftThreshold`、`amendments`（受け入れられたもの：`number`、`text`）、`resumeAt?`（実行が再開するとき：作業が残っている最初の工程） |
 | `study.passage_started` | `passage`、`number`（1 から 7）、`amendments`（有効な、受け入れられた追加指示の番号）、そして後の工程から差し戻された場合は `reopenedBy?`、`focus?`、`reason?` |
-| `study.passage_completed` | `passage`、`attempts`（監視役がやり直させた場合は 2）、`items`（それぞれに `collection`、`id`、`statement`、`status`、`sources`、`servesObjective`、主張のそのほかのフィールドと独自のフィールド）、`reopenedBy?`、`reopen?`（`passage`、`focus`、`reason`：差し戻しを求める前の工程） |
+| `study.passage_completed` | `passage`、`attempts`（監視役がやり直させた場合は 2）、`keptAttempt?`（最初の試行がやり直しより良かったために残された場合は 1）、`items`（それぞれに `collection`、`id`、`statement`、`status`、`sources`、`servesObjective`、主張のそのほかのフィールドと独自のフィールド）、`reopenedBy?`、`reopen?`（`passage`、`focus`、`reason`：差し戻しを求める前の工程。この工程は、もう一度実行されるまで完了しない）、`resumed?`（再開された実行が、それを仕上げるためだけに実行した） |
 | `study.search` | `passage`、`purpose`（`research`、または新規性の先行技術なら `priorArt`）、`tool`、`query`、`servesObjective`、`claims?`（探している新規性）、`resultIds`、`results`（`id`、`title`、`locator`、`date?`）、`error?`（検索が失敗した）、`skipped?`（`maxSearches`：実行されなかった） |
 | `study.model_called` | `purpose`（`passage`、`queries`、`check`、`priorArtQueries`、`priorArtCheck`、`amendment`）、`passage?`、`model?`、`requestedModel?`、`usage`（`promptTokens`、`completionTokens`、`calls`、`unmeteredCalls?`、`unmeteredTokens?`：呼び出しとその修復で 1 つのイベント）、`failed?`（応答が使えなかった理由）。コストと期間ごとの予算に数えられる |
-| `study.drift_rejected` | `passage`、`collection`、`item`（`id?`、`statement?`、`servesObjective?`）、`reason`、`by`（`guardian`：目的から外れていると判定された。`schema`：その前に拒否された。たとえば `servesObjective` がない）、`attempt`（やり直しでは 2） |
-| `study.amendment_accepted` / `study.amendment_refused` | `number?`（受け入れられた場合のみ）、`text`、`verdict`（`refines`、`conflicts`、`changesObjective`、`unclassified`）、`accepted`、`reason`、`charterHash`。追加指示専用の実行に記録される |
+| `study.drift_rejected` | `passage`、`collection`、`item`（`id?`、`statement?`、`servesObjective?`）、`reason`（`code`、`params?`、`message`）、`by`（`guardian`：目的から外れていると判定された。`schema`：その前に拒否された。たとえば `servesObjective` がない）、`attempt`（やり直しでは 2） |
+| `study.capability_demoted` | `passage`、`item`（アーキテクチャの ID）、`name`、`reason`（`code`、`params?`、`message`）：より速い、あるいは安いだけだと監視役が判断し、改良になった能力 |
+| `study.amendment_accepted` / `study.amendment_refused` | `number?`（受け入れられた場合のみ）、`text`、`verdict`（`refines`、`conflicts`、`changesObjective`、`unclassified`）、`accepted`、`reason`（`code`、`params?`、`message`。`unclassified` の場合は `amendmentUnclassified`、`amendmentTimedOut`、`amendmentCancelled`、`amendmentPolicy` のいずれか）、`charterHash`。追加指示専用の実行に記録される |
 | `study.result_recorded` | `card`、`resultAndError`（`result`、`error?`）、`conclusionAndMemory?`。カードを書いた実行に、その終了後に追記される |
-| `study.completed` | `status`、`passages`（`passage`、`state`）、`stats` |
-| `study.failed` | `status`（`stopped`、`failed`、`cancelled` のいずれか）、`stoppedBy?`、`error`、`passages`、`stats`、`partial: true`。その後に `run.failed` または `run.cancelled` |
+| `study.completed` | `status`、`passages`（`passage`、`state`）、この実行の `stats`（ベンダーが応答した `modelCalls`、`searches`、`searchesSkipped`、`redos`、`loops`、`steps`） |
+| `study.failed` | `status`（`stopped`、`failed`、`cancelled` のいずれか）、`stoppedBy?`、`error`、`passages`、この実行の `stats`、`partial: true`。その後に `run.failed` または `run.cancelled` |
 
-`study.model_called` は、`getRunCost` と予算が研究について読むイベントです。2 つの実行を比較するとき、研究のイベントは工程ごとに対応づけられ（`study.model_called` は用途と工程ごと）、`study.model_called` の `usage` は比較されません。
+`study.model_called` は、`getRunCost` と予算が研究について読むイベントです。2 つの実行を比較するとき、研究のイベントは工程ごとに対応づけられ（`study.model_called` は用途と工程ごと）、`study.model_called` の `usage` は比較されません。追加指示の実行には、`run.started`、予算のポリシーが分類を拒否した場合は `policy.violated`、ベンダーが応答した場合は `study.model_called`、追加指示のイベント、そして `run.completed` が含まれます。
 
 ## 運用 {#operations}
 

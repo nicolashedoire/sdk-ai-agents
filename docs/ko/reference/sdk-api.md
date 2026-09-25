@@ -175,15 +175,15 @@ interface OutcomeEvaluator {
 
 | 멤버 | |
 | --- | --- |
-| `id` | `study_…`, 연구마다 새로 생깁니다. 연구 이벤트의 `metadata.agentId`이자, 예산과 도구 호출의 에이전트 id입니다 |
+| `id` | `study_…`, 연구마다 새로 생깁니다. 연구 이벤트의 `metadata.agentId`이자, 예산, 정책, 도구 호출의 에이전트 id입니다 |
 | `name`, `language`, `charter`, `charterHash` | 이름, 언어, 고정된 `StudyCharter`, 그리고 그 SHA-256(16진수)으로, `study.started`와 각 개정안에 기록됩니다 |
 | `amendments` | `StudyAmendment[]`: 수락된 것과 거부된 것, 순서대로 |
-| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`. 완료되지 않은 첫 과정부터, `restart`를 주면 첫 과정부터 과정들을 실행합니다. 한도, 정책, 취소, 오류는 실행을 그 상태와 함께, 한 일의 보고서와 함께 끝냅니다. 예외를 던지는 경우는 이미 진행 중인 실행, 처리할 수 없는 `onEvent`, 실패하는 이벤트 저장소뿐입니다. `onEvent`는 `agent.run`에서와 똑같이 동작합니다 |
-| `amend(text)` | `Promise<StudyAmendment>`. 자체 실행(`mode: 'study-amendment'`)에서 헌장에 비추어 분류됩니다. `refines`만 수락되며, 이후의 모든 프롬프트에 표시됩니다 |
+| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`. 마지막 실행이 멈춘 곳에서 재개합니다. 먼저 감시자가 그 실행이 판단하지 않고 남긴 것을 판단하고, 판단은 되었지만 끝나지 않은 과정은 마무리만 하며, 그다음 완료되지 않은 과정들이 실행됩니다. `restart`는 연구를 처음부터 다시 시작합니다. 과정, 결과, 검색, 이탈 기록, 번호 매기기, 실행이 지워지고, 헌장과 개정안은 남습니다. 한도, 정책, 취소, 오류는 실행을 그 상태와 함께, 한 일의 보고서와 함께 끝냅니다. 예외를 던지는 경우는 이미 진행 중인 실행, 처리할 수 없는 `onEvent`, 실패하는 이벤트 저장소뿐입니다. `onEvent`는 `agent.run`에서와 똑같이 동작합니다 |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`. 자체 실행(`mode: 'study-amendment'`)에서 오직 헌장에만 비추어 분류되며, 앞선 개정안에 비추어 분류되는 일은 절대 없습니다. 그 실행에서는 예산 정책이 먼저 검사됩니다. `refines`만 수락되며, 이후의 모든 프롬프트에 표시됩니다. `timeoutMs`(기본값 60 000)와 `signal`이 분류에 한도를 둡니다. 그 한도를 넘거나 정책이 분류를 거부하면, 개정안은 `unclassified`로 거부됩니다. 빈 텍스트, `MAX_AMENDMENT_LENGTH`(500자)보다 긴 텍스트, 또는 이미 `MAX_AMENDMENTS`(10)개의 개정안이 수락된 경우에는 `ValidationError`를 던집니다 |
 | `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`. 카드의 10번과 11번 필드를 채우고, 그 카드를 작성한 실행에 `study.result_recorded`를 기록합니다. 알 수 없는 카드나 빈 `result`에는 `ValidationError` |
 | `report()` | `StudyReport`: 현재 상태의 보고서로, 마지막 실행 이후에 기록된 결과를 포함합니다 |
 
-`Study`와 `StudyEnvironment`(연구가 SDK에서 쓰는 것: 프로바이더, 이벤트 저장소, 실시간 이벤트, 정책 엔진, 통제된 도구)는 커스텀 구성을 위해 export되어 있습니다.
+연구는 `sdk.createStudy`로 만듭니다. `Study` 클래스는 그 타입을 위해 export되어 있으며, 연구를 구성하는 데 쓰이는 것은 내부 구현입니다. `MAX_AMENDMENTS`와 `MAX_AMENDMENT_LENGTH`도 export되어 있고, `amend`의 옵션 타입인 `StudyAmendOptions`도 마찬가지입니다.
 
 ### `StudyResult` {#studyresult}
 
@@ -228,7 +228,7 @@ interface StudyReport {
   searches: StudySearch[];
   driftLog: StudyDriftEntry[];
   stats: StudyStats;
-  runIds: string[];                             // runs and amendment runs, oldest first
+  runIds: string[];                             // runs of run() since the last restart, oldest first
 }
 
 interface StudyClaim {
@@ -237,16 +237,41 @@ interface StudyClaim {
   statement: string;
   status: 'established' | 'hypothesis' | 'novelty'; // after the study's checks
   declaredStatus?: StudyClaimStatus;                // the model's, when the study changed it
-  statusReason?: string;
-  sources: string[];                                // results retrieved in this study
-  unretrievedSources?: string[];                    // cited, never retrieved: they support nothing
+  statusReason?: StudyReason;
+  sources: string[];                                // results listed in the prompt that wrote it
+  unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
   servesObjective: string;
   toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
   priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
-  unchecked?: boolean;                              // the guardian had not judged it when the run stopped
+  unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
   runId: string;
 }
+
+interface StudyReason {
+  code: StudyReasonCode;
+  params?: Record<string, string>;
+  message: string;                                  // the same reason, in English
+}
+
+interface StudyTrace {
+  from: string[];                                   // records of the investigation it comes from
+  unknownFrom?: string[];                           // cited, not listed in the design's prompt
+  untraced?: boolean;                               // it cites none of the listed records
+}
 ```
+
+보고서의 모든 이유는 `StudyReason`입니다. 주장과 구성 요소의 `statusReason`, 이탈 항목과 개정안의 `reason`, 그리고 격하된 아키텍처의 `kindReason`입니다. 자료집은 그 `code`를 연구의 언어로 표시합니다(`studyLabels(language).reasons`). 감시자나 모델이 쓴 텍스트는 코드가 `judged`이며, 텍스트는 `params.text`에 있습니다. 코드(`StudyReasonCode`)는 다음과 같습니다.
+
+| 코드 | 이유 |
+| --- | --- |
+| `noSourceConfigured`, `citesUnlisted`, `citesNothing` | `hypothesis`로 낮춰진 `established` 주장이나 구성 요소. 소스가 없거나, 그 프롬프트에 나열된 id가 하나도 없음 |
+| `noveltyNotSearchedYet`, `noveltyNoSource`, `noveltySearchBudget`, `noveltyNotSearched`, `noveltySearchFailed`, `noveltyNoResult`, `noveltyNotAssessed`, `noveltyUnsupported` | 신규 주장이 아직 검증 대상인 이유 |
+| `priorArtExists` | `hypothesis`로 낮춰진 신규 주장. 가장 가까운 작업이 이미 그것을 실현함 |
+| `componentDocumented`, `componentUndocumented` | 새것으로 제시된 구성 요소 |
+| `noServesObjective`, `invalidItem`, `notAnObject`, `notAUserLead`, `leadAlreadyJudged` | 스키마가 거부한 항목 |
+| `designWithoutCapability` | 새로운 역량이 하나도 없는 설계 |
+| `amendmentUnclassified`, `amendmentCancelled`, `amendmentTimedOut`, `amendmentPolicy` | 분류할 수 없었던 개정안 |
+| `judged` | 감시자나 모델 자신의 말 |
 
 모든 항목은 고유 필드를 가진 `StudyClaim`입니다.
 
@@ -260,12 +285,12 @@ interface StudyClaim {
 | `StudyLeadVerdict` | `lead`(헌장에 적힌 그대로), `verdict`(`relevant`, `partlyRelevant`, `notRelevant`), `reasons` |
 | `StudyIndependentLead` | `tool`, `kind`(`mathematical`, `technical`, `other`), `piece?` |
 | `StudyReference` | `name`, `piece?`, `date?` |
-| `StudyAnalogue` | `breakthrough`, `domain?`, `date?`, `components`(두 개 이상의 `{ name, date? }`), `liftedConstraint`, `capability`, `pattern` |
+| `StudyAnalogue` | `breakthrough`, `named?`(이 항목이 해체하는 헌장 속 혁신의 번호), `domain?`, `date?`, `components`(두 개 이상의 `{ name, date? }`), `liftedConstraint`, `capability`, `pattern` |
 | `StudyConstraint` | `constraint`, `state`(`remains`, `weakened`, `newRequirement`), `piece?` |
 | `StudyRevisableDecision` | `decision`, `because`(바뀐 조건), `opens` |
 | `StudyCombination` | `a`, `b`, `enables`(A가 B에게 가능하게 하는 것), `exchange`, `cost`, `changes`(`representation`, `distribution`, `responsibilities`) |
 | `StudyCapability` | `capability`, `forWhom`, `hardToday`, `principle?` |
-| `StudyArchitecture` | `name`, `kind`(`capability` 또는 `improvement`), `declaredKind?`, `capability`(`what`, `forWhom`, `liftedConstraint`), `principleChange?`(`principle`: `representation`, `distribution`, `responsibility`, `trust`, `verification` 또는 `other`. 그리고 `change`), `mechanism`, `components`(`StudyComponent[]`: `name`, `statement`, `date?`, `status`, `declaredStatus?`, `statusReason?`, `sources`, `unretrievedSources?`), `assembly`(`component`, `gives`, `exchanges`, `cost`), `conditions`, `benefit`, `addedCost`, `counterexample`, `chain`(`stage`, `how`), `uncoveredStages`(연구가 검사한 결과, 이 아키텍처가 다루지 않는 전체 사슬의 단계), `predictions` |
+| `StudyArchitecture` | `name`, `kind`(`capability` 또는 `improvement`), `declaredKind?`와 `kindReason?`(감시자가 단지 더 빠르거나 더 싸다고 판단한 역량), `capability`(`what`, `forWhom`, `liftedConstraint`), `principleChange?`(`principle`: `representation`, `distribution`, `responsibility`, `trust`, `verification` 또는 `other`. 그리고 `change`), `mechanism`, `components`(`StudyComponent[]`: `name`, `statement`, `date?`, `status`, `declaredStatus?`, `statusReason?`, `sources`, `unlistedSources?`, 그리고 `StudyTrace`), `assembly`(`component`, `gives`, `exchanges`, `cost`, 그리고 `StudyTrace`), `conditions`, `benefit`, `addedCost`, `counterexample`, `chain`(`stage`, `how`), `uncoveredStages`(연구가 검사한 결과, 이 아키텍처가 다루지 않는 전체 사슬의 단계), `predictions` |
 | `StudyThreeState` | `piece`, `state`(`atItsTime`, `currentBest`, `proposal`), `architecture?` |
 | `StudyNoveltyClaim` | `architecture?` |
 | `StudyExperiment` | `name`, `architectures`, `protocol`, `measures`, `criteria`, `expected`(`architecture`, `result`), `wholeChain` |
@@ -275,13 +300,13 @@ interface StudyClaim {
 
 | 타입 | 필드 |
 | --- | --- |
-| `StudyAmendment` | `number?`(수락된 경우만, 1부터), `text`, `verdict`(`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason`, `runId` |
-| `StudyDriftEntry` | `passage`, `collection`, `item`(`id?`, `statement?`, `servesObjective?`), `reason`, `by`(`guardian`: 목표를 벗어남. `schema`: 그 전에 거부됨, 예를 들어 `servesObjective`가 없음), `attempt`(재수행에서는 2), `runId` |
-| `StudySearchResult` | `id`(`S1`…, 같은 결과를 다시 찾으면 유지됨), `title`, `locator`(URL 또는 다른 위치 정보), `date?`, `excerpt`, `tool`, `query`, `runId` |
+| `StudyAmendment` | `number?`(수락된 경우만, 1부터), `text`, `verdict`(`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason`(`StudyReason`), `runId` |
+| `StudyDriftEntry` | `passage`, `collection`, `item`(`id?`, `statement?`, `servesObjective?`), `reason`(`StudyReason`), `by`(`guardian`: 목표를 벗어남. `schema`: 그 전에 거부됨, 예를 들어 `servesObjective`가 없음), `attempt`(재수행에서는 2), `runId` |
+| `StudySearchResult` | `id`(`S1`…, 같은 결과를 다시 찾으면 다시 시작하기 전까지 유지됨), `title`, `locator`(URL 또는 다른 위치 정보), `date?`, `excerpt`, `tool`, `query`, `runId` |
 | `StudySearch` | `passage`, `purpose`(`research` 또는 `priorArt`), `tool`, `query`, `servesObjective`, `claims?`, `resultIds`, `error?`, `skipped?`(`maxSearches`), `runId` |
-| `StudyPassageState` | `passage`, `state`(`complete`, `partial`: 판단은 되었지만 과정이 끝나기 전에 실행이 멈춤, `unchecked`: 아직 판단되지 않은 항목, `notRun`), `attempts`(재수행 뒤에는 2), `reopenedBy`, `runId?` |
-| `StudyNotice` | `code`(`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noCapability`, `noveltiesToVerify`), `message`(영어), `details?` |
-| `StudyStats` | `runs`, `modelCalls`, `searches`, `searchesSkipped`, `results`, `items`, `rejected`, `byStatus`(상태별), `downgraded`(연구가 상태를 낮춘 주장), `noveltiesToVerify`, `redos`, `loops` — 연구의 모든 실행에 대한 값 |
+| `StudyPassageState` | `passage`, `state`(`complete`. `partial`: 판단은 되었지만 끝나지 않음, 즉 루프를 기다리고 있거나 선행 기술 검색이 중간에 끊김. `unchecked`: 감시자가 판단하지 않은 항목. `notRun`), `attempts`(재수행 뒤에는 2), `reopenedBy`, `runId?` |
+| `StudyNotice` | `code`(`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noDesign`, `noCapability`, `minimumsNotMet`, `untracedAssembly`, `noveltiesToVerify`), `params?`(`limit`, `error`, `count`), `details?`(해당하는 과정, `passage.collection` 쌍, 단서, 혁신 또는 아키텍처), `message`(영어. 자료집은 코드를 자신의 언어로 표시함) |
+| `StudyStats` | 마지막으로 다시 시작한 이후: `runs`와 `modelCalls`(`run()`의 실행, 그리고 그 안에서 벤더가 응답한 호출), `searches`, `searchesSkipped`, `results`, `items`, `rejected`, `byStatus`(상태별), `downgraded`(연구가 상태를 낮춘 주장), `noveltiesToVerify`, `redos`, `loops`. 그리고 `amendments`(`count`, `modelCalls`): 연구의 모든 개정안을 따로 센 값 |
 
 ### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}
 

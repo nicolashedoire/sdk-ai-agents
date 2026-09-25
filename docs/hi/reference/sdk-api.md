@@ -175,15 +175,15 @@ interface OutcomeEvaluator {
 
 | सदस्य | |
 | --- | --- |
-| `id` | `study_…`, हर अध्ययन के लिए नया: उसके इवेंट्स का `metadata.agentId`, और उसके बजट और टूल कॉल का एजेंट id |
+| `id` | `study_…`, हर अध्ययन के लिए नया: उसके इवेंट्स का `metadata.agentId`, और उसके बजट, नीतियों और टूल कॉल का एजेंट id |
 | `name`, `language`, `charter`, `charterHash` | नाम, भाषा, फ़्रीज़ किया गया `StudyCharter`, और उसका SHA-256 (hexadecimal), जो `study.started` में और हर संशोधन के साथ दर्ज होता है |
 | `amendments` | `StudyAmendment[]`: स्वीकार और अस्वीकार किए गए, क्रम से |
-| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`। पहले अधूरे चरण से चरण चलाता है, या `restart` के साथ पहले चरण से। कोई सीमा, नीति, रद्दीकरण या error run को उसकी स्थिति और अब तक किए गए काम की रिपोर्ट के साथ खत्म करता है; यह error सिर्फ़ तब फेंकता है जब कोई run पहले से चल रहा हो, `onEvent` सर्व न किया जा सके, या इवेंट स्टोर विफल हो। `onEvent` वैसे ही काम करता है जैसे `agent.run` के साथ |
-| `amend(text)` | `Promise<StudyAmendment>`। एक अलग run (`mode: 'study-amendment'`) में चार्टर के सामने वर्गीकृत किया जाता है; सिर्फ़ `refines` स्वीकार होता है, और वह बाद के हर prompt में दिखता है |
+| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`। वहीं से फिर शुरू होता है जहाँ पिछला run रुका था: सबसे पहले संरक्षक वह परखता है जो उस run ने बिना परखे छोड़ा था, जो चरण परखा जा चुका है पर पूरा नहीं हुआ वह सिर्फ़ पूरा होता है, फिर अधूरे चरण चलते हैं। `restart` अध्ययन को नए सिरे से शुरू करता है: चरण, परिणाम, खोजें, भटकाव लॉग, क्रमांकन और runs साफ़ कर दिए जाते हैं; चार्टर और संशोधन बचे रहते हैं। कोई सीमा, नीति, रद्दीकरण या error run को उसकी स्थिति और अब तक किए गए काम की रिपोर्ट के साथ खत्म करता है; यह error सिर्फ़ तब फेंकता है जब कोई run पहले से चल रहा हो, `onEvent` सर्व न किया जा सके, या इवेंट स्टोर विफल हो। `onEvent` वैसे ही काम करता है जैसे `agent.run` के साथ |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`। सिर्फ़ चार्टर के सामने वर्गीकृत किया जाता है, पहले के संशोधनों के सामने कभी नहीं, एक अलग run (`mode: 'study-amendment'`) में, जिसमें पहले बजट नीतियाँ जाँची जाती हैं; सिर्फ़ `refines` स्वीकार होता है, और वह बाद के हर prompt में दिखता है। `timeoutMs` (डिफ़ॉल्ट 60 000) और `signal` वर्गीकरण की सीमा तय करते हैं: उनके पार होने पर, या जब कोई नीति उसे ठुकरा दे, संशोधन `unclassified` के रूप में ठुकरा दिया जाता है। खाली टेक्स्ट पर, `MAX_AMENDMENT_LENGTH` (500 अक्षर) से लंबे टेक्स्ट पर, या `MAX_AMENDMENTS` (10) संशोधन स्वीकार हो जाने के बाद `ValidationError` फेंकता है |
 | `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`। किसी कार्ड के फ़ील्ड 10 और 11 भरता है और उसे लिखने वाले run में `study.result_recorded` दर्ज करता है; अज्ञात कार्ड या खाली `result` पर `ValidationError` |
 | `report()` | `StudyReport`: रिपोर्ट अपनी मौजूदा हालत में, पिछले run के बाद दर्ज परिणामों समेत |
 
-`Study` और `StudyEnvironment` (अध्ययन SDK से जो इस्तेमाल करता है: उसका प्रदाता, इवेंट स्टोर, लाइव इवेंट, नीति इंजन और नियंत्रित टूल) कस्टम सेटअप के लिए export किए जाते हैं।
+अध्ययन `sdk.createStudy` से बनाया जाता है: `Study` class उसके टाइप के लिए export की जाती है, और वह जिन चीज़ों से बनता है वे आंतरिक हैं। `MAX_AMENDMENTS` और `MAX_AMENDMENT_LENGTH` export किए जाते हैं, और `StudyAmendOptions` भी, जो `amend` के विकल्पों का टाइप है।
 
 ### `StudyResult` {#studyresult}
 
@@ -228,7 +228,7 @@ interface StudyReport {
   searches: StudySearch[];
   driftLog: StudyDriftEntry[];
   stats: StudyStats;
-  runIds: string[];                             // runs and amendment runs, oldest first
+  runIds: string[];                             // runs of run() since the last restart, oldest first
 }
 
 interface StudyClaim {
@@ -237,16 +237,41 @@ interface StudyClaim {
   statement: string;
   status: 'established' | 'hypothesis' | 'novelty'; // after the study's checks
   declaredStatus?: StudyClaimStatus;                // the model's, when the study changed it
-  statusReason?: string;
-  sources: string[];                                // results retrieved in this study
-  unretrievedSources?: string[];                    // cited, never retrieved: they support nothing
+  statusReason?: StudyReason;
+  sources: string[];                                // results listed in the prompt that wrote it
+  unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
   servesObjective: string;
   toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
   priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
-  unchecked?: boolean;                              // the guardian had not judged it when the run stopped
+  unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
   runId: string;
 }
+
+interface StudyReason {
+  code: StudyReasonCode;
+  params?: Record<string, string>;
+  message: string;                                  // the same reason, in English
+}
+
+interface StudyTrace {
+  from: string[];                                   // records of the investigation it comes from
+  unknownFrom?: string[];                           // cited, not listed in the design's prompt
+  untraced?: boolean;                               // it cites none of the listed records
+}
 ```
+
+रिपोर्ट का हर कारण एक `StudyReason` है: दावों और घटकों का `statusReason`, भटकाव entries और संशोधनों का `reason`, और दर्जा घटाए गए आर्किटेक्चर का `kindReason`। डोज़ियर उसके `code` को अध्ययन की भाषा में लिखता है (`studyLabels(language).reasons`); संरक्षक या मॉडल द्वारा लिखे गए टेक्स्ट का कोड `judged` होता है, और टेक्स्ट `params.text` में। कोड (`StudyReasonCode`):
+
+| कोड | क्यों |
+| --- | --- |
+| `noSourceConfigured`, `citesUnlisted`, `citesNothing` | `hypothesis` तक घटाया गया `established` दावा या घटक: कोई स्रोत नहीं, या उसके prompt में सूचीबद्ध कोई id नहीं |
+| `noveltyNotSearchedYet`, `noveltyNoSource`, `noveltySearchBudget`, `noveltyNotSearched`, `noveltySearchFailed`, `noveltyNoResult`, `noveltyNotAssessed`, `noveltyUnsupported` | किसी नवीनता की जाँच अभी क्यों बाकी है |
+| `priorArtExists` | `hypothesis` तक घटाई गई नवीनता: सबसे नज़दीकी काम पहले ही यह करता है |
+| `componentDocumented`, `componentUndocumented` | नया बताया गया घटक |
+| `noServesObjective`, `invalidItem`, `notAnObject`, `notAUserLead`, `leadAlreadyJudged` | स्कीमा द्वारा ठुकराया गया आइटम |
+| `designWithoutCapability` | बिना किसी नई क्षमता वाला डिज़ाइन |
+| `amendmentUnclassified`, `amendmentCancelled`, `amendmentTimedOut`, `amendmentPolicy` | ऐसा संशोधन जिसे वर्गीकृत नहीं किया जा सका |
+| `judged` | संरक्षक या मॉडल के अपने शब्द |
 
 हर आइटम एक `StudyClaim` है, जिसके अपने फ़ील्ड भी होते हैं:
 
@@ -260,12 +285,12 @@ interface StudyClaim {
 | `StudyLeadVerdict` | `lead` (जैसा चार्टर उसे लिखता है), `verdict` (`relevant`, `partlyRelevant`, `notRelevant`), `reasons` |
 | `StudyIndependentLead` | `tool`, `kind` (`mathematical`, `technical`, `other`), `piece?` |
 | `StudyReference` | `name`, `piece?`, `date?` |
-| `StudyAnalogue` | `breakthrough`, `domain?`, `date?`, `components` (दो या ज़्यादा `{ name, date? }`), `liftedConstraint`, `capability`, `pattern` |
+| `StudyAnalogue` | `breakthrough`, `named?` (चार्टर की उस सफलता का क्रमांक जिसे यह विखंडित करता है), `domain?`, `date?`, `components` (दो या ज़्यादा `{ name, date? }`), `liftedConstraint`, `capability`, `pattern` |
 | `StudyConstraint` | `constraint`, `state` (`remains`, `weakened`, `newRequirement`), `piece?` |
 | `StudyRevisableDecision` | `decision`, `because` (वह शर्त जो बदली), `opens` |
 | `StudyCombination` | `a`, `b`, `enables` (A, B को क्या करने देता है), `exchange`, `cost`, `changes` (`representation`, `distribution`, `responsibilities`) |
 | `StudyCapability` | `capability`, `forWhom`, `hardToday`, `principle?` |
-| `StudyArchitecture` | `name`, `kind` (`capability` या `improvement`), `declaredKind?`, `capability` (`what`, `forWhom`, `liftedConstraint`), `principleChange?` (`principle`: `representation`, `distribution`, `responsibility`, `trust`, `verification` या `other`; `change`), `mechanism`, `components` (`StudyComponent[]`: `name`, `statement`, `date?`, `status`, `declaredStatus?`, `statusReason?`, `sources`, `unretrievedSources?`), `assembly` (`component`, `gives`, `exchanges`, `cost`), `conditions`, `benefit`, `addedCost`, `counterexample`, `chain` (`stage`, `how`), `uncoveredStages` (पूरी श्रृंखला की वे कड़ियाँ जिन्हें यह छोड़ देता है, जैसा अध्ययन ने जाँचा), `predictions` |
+| `StudyArchitecture` | `name`, `kind` (`capability` या `improvement`), `declaredKind?` और `kindReason?` (ऐसी क्षमता जिसे संरक्षक ने सिर्फ़ तेज़ या सस्ता माना), `capability` (`what`, `forWhom`, `liftedConstraint`), `principleChange?` (`principle`: `representation`, `distribution`, `responsibility`, `trust`, `verification` या `other`; `change`), `mechanism`, `components` (`StudyComponent[]`: `name`, `statement`, `date?`, `status`, `declaredStatus?`, `statusReason?`, `sources`, `unlistedSources?`, और एक `StudyTrace`), `assembly` (`component`, `gives`, `exchanges`, `cost`, और एक `StudyTrace`), `conditions`, `benefit`, `addedCost`, `counterexample`, `chain` (`stage`, `how`), `uncoveredStages` (पूरी श्रृंखला की वे कड़ियाँ जिन्हें यह छोड़ देता है, जैसा अध्ययन ने जाँचा), `predictions` |
 | `StudyThreeState` | `piece`, `state` (`atItsTime`, `currentBest`, `proposal`), `architecture?` |
 | `StudyNoveltyClaim` | `architecture?` |
 | `StudyExperiment` | `name`, `architectures`, `protocol`, `measures`, `criteria`, `expected` (`architecture`, `result`), `wholeChain` |
@@ -275,13 +300,13 @@ interface StudyClaim {
 
 | टाइप | फ़ील्ड |
 | --- | --- |
-| `StudyAmendment` | `number?` (सिर्फ़ स्वीकार किए गए, 1 से), `text`, `verdict` (`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason`, `runId` |
-| `StudyDriftEntry` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason`, `by` (`guardian`: उद्देश्य से भटका हुआ; `schema`: पहले ही ठुकराया गया, जैसे `servesObjective` के बिना), `attempt` (दोबारा करने पर 2), `runId` |
-| `StudySearchResult` | `id` (`S1`…, वही परिणाम दोबारा मिलने पर बना रहता है), `title`, `locator` (एक URL या कोई दूसरा पता), `date?`, `excerpt`, `tool`, `query`, `runId` |
+| `StudyAmendment` | `number?` (सिर्फ़ स्वीकार किए गए, 1 से), `text`, `verdict` (`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason` (`StudyReason`), `runId` |
+| `StudyDriftEntry` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason` (`StudyReason`), `by` (`guardian`: उद्देश्य से भटका हुआ; `schema`: पहले ही ठुकराया गया, जैसे `servesObjective` के बिना), `attempt` (दोबारा करने पर 2), `runId` |
+| `StudySearchResult` | `id` (`S1`…, वही परिणाम दोबारा मिलने पर बना रहता है, नए सिरे से शुरू करने तक), `title`, `locator` (एक URL या कोई दूसरा पता), `date?`, `excerpt`, `tool`, `query`, `runId` |
 | `StudySearch` | `passage`, `purpose` (`research` या `priorArt`), `tool`, `query`, `servesObjective`, `claims?`, `resultIds`, `error?`, `skipped?` (`maxSearches`), `runId` |
-| `StudyPassageState` | `passage`, `state` (`complete`; `partial`: परखा गया पर run उसके अंत से पहले रुक गया; `unchecked`: आइटम अभी परखे नहीं गए; `notRun`), `attempts` (दोबारा करने के बाद 2), `reopenedBy`, `runId?` |
-| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noCapability`, `noveltiesToVerify`), `message` (अंग्रेज़ी में), `details?` |
-| `StudyStats` | `runs`, `modelCalls`, `searches`, `searchesSkipped`, `results`, `items`, `rejected`, `byStatus` (हर स्थिति के लिए), `downgraded` (वे दावे जिनकी स्थिति अध्ययन ने घटाई), `noveltiesToVerify`, `redos`, `loops` — अध्ययन के सभी runs के लिए |
+| `StudyPassageState` | `passage`, `state` (`complete`; `partial`: परखा गया पर पूरा नहीं हुआ, अपने चक्र के इंतज़ार में या अपनी पूर्व कार्य की खोज बीच में कट जाने के कारण; `unchecked`: वे आइटम जिन्हें संरक्षक ने नहीं परखा; `notRun`), `attempts` (दोबारा करने के बाद 2), `reopenedBy`, `runId?` |
+| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noDesign`, `noCapability`, `minimumsNotMet`, `untracedAssembly`, `noveltiesToVerify`), `params?` (`limit`, `error`, `count`), `details?` (संबंधित चरण, `passage.collection` जोड़े, सुराग, सफलताएँ या आर्किटेक्चर), `message` (अंग्रेज़ी में; डोज़ियर कोड को अपनी भाषा में लिखता है) |
+| `StudyStats` | पिछली बार नए सिरे से शुरू करने के बाद से: `runs` और `modelCalls` (`run()` के runs, और उनमें वे कॉल जिनका विक्रेता ने जवाब दिया), `searches`, `searchesSkipped`, `results`, `items`, `rejected`, `byStatus` (हर स्थिति के लिए), `downgraded` (वे दावे जिनकी स्थिति अध्ययन ने घटाई), `noveltiesToVerify`, `redos`, `loops`। और `amendments` (`count`, `modelCalls`): अध्ययन का हर संशोधन, अलग गिना गया |
 
 ### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}
 
