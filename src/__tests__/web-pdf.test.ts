@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { pdfText, UNPDF_MISSING } from '../tools/web/pdf-text.js';
+import { WebRequestRefusedError, WebTimeoutError } from '../tools/web/web-errors.js';
 import type { WebFetchOutput } from '../tools/web/web-fetch.js';
 import { type WebToolsOptions, webTools } from '../tools/web/web-tools.js';
-import { tinyPdf } from './support/tiny-pdf.js';
+import { flateBombPdf, tinyPdf } from './support/tiny-pdf.js';
 import { reply, WebServer } from './support/web-server.js';
 
 const PAPER = tinyPdf(['Fragments make layout immutable.', 'Results are reused across frames.'], {
@@ -68,12 +69,25 @@ describe('web_fetch on a PDF', () => {
     });
   });
 
-  it('refuses a PDF larger than maxPdfBytes before downloading it', async () => {
-    server.on('/big.pdf', reply(PAPER, { type: 'application/pdf' }));
+  it('refuses a PDF larger than maxPdfBytes by its Content-Length, before reading its body', async () => {
+    let bodyStarted = false;
+    server.on('/big.pdf', (_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/pdf', 'content-length': '50000000' });
+      response.flushHeaders();
+      // The body would come a second later: a client that waits for it has not refused early.
+      setTimeout(() => {
+        if (response.destroyed) return;
+        bodyStarted = true;
+        response.end(Buffer.alloc(1_000));
+      }, 1_000);
+    });
+    const started = Date.now();
 
     await expect(fetchPdf(`${server.url}/big.pdf`, { maxPdfBytes: 100 })).rejects.toThrow(
       `${server.url}/big.pdf is a PDF larger than 100 bytes (maxPdfBytes): refused`
     );
+    expect(Date.now() - started).toBeLessThan(500);
+    expect(bodyStarted).toBe(false);
   });
 
   it('stops reading a PDF streamed past maxPdfBytes (no Content-Length), and refuses it', async () => {
@@ -104,6 +118,49 @@ describe('web_fetch on a PDF', () => {
     await expect(fetchPdf(`${server.url}/blob`)).rejects.toThrow(
       'is application/octet-stream and not a PDF'
     );
+  });
+
+  describe('a Flate bomb: a small PDF that inflates to hundreds of MB', () => {
+    let bomb: Buffer;
+    beforeAll(async () => {
+      bomb = await flateBombPdf(400);
+    }, 30_000);
+
+    it('is read in a worker stopped past its memory limit, the process never blocked', async () => {
+      let ticks = 0;
+      const ticker = setInterval(() => ticks++, 10);
+      const started = Date.now();
+      let error: unknown;
+      try {
+        await pdfText(bomb, { maxPages: 30, maxMemoryMb: 64 });
+      } catch (caught) {
+        error = caught;
+      }
+      clearInterval(ticker);
+      const elapsed = Date.now() - started;
+
+      expect(error).toBeInstanceOf(WebRequestRefusedError);
+      expect((error as Error).message).toBe('The PDF needs more than 64 MB of memory to read: refused');
+      expect(elapsed).toBeLessThan(10_000);
+      // The main thread kept running while the worker decoded: timers fired all along.
+      expect(ticks).toBeGreaterThan(elapsed / 10 / 3);
+    }, 20_000);
+
+    it('is stopped at its time limit', async () => {
+      const started = Date.now();
+
+      await expect(pdfText(bomb, { maxPages: 30, timeoutMs: 150 })).rejects.toThrow(
+        new WebTimeoutError('Reading the PDF took more than 150 ms')
+      );
+      expect(Date.now() - started).toBeLessThan(1_500);
+    });
+
+    it('is stopped when the call is cancelled', async () => {
+      const cancel = new AbortController();
+      setTimeout(() => cancel.abort(new Error('caller gave up')), 100);
+
+      await expect(pdfText(bomb, { maxPages: 30, signal: cancel.signal })).rejects.toThrow('caller gave up');
+    });
   });
 
   it('says how to install unpdf when it is missing', async () => {

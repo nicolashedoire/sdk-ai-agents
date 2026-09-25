@@ -108,7 +108,10 @@ export async function fetchPage(
   if (contentType === 'application/pdf' || contentType === 'application/x-pdf') {
     // A cut PDF has lost its cross-reference table: it cannot be read at all.
     if (response.truncated) throw tooLarge(response.url, settings.maxPdfBytes);
-    const pdf = await pdfText(response.body, { maxPages: settings.maxPdfPages });
+    const pdf = await pdfText(response.body, {
+      maxPages: settings.maxPdfPages,
+      ...(settings.signal ? { signal: settings.signal } : {}),
+    });
     return {
       url,
       finalUrl: response.url,

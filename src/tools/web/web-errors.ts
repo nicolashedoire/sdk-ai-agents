@@ -55,9 +55,25 @@ export class SearchThrottledError extends Error {
   }
 }
 
-/** Worth retrying: 429, server errors, timeouts and network failures — not refusals or 4xx. */
+/**
+ * A setup the call cannot work with: an optional package missing, a token a search needs.
+ * Never retried: the same call fails again until the setup changes.
+ */
+export class WebConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'WebConfigurationError';
+  }
+}
+
+/**
+ * Worth retrying: 429, server errors, timeouts and network failures — not refusals, 4xx or
+ * a missing setup.
+ */
 export function isRetryableWebError(error: Error): boolean {
-  if (error instanceof WebRequestRefusedError) return false;
+  if (error instanceof WebRequestRefusedError || error instanceof WebConfigurationError) {
+    return false;
+  }
   if (error instanceof WebHttpError) return error.status === 429 || error.status >= 500;
   return true;
 }
