@@ -103,9 +103,10 @@ export async function flateBombPdf(
 /**
  * A PDF as real ones are: pages of Flate-compressed text, a JPEG image drawn on each page (its
  * DCT data, which text extraction never decodes), and a large binary stream (as an embedded
- * font would be). About 2 MB for the default 15 pages.
+ * font would be). About 1.6 MB for the default 15 pages. With `indirectLength`, every stream's
+ * `/Length` is a reference to an object written after it, as pdfTeX writes them.
  */
-export function realisticPdf(pages = 15): Buffer {
+export function realisticPdf(pages = 15, options: { indirectLength?: boolean } = {}): Buffer {
   const parts: Buffer[] = [];
   let length = 0;
   const offsets: number[] = [];
@@ -113,20 +114,28 @@ export function realisticPdf(pages = 15): Buffer {
     parts.push(part);
     length += part.length;
   };
+  const firstLength = 6 + pages * 2;
+  let nextLength = firstLength;
+  const lengthObjects: Array<[number, number]> = [];
   const object = (number: number, dictionary: string, stream?: Buffer) => {
     offsets[number] = length;
     if (!stream) {
       add(Buffer.from(`${number} 0 obj\n${dictionary}\nendobj\n`, 'latin1'));
       return;
     }
+    let lengthEntry = String(stream.length);
+    if (options.indirectLength) {
+      lengthEntry = `${nextLength} 0 R`;
+      lengthObjects.push([nextLength++, stream.length]);
+    }
     add(
-      Buffer.from(
-        `${number} 0 obj\n<< ${dictionary} /Length ${stream.length} >>\nstream\n`,
-        'latin1'
-      )
+      Buffer.from(`${number} 0 obj\n<< ${dictionary} /Length ${lengthEntry} >>\nstream\n`, 'latin1')
     );
     add(stream);
     add(Buffer.from('\nendstream\nendobj\n', 'latin1'));
+    // pdfTeX writes the length right after the stream.
+    const written = lengthObjects.at(-1);
+    if (options.indirectLength && written) object(written[0], String(written[1]));
   };
   add(Buffer.from('%PDF-1.7\n%\xe2\xe3\xcf\xd3\n', 'latin1'));
   const pageNumbers = Array.from({ length: pages }, (_, index) => 6 + index * 2);
@@ -156,7 +165,7 @@ export function realisticPdf(pages = 15): Buffer {
     );
     object(number + 1, '/Filter /FlateDecode', deflateSync(content));
   });
-  const count = 6 + pages * 2;
+  const count = nextLength;
   const xref = length;
   let table = `xref\n0 ${count}\n0000000000 65535 f \n`;
   for (let number = 1; number < count; number++) {

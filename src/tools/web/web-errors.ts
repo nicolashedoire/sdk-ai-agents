@@ -7,6 +7,7 @@ export type WebRefusalReason =
   | 'robots'
   | 'content-type'
   | 'too-large'
+  | 'unreadable'
   | 'pacing';
 
 /**

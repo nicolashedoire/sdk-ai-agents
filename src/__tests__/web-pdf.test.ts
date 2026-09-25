@@ -194,6 +194,16 @@ describe('web_fetch on a PDF', () => {
       expect(read[0]?.content.startsWith('Page 1, line 1: the fragment tree is immutable.')).toBe(true);
     }, 30_000);
 
+    it('reads a PDF whose streams give their /Length by reference, as pdfTeX writes them', async () => {
+      const pdf = realisticPdf(15, { indirectLength: true });
+      expect(pdf.toString('latin1')).toMatch(/\/Length \d+ 0 R/);
+
+      const read = await pdfText(pdf, { maxPages: 30 });
+
+      expect(read.pagesRead).toBe(15);
+      expect(read.content.startsWith('Page 1, line 1: the fragment tree is immutable.')).toBe(true);
+    }, 30_000);
+
     it('does not blame a PDF for what the rest of the process allocates', async () => {
       const slow = await flateBombPdf(8, { unit: 'BT /F1 12 Tf 72 700 Td (word) Tj ET\n' });
       const elsewhere: Buffer[] = [];

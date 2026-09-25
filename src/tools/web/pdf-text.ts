@@ -62,7 +62,7 @@ type WorkerAnswer =
       creationDate?: string;
       modDate?: string;
     }
-  | { ok: false; message: string; refused?: boolean };
+  | { ok: false; message: string; refused?: 'too-large' | 'unreadable' };
 
 /**
  * Runs in the worker: loads `unpdf` (pdf.js) and reads the text of the first pages. Plain
@@ -78,7 +78,7 @@ const prescan = ${prescanPdf.toString()};
   // Measured before pdf.js reads anything: a bomb is refused here, event loops or not.
   const verdict = prescan(new Uint8Array(workerData.bytes), zlib, workerData.maxDecodedBytes);
   if (!verdict.ok) {
-    parentPort.postMessage({ ok: false, refused: true, message: verdict.reason });
+    parentPort.postMessage({ ok: false, refused: verdict.kind, message: verdict.reason });
     return;
   }
   const loaded = await import(workerData.moduleUrl);
@@ -105,8 +105,10 @@ const prescan = ${prescanPdf.toString()};
  *
  * The PDF is read in a worker thread, one PDF at a time in the process, so that a hostile PDF
  * cannot block the process and what it costs is its own:
- * - before pdf.js reads it, the worker inflates its streams (every filter chain, Flate and the
- *   other decoders that expand) within `maxDecodedMb` in all, and refuses it past that;
+ * - before pdf.js reads it, the worker parses it and inflates its streams (every filter chain,
+ *   Flate and the other decoders that expand) within `maxDecodedMb` in all, and refuses it
+ *   past that, or when it cannot read it (`prescanPdf`, which fails closed); an encrypted PDF
+ *   cannot be measured and has only the limits below;
  * - the worker is stopped when the process grows by more than `maxMemoryMb`, when `timeoutMs`
  *   has passed, or when `signal` aborts. Waiting for the reader counts against `deadline` and
  *   `signal`.
@@ -124,7 +126,7 @@ export async function pdfText(bytes: Uint8Array, options: PdfTextOptions): Promi
     release();
   }
   if (!answer.ok && answer.refused) {
-    throw new WebRequestRefusedError(`The PDF is refused: ${answer.message}`, 'too-large');
+    throw new WebRequestRefusedError(`The PDF is refused: ${answer.message}`, answer.refused);
   }
   if (!answer.ok) {
     if (/Cannot find (?:package|module)|ERR_MODULE_NOT_FOUND/i.test(answer.message)) {
