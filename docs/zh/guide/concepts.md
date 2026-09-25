@@ -60,6 +60,8 @@ const calculatorTool = sdk.defineTool({
 })
 ```
 
+现成的工具（一个文件夹、一个数据库、一个 Web API、整个 Web、另一个智能体、一个 MCP 服务器），以及每一次调用如何受治理：参见[工具](./tools)。
+
 ### 3. 能力 {#_3-capability}
 
 **能力（Capability）** 是一组逻辑上相关的工具，可以在多个智能体之间复用。

@@ -60,6 +60,8 @@ const calculatorTool = sdk.defineTool({
 })
 ```
 
+Fertige Tools (ein Ordner, eine Datenbank, eine Web-API, das Web, ein anderer Agent, ein MCP-Server) und wie jeder Aufruf kontrolliert wird: siehe [Tools](./tools).
+
 ### 3. Fähigkeit (Capability) {#_3-capability}
 
 Eine **Fähigkeit** (Capability) ist eine logische Gruppe von Tools, die sich in mehreren Agenten wiederverwenden lässt.

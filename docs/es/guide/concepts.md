@@ -60,6 +60,8 @@ const calculatorTool = sdk.defineTool({
 })
 ```
 
+Las herramientas ya hechas (una carpeta, una base de datos, una API web, la Web, otro agente, un servidor MCP) y cómo se gobierna cada llamada: consulta [Herramientas](./tools).
+
 ### 3. Capacidad {#_3-capability}
 
 Una **capacidad** es un grupo lógico de herramientas que se puede reutilizar en varios agentes.

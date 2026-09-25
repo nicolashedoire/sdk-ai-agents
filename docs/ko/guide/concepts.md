@@ -60,6 +60,8 @@ const calculatorTool = sdk.defineTool({
 })
 ```
 
+바로 쓸 수 있는 도구(폴더, 데이터베이스, 웹 API, 웹, 다른 에이전트, MCP 서버)와 모든 호출이 통제되는 방식은 [도구](./tools)를 보세요.
+
 ### 3. 역량 {#_3-capability}
 
 **역량**(Capability)은 여러 에이전트에서 재사용할 수 있는 도구의 논리적 묶음입니다.
