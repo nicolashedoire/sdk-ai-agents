@@ -246,7 +246,7 @@ Accepted amendments (subordinate to the objective):
 
 REMINDER
 This step must produce: at least two architectures, at least one aiming at a new capability, …
-Out of scope: anything that serves neither the objective nor the needs.
+Out of scope: anything that does not serve the objective (the needs are priorities, not the only topics).
 The aim is a new capability, not only a speed-up: none named; propose candidates: what a change of principle would make possible that is difficult today, not only faster.
 Write every text value in English (en). Reply with the JSON object only.
 Objective: A browser design whose every choice follows from the investigation
@@ -260,7 +260,7 @@ Objective: A browser design whose every choice follows from the investigation
 
 ### 守护者 {#the-guardian}
 
-每个环节结束后，会有一次独立的调用——**守护者**——它只看到章程、已接受的修正案和该环节的条目：看不到任务，看不到较早的记录，也看不到搜索。它以温度 0 运行，并逐条单独评判：是否紧扣目标，以及原因。对于设计，它还能看到每种架构的机制、组件和组装，并评判它是否开启了一项新能力（参见[能力、原理、机制](#capability-principle-mechanism)）。
+每个环节结束后，会有一次独立的调用——**守护者**——它只看到章程、已接受的修正案和该环节的条目：看不到任务，看不到较早的记录，也看不到搜索。它以温度 0 运行，并逐条单独评判：是否紧扣目标，以及原因。对于设计，它还能看到每种架构的机制、组件和组装，并评判它是否开启了一项新能力（参见[能力、原理、机制](#capability-principle-mechanism)）。章程中的需求是优先事项，而不是封闭的话题清单：章程没有提到的对象的某个方面（例如它的安全性、能耗），只要服务于重新设计，就符合目标；服务于其他目的的内容，例如发布计划，则不符合。
 
 - 偏离目标的条目会被移除，并连同原因记入**偏离日志**（`by: 'guardian'`），同时记录为一个 `study.drift_rejected` 事件。
 - **它失效即关闭。** 只有 `onObjective` 为 true 或 false 的判定才算数。没有得到这种判定的条目保持 `unchecked`：它留在报告中并被标出（提示 `uncheckedItems`），但永远不会进入之后的 prompt，下一次运行会先让守护者评判它。如果守护者对某个环节的条目一个也没有评判，运行就会失败。当一次修复无法使用，或提供商在修复时出错时，会改为宽松地读取第一次回复：它的有效判定算数，没有判定的条目仍未经评判（修复得到应答时，`study.model_called` 上的 `usedAttempt: 1`）。停止（达到上限或被取消）仍会让运行停止。

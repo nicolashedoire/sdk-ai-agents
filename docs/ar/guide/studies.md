@@ -246,7 +246,7 @@ Accepted amendments (subordinate to the objective):
 
 REMINDER
 This step must produce: at least two architectures, at least one aiming at a new capability, …
-Out of scope: anything that serves neither the objective nor the needs.
+Out of scope: anything that does not serve the objective (the needs are priorities, not the only topics).
 The aim is a new capability, not only a speed-up: none named; propose candidates: what a change of principle would make possible that is difficult today, not only faster.
 Write every text value in English (en). Reply with the JSON object only.
 Objective: A browser design whose every choice follows from the investigation
@@ -260,7 +260,7 @@ Objective: A browser design whose every choice follows from the investigation
 
 ### الحارس {#the-guardian}
 
-بعد كل مرحلة، يرى استدعاءٌ منفصل — **الحارس** — الميثاقَ والتعديلات المقبولة وعناصر تلك المرحلة فقط: لا المهمّة، ولا السجلّات السابقة، ولا عمليات البحث. ويعمل بدرجة حرارة 0، ويحكم على كل عنصر على حدة: هل هو على الهدف أم لا، ولماذا. وفي التصميم، يرى أيضًا آلية كل بنية ومكوّناتها وتركيبها، ويحكم على ما إذا كانت تفتح قدرة جديدة (انظر [القدرة، والمبدأ، والآلية](#capability-principle-mechanism)).
+بعد كل مرحلة، يرى استدعاءٌ منفصل — **الحارس** — الميثاقَ والتعديلات المقبولة وعناصر تلك المرحلة فقط: لا المهمّة، ولا السجلّات السابقة، ولا عمليات البحث. ويعمل بدرجة حرارة 0، ويحكم على كل عنصر على حدة: هل هو على الهدف أم لا، ولماذا. وفي التصميم، يرى أيضًا آلية كل بنية ومكوّناتها وتركيبها، ويحكم على ما إذا كانت تفتح قدرة جديدة (انظر [القدرة، والمبدأ، والآلية](#capability-principle-mechanism)). احتياجات الميثاق أولويات، لا قائمة مغلقة بالموضوعات: فجانبٌ من الموضوع لا يذكره الميثاق — أمنه أو استهلاكه للطاقة — يكون على الهدف إذا خدم إعادة التصميم؛ أما ما يخدم غايةً أخرى، كخطة إطلاق، فليس كذلك.
 
 - العنصر الخارج عن الهدف يُحذَف ويُدوَّن في **سجلّ الانحراف** (`by: 'guardian'`)، مع السبب، ويُسجَّل حدثًا من نوع `study.drift_rejected`.
 - **يفشل مُغلَقًا.** لا يُحتسَب إلا الحكم الذي تكون فيه قيمة `onObjective` صحيحة أو خاطئة. والعنصر الذي يبقى بلا حكم يبقى `unchecked`: يبقى في التقرير، موسومًا (الإشعار `uncheckedItems`)، لكنه لا يصل أبدًا إلى موجّه لاحق، ويجعل التشغيلُ التالي الحارسَ يحكم عليه أولًا. والحارس الذي لا يحكم على أيٍّ من عناصر مرحلة يُفشِل التشغيل. وحين يتعذّر استخدام إصلاحٍ، أو يفشل المزوّد فيه، يُقرأ الرد الأول بتساهل بدلًا منه: تُحتسَب أحكامه الصالحة، وتبقى العناصر التي لا حكم لها غير مفحوصة (`usedAttempt: 1` في `study.model_called` حين يكون الإصلاح قد تلقّى ردًّا). أمّا التوقّف — بلوغ حدٍّ أو الإلغاء — فيظلّ يوقف التشغيل.

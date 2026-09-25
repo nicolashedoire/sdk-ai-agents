@@ -246,7 +246,7 @@ Accepted amendments (subordinate to the objective):
 
 REMINDER
 This step must produce: at least two architectures, at least one aiming at a new capability, …
-Out of scope: anything that serves neither the objective nor the needs.
+Out of scope: anything that does not serve the objective (the needs are priorities, not the only topics).
 The aim is a new capability, not only a speed-up: none named; propose candidates: what a change of principle would make possible that is difficult today, not only faster.
 Write every text value in English (en). Reply with the JSON object only.
 Objective: A browser design whose every choice follows from the investigation
@@ -260,7 +260,7 @@ Chaque élément doit porter `servesObjective` : en une phrase, quelle partie d
 
 ### Le gardien {#the-guardian}
 
-Après chaque passage, un appel distinct — **le gardien** — ne voit que la charte, les amendements acceptés et les éléments de ce passage : ni la tâche, ni les enregistrements antérieurs, ni les recherches. Il s'exécute à une température de 0 et juge chaque élément pour lui-même : sur l'objectif ou non, et pourquoi. Pour la conception, il voit aussi le mécanisme, les composants et l'assemblage de chaque architecture, et juge si elle ouvre une capacité nouvelle (voir [Capacité, principe, mécanisme](#capability-principle-mechanism)).
+Après chaque passage, un appel distinct — **le gardien** — ne voit que la charte, les amendements acceptés et les éléments de ce passage : ni la tâche, ni les enregistrements antérieurs, ni les recherches. Il s'exécute à une température de 0 et juge chaque élément pour lui-même : sur l'objectif ou non, et pourquoi. Pour la conception, il voit aussi le mécanisme, les composants et l'assemblage de chaque architecture, et juge si elle ouvre une capacité nouvelle (voir [Capacité, principe, mécanisme](#capability-principle-mechanism)). Les besoins de la charte sont des priorités, pas une liste fermée de sujets : un aspect de l'objet que la charte ne nomme pas — sa sécurité, sa consommation d'énergie — est sur l'objectif s'il sert la reconception ; ce qui sert un autre but, comme un plan de lancement, ne l'est pas.
 
 - Un élément hors de l'objectif est retiré et consigné dans le **journal de dérive** (`by: 'guardian'`), avec la raison, et enregistré comme un événement `study.drift_rejected`.
 - **Faute de verdict, il bloque.** Seul compte un verdict dont `onObjective` vaut vrai ou faux. Un élément laissé sans verdict demeure `unchecked` : il reste dans le rapport, signalé (avertissement `uncheckedItems`), mais n'atteint jamais un prompt ultérieur, et l'exécution suivante le fait d'abord juger par le gardien. Un gardien qui ne juge aucun des éléments d'un passage fait échouer l'exécution. Quand une réparation est inutilisable, ou que le fournisseur échoue sur elle, c'est la première réponse qui est lue à la place, de façon permissive : ses verdicts valides comptent, et les éléments qui n'en ont pas restent non jugés (`usedAttempt: 1` sur `study.model_called` quand la réparation a reçu une réponse). Un arrêt — une limite, une annulation — arrête toujours l'exécution.

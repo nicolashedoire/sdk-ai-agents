@@ -246,7 +246,7 @@ Accepted amendments (subordinate to the objective):
 
 REMINDER
 This step must produce: at least two architectures, at least one aiming at a new capability, …
-Out of scope: anything that serves neither the objective nor the needs.
+Out of scope: anything that does not serve the objective (the needs are priorities, not the only topics).
 The aim is a new capability, not only a speed-up: none named; propose candidates: what a change of principle would make possible that is difficult today, not only faster.
 Write every text value in English (en). Reply with the JSON object only.
 Objective: A browser design whose every choice follows from the investigation
@@ -260,7 +260,7 @@ Objective: A browser design whose every choice follows from the investigation
 
 ### 監視役 {#the-guardian}
 
-各工程の後、別の呼び出し、つまり **監視役** が、憲章、受け入れられた追加指示、その工程の項目だけを見ます。タスクも、それより前のレコードも、検索も見ません。監視役は温度 0 で動き、各項目を個別に判定します。目的に沿っているかどうかと、その理由です。設計については、各アーキテクチャのメカニズム、構成要素、組み立ても見て、新しい能力を開くかどうかを判定します（[能力、原理、メカニズム](#capability-principle-mechanism) を参照）。
+各工程の後、別の呼び出し、つまり **監視役** が、憲章、受け入れられた追加指示、その工程の項目だけを見ます。タスクも、それより前のレコードも、検索も見ません。監視役は温度 0 で動き、各項目を個別に判定します。目的に沿っているかどうかと、その理由です。設計については、各アーキテクチャのメカニズム、構成要素、組み立ても見て、新しい能力を開くかどうかを判定します（[能力、原理、メカニズム](#capability-principle-mechanism) を参照）。憲章のニーズは優先事項であり、扱ってよい話題の閉じたリストではありません。憲章が挙げていない対象の側面（セキュリティやエネルギー消費など）も、再設計に役立つなら目的に沿っています。発売計画のように別の目的に役立つものは目的に沿っていません。
 
 - 目的から外れた項目は取り除かれ、理由とともに **逸脱ログ** に記録され（`by: 'guardian'`）、`study.drift_rejected` イベントとして記録されます。
 - **判定のないものは通さない（フェイルクローズ）。** 数えられるのは、`onObjective` が true または false の判定だけです。判定のないまま残った項目は `unchecked` のままです。レポートにはそのことを示したうえで残りますが（注意事項 `uncheckedItems`）、それ以降のプロンプトに入ることは決してなく、次の実行では監視役がまずそれを判定します。工程の項目を 1 つも判定しない監視役は、実行を失敗させます。修復が使えないとき、またはプロバイダーが修復で失敗したときは、代わりに最初の応答が寛容に読まれます。その有効な判定は数えられ、判定のない項目は未判定のまま残ります（修復に応答があった場合は `study.model_called` の `usedAttempt: 1`）。停止（上限やキャンセル）は、これまでどおり実行を止めます。

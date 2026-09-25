@@ -5,7 +5,12 @@ import { progressDescriber } from '../mcp/mcp-progress.js';
 import type { LLMRequest } from '../providers/llm-provider.js';
 import type { StudyConfig } from '../study/study-types.js';
 import type { Event } from '../types/events.js';
-import { channelOf, json, ScriptedLLMProvider, type ScriptedReply } from './support/scripted-llm-provider.js';
+import {
+  channelOf,
+  json,
+  ScriptedLLMProvider,
+  type ScriptedReply,
+} from './support/scripted-llm-provider.js';
 import {
   checkedItems,
   defineSearchTool,
@@ -114,13 +119,17 @@ describe('study review fixes', () => {
               .map((shown) => ({ id: shown.id, onObjective: true, reason: 'ok' })),
           }),
       };
-      provider.enqueue('study-check:observe', partial).enqueue('study-check:observe:repair', partial);
+      provider
+        .enqueue('study-check:observe', partial)
+        .enqueue('study-check:observe:repair', partial);
       const { study } = setup({}, provider);
 
       const result = await study.run();
 
       expect(result.status).toBe('completed');
-      expect(result.report.observations.map((observation) => [observation.id, observation.unchecked])).toEqual([
+      expect(
+        result.report.observations.map((observation) => [observation.id, observation.unchecked])
+      ).toEqual([
         ['O1', undefined],
         ['O2', true],
       ]);
@@ -360,7 +369,10 @@ describe('study review fixes', () => {
       provider.enqueue(
         'study:design',
         passage({
-          architectures: [capability('Good', 'A good capability'), capability('Bad', `Bad ${OFF_OBJECTIVE}`)],
+          architectures: [
+            capability('Good', 'A good capability'),
+            capability('Bad', `Bad ${OFF_OBJECTIVE}`),
+          ],
         }),
         passage({
           architectures: [
@@ -449,6 +461,22 @@ describe('study review fixes', () => {
       expect(check).not.toContain('A design that offers no new capability is off the objective');
     });
 
+    it('tells the guardian the needs are priorities, not a closed list of topics', async () => {
+      const { study, provider } = setup();
+
+      await study.run();
+
+      // A real GPT-5.4 study had its guardian refuse four security items of a browser redesign,
+      // "security not being among the charter's needs": the needs were read as the only topics.
+      const guardian = requestsOf(provider, 'study-check:cross')[0]?.messages[0]?.content ?? '';
+      expect(guardian).toContain('priorities, not a closed list of allowed topics');
+      expect(guardian).toContain('nor is a topic the charter does not list');
+      expect(guardian).not.toContain('serves the objective or one of the needs');
+      const passage = requestsOf(provider, 'study:cross')[0];
+      expect(passage?.messages[0]?.content).toContain('(priorities, not the only topics)');
+      expect(lastMessage(passage)).not.toContain('serves neither the objective nor the needs');
+    });
+
     it('6: a reopened passage adds only what it needs, and prior art waits for the final design (P7)', async () => {
       const provider = new ScriptedLLMProvider();
       provider.enqueue(
@@ -497,10 +525,15 @@ describe('study review fixes', () => {
         handler: async ({ query }) =>
           query.startsWith('prior art')
             ? { results: [] }
-            : { results: [{ title: `About ${query}`, url: `https://e.org/${encodeURIComponent(query)}` }] },
+            : {
+                results: [
+                  { title: `About ${query}`, url: `https://e.org/${encodeURIComponent(query)}` },
+                ],
+              },
       });
       provider.always('study-prior-art-check:design', {
-        respond: () => json({ checks: [{ claim: 'N1', closest: 'none', sources: [], verdict: 'novel' }] }),
+        respond: () =>
+          json({ checks: [{ claim: 'N1', closest: 'none', sources: [], verdict: 'novel' }] }),
       });
       const study = env.sdk.createStudy(studyConfig());
 
@@ -554,8 +587,16 @@ describe('study review fixes', () => {
 
       const { report } = await study.run();
 
-      expect(report.results.slice(0, 2).map(({ title, locator, excerpt }) => ({ title, locator, excerpt }))).toEqual([
-        { title: 'First page', locator: 'https://one.example/a', excerpt: 'What the first page says' },
+      expect(
+        report.results
+          .slice(0, 2)
+          .map(({ title, locator, excerpt }) => ({ title, locator, excerpt }))
+      ).toEqual([
+        {
+          title: 'First page',
+          locator: 'https://one.example/a',
+          excerpt: 'What the first page says',
+        },
         {
           title: 'Second page',
           locator: 'https://two.example/b',
@@ -570,14 +611,21 @@ describe('study review fixes', () => {
         'study:observe',
         passage({
           observations: [
-            item('x', { kind: 'behaviour', conditions: 'c', status: 'established', sources: ['S9'] }),
+            item('x', {
+              kind: 'behaviour',
+              conditions: 'c',
+              status: 'established',
+              sources: ['S9'],
+            }),
           ],
         })
       );
 
       const result = await study.run();
 
-      expect(result.markdown).toContain('_Déclaré établi, mais il cite S9, absent de la liste de son prompt._');
+      expect(result.markdown).toContain(
+        '_Déclaré établi, mais il cite S9, absent de la liste de son prompt._'
+      );
       expect(result.markdown).not.toContain('Declared established');
       // The English message stays in the report, with the code and its parameters.
       expect(result.report.observations[0]?.statusReason).toEqual({
@@ -589,7 +637,10 @@ describe('study review fixes', () => {
 
     it('11: classifies each amendment against the charter alone, within limits', async () => {
       const provider = new ScriptedLLMProvider();
-      provider.always('study-amendment', json({ verdict: 'refines', reason: 'Within the objective' }));
+      provider.always(
+        'study-amendment',
+        json({ verdict: 'refines', reason: 'Within the objective' })
+      );
       const { study } = setup({}, provider);
 
       await study.amend('Examine memory safety too');
@@ -705,7 +756,13 @@ describe('study review fixes', () => {
       const { report, markdown } = await study.run();
 
       const [traced] = report.architectures;
-      expect(traced?.components.map(({ from, unknownFrom, untraced }) => ({ from, unknownFrom, untraced }))).toEqual([
+      expect(
+        traced?.components.map(({ from, unknownFrom, untraced }) => ({
+          from,
+          unknownFrom,
+          untraced,
+        }))
+      ).toEqual([
         { from: ['V1', 'Y1'], unknownFrom: undefined, untraced: undefined },
         { from: [], unknownFrom: ['V99'], untraced: true },
       ]);
@@ -769,11 +826,15 @@ describe('study review fixes', () => {
         'study:changes',
         json({
           ...changes,
-          leadVerdicts: changes.leadVerdicts.map((verdict: Record<string, unknown>, index: number) => ({
-            ...verdict,
-            lead: index + 1,
-          })),
-          analogues: [{ ...changes.analogues[0], breakthrough: 'La monnaie de Nakamoto', named: 1 }],
+          leadVerdicts: changes.leadVerdicts.map(
+            (verdict: Record<string, unknown>, index: number) => ({
+              ...verdict,
+              lead: index + 1,
+            })
+          ),
+          analogues: [
+            { ...changes.analogues[0], breakthrough: 'La monnaie de Nakamoto', named: 1 },
+          ],
         })
       );
       const { study } = setup({ analogues: ['Bitcoin'] }, provider);
@@ -798,7 +859,11 @@ describe('study review fixes', () => {
         schema: z.object({ query: z.string() }),
         handler: async ({ query }) => {
           if (query.startsWith('prior art')) throw new Error('search down');
-          return { results: [{ title: `About ${query}`, url: `https://e.org/${encodeURIComponent(query)}` }] };
+          return {
+            results: [
+              { title: `About ${query}`, url: `https://e.org/${encodeURIComponent(query)}` },
+            ],
+          };
         },
       });
       const study = env.sdk.createStudy(studyConfig());
@@ -819,7 +884,9 @@ describe('study review fixes', () => {
       const { report } = await study.run();
 
       expect(report.notices.map((notice) => notice.code)).not.toContain('leadsNotVerified');
-      expect(report.notices.map((notice) => notice.code)).not.toContain('analoguesNotDeconstructed');
+      expect(report.notices.map((notice) => notice.code)).not.toContain(
+        'analoguesNotDeconstructed'
+      );
     });
 
     it('admits a redo as a step: budget policies are checked before it', async () => {
@@ -846,7 +913,9 @@ describe('study review fixes', () => {
 
       expect(result).toMatchObject({ status: 'stopped', stoppedBy: 'policy' });
       expect(requestsOf(provider, 'study:observe')).toHaveLength(1);
-      expect(result.report.observations.map((observation) => observation.statement)).toEqual(['ok']);
+      expect(result.report.observations.map((observation) => observation.statement)).toEqual([
+        'ok',
+      ]);
     });
 
     it('gives notices a code and parameters the dossier renders in its language', async () => {
@@ -855,7 +924,10 @@ describe('study review fixes', () => {
       const result = await study.run();
 
       expect(result.report.notices).toContainEqual(
-        expect.objectContaining({ code: 'stopped', params: expect.objectContaining({ limit: 'maxModelCalls' }) })
+        expect.objectContaining({
+          code: 'stopped',
+          params: expect.objectContaining({ limit: 'maxModelCalls' }),
+        })
       );
       expect(result.markdown).toContain(
         '> - L’exécution a été arrêtée (limite d’appels au modèle) ; ce dossier est partiel.'
@@ -894,7 +966,10 @@ describe('study review fixes', () => {
 
     it('shows the note of a refused new objective in the dossier', async () => {
       const provider = new ScriptedLLMProvider();
-      provider.always('study-amendment', json({ verdict: 'changesObjective', reason: 'Another object' }));
+      provider.always(
+        'study-amendment',
+        json({ verdict: 'changesObjective', reason: 'Another object' })
+      );
       const { study } = setup({ language: 'fr' }, provider);
       await study.amend('Study the car instead');
 
