@@ -19,7 +19,6 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FileEventStore, createSDK } from '../src/index.js';
-import { getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { connectMcpServer, type McpConnection } from '../src/mcp.js';
 
 const eventStore = new FileEventStore(join(import.meta.dirname, 'events'));
@@ -89,18 +88,15 @@ if (result.status !== 'completed') process.exitCode = 1;
 async function connectSearch(command: string): Promise<McpConnection> {
   const [program = '', ...args] = command.split(' ').filter(Boolean);
   const include = process.env.SEARCH_TOOLS?.split(',').map((name) => name.trim());
-  // The server gets a minimal environment and only the variables named in SEARCH_ENV: never
-  // this process's other secrets (the model key among them).
+  // The server gets only the variables named in SEARCH_ENV, never this process's other
+  // secrets (the model key among them); the MCP client adds a minimal environment (PATH, HOME…).
   const needed = (process.env.SEARCH_ENV ?? '').split(',').map((name) => name.trim());
-  const env = {
-    ...getDefaultEnvironment(),
-    ...Object.fromEntries(
-      needed.flatMap((name) => {
-        const value = name ? process.env[name] : undefined;
-        return value === undefined ? [] : [[name, value]];
-      })
-    ),
-  };
+  const env = Object.fromEntries(
+    needed.flatMap((name) => {
+      const value = name ? process.env[name] : undefined;
+      return value === undefined ? [] : [[name, value]];
+    })
+  );
   return connectMcpServer({
     name: 'search',
     transport: { type: 'stdio', command: program, args, env },
