@@ -35,7 +35,6 @@ const sdk = createSDK({
 Un outil est une capacité que l'agent peut utiliser. Il doit être déclaré explicitement.
 
 ```typescript
-import { defineTool } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const calculatorTool = sdk.defineTool({
@@ -95,7 +94,7 @@ console.log(trace.summary);
 ## Exemple complet (10 lignes) {#complete-example-10-lines}
 
 ```typescript
-import { createSDK, defineTool } from '@sdk-ai-agents/core';
+import { createSDK } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const sdk = createSDK({ apiKey: process.env.OPENAI_API_KEY });
@@ -115,27 +114,8 @@ console.log(await sdk.getTrace(result.runId));
 
 Les outils sont les seules actions que l'agent peut effectuer. **Rien n'est autorisé par défaut** (refus par défaut, *deny-by-default*) : un outil doit être enregistré avant que quoi que ce soit puisse l'exécuter.
 
-::: warning Périmètre d'un agent gouverné
-Un agent gouverné peut exécuter **n'importe quel outil enregistré dans le SDK** que le modèle nomme : la liste `tools` de l'agent détermine ce qui est proposé au modèle, pas ce qu'il a le droit d'appeler. Restreignez-le avec une politique `allowlist` — tout autre outil est alors refusé avant son exécution :
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-Les agents cognitifs et les serveurs MCP sont automatiquement restreints à leur liste d'outils.
+::: info Périmètre d'un agent gouverné
+Un agent gouverné n'exécute **que ses propres outils** : ceux de ses `tools` et de ses `capabilities`. Si le modèle nomme un autre outil, même un outil enregistré dans le SDK pour un autre agent, l'appel est refusé avant son exécution (`policy.violated`, `allowed-tools`). Les agents cognitifs, les études et les serveurs MCP sont restreints de la même façon à leur liste d'outils. Une politique `allowlist` la réduit encore, pour un agent ou pour tous.
 :::
 
 **Caractéristiques :**
@@ -166,25 +146,35 @@ Les capacités permettent de regrouper des outils de façon logique et de les r�
 
 **Exemple :**
 ```typescript
-// Option 1: With tool names (tools already registered)
-const mathCapability = sdk.defineCapability({
+import { defineTool } from '@sdk-ai-agents/core';
+
+// Option 1: With the names of tools already registered with sdk.defineTool
+sdk.defineCapability({
   name: 'math',
   description: 'Mathematical operations',
-  tools: ['calculator', 'scientific-calculator'],
+  tools: ['calculator'],
 });
 
-// Option 2: With Tool objects (auto-registration)
-const mathCapability = sdk.defineCapability({
-  name: 'math',
-  description: 'Mathematical operations',
-  tools: [calculatorTool, scientificTool],
+// Option 2: With Tool objects not registered yet (built with defineTool):
+// defineCapability registers them. A tool already registered would throw.
+const percentTool = defineTool({
+  name: 'percent',
+  description: 'Computes what percentage a part is of a total',
+  schema: z.object({ part: z.number(), total: z.number().positive() }),
+  handler: async ({ part, total }) => (part / total) * 100,
+});
+
+sdk.defineCapability({
+  name: 'percentages',
+  description: 'Percentages',
+  tools: [percentTool],
 });
 
 // Usage in an agent
 const agent = sdk.createAgent({
   name: 'assistant',
   model: 'gpt-5.4',
-  capabilities: ['math'],
+  capabilities: ['math', 'percentages'],
 });
 ```
 
@@ -193,7 +183,7 @@ const agent = sdk.createAgent({
 Les politiques contrôlent ce que l'agent peut faire.
 
 **Types de politiques :**
-- **Budget** : limite du nombre d'étapes ou de tokens
+- **Budget** : limite du nombre d'étapes, de tokens, d'appels d'outils ou du coût (par exécution, ou par agent, par outil et par période)
 - **Délai maximal** (*timeout*) : durée d'exécution maximale
 - **Liste d'autorisation** (*allowlist*) : liste des outils autorisés
 - **Personnalisée** (*custom*) : validateur personnalisé

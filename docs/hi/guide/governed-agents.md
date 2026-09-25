@@ -35,7 +35,6 @@ const sdk = createSDK({
 टूल एक ऐसी क्षमता है जिसे एजेंट इस्तेमाल कर सकता है। इसे स्पष्ट रूप से घोषित करना ज़रूरी है।
 
 ```typescript
-import { defineTool } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const calculatorTool = sdk.defineTool({
@@ -95,7 +94,7 @@ console.log(trace.summary);
 ## पूरा उदाहरण (10 लाइनें) {#complete-example-10-lines}
 
 ```typescript
-import { createSDK, defineTool } from '@sdk-ai-agents/core';
+import { createSDK } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const sdk = createSDK({ apiKey: process.env.OPENAI_API_KEY });
@@ -115,27 +114,8 @@ console.log(await sdk.getTrace(result.runId));
 
 टूल ही वे एकमात्र कार्रवाइयाँ हैं जो एजेंट कर सकता है। **डिफ़ॉल्ट रूप से किसी भी चीज़ की अनुमति नहीं है** (deny-by-default): किसी टूल को कोई चला सके, इससे पहले उसका रजिस्टर होना ज़रूरी है।
 
-::: warning नियंत्रित एजेंट का दायरा
-एक नियंत्रित एजेंट **SDK में रजिस्टर किया गया कोई भी टूल** चला सकता है जिसका नाम मॉडल ले: एजेंट की `tools` सूची यह तय करती है कि मॉडल को क्या पेश किया जाता है, यह नहीं कि वह क्या कॉल कर सकता है। इसे एक `allowlist` नीति से सीमित करें — कोई भी दूसरा टूल चलने से पहले ही मना कर दिया जाता है:
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-संज्ञानात्मक एजेंट और MCP सर्वर अपने-आप अपनी टूल-सूची तक सीमित रहते हैं।
+::: info नियंत्रित एजेंट का दायरा
+एक नियंत्रित एजेंट **सिर्फ़ अपने टूल** चलाता है: उसके `tools` के और उसकी `capabilities` के टूल। अगर मॉडल किसी दूसरे टूल का नाम ले, भले ही वह SDK में किसी दूसरे एजेंट के लिए रजिस्टर किया गया हो, तो कॉल चलने से पहले ही ठुकरा दी जाती है (`policy.violated`, `allowed-tools`)। संज्ञानात्मक एजेंट, अध्ययन और MCP सर्वर भी इसी तरह अपनी टूल-सूची तक सीमित रहते हैं। एक `allowlist` नीति इसे और सीमित करती है, किसी एक एजेंट के लिए या सभी के लिए।
 :::
 
 **विशेषताएँ:**
@@ -166,25 +146,35 @@ const weatherTool = sdk.defineTool({
 
 **उदाहरण:**
 ```typescript
-// Option 1: With tool names (tools already registered)
-const mathCapability = sdk.defineCapability({
+import { defineTool } from '@sdk-ai-agents/core';
+
+// Option 1: With the names of tools already registered with sdk.defineTool
+sdk.defineCapability({
   name: 'math',
   description: 'Mathematical operations',
-  tools: ['calculator', 'scientific-calculator'],
+  tools: ['calculator'],
 });
 
-// Option 2: With Tool objects (auto-registration)
-const mathCapability = sdk.defineCapability({
-  name: 'math',
-  description: 'Mathematical operations',
-  tools: [calculatorTool, scientificTool],
+// Option 2: With Tool objects not registered yet (built with defineTool):
+// defineCapability registers them. A tool already registered would throw.
+const percentTool = defineTool({
+  name: 'percent',
+  description: 'Computes what percentage a part is of a total',
+  schema: z.object({ part: z.number(), total: z.number().positive() }),
+  handler: async ({ part, total }) => (part / total) * 100,
+});
+
+sdk.defineCapability({
+  name: 'percentages',
+  description: 'Percentages',
+  tools: [percentTool],
 });
 
 // Usage in an agent
 const agent = sdk.createAgent({
   name: 'assistant',
   model: 'gpt-5.4',
-  capabilities: ['math'],
+  capabilities: ['math', 'percentages'],
 });
 ```
 
@@ -193,7 +183,7 @@ const agent = sdk.createAgent({
 नीतियाँ नियंत्रित करती हैं कि एजेंट क्या कर सकता है।
 
 **नीतियों के प्रकार:**
-- **Budget (बजट)**: कदमों या tokens की सीमा
+- **Budget (बजट)**: कदमों, tokens, टूल कॉल या लागत की सीमा (हर run के लिए, या हर एजेंट, टूल और अवधि के लिए)
 - **Timeout (समय-सीमा)**: चलने की अधिकतम अवधि
 - **Allowlist (अनुमति-सूची)**: अनुमति वाले टूल की सूची
 - **Custom (अपनी)**: आपका अपना सत्यापनकर्ता

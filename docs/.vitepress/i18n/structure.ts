@@ -37,6 +37,7 @@ export const SIDEBAR = [
   {
     group: 'connect',
     pages: [
+      'guide/tools',
       'guide/typed-decisions',
       'guide/web-research',
       'guide/mcp',

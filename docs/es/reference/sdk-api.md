@@ -489,7 +489,7 @@ Un listener es `(event: Event) => unknown`. Recibe los eventos de uno en uno, en
 
 ## Fuentes de herramientas {#tool-sources}
 
-Cada una devuelve `ToolDefinition` listas para usar: pásalas a `sdk.defineTool`, a un agente, o directamente a las `tools` de un servidor MCP. Consulta [Un servidor MCP para cualquier cosa](../guide/mcp-recipes).
+Cada una devuelve `ToolDefinition` listas para usar: pásalas por `sdk.defineTool` antes de dárselas a un agente (los agentes aceptan `Tool[]`), o directamente a las `tools` de un servidor MCP. Consulta [Herramientas](../guide/tools) y [Un servidor MCP para cualquier cosa](../guide/mcp-recipes).
 
 | Función | Devuelve | |
 | --- | --- | --- |

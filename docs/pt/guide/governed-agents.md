@@ -35,7 +35,6 @@ const sdk = createSDK({
 Uma ferramenta é uma capacidade que o agente pode usar. Ela precisa ser declarada explicitamente.
 
 ```typescript
-import { defineTool } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const calculatorTool = sdk.defineTool({
@@ -95,7 +94,7 @@ console.log(trace.summary);
 ## Exemplo completo (10 linhas) {#complete-example-10-lines}
 
 ```typescript
-import { createSDK, defineTool } from '@sdk-ai-agents/core';
+import { createSDK } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const sdk = createSDK({ apiKey: process.env.OPENAI_API_KEY });
@@ -115,27 +114,8 @@ console.log(await sdk.getTrace(result.runId));
 
 As ferramentas são as únicas ações que o agente pode realizar. **Nada é autorizado por padrão** (deny-by-default): uma ferramenta precisa ser registrada antes que algo possa executá-la.
 
-::: warning Alcance de um agente governado
-Um agente governado pode executar **qualquer ferramenta registrada no SDK** que o modelo mencionar: a lista `tools` do agente decide o que é oferecido ao modelo, não o que ele pode chamar. Restrinja-o com uma política `allowlist` — qualquer outra ferramenta é negada antes da execução:
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-Os agentes cognitivos e os servidores MCP ficam restritos à sua lista de ferramentas automaticamente.
+::: info Alcance de um agente governado
+Um agente governado executa **apenas as suas próprias ferramentas**: as de `tools` e as das suas `capabilities`. Se o modelo nomear qualquer outra ferramenta, mesmo uma registrada no SDK para outro agente, a chamada é recusada antes da execução (`policy.violated`, `allowed-tools`). Os agentes cognitivos, os estudos e os servidores MCP ficam restritos à sua lista de ferramentas da mesma forma. Uma política `allowlist` restringe essa lista ainda mais, para um agente ou para todos.
 :::
 
 **Características:**
@@ -166,25 +146,35 @@ As capacidades permitem agrupar as ferramentas de forma lógica e reutilizá-las
 
 **Exemplo:**
 ```typescript
-// Option 1: With tool names (tools already registered)
-const mathCapability = sdk.defineCapability({
+import { defineTool } from '@sdk-ai-agents/core';
+
+// Option 1: With the names of tools already registered with sdk.defineTool
+sdk.defineCapability({
   name: 'math',
   description: 'Mathematical operations',
-  tools: ['calculator', 'scientific-calculator'],
+  tools: ['calculator'],
 });
 
-// Option 2: With Tool objects (auto-registration)
-const mathCapability = sdk.defineCapability({
-  name: 'math',
-  description: 'Mathematical operations',
-  tools: [calculatorTool, scientificTool],
+// Option 2: With Tool objects not registered yet (built with defineTool):
+// defineCapability registers them. A tool already registered would throw.
+const percentTool = defineTool({
+  name: 'percent',
+  description: 'Computes what percentage a part is of a total',
+  schema: z.object({ part: z.number(), total: z.number().positive() }),
+  handler: async ({ part, total }) => (part / total) * 100,
+});
+
+sdk.defineCapability({
+  name: 'percentages',
+  description: 'Percentages',
+  tools: [percentTool],
 });
 
 // Usage in an agent
 const agent = sdk.createAgent({
   name: 'assistant',
   model: 'gpt-5.4',
-  capabilities: ['math'],
+  capabilities: ['math', 'percentages'],
 });
 ```
 
@@ -193,7 +183,7 @@ const agent = sdk.createAgent({
 As políticas controlam o que o agente pode fazer.
 
 **Tipos de política:**
-- **Budget** (orçamento): limite de etapas ou de tokens
+- **Budget** (orçamento): limite de etapas, de tokens, de chamadas de ferramentas ou de custo (por execução, ou por agente, ferramenta e período)
 - **Timeout**: duração máxima de execução
 - **Allowlist**: lista de ferramentas autorizadas
 - **Custom**: validador personalizado

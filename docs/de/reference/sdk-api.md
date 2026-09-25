@@ -489,7 +489,7 @@ Ein Listener ist `(event: Event) => unknown`. Er erhält ein Ereignis nach dem a
 
 ## Tool-Quellen {#tool-sources}
 
-Jede liefert fertige `ToolDefinition`s: Übergeben Sie sie an `sdk.defineTool`, an einen Agenten oder direkt an `tools` eines MCP-Servers. Siehe [Ein MCP-Server für alles](../guide/mcp-recipes).
+Jede liefert fertige `ToolDefinition`s: Schicken Sie sie durch `sdk.defineTool`, bevor Sie sie einem Agenten geben (Agenten nehmen `Tool[]` entgegen), oder übergeben Sie sie direkt an `tools` eines MCP-Servers. Siehe [Tools](../guide/tools) und [Ein MCP-Server für alles](../guide/mcp-recipes).
 
 | Funktion | Rückgabe | |
 | --- | --- | --- |

@@ -35,7 +35,6 @@ const sdk = createSDK({
 الأداة قدرة يستطيع الوكيل استخدامها. ويجب التصريح بها صراحةً.
 
 ```typescript
-import { defineTool } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const calculatorTool = sdk.defineTool({
@@ -95,7 +94,7 @@ console.log(trace.summary);
 ## مثال كامل (10 أسطر) {#complete-example-10-lines}
 
 ```typescript
-import { createSDK, defineTool } from '@sdk-ai-agents/core';
+import { createSDK } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const sdk = createSDK({ apiKey: process.env.OPENAI_API_KEY });
@@ -115,27 +114,8 @@ console.log(await sdk.getTrace(result.runId));
 
 الأدوات هي الإجراءات الوحيدة التي يستطيع الوكيل تنفيذها. **لا شيء مأذون به افتراضيًا** (الرفض افتراضيًا، deny-by-default): يجب تسجيل الأداة قبل أن يتمكّن أي شيء من تشغيلها.
 
-::: warning نطاق الوكيل الخاضع للحوكمة
-يستطيع الوكيل الخاضع للحوكمة تنفيذ **أي أداة مسجَّلة في حزمة SDK** يذكر النموذج اسمها: قائمة `tools` الخاصة بالوكيل تحدّد ما يُعرَض على النموذج، لا ما يُسمَح له باستدعائه. قيّده بسياسة `allowlist` — فتُرفَض أي أداة أخرى قبل التنفيذ:
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-يُقيَّد الوكلاء المعرفيون وخوادم MCP بقائمة أدواتهم تلقائيًا.
+::: info نطاق الوكيل الخاضع للحوكمة
+لا يشغّل الوكيل الخاضع للحوكمة إلا **أدواته هو**: أدوات `tools` الخاصة به وأدوات قدراته `capabilities`. وإذا ذكر النموذج أي أداة أخرى، حتى لو كانت مسجَّلة في حزمة SDK لوكيل آخر، يُرفَض الاستدعاء قبل التنفيذ (`policy.violated`، `allowed-tools`). ويُقيَّد الوكلاء المعرفيون والدراسات وخوادم MCP بقائمة أدواتهم بالطريقة نفسها. وتضيّق سياسة `allowlist` هذه القائمة أكثر، لوكيل واحد أو للجميع.
 :::
 
 **الخصائص:**
@@ -166,25 +146,35 @@ const weatherTool = sdk.defineTool({
 
 **مثال:**
 ```typescript
-// Option 1: With tool names (tools already registered)
-const mathCapability = sdk.defineCapability({
+import { defineTool } from '@sdk-ai-agents/core';
+
+// Option 1: With the names of tools already registered with sdk.defineTool
+sdk.defineCapability({
   name: 'math',
   description: 'Mathematical operations',
-  tools: ['calculator', 'scientific-calculator'],
+  tools: ['calculator'],
 });
 
-// Option 2: With Tool objects (auto-registration)
-const mathCapability = sdk.defineCapability({
-  name: 'math',
-  description: 'Mathematical operations',
-  tools: [calculatorTool, scientificTool],
+// Option 2: With Tool objects not registered yet (built with defineTool):
+// defineCapability registers them. A tool already registered would throw.
+const percentTool = defineTool({
+  name: 'percent',
+  description: 'Computes what percentage a part is of a total',
+  schema: z.object({ part: z.number(), total: z.number().positive() }),
+  handler: async ({ part, total }) => (part / total) * 100,
+});
+
+sdk.defineCapability({
+  name: 'percentages',
+  description: 'Percentages',
+  tools: [percentTool],
 });
 
 // Usage in an agent
 const agent = sdk.createAgent({
   name: 'assistant',
   model: 'gpt-5.4',
-  capabilities: ['math'],
+  capabilities: ['math', 'percentages'],
 });
 ```
 
@@ -193,7 +183,7 @@ const agent = sdk.createAgent({
 تتحكّم السياسات فيما يستطيع الوكيل فعله.
 
 **أنواع السياسات:**
-- **الميزانية** (Budget): حدّ لعدد الخطوات أو الرموز (tokens)
+- **الميزانية** (Budget): حدّ لعدد الخطوات، أو الرموز (tokens)، أو استدعاءات الأدوات، أو للكلفة (لكل تشغيل، أو لكل وكيل وأداة وفترة)
 - **المهلة الزمنية** (Timeout): أقصى مدة للتنفيذ
 - **قائمة السماح** (Allowlist): قائمة الأدوات المأذون بها
 - **مخصّصة** (Custom): أداة تحقّق مخصّصة

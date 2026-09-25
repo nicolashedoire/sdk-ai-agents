@@ -35,7 +35,6 @@ const sdk = createSDK({
 도구는 에이전트가 사용할 수 있는 기능입니다. 명시적으로 선언해야 합니다.
 
 ```typescript
-import { defineTool } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const calculatorTool = sdk.defineTool({
@@ -95,7 +94,7 @@ console.log(trace.summary);
 ## 전체 예제 (10줄) {#complete-example-10-lines}
 
 ```typescript
-import { createSDK, defineTool } from '@sdk-ai-agents/core';
+import { createSDK } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const sdk = createSDK({ apiKey: process.env.OPENAI_API_KEY });
@@ -115,27 +114,8 @@ console.log(await sdk.getTrace(result.runId));
 
 도구는 에이전트가 수행할 수 있는 유일한 행동입니다. **기본적으로 아무것도 허용되지 않습니다**(deny-by-default). 무엇이든 도구를 실행하려면 먼저 그 도구가 등록되어 있어야 합니다.
 
-::: warning 통제형 에이전트의 범위
-통제형 에이전트는 모델이 이름을 대는 **SDK에 등록된 모든 도구**를 실행할 수 있습니다. 에이전트의 `tools` 목록은 모델에게 무엇을 제시할지를 정할 뿐, 무엇을 호출할 수 있는지를 정하지 않습니다. `allowlist` 정책으로 제한하세요. 그 밖의 도구는 실행 전에 거부됩니다.
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-인지 에이전트와 MCP 서버는 자동으로 자신의 도구 목록으로 제한됩니다.
+::: info 통제형 에이전트의 범위
+통제형 에이전트는 **자신의 도구만** 실행합니다. `tools`에 있는 도구와 `capabilities`에 있는 도구입니다. 모델이 그 밖의 도구의 이름을 대면, 다른 에이전트를 위해 SDK에 등록된 도구라 해도 그 호출은 실행 전에 거부됩니다(`policy.violated`, `allowed-tools`). 인지 에이전트, 연구, MCP 서버도 같은 방식으로 자신의 도구 목록으로 제한됩니다. `allowlist` 정책은 에이전트 하나 또는 모든 에이전트에 대해 이 범위를 더 좁힙니다.
 :::
 
 **특징:**
@@ -166,25 +146,35 @@ const weatherTool = sdk.defineTool({
 
 **예시:**
 ```typescript
-// Option 1: With tool names (tools already registered)
-const mathCapability = sdk.defineCapability({
+import { defineTool } from '@sdk-ai-agents/core';
+
+// Option 1: With the names of tools already registered with sdk.defineTool
+sdk.defineCapability({
   name: 'math',
   description: 'Mathematical operations',
-  tools: ['calculator', 'scientific-calculator'],
+  tools: ['calculator'],
 });
 
-// Option 2: With Tool objects (auto-registration)
-const mathCapability = sdk.defineCapability({
-  name: 'math',
-  description: 'Mathematical operations',
-  tools: [calculatorTool, scientificTool],
+// Option 2: With Tool objects not registered yet (built with defineTool):
+// defineCapability registers them. A tool already registered would throw.
+const percentTool = defineTool({
+  name: 'percent',
+  description: 'Computes what percentage a part is of a total',
+  schema: z.object({ part: z.number(), total: z.number().positive() }),
+  handler: async ({ part, total }) => (part / total) * 100,
+});
+
+sdk.defineCapability({
+  name: 'percentages',
+  description: 'Percentages',
+  tools: [percentTool],
 });
 
 // Usage in an agent
 const agent = sdk.createAgent({
   name: 'assistant',
   model: 'gpt-5.4',
-  capabilities: ['math'],
+  capabilities: ['math', 'percentages'],
 });
 ```
 
@@ -193,7 +183,7 @@ const agent = sdk.createAgent({
 정책은 에이전트가 할 수 있는 일을 통제합니다.
 
 **정책 유형:**
-- **예산(Budget)**: 단계 수 또는 토큰 수의 한도
+- **예산(Budget)**: 단계 수, 토큰 수, 도구 호출 수 또는 비용의 한도(실행별, 또는 에이전트, 도구, 기간별)
 - **타임아웃(Timeout)**: 최대 실행 시간
 - **허용 목록(Allowlist)**: 허용된 도구 목록
 - **커스텀(Custom)**: 직접 만든 검증기

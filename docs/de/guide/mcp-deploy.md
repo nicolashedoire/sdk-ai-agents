@@ -147,7 +147,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-Während er wartet, erscheint der Aufruf in `sdk.getPendingApprovals()`. Ihr Code entscheidet mit `sdk.approveAction(id, who, reason)` oder `sdk.rejectAction(id, who, reason)`; beides wird aufgezeichnet (`approval.requested`, `approval.approved` oder `approval.rejected`). Ein stdio-Server kann nicht in seinem eigenen Terminal nachfragen – die Standardeingabe trägt das Protokoll –, also kommt die Entscheidung über einen anderen Kanal. Zum Beispiel über einen kleinen Admin-Endpunkt auf diesem Rechner, im selben Prozess wie der Server.
+Ein Aufruf, den irgendeine Richtlinie ablehnt, wird abgelehnt, ohne dass eine Freigabe angefragt wird: Eine Freigabe setzt sich nie über ein Verbot, eine Allowlist oder ein Budget hinweg. Während er wartet, erscheint der Aufruf in `sdk.getPendingApprovals()`. Ihr Code entscheidet mit `sdk.approveAction(id, who, reason)` oder `sdk.rejectAction(id, who, reason)`; beides wird aufgezeichnet (`approval.requested`, `approval.approved` oder `approval.rejected`). Ein stdio-Server kann nicht in seinem eigenen Terminal nachfragen – die Standardeingabe trägt das Protokoll –, also kommt die Entscheidung über einen anderen Kanal. Zum Beispiel über einen kleinen Admin-Endpunkt auf diesem Rechner, im selben Prozess wie der Server.
 
 **Der Admin-Endpunkt entscheidet, was ausgeführt wird: Schützen Sie ihn wie den MCP-Endpunkt.** Sonst könnte eine in Ihrem Browser geöffnete Seite `localhost` erreichen (DNS Rebinding) und für Sie freigeben. Deshalb lauscht er nur auf `127.0.0.1`, akzeptiert nur seinen eigenen `Host`, lehnt jede Anfrage mit einem `Origin` ab (Browser fügen einen hinzu, Skripte und `curl` nicht) und verlangt einen geheimen Header:
 

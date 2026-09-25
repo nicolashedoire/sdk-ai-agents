@@ -147,7 +147,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-While it waits, the call appears in `sdk.getPendingApprovals()`. Your code decides with `sdk.approveAction(id, who, reason)` or `sdk.rejectAction(id, who, reason)`; both are recorded (`approval.requested`, `approval.approved` or `approval.rejected`). A stdio server cannot ask in its own terminal — standard input carries the protocol — so the decision comes from another channel. For example, a small admin endpoint on this machine, in the same process as the server.
+A call that any policy refuses is refused without asking for an approval: an approval never overrides a deny, an allowlist or a budget. While it waits, the call appears in `sdk.getPendingApprovals()`. Your code decides with `sdk.approveAction(id, who, reason)` or `sdk.rejectAction(id, who, reason)`; both are recorded (`approval.requested`, `approval.approved` or `approval.rejected`). A stdio server cannot ask in its own terminal — standard input carries the protocol — so the decision comes from another channel. For example, a small admin endpoint on this machine, in the same process as the server.
 
 **The admin endpoint decides what runs: protect it like the MCP endpoint.** A page open in your browser could otherwise reach `localhost` (DNS rebinding) and approve for you. So it listens on `127.0.0.1` only, accepts only its own `Host`, refuses any request carrying an `Origin` (browsers add one; scripts and `curl` do not) and requires a secret header:
 

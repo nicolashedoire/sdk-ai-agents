@@ -60,6 +60,8 @@ const calculatorTool = sdk.defineTool({
 })
 ```
 
+Ready-made tools (a folder, a database, a web API, the Web, another agent, an MCP server) and how every call is governed: see [Tools](./tools).
+
 ### 3. Capability
 
 A **Capability** is a logical group of tools that can be reused across multiple agents.
@@ -113,7 +115,7 @@ const agent = sdk.createAgent({
 A **Policy** defines the governance rules applied before each action.
 
 **Policy types:**
-- **Budget**: Limit on steps or tokens
+- **Budget**: Limit on steps, tokens, tool calls or cost (per run, or per agent, tool and period)
 - **Timeout**: Maximum execution duration
 - **Allowlist**: List of authorized tools
 - **Custom**: Custom validator
@@ -218,27 +220,8 @@ The LLM generates intentions, never direct actions. All actions go through the A
 
 Nothing is authorized by default. All tools must be explicitly declared (registered) before anything can run them.
 
-::: warning Scope of a governed agent
-A governed agent can execute **any tool registered in the SDK** that the model names: the agent's `tools` list decides what the model is offered, not what it may call. Restrict it with an `allowlist` policy — any other tool is denied before execution:
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-Cognitive agents and MCP servers are restricted to their tool list automatically.
+::: info Scope of a governed agent
+A governed agent runs **only its own tools**: those of its `tools` and of its `capabilities`. If the model names any other tool, even one registered in the SDK for another agent, the call is refused before execution (`policy.violated`, `allowed-tools`). Cognitive agents, studies and MCP servers are restricted to their tool list in the same way. An `allowlist` policy narrows it further, for one agent or for all.
 :::
 
 ### 3. Native Event-Sourcing

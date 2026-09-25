@@ -147,7 +147,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-Enquanto aguarda, a chamada aparece em `sdk.getPendingApprovals()`. O seu código decide com `sdk.approveAction(id, who, reason)` ou `sdk.rejectAction(id, who, reason)`; as duas decisões são registradas (`approval.requested`, `approval.approved` ou `approval.rejected`). Um servidor stdio não pode perguntar no próprio terminal — a entrada padrão transporta o protocolo —, então a decisão vem por outro canal. Por exemplo, um pequeno endpoint de administração nesta máquina, no mesmo processo que o servidor.
+Uma chamada que alguma política recusa é recusada sem que se peça uma aprovação: uma aprovação nunca passa por cima de uma negação, de uma allowlist ou de um orçamento. Enquanto aguarda, a chamada aparece em `sdk.getPendingApprovals()`. O seu código decide com `sdk.approveAction(id, who, reason)` ou `sdk.rejectAction(id, who, reason)`; as duas decisões são registradas (`approval.requested`, `approval.approved` ou `approval.rejected`). Um servidor stdio não pode perguntar no próprio terminal — a entrada padrão transporta o protocolo —, então a decisão vem por outro canal. Por exemplo, um pequeno endpoint de administração nesta máquina, no mesmo processo que o servidor.
 
 **O endpoint de administração decide o que é executado: proteja-o como o endpoint MCP.** Caso contrário, uma página aberta no seu navegador poderia alcançar `localhost` (DNS rebinding) e aprovar por você. Por isso, ele escuta apenas em `127.0.0.1`, aceita apenas o próprio `Host`, recusa qualquer requisição que traga um `Origin` (os navegadores adicionam um; scripts e `curl` não) e exige um cabeçalho secreto:
 

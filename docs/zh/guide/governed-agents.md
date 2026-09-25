@@ -35,7 +35,6 @@ const sdk = createSDK({
 工具是智能体可以使用的一项能力。它必须被显式声明。
 
 ```typescript
-import { defineTool } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const calculatorTool = sdk.defineTool({
@@ -95,7 +94,7 @@ console.log(trace.summary);
 ## 完整示例（10 行） {#complete-example-10-lines}
 
 ```typescript
-import { createSDK, defineTool } from '@sdk-ai-agents/core';
+import { createSDK } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const sdk = createSDK({ apiKey: process.env.OPENAI_API_KEY });
@@ -115,27 +114,8 @@ console.log(await sdk.getTrace(result.runId));
 
 工具是智能体唯一能执行的动作。**默认情况下什么都不被允许**（默认拒绝）：一个工具必须先注册，然后才能被运行。
 
-::: warning 受治理智能体的作用范围
-受治理智能体可以执行模型点名的**任何已在 SDK 中注册的工具**：智能体的 `tools` 列表决定的是向模型提供哪些工具，而不是它可以调用哪些工具。请用一个 `allowlist` 策略来限制它——任何其他工具都会在执行前被拒绝：
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-认知智能体和 MCP 服务器会自动限制在各自的工具列表之内。
+::: info 受治理智能体的作用范围
+受治理智能体**只运行它自己的工具**：即它的 `tools` 和它的 `capabilities` 中的工具。如果模型点名了任何其他工具，即使是在 SDK 中为另一个智能体注册的工具，调用也会在执行前被拒绝（`policy.violated`、`allowed-tools`）。认知智能体、研究和 MCP 服务器也以同样的方式被限制在各自的工具列表之内。`allowlist` 策略可以针对一个智能体或所有智能体，进一步缩小这个范围。
 :::
 
 **特点：**
@@ -166,25 +146,35 @@ const weatherTool = sdk.defineTool({
 
 **示例：**
 ```typescript
-// Option 1: With tool names (tools already registered)
-const mathCapability = sdk.defineCapability({
+import { defineTool } from '@sdk-ai-agents/core';
+
+// Option 1: With the names of tools already registered with sdk.defineTool
+sdk.defineCapability({
   name: 'math',
   description: 'Mathematical operations',
-  tools: ['calculator', 'scientific-calculator'],
+  tools: ['calculator'],
 });
 
-// Option 2: With Tool objects (auto-registration)
-const mathCapability = sdk.defineCapability({
-  name: 'math',
-  description: 'Mathematical operations',
-  tools: [calculatorTool, scientificTool],
+// Option 2: With Tool objects not registered yet (built with defineTool):
+// defineCapability registers them. A tool already registered would throw.
+const percentTool = defineTool({
+  name: 'percent',
+  description: 'Computes what percentage a part is of a total',
+  schema: z.object({ part: z.number(), total: z.number().positive() }),
+  handler: async ({ part, total }) => (part / total) * 100,
+});
+
+sdk.defineCapability({
+  name: 'percentages',
+  description: 'Percentages',
+  tools: [percentTool],
 });
 
 // Usage in an agent
 const agent = sdk.createAgent({
   name: 'assistant',
   model: 'gpt-5.4',
-  capabilities: ['math'],
+  capabilities: ['math', 'percentages'],
 });
 ```
 
@@ -193,7 +183,7 @@ const agent = sdk.createAgent({
 策略控制智能体能做什么。
 
 **策略类型：**
-- **预算（Budget）**：对步数或 token 数的限制
+- **预算（Budget）**：对步数、token 数、工具调用次数或费用的限制（按运行，或者按智能体、工具和时间段）
 - **超时（Timeout）**：最长执行时间
 - **允许列表（Allowlist）**：获准使用的工具列表
 - **自定义（Custom）**：自定义校验器

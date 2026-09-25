@@ -489,7 +489,7 @@ interface ModelCostLine {
 
 ## ツールソース {#tool-sources}
 
-どれも、すぐに使える `ToolDefinition` を返します。`sdk.defineTool` に渡すことも、エージェントに渡すことも、MCP サーバーの `tools` に直接渡すこともできます。[なんでも MCP サーバーにする](../guide/mcp-recipes) を参照してください。
+どれも、すぐに使える `ToolDefinition` を返します。エージェントに渡す前に `sdk.defineTool` に通すか（エージェントが受け取るのは `Tool[]` です）、MCP サーバーの `tools` に直接渡してください。[ツール](../guide/tools) と [なんでも MCP サーバーにする](../guide/mcp-recipes) を参照してください。
 
 | 関数 | 戻り値 | |
 | --- | --- | --- |

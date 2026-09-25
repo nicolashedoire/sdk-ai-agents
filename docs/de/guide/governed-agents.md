@@ -35,7 +35,6 @@ const sdk = createSDK({
 Ein Tool ist eine Fähigkeit, die der Agent nutzen kann. Es muss explizit deklariert werden.
 
 ```typescript
-import { defineTool } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const calculatorTool = sdk.defineTool({
@@ -95,7 +94,7 @@ console.log(trace.summary);
 ## Vollständiges Beispiel (10 Zeilen) {#complete-example-10-lines}
 
 ```typescript
-import { createSDK, defineTool } from '@sdk-ai-agents/core';
+import { createSDK } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const sdk = createSDK({ apiKey: process.env.OPENAI_API_KEY });
@@ -115,27 +114,8 @@ console.log(await sdk.getTrace(result.runId));
 
 Tools sind die einzigen Aktionen, die der Agent ausführen kann. **Standardmäßig ist nichts erlaubt** (deny-by-default): Ein Tool muss registriert sein, bevor irgendetwas es ausführen kann.
 
-::: warning Reichweite eines kontrollierten Agenten
-Ein kontrollierter Agent kann **jedes im SDK registrierte Tool** ausführen, das das Modell nennt: Die Liste `tools` des Agenten legt fest, was dem Modell angeboten wird, nicht, was es aufrufen darf. Schränken Sie das mit einer `allowlist`-Richtlinie ein – jedes andere Tool wird dann vor der Ausführung abgelehnt:
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-Kognitive Agenten und MCP-Server sind automatisch auf ihre Tool-Liste beschränkt.
+::: info Reichweite eines kontrollierten Agenten
+Ein kontrollierter Agent führt **nur seine eigenen Tools** aus: die aus seinen `tools` und aus seinen `capabilities`. Nennt das Modell ein anderes Tool, selbst eines, das im SDK für einen anderen Agenten registriert ist, wird der Aufruf vor der Ausführung abgelehnt (`policy.violated`, `allowed-tools`). Kognitive Agenten, Studien und MCP-Server sind auf dieselbe Weise auf ihre Tool-Liste beschränkt. Eine `allowlist`-Richtlinie schränkt das weiter ein, für einen Agenten oder für alle.
 :::
 
 **Merkmale:**
@@ -166,25 +146,35 @@ Mit Fähigkeiten (Capabilities) gruppieren Sie Tools logisch und verwenden sie w
 
 **Beispiel:**
 ```typescript
-// Option 1: With tool names (tools already registered)
-const mathCapability = sdk.defineCapability({
+import { defineTool } from '@sdk-ai-agents/core';
+
+// Option 1: With the names of tools already registered with sdk.defineTool
+sdk.defineCapability({
   name: 'math',
   description: 'Mathematical operations',
-  tools: ['calculator', 'scientific-calculator'],
+  tools: ['calculator'],
 });
 
-// Option 2: With Tool objects (auto-registration)
-const mathCapability = sdk.defineCapability({
-  name: 'math',
-  description: 'Mathematical operations',
-  tools: [calculatorTool, scientificTool],
+// Option 2: With Tool objects not registered yet (built with defineTool):
+// defineCapability registers them. A tool already registered would throw.
+const percentTool = defineTool({
+  name: 'percent',
+  description: 'Computes what percentage a part is of a total',
+  schema: z.object({ part: z.number(), total: z.number().positive() }),
+  handler: async ({ part, total }) => (part / total) * 100,
+});
+
+sdk.defineCapability({
+  name: 'percentages',
+  description: 'Percentages',
+  tools: [percentTool],
 });
 
 // Usage in an agent
 const agent = sdk.createAgent({
   name: 'assistant',
   model: 'gpt-5.4',
-  capabilities: ['math'],
+  capabilities: ['math', 'percentages'],
 });
 ```
 
@@ -193,7 +183,7 @@ const agent = sdk.createAgent({
 Richtlinien (Policies) steuern, was der Agent tun darf.
 
 **Arten von Richtlinien:**
-- **Budget**: Begrenzung der Schritte oder Tokens
+- **Budget**: Begrenzung der Schritte, Tokens, Tool-Aufrufe oder Kosten (pro Lauf oder pro Agent, Tool und Zeitraum)
 - **Timeout**: Maximale Ausführungsdauer
 - **Allowlist**: Liste der erlaubten Tools
 - **Custom**: Eigener Validator

@@ -35,7 +35,6 @@ const sdk = createSDK({
 A tool is a capability the agent can use. It must be explicitly declared.
 
 ```typescript
-import { defineTool } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const calculatorTool = sdk.defineTool({
@@ -95,7 +94,7 @@ console.log(trace.summary);
 ## Complete Example (10 Lines)
 
 ```typescript
-import { createSDK, defineTool } from '@sdk-ai-agents/core';
+import { createSDK } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const sdk = createSDK({ apiKey: process.env.OPENAI_API_KEY });
@@ -115,27 +114,8 @@ console.log(await sdk.getTrace(result.runId));
 
 Tools are the only actions the agent can perform. **Nothing is authorized by default** (deny-by-default): a tool must be registered before anything can run it.
 
-::: warning Scope of a governed agent
-A governed agent can execute **any tool registered in the SDK** that the model names: the agent's `tools` list decides what the model is offered, not what it may call. Restrict it with an `allowlist` policy — any other tool is denied before execution:
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-Cognitive agents and MCP servers are restricted to their tool list automatically.
+::: info Scope of a governed agent
+A governed agent runs **only its own tools**: those of its `tools` and of its `capabilities`. If the model names any other tool, even one registered in the SDK for another agent, the call is refused before execution (`policy.violated`, `allowed-tools`). Cognitive agents, studies and MCP servers are restricted to their tool list in the same way. An `allowlist` policy narrows it further, for one agent or for all.
 :::
 
 **Characteristics:**
@@ -166,25 +146,35 @@ Capabilities let you group tools logically and reuse them.
 
 **Example:**
 ```typescript
-// Option 1: With tool names (tools already registered)
-const mathCapability = sdk.defineCapability({
+import { defineTool } from '@sdk-ai-agents/core';
+
+// Option 1: With the names of tools already registered with sdk.defineTool
+sdk.defineCapability({
   name: 'math',
   description: 'Mathematical operations',
-  tools: ['calculator', 'scientific-calculator'],
+  tools: ['calculator'],
 });
 
-// Option 2: With Tool objects (auto-registration)
-const mathCapability = sdk.defineCapability({
-  name: 'math',
-  description: 'Mathematical operations',
-  tools: [calculatorTool, scientificTool],
+// Option 2: With Tool objects not registered yet (built with defineTool):
+// defineCapability registers them. A tool already registered would throw.
+const percentTool = defineTool({
+  name: 'percent',
+  description: 'Computes what percentage a part is of a total',
+  schema: z.object({ part: z.number(), total: z.number().positive() }),
+  handler: async ({ part, total }) => (part / total) * 100,
+});
+
+sdk.defineCapability({
+  name: 'percentages',
+  description: 'Percentages',
+  tools: [percentTool],
 });
 
 // Usage in an agent
 const agent = sdk.createAgent({
   name: 'assistant',
   model: 'gpt-5.4',
-  capabilities: ['math'],
+  capabilities: ['math', 'percentages'],
 });
 ```
 
@@ -193,7 +183,7 @@ const agent = sdk.createAgent({
 Policies control what the agent can do.
 
 **Policy types:**
-- **Budget**: Limit on steps or tokens
+- **Budget**: Limit on steps, tokens, tool calls or cost (per run, or per agent, tool and period)
 - **Timeout**: Maximum execution duration
 - **Allowlist**: List of authorized tools
 - **Custom**: Custom validator

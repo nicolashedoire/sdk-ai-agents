@@ -25,6 +25,7 @@ export const text: LocaleText = {
     'guide/thinker-profiles': 'الاستدلال على طريقة شخص معيّن',
     'guide/governed-agents': 'الوكلاء الخاضعون للحوكمة',
     'guide/studies': 'الدراسات',
+    'guide/tools': 'الأدوات',
     'guide/typed-decisions': 'القرارات المُنمَّطة (Jev)',
     'guide/web-research': 'البحث على الويب',
     'guide/mcp': 'MCP بكلمات بسيطة',

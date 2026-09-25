@@ -25,6 +25,7 @@ export const text: LocaleText = {
     'guide/thinker-profiles': 'Raisonner comme une personne donnée',
     'guide/governed-agents': 'Agents gouvernés',
     'guide/studies': 'Études',
+    'guide/tools': 'Outils',
     'guide/typed-decisions': 'Décisions typées (Jev)',
     'guide/web-research': 'Recherche sur le Web',
     'guide/mcp': 'MCP expliqué simplement',

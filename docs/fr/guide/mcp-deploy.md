@@ -147,7 +147,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-Pendant l'attente, l'appel apparaît dans `sdk.getPendingApprovals()`. Votre code décide avec `sdk.approveAction(id, who, reason)` ou `sdk.rejectAction(id, who, reason)` ; les deux sont enregistrés (`approval.requested`, `approval.approved` ou `approval.rejected`). Un serveur stdio ne peut pas poser la question dans son propre terminal — l'entrée standard transporte le protocole —, donc la décision doit venir d'un autre canal. Par exemple, un petit point d'accès d'administration sur cette machine, dans le même processus que le serveur.
+Un appel refusé par une politique, quelle qu'elle soit, est refusé sans qu'une approbation soit demandée : une approbation ne l'emporte jamais sur un refus, une liste d'autorisation ou un budget. Pendant l'attente, l'appel apparaît dans `sdk.getPendingApprovals()`. Votre code décide avec `sdk.approveAction(id, who, reason)` ou `sdk.rejectAction(id, who, reason)` ; les deux sont enregistrés (`approval.requested`, `approval.approved` ou `approval.rejected`). Un serveur stdio ne peut pas poser la question dans son propre terminal — l'entrée standard transporte le protocole —, donc la décision doit venir d'un autre canal. Par exemple, un petit point d'accès d'administration sur cette machine, dans le même processus que le serveur.
 
 **Le point d'accès d'administration décide de ce qui s'exécute : protégez-le comme le point d'accès MCP.** Sinon, une page ouverte dans votre navigateur pourrait atteindre `localhost` (DNS rebinding) et approuver à votre place. Il n'écoute donc que sur `127.0.0.1`, n'accepte que son propre `Host`, refuse toute requête portant un en-tête `Origin` (les navigateurs en ajoutent un ; les scripts et `curl` non) et exige un en-tête secret :
 

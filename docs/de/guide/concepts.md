@@ -60,6 +60,8 @@ const calculatorTool = sdk.defineTool({
 })
 ```
 
+Fertige Tools (ein Ordner, eine Datenbank, eine Web-API, das Web, ein anderer Agent, ein MCP-Server) und wie jeder Aufruf kontrolliert wird: siehe [Tools](./tools).
+
 ### 3. Fähigkeit (Capability) {#_3-capability}
 
 Eine **Fähigkeit** (Capability) ist eine logische Gruppe von Tools, die sich in mehreren Agenten wiederverwenden lässt.
@@ -113,7 +115,7 @@ const agent = sdk.createAgent({
 Eine **Richtlinie** (Policy) legt die Governance-Regeln fest, die vor jeder Aktion angewendet werden.
 
 **Arten von Richtlinien:**
-- **Budget**: Begrenzung der Schritte oder Tokens
+- **Budget**: Begrenzung der Schritte, Tokens, Tool-Aufrufe oder Kosten (pro Lauf oder pro Agent, Tool und Zeitraum)
 - **Timeout**: Maximale Ausführungsdauer
 - **Allowlist**: Liste der erlaubten Tools
 - **Custom**: Eigener Validator
@@ -218,27 +220,8 @@ Das LLM erzeugt Intentionen, niemals direkte Aktionen. Alle Aktionen laufen durc
 
 Standardmäßig ist nichts erlaubt. Alle Tools müssen explizit deklariert (registriert) werden, bevor irgendetwas sie ausführen kann.
 
-::: warning Reichweite eines kontrollierten Agenten
-Ein kontrollierter Agent kann **jedes im SDK registrierte Tool** ausführen, das das Modell nennt: Die Liste `tools` des Agenten legt fest, was dem Modell angeboten wird, nicht, was es aufrufen darf. Schränken Sie das mit einer `allowlist`-Richtlinie ein – jedes andere Tool wird dann vor der Ausführung abgelehnt:
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-Kognitive Agenten und MCP-Server sind automatisch auf ihre Tool-Liste beschränkt.
+::: info Reichweite eines kontrollierten Agenten
+Ein kontrollierter Agent führt **nur seine eigenen Tools** aus: die aus seinen `tools` und aus seinen `capabilities`. Nennt das Modell ein anderes Tool, selbst eines, das im SDK für einen anderen Agenten registriert ist, wird der Aufruf vor der Ausführung abgelehnt (`policy.violated`, `allowed-tools`). Kognitive Agenten, Studien und MCP-Server sind auf dieselbe Weise auf ihre Tool-Liste beschränkt. Eine `allowlist`-Richtlinie schränkt das weiter ein, für einen Agenten oder für alle.
 :::
 
 ### 3. Natives Event Sourcing {#_3-native-event-sourcing}
