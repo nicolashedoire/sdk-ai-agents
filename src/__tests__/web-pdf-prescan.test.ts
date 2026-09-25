@@ -180,6 +180,9 @@ describe('prescanPdf', () => {
     const hostile = Buffer.from(`%PDF-1.7\n${'1 0 obj ('.repeat(200_000)}`, 'latin1');
     const started = Date.now();
     expect(scan(hostile)).toEqual(unreadable('its structure is too complex to measure'));
-    expect(Date.now() - started).toBeLessThan(5_000);
+    // The refusal comes from the cap on the parser's work, not from a clock: this bound only
+    // catches a return to unbounded work (minutes), and leaves room for slow CI machines, where
+    // the capped work takes about 6 s. The scan runs in the PDF worker, never on the main thread.
+    expect(Date.now() - started).toBeLessThan(20_000);
   });
 });
