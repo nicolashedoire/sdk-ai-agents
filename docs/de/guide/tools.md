@@ -49,8 +49,8 @@ const refundOrder = sdk.defineTool({
 | Feld | |
 | --- | --- |
 | `name`, `description` | Was das Modell sieht und wonach es entscheidet. Verwenden Sie Buchstaben, Ziffern, `_` und `-`, bis zu 64 Zeichen: Modell-APIs und MCP-Clients können andere Namen ablehnen. |
-| `schema` | Die Argumente als zod-Schema; die Texte aus `.describe()` werden dem Modell gezeigt. Ein Aufruf, der nicht passt, wird vor allem anderen abgelehnt. |
-| `handler(params, context?)` | Ihr Code. `context` enthält `runId`, `agentId` und `signal`, das abgebrochen wird, wenn der Aufrufer aufgibt. |
+| `schema` | Die Argumente als zod-Schema; die Texte aus `.describe()` werden dem Modell gezeigt. Ein Aufruf, der nicht passt, wird vor jeder Richtlinie, jeder Freigabe und jedem Budget abgelehnt. |
+| `handler(params, context?)` | Ihr Code. `context` enthält `runId`, `agentId`, `signal` (abgebrochen, wenn der Aufrufer aufgibt) und `onEvent` (gesetzt, wenn der Aufrufer den Aufruf live verfolgt). |
 | `metadata` | `riskLevel` (`low`, `medium`, `high`), `requiresApproval`, `readOnly`, `category`: siehe [Wie Aufrufe kontrolliert werden](#how-calls-are-governed). Standardmäßig keine. |
 | `retry` | `{ maxRetries, initialDelayMs? (200), maxDelayMs? (5,000), retryOn? }`, nur für idempotente Tools. |
 | `version` | Standardmäßig `1.0.0`. Sie ist Teil des Konfigurations-Hashs des Agenten, sodass sich Läufe vor und nach einer Änderung [vergleichen](../reference/sdk-api#comparisons-and-impact) lassen. |
@@ -65,8 +65,8 @@ Jede Quelle liefert Tool-Definitionen, bereit für `sdk.defineTool` (bei `connec
 | Quelle | Der Agent kann | Tool-Namen | Risiko, schreibgeschützt | Braucht | Details |
 | --- | --- | --- | --- | --- | --- |
 | `folderTools({ root })` | Die Textdateien eines Ordners auflisten, lesen und durchsuchen, nie außerhalb davon | `list_files`, `read_file`, `search_files` | niedrig, schreibgeschützt | Einen Ordner | [Ein Dokumentenordner](./mcp-recipes#a-folder-of-documents) |
-| `databaseTools({ database })` | Die Tabellen auflisten, eine beschreiben, eine `SELECT`-Abfrage ausführen (standardmäßig 100 Zeilen) | `list_tables`, `describe_table`, `query` | mittel, schreibgeschützt | `sqliteReadOnly(db)` (`node:sqlite` oder `better-sqlite3`) oder `postgresReadOnly({ pool })` (`pg`) | [Eine schreibgeschützte Datenbank](./mcp-recipes#a-read-only-database) |
-| `await openApiTools({ spec })` | Eine Web-API aufrufen, ein Tool pro Operation; nur `GET`, sofern nicht in `include` aufgelistet | Die `operationId`, sonst Methode und Pfad (`get_pets_petId`) | `GET`: niedrig, schreibgeschützt. Andere: hoch, Freigabe erforderlich | Eine OpenAPI-3-Beschreibung (URL, Datei oder Objekt) | [Eine Web-API](./mcp-recipes#a-web-api-from-its-openapi-description) |
+| `databaseTools({ database })` | Die Tabellen auflisten, eine beschreiben, eine schreibgeschützte Abfrage ausführen: `SELECT`, `WITH … SELECT` oder `VALUES` (standardmäßig höchstens 100 Zeilen) | `list_tables`, `describe_table`, `query` | mittel, schreibgeschützt | `sqliteReadOnly(db)` (`node:sqlite` oder `better-sqlite3`) oder `postgresReadOnly({ pool })` (`pg`) | [Eine schreibgeschützte Datenbank](./mcp-recipes#a-read-only-database) |
+| `await openApiTools({ spec })` | Eine Web-API aufrufen, ein Tool pro Operation: standardmäßig die `GET`-Operationen; `include` ersetzt sie durch die Operationen, die es auflistet – der einzige Weg zu Schreiboperationen | Die `operationId`, sonst Methode und Pfad (`get_pets_petId`) | `GET`: niedrig, schreibgeschützt. Andere: hoch, Freigabe erforderlich | Eine OpenAPI-3-Beschreibung (URL, Datei oder Objekt) | [Eine Web-API](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | Im Web suchen, eine Seite oder ein PDF lesen, in arXiv, Wikipedia und GitHub suchen | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` | `web_fetch` mittel, die anderen niedrig; alle schreibgeschützt | Nichts für den Anfang (DuckDuckGo); `unpdf` für PDFs; ein GitHub-Token für die Codesuche | [Webrecherche](./web-research) |
 | `governedAgentTool(agent)`, `cognitiveAgentTool(agent)` | Einen anderen Agenten fragen: Ein kontrollierter Agent beantwortet eine `message`, ein kognitiver Agent denkt über ein `problem` nach und liefert seine Entscheidung | `ask_<agent name>` | mittel, nicht als schreibgeschützt markiert | Einen Agenten, also einen Modellschlüssel | [Ein Agent](./mcp-recipes#an-agent-your-reasoning-twin) |
 | `await connectMcpServer({ name, transport })` | Die Tools eines beliebigen MCP-Servers nutzen | Die Namen des Servers, mit `toolPrefix` davor | Keine gesetzt: `metadata` gilt für jedes importierte Tool | `@sdk-ai-agents/core/mcp` und `@modelcontextprotocol/sdk`; `close()`, wenn Sie fertig sind | [Die Tools eines MCP-Servers nutzen](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
@@ -120,7 +120,7 @@ Ein Aufruf durchläuft diese Schritte in dieser Reihenfolge und endet bei der er
 1. **Die Tools des Aufrufers.** Ein Tool, das dem Aufrufer nicht gegeben wurde – über die Tools eines Agenten, die Quellen einer Studie, die Liste eines MCP-Servers oder `allowedTools` –, wird abgelehnt. `executeTool` ohne `allowedTools` kann jedes registrierte Tool ausführen.
 2. **Die Argumente**, gegen das Schema geprüft, bevor irgendjemand um etwas gebeten wird.
 3. **Die Richtlinien**: jede globale Richtlinie und jede Richtlinie des Agenten (siehe [Kontrollierte Agenten](./governed-agents#_3-policies)).
-4. **Die Freigabe**, wenn das Tool oder eine Richtlinie eine verlangt.
+4. **Die Freigabe**, wenn das Tool oder eine Richtlinie eine verlangt. Ein Aufruf, den irgendeine Richtlinie ablehnt, wird abgelehnt, ohne dass eine Freigabe angefragt wird: Eine Freigabe setzt sich nie über ein Verbot, eine Allowlist oder ein Budget hinweg.
 5. **Das Budget**: Der Aufruf wird beim Start gezählt, unabhängig von seinem Ausgang.
 6. **Das Tool wird ausgeführt**, mit seinen Wiederholungsversuchen.
 
@@ -152,7 +152,7 @@ Die Liste wird erstellt, wenn die Richtlinie definiert wird: Definieren Sie die 
 
 ### Freigaben {#approvals}
 
-Ein Aufruf wartet auf einen Menschen, wenn das Tool `requiresApproval: true` hat (der Standard von `openApiTools` für Schreiboperationen) oder eine Richtlinienregel `require_approval` sagt. Er erscheint in `sdk.getPendingApprovals()`; `sdk.approveAction(id, who, reason?)` lässt ihn ausführen, `sdk.rejectAction(id, who, reason?)` lehnt ihn ab. Gibt der Aufrufer vorher auf (ein angehaltener Lauf, ein abgebrochenes `signal`, `approvalTimeoutMs`, bei MCP-Servern standardmäßig 50 s), wird die Freigabe abgebrochen, und das Tool wird nie ausgeführt. Siehe [Freigaben](./mcp-deploy#approvals-a-human-says-yes-first).
+Ein Aufruf wartet auf einen Menschen, wenn das Tool `requiresApproval: true` hat (der Standard von `openApiTools` für Schreiboperationen) oder eine Richtlinienregel `require_approval` sagt. Er erscheint in `sdk.getPendingApprovals()`; `sdk.approveAction(id, who, reason?)` lässt ihn ausführen, `sdk.rejectAction(id, who, reason?)` lehnt ihn ab. Ein Aufruf, den irgendeine Richtlinie ablehnt, wird abgelehnt, ohne dass eine Freigabe angefragt wird: Eine Freigabe setzt sich nie über ein Verbot, eine Allowlist oder ein Budget hinweg. Gibt der Aufrufer vorher auf (ein angehaltener Lauf, ein abgebrochenes `signal`, `approvalTimeoutMs`, bei MCP-Servern standardmäßig 50 s), wird die Freigabe abgebrochen, und das Tool wird nie ausgeführt. Siehe [Freigaben](./mcp-deploy#approvals-a-human-says-yes-first).
 
 ### Schreibgeschützte Tools {#read-only-tools}
 
@@ -182,7 +182,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-`maxTokens` und `maxCost` zählen die Modellaufrufe und lehnen die Tool-Aufrufe ab, sobald das Budget aufgebraucht ist. Siehe [API-Kosten](./costs#budgets).
+Ein `budgetLimit` kann auch `maxTokens` und `maxCost` begrenzen, gezählt über die Modellaufrufe: Sobald der Verbrauch des Zeitraums eine Grenze überschreitet, werden Tool-Aufrufe abgelehnt, und `maxCost` lehnt sie außerdem ab, sobald die Kosten eines Aufrufs unbekannt sind (ein Modell ohne Preis, ein Aufruf ohne Token-Zahlen). Siehe [API-Kosten](./costs#budgets).
 
 ### Nicht vertrauenswürdige Ausgaben {#untrusted-output}
 
@@ -208,7 +208,7 @@ Ein mit `executeTool` gemachter Aufruf ist ein eigener Lauf, sofern Sie keine `r
 | --- | --- |
 | Meinen eigenen Code oder Dienst | `sdk.defineTool` |
 | Dokumente in einem Ordner | `folderTools` |
-| Antworten aus einer SQL-Datenbank, ohne jedes Risiko eines Schreibvorgangs | `databaseTools` mit `sqliteReadOnly` oder `postgresReadOnly` |
+| Antworten aus einer SQL-Datenbank, schreibgeschützt | `databaseTools` mit `sqliteReadOnly` oder `postgresReadOnly`; bei PostgreSQL verbinden Sie sich außerdem mit einer Rolle, die nur lesen kann |
 | Eine Web-API, die eine OpenAPI-Beschreibung veröffentlicht | `openApiTools` |
 | Eine Web-API ohne eine solche Beschreibung | `sdk.defineTool`, mit `fetch` im Handler |
 | Das Web, wissenschaftliche Artikel, Enzyklopädieartikel, Code auf GitHub | `webTools` |

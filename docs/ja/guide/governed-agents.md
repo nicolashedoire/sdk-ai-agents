@@ -35,7 +35,6 @@ const sdk = createSDK({
 ツールは、エージェントが使える機能です。明示的に宣言しなければなりません。
 
 ```typescript
-import { defineTool } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const calculatorTool = sdk.defineTool({
@@ -95,7 +94,7 @@ console.log(trace.summary);
 ## 完全な例（10 行） {#complete-example-10-lines}
 
 ```typescript
-import { createSDK, defineTool } from '@sdk-ai-agents/core';
+import { createSDK } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const sdk = createSDK({ apiKey: process.env.OPENAI_API_KEY });
@@ -115,27 +114,8 @@ console.log(await sdk.getTrace(result.runId));
 
 エージェントが実行できるアクションは、ツールだけです。**デフォルトでは何も許可されていません**（デフォルト拒否）。ツールは、何かがそれを実行できるようになる前に登録しなければなりません。
 
-::: warning ガバナンス付きエージェントの範囲
-ガバナンス付きエージェントは、モデルが名前を挙げた **SDK に登録済みのどのツールでも** 実行できます。エージェントの `tools` リストが決めるのは、モデルに何を提示するかであって、何を呼び出してよいかではありません。`allowlist` ポリシーで制限してください。それ以外のツールは実行前に拒否されます。
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-認知エージェントと MCP サーバーは、自動的にそれぞれのツールリストに制限されます。
+::: info ガバナンス付きエージェントの範囲
+ガバナンス付きエージェントが実行するのは **自分のツールだけ**、つまり `tools` のツールと、その `capabilities` のツールだけです。モデルがそれ以外のツールの名前を挙げた場合は、それが別のエージェントのために SDK に登録されたツールであっても、呼び出しは実行の前に拒否されます（`policy.violated`、`allowed-tools`）。認知エージェント、研究、MCP サーバーも、同じようにそれぞれのツールリストに制限されます。`allowlist` ポリシーを使うと、1 つのエージェントについて、またはすべてのエージェントについて、さらに絞り込めます。
 :::
 
 **特徴：**
@@ -166,25 +146,35 @@ const weatherTool = sdk.defineTool({
 
 **例：**
 ```typescript
-// Option 1: With tool names (tools already registered)
-const mathCapability = sdk.defineCapability({
+import { defineTool } from '@sdk-ai-agents/core';
+
+// Option 1: With the names of tools already registered with sdk.defineTool
+sdk.defineCapability({
   name: 'math',
   description: 'Mathematical operations',
-  tools: ['calculator', 'scientific-calculator'],
+  tools: ['calculator'],
 });
 
-// Option 2: With Tool objects (auto-registration)
-const mathCapability = sdk.defineCapability({
-  name: 'math',
-  description: 'Mathematical operations',
-  tools: [calculatorTool, scientificTool],
+// Option 2: With Tool objects not registered yet (built with defineTool):
+// defineCapability registers them. A tool already registered would throw.
+const percentTool = defineTool({
+  name: 'percent',
+  description: 'Computes what percentage a part is of a total',
+  schema: z.object({ part: z.number(), total: z.number().positive() }),
+  handler: async ({ part, total }) => (part / total) * 100,
+});
+
+sdk.defineCapability({
+  name: 'percentages',
+  description: 'Percentages',
+  tools: [percentTool],
 });
 
 // Usage in an agent
 const agent = sdk.createAgent({
   name: 'assistant',
   model: 'gpt-5.4',
-  capabilities: ['math'],
+  capabilities: ['math', 'percentages'],
 });
 ```
 
@@ -193,7 +183,7 @@ const agent = sdk.createAgent({
 ポリシーは、エージェントが何をできるかを制御します。
 
 **ポリシーの種類：**
-- **予算（Budget）**：ステップ数またはトークン数の上限
+- **予算（Budget）**：ステップ数、トークン数、ツール呼び出しの回数、または費用の上限（実行ごと、またはエージェント、ツール、期間ごと）
 - **タイムアウト（Timeout）**：実行時間の上限
 - **許可リスト（Allowlist）**：許可されたツールのリスト
 - **カスタム（Custom）**：独自のバリデーター

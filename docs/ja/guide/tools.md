@@ -49,8 +49,8 @@ const refundOrder = sdk.defineTool({
 | フィールド | |
 | --- | --- |
 | `name`、`description` | モデルが目にし、それをもとに判断するもの。英字、数字、`_`、`-` を使い、64 文字以内にする。それ以外の名前は、モデルの API や MCP クライアントに拒否されることがある。 |
-| `schema` | zod スキーマで表した引数。`.describe()` のテキストはモデルに示される。合わない呼び出しは、ほかの何よりも先に拒否される。 |
-| `handler(params, context?)` | あなたのコード。`context` は `runId`、`agentId`、そして `signal` を持つ。`signal` は、呼び出し元が待つのをやめると中断される。 |
+| `schema` | zod スキーマで表した引数。`.describe()` のテキストはモデルに示される。合わない呼び出しは、どのポリシー、承認、予算よりも先に拒否される。 |
+| `handler(params, context?)` | あなたのコード。`context` は `runId`、`agentId`、`signal`（呼び出し元が待つのをやめると中断される）、`onEvent`（呼び出し元が呼び出しをリアルタイムで見守っているときに設定される）を持つ。 |
 | `metadata` | `riskLevel`（`low`、`medium`、`high`）、`requiresApproval`、`readOnly`、`category`。[呼び出しはどうガバナンスされるか](#how-calls-are-governed) を参照。デフォルトでは何も設定されていない。 |
 | `retry` | `{ maxRetries, initialDelayMs? (200), maxDelayMs? (5,000), retryOn? }`。冪等なツールに限る。 |
 | `version` | デフォルトは `1.0.0`。エージェントの設定ハッシュの一部なので、変更の前と後の実行を [比較](../reference/sdk-api#comparisons-and-impact) できる。 |
@@ -65,8 +65,8 @@ const refundOrder = sdk.defineTool({
 | ソース | エージェントができること | ツール名 | リスク、読み取り専用 | 必要なもの | 詳細 |
 | --- | --- | --- | --- | --- | --- |
 | `folderTools({ root })` | 1 つのフォルダーのテキストファイルを一覧し、読み、検索する。フォルダーの外には決して出ない | `list_files`、`read_file`、`search_files` | 低、読み取り専用 | フォルダー | [ドキュメントのフォルダー](./mcp-recipes#a-folder-of-documents) |
-| `databaseTools({ database })` | テーブルを一覧する、1 つを記述する、`SELECT` を 1 文実行する（デフォルトでは最大 100 行） | `list_tables`、`describe_table`、`query` | 中、読み取り専用 | `sqliteReadOnly(db)`（`node:sqlite` または `better-sqlite3`）、または `postgresReadOnly({ pool })`（`pg`） | [読み取り専用のデータベース](./mcp-recipes#a-read-only-database) |
-| `await openApiTools({ spec })` | Web API を呼び出す。オペレーションごとに 1 つのツール。`include` に列挙しない限り `GET` のみ | `operationId`、なければメソッドとパス（`get_pets_petId`） | `GET`：低、読み取り専用。それ以外：高、承認が必要 | OpenAPI 3 の記述（URL、ファイル、またはオブジェクト） | [Web API](./mcp-recipes#a-web-api-from-its-openapi-description) |
+| `databaseTools({ database })` | テーブルを一覧する、1 つを記述する、読み取り専用のクエリを 1 つ実行する：`SELECT`、`WITH … SELECT`、`VALUES`（デフォルトでは最大 100 行） | `list_tables`、`describe_table`、`query` | 中、読み取り専用 | `sqliteReadOnly(db)`（`node:sqlite` または `better-sqlite3`）、または `postgresReadOnly({ pool })`（`pg`） | [読み取り専用のデータベース](./mcp-recipes#a-read-only-database) |
+| `await openApiTools({ spec })` | Web API を呼び出す。オペレーションごとに 1 つのツール。デフォルトでは `GET` オペレーション。`include` はそれを、列挙したオペレーションで置き換える。書き込みオペレーションを得る唯一の方法 | `operationId`、なければメソッドとパス（`get_pets_petId`） | `GET`：低、読み取り専用。それ以外：高、承認が必要 | OpenAPI 3 の記述（URL、ファイル、またはオブジェクト） | [Web API](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | Web を検索する、ページや PDF を読む、arXiv、Wikipedia、GitHub を検索する | `web_search`、`web_fetch`、`arxiv_search`、`wikipedia_search`、`github_search` | `web_fetch` は中、それ以外は低。すべて読み取り専用 | 始めるのに必要なものはない（DuckDuckGo）。PDF には `unpdf`、コードの検索には GitHub のトークン | [Web で調べる](./web-research) |
 | `governedAgentTool(agent)`、`cognitiveAgentTool(agent)` | 別のエージェントに尋ねる。ガバナンス付きエージェントは `message` に答え、認知エージェントは `problem` について推論して、その決定を返す | `ask_<agent name>` | 中、読み取り専用の印はない | エージェント。したがってモデルのキー | [エージェント](./mcp-recipes#an-agent-your-reasoning-twin) |
 | `await connectMcpServer({ name, transport })` | 任意の MCP サーバーのツールを使う | サーバーでの名前（前に `toolPrefix` が付く） | 何も設定されない。`metadata` を指定すると、取り込んだすべてのツールに適用される | `@sdk-ai-agents/core/mcp` と `@modelcontextprotocol/sdk`。使い終わったら `close()` | [MCP サーバーのツールをエージェントで使う](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
@@ -120,7 +120,7 @@ const order = await sdk.executeTool('lookup_order', { orderId: 'o-1042' }, { age
 1. **呼び出し元のツール。** 呼び出し元に与えられていないツールは拒否されます。与えられたツールとは、エージェントのツール、研究のソース、MCP サーバーのリスト、または `allowedTools` です。`allowedTools` を指定しない `executeTool` は、登録済みのどのツールでも実行できます。
 2. **引数。** 誰かに何かを尋ねる前に、スキーマと照合してチェックされます。
 3. **ポリシー。** すべてのグローバルポリシーと、エージェントのすべてのポリシーです（[ガバナンス付きエージェント](./governed-agents#_3-policies) を参照）。
-4. **承認。** ツールかポリシーが承認を求める場合です。
+4. **承認。** ツールかポリシーが承認を求める場合です。いずれかのポリシーが拒否する呼び出しは、承認を求めることなく拒否されます。承認が、拒否のルール、許可リスト、予算を覆すことは決してありません。
 5. **予算。** 呼び出しは、結果にかかわらず、開始した時点で計上されます。
 6. **ツールの実行。** リトライも含みます。
 
@@ -152,7 +152,7 @@ sdk.defineGlobalPolicy({
 
 ### 承認 {#approvals}
 
-ツールに `requiresApproval: true` がある場合（`openApiTools` の書き込みオペレーションではこれがデフォルト）、またはポリシーのルールが `require_approval` を指定する場合、呼び出しは人を待ちます。待っている呼び出しは `sdk.getPendingApprovals()` に現れます。`sdk.approveAction(id, who, reason?)` はそれを実行させ、`sdk.rejectAction(id, who, reason?)` はそれを拒否します。それより先に呼び出し元が待つのをやめた場合（実行の停止、`signal` の中断、`approvalTimeoutMs` の経過。MCP サーバーではデフォルトで 50 秒）、承認はキャンセルされ、ツールは決して実行されません。[承認](./mcp-deploy#approvals-a-human-says-yes-first) を参照してください。
+ツールに `requiresApproval: true` がある場合（`openApiTools` の書き込みオペレーションではこれがデフォルト）、またはポリシーのルールが `require_approval` を指定する場合、呼び出しは人を待ちます。待っている呼び出しは `sdk.getPendingApprovals()` に現れます。`sdk.approveAction(id, who, reason?)` はそれを実行させ、`sdk.rejectAction(id, who, reason?)` はそれを拒否します。いずれかのポリシーが拒否する呼び出しは、承認を求めることなく拒否されます。承認が、拒否のルール、許可リスト、予算を覆すことは決してありません。それより先に呼び出し元が待つのをやめた場合（実行の停止、`signal` の中断、`approvalTimeoutMs` の経過。MCP サーバーではデフォルトで 50 秒）、承認はキャンセルされ、ツールは決して実行されません。[承認](./mcp-deploy#approvals-a-human-says-yes-first) を参照してください。
 
 ### 読み取り専用のツール {#read-only-tools}
 
@@ -182,7 +182,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-`maxTokens` と `maxCost` はモデル呼び出しを数え、使い切るとツール呼び出しを拒否します。[API コスト](./costs#budgets) を参照してください。
+`budgetLimit` では `maxTokens` と `maxCost` にも上限を設けられ、これらはモデル呼び出しについて数えられます。期間内の使用量が上限を超えると、ツール呼び出しは拒否されます。また `maxCost` は、ある呼び出しのコストが不明になった時点でも拒否します（価格のないモデル、トークン数のない呼び出し）。[API コスト](./costs#budgets) を参照してください。
 
 ### 信頼できない出力 {#untrusted-output}
 
@@ -208,7 +208,7 @@ sdk.defineGlobalPolicy({
 | --- | --- |
 | 自分のコードやサービス | `sdk.defineTool` |
 | フォルダーの中のドキュメント | `folderTools` |
-| SQL データベースからの回答。書き込みの危険はまったくなしで | `databaseTools` と、`sqliteReadOnly` または `postgresReadOnly` |
+| SQL データベースからの回答。読み取り専用で | `databaseTools` と、`sqliteReadOnly` または `postgresReadOnly`。PostgreSQL では、読み取りしかできないロールで接続することも必要 |
 | OpenAPI の記述を公開している Web API | `openApiTools` |
 | OpenAPI の記述を公開していない Web API | `sdk.defineTool`。ハンドラーの中で `fetch` を使う |
 | Web、論文、百科事典の記事、GitHub 上のコード | `webTools` |

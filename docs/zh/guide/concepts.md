@@ -115,7 +115,7 @@ const agent = sdk.createAgent({
 **策略（Policy）** 定义了在每个动作之前应用的治理规则。
 
 **策略类型：**
-- **预算（Budget）**：对步数或 token 数的限制
+- **预算（Budget）**：对步数、token 数、工具调用次数或费用的限制（按运行，或者按智能体、工具和时间段）
 - **超时（Timeout）**：最长执行时间
 - **允许列表（Allowlist）**：获准使用的工具列表
 - **自定义（Custom）**：自定义校验器
@@ -220,27 +220,8 @@ LLM 生成的是意图，而不是直接的动作。所有动作都要经过动�
 
 默认情况下什么都不被允许。所有工具都必须先显式声明（注册），然后才能被运行。
 
-::: warning 受治理智能体的作用范围
-受治理智能体可以执行模型点名的**任何已在 SDK 中注册的工具**：智能体的 `tools` 列表决定的是向模型提供哪些工具，而不是它可以调用哪些工具。请用一个 `allowlist` 策略来限制它——任何其他工具都会在执行前被拒绝：
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-认知智能体和 MCP 服务器会自动限制在各自的工具列表之内。
+::: info 受治理智能体的作用范围
+受治理智能体**只运行它自己的工具**：即它的 `tools` 和它的 `capabilities` 中的工具。如果模型点名了任何其他工具，即使是在 SDK 中为另一个智能体注册的工具，调用也会在执行前被拒绝（`policy.violated`、`allowed-tools`）。认知智能体、研究和 MCP 服务器也以同样的方式被限制在各自的工具列表之内。`allowlist` 策略可以针对一个智能体或所有智能体，进一步缩小这个范围。
 :::
 
 ### 3. 原生事件溯源 {#_3-native-event-sourcing}

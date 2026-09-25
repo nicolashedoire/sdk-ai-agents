@@ -489,7 +489,7 @@ Un écouteur est de la forme `(event: Event) => unknown`. Il reçoit un événem
 
 ## Sources d'outils {#tool-sources}
 
-Chacune renvoie des `ToolDefinition` prêtes à l'emploi : passez-les à `sdk.defineTool`, à un agent, ou directement à la liste `tools` d'un serveur MCP. Voir [Un serveur MCP pour tout](../guide/mcp-recipes).
+Chacune renvoie des `ToolDefinition` prêtes à l'emploi : faites-les passer par `sdk.defineTool` avant de les donner à un agent (les agents prennent des `Tool[]`), ou passez-les directement à la liste `tools` d'un serveur MCP. Voir [Outils](../guide/tools) et [Un serveur MCP pour tout](../guide/mcp-recipes).
 
 | Fonction | Renvoie | |
 | --- | --- | --- |

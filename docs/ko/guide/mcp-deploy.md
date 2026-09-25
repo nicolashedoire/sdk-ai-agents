@@ -147,7 +147,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-기다리는 동안 호출은 `sdk.getPendingApprovals()`에 나타납니다. 여러분의 코드는 `sdk.approveAction(id, who, reason)` 또는 `sdk.rejectAction(id, who, reason)`으로 결정하며, 둘 다 기록됩니다(`approval.requested`, `approval.approved` 또는 `approval.rejected`). stdio 서버는 자기 터미널에서 물어볼 수 없습니다. 표준 입력이 프로토콜을 운반하기 때문입니다. 그래서 결정은 다른 경로로 와야 합니다. 예를 들어 서버와 같은 프로세스 안에, 이 컴퓨터에서만 접근할 수 있는 작은 관리용 엔드포인트를 둘 수 있습니다.
+어떤 정책이든 거부하는 호출은 승인을 요청하지 않고 거부됩니다. 승인은 거부 규칙, 허용 목록, 예산을 절대 뒤집지 않습니다. 기다리는 동안 호출은 `sdk.getPendingApprovals()`에 나타납니다. 여러분의 코드는 `sdk.approveAction(id, who, reason)` 또는 `sdk.rejectAction(id, who, reason)`으로 결정하며, 둘 다 기록됩니다(`approval.requested`, `approval.approved` 또는 `approval.rejected`). stdio 서버는 자기 터미널에서 물어볼 수 없습니다. 표준 입력이 프로토콜을 운반하기 때문입니다. 그래서 결정은 다른 경로로 와야 합니다. 예를 들어 서버와 같은 프로세스 안에, 이 컴퓨터에서만 접근할 수 있는 작은 관리용 엔드포인트를 둘 수 있습니다.
 
 **관리용 엔드포인트는 무엇이 실행될지를 결정합니다. MCP 엔드포인트처럼 보호하세요.** 그렇지 않으면 브라우저에 열어 둔 페이지가 `localhost`에 접근해(DNS 리바인딩) 여러분 대신 승인할 수 있습니다. 그래서 이 엔드포인트는 `127.0.0.1`에서만 수신하고, 자신의 `Host`만 받아들이고, `Origin`이 붙은 모든 요청을 거부하며(브라우저는 이를 붙이지만, 스크립트와 `curl`은 붙이지 않습니다), 비밀 헤더를 요구합니다.
 

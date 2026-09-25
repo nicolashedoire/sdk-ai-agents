@@ -147,7 +147,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-इंतज़ार के दौरान, कॉल `sdk.getPendingApprovals()` में दिखती है। आपका कोड `sdk.approveAction(id, who, reason)` या `sdk.rejectAction(id, who, reason)` से निर्णय लेता है; दोनों दर्ज होते हैं (`approval.requested`, `approval.approved` या `approval.rejected`)। एक stdio सर्वर अपने ही टर्मिनल में नहीं पूछ सकता — standard input प्रोटोकॉल ढोता है — इसलिए निर्णय किसी दूसरे माध्यम से आता है। उदाहरण के लिए, इसी मशीन पर, सर्वर वाले प्रोसेस में ही, एक छोटा admin endpoint।
+जिस कॉल को कोई भी नीति ठुकराए, वह मंज़ूरी माँगे बिना ठुकरा दी जाती है: मंज़ूरी कभी किसी इनकार (deny), अनुमति-सूची या बजट पर हावी नहीं होती। इंतज़ार के दौरान, कॉल `sdk.getPendingApprovals()` में दिखती है। आपका कोड `sdk.approveAction(id, who, reason)` या `sdk.rejectAction(id, who, reason)` से निर्णय लेता है; दोनों दर्ज होते हैं (`approval.requested`, `approval.approved` या `approval.rejected`)। एक stdio सर्वर अपने ही टर्मिनल में नहीं पूछ सकता — standard input प्रोटोकॉल ढोता है — इसलिए निर्णय किसी दूसरे माध्यम से आता है। उदाहरण के लिए, इसी मशीन पर, सर्वर वाले प्रोसेस में ही, एक छोटा admin endpoint।
 
 **admin endpoint तय करता है कि क्या चलेगा: इसे MCP endpoint की तरह ही सुरक्षित रखें।** वरना आपके ब्राउज़र में खुला कोई पेज `localhost` तक पहुँच सकता है (DNS rebinding) और आपकी ओर से मंज़ूरी दे सकता है। इसलिए यह सिर्फ़ `127.0.0.1` पर सुनता है, सिर्फ़ अपना `Host` स्वीकार करता है, `Origin` वाले हर अनुरोध को ठुकराता है (ब्राउज़र इसे जोड़ते हैं; scripts और `curl` नहीं) और एक गुप्त header माँगता है:
 

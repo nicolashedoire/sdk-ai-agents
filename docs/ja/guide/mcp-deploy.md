@@ -147,7 +147,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-待っている間、その呼び出しは `sdk.getPendingApprovals()` に現れます。あなたのコードは `sdk.approveAction(id, who, reason)` または `sdk.rejectAction(id, who, reason)` で判断し、どちらも記録されます（`approval.requested`、`approval.approved` または `approval.rejected`）。stdio サーバーは、自分のターミナルで尋ねることができません。標準入力がプロトコルを運んでいるからです。そのため、判断は別の経路から届きます。たとえば、このマシン上で、サーバーと同じプロセスの中で動く小さな管理用エンドポイントです。
+いずれかのポリシーが拒否する呼び出しは、承認を求めることなく拒否されます。承認が、拒否のルール、許可リスト、予算を覆すことは決してありません。待っている間、その呼び出しは `sdk.getPendingApprovals()` に現れます。あなたのコードは `sdk.approveAction(id, who, reason)` または `sdk.rejectAction(id, who, reason)` で判断し、どちらも記録されます（`approval.requested`、`approval.approved` または `approval.rejected`）。stdio サーバーは、自分のターミナルで尋ねることができません。標準入力がプロトコルを運んでいるからです。そのため、判断は別の経路から届きます。たとえば、このマシン上で、サーバーと同じプロセスの中で動く小さな管理用エンドポイントです。
 
 **管理用エンドポイントは、何が実行されるかを決めます。MCP エンドポイントと同じように保護してください。** そうしないと、ブラウザーで開いているページが `localhost` に到達し（DNS リバインディング）、あなたの代わりに承認できてしまいます。そこで、このエンドポイントは `127.0.0.1` でのみ待ち受け、自分自身の `Host` だけを受け付け、`Origin` を含むリクエストはすべて拒否し（ブラウザーはこれを付けますが、スクリプトや `curl` は付けません）、秘密のヘッダーを要求します。
 

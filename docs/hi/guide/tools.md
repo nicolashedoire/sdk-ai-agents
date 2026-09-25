@@ -49,8 +49,8 @@ const refundOrder = sdk.defineTool({
 | फ़ील्ड | |
 | --- | --- |
 | `name`, `description` | मॉडल जो देखता है और जिसके आधार पर निर्णय लेता है। अक्षर, अंक, `_` और `-` इस्तेमाल करें, 64 अक्षरों तक: मॉडल API और MCP क्लाइंट दूसरे नाम ठुकरा सकते हैं। |
-| `schema` | arguments, एक zod स्कीमा के रूप में; `.describe()` के टेक्स्ट मॉडल को दिखाए जाते हैं। मेल न खाने वाली कॉल किसी भी दूसरी चीज़ से पहले ठुकरा दी जाती है। |
-| `handler(params, context?)` | आपका कोड। `context` में `runId`, `agentId` और `signal` होते हैं; `signal` तब abort हो जाता है जब कॉल करने वाला हार मान ले। |
+| `schema` | arguments, एक zod स्कीमा के रूप में; `.describe()` के टेक्स्ट मॉडल को दिखाए जाते हैं। मेल न खाने वाली कॉल किसी भी नीति, मंज़ूरी या बजट से पहले ठुकरा दी जाती है। |
+| `handler(params, context?)` | आपका कोड। `context` में `runId`, `agentId`, `signal` (जो कॉल करने वाले के हार मानने पर abort हो जाता है) और `onEvent` (जो तब सेट होता है जब कॉल करने वाला कॉल को लाइव देख रहा हो) होते हैं। |
 | `metadata` | `riskLevel` (`low`, `medium`, `high`), `requiresApproval`, `readOnly`, `category`: देखें [कॉल कैसे नियंत्रित होती हैं](#how-calls-are-governed)। डिफ़ॉल्ट रूप से कोई नहीं। |
 | `retry` | `{ maxRetries, initialDelayMs? (200), maxDelayMs? (5,000), retryOn? }`, सिर्फ़ idempotent टूल के लिए। |
 | `version` | डिफ़ॉल्ट रूप से `1.0.0`। यह एजेंट के कॉन्फ़िगरेशन hash का हिस्सा है, इसलिए किसी बदलाव से पहले और बाद के runs की [तुलना](../reference/sdk-api#comparisons-and-impact) की जा सकती है। |
@@ -65,8 +65,8 @@ const refundOrder = sdk.defineTool({
 | स्रोत | एजेंट क्या कर सकता है | टूल के नाम | जोखिम, केवल-पढ़ने-योग्य | ज़रूरत | विवरण |
 | --- | --- | --- | --- | --- | --- |
 | `folderTools({ root })` | किसी एक फ़ोल्डर की टेक्स्ट फ़ाइलों की सूची देखना, उन्हें पढ़ना और उनमें खोजना, उस फ़ोल्डर के बाहर कभी नहीं | `list_files`, `read_file`, `search_files` | कम, केवल-पढ़ने-योग्य | एक फ़ोल्डर | [दस्तावेज़ों का एक फ़ोल्डर](./mcp-recipes#a-folder-of-documents) |
-| `databaseTools({ database })` | टेबलों की सूची देखना, किसी एक का विवरण देखना, एक `SELECT` चलाना (डिफ़ॉल्ट रूप से 100 पंक्तियाँ) | `list_tables`, `describe_table`, `query` | मध्यम, केवल-पढ़ने-योग्य | `sqliteReadOnly(db)` (`node:sqlite` या `better-sqlite3`) या `postgresReadOnly({ pool })` (`pg`) | [एक केवल-पढ़ने-योग्य डेटाबेस](./mcp-recipes#a-read-only-database) |
-| `await openApiTools({ spec })` | किसी वेब API को कॉल करना, हर operation के लिए एक टूल; `include` में सूचीबद्ध न हो तो सिर्फ़ `GET` | `operationId`, वह न हो तो method और path (`get_pets_petId`) | `GET`: कम, केवल-पढ़ने-योग्य। बाकी: उच्च, मंज़ूरी ज़रूरी | एक OpenAPI 3 विवरण (URL, फ़ाइल या ऑब्जेक्ट) | [एक वेब API](./mcp-recipes#a-web-api-from-its-openapi-description) |
+| `databaseTools({ database })` | टेबलों की सूची देखना, किसी एक का विवरण देखना, एक केवल-पढ़ने वाली क्वेरी चलाना: `SELECT`, `WITH … SELECT` या `VALUES` (डिफ़ॉल्ट रूप से ज़्यादा से ज़्यादा 100 पंक्तियाँ) | `list_tables`, `describe_table`, `query` | मध्यम, केवल-पढ़ने-योग्य | `sqliteReadOnly(db)` (`node:sqlite` या `better-sqlite3`) या `postgresReadOnly({ pool })` (`pg`) | [एक केवल-पढ़ने-योग्य डेटाबेस](./mcp-recipes#a-read-only-database) |
+| `await openApiTools({ spec })` | किसी वेब API को कॉल करना, हर operation के लिए एक टूल: डिफ़ॉल्ट रूप से `GET` operations; `include` उनकी जगह उन operations को रखता है जिन्हें वह सूचीबद्ध करता है, लिखने वाले operations पाने का यही एकमात्र तरीका है | `operationId`, वह न हो तो method और path (`get_pets_petId`) | `GET`: कम, केवल-पढ़ने-योग्य। बाकी: उच्च, मंज़ूरी ज़रूरी | एक OpenAPI 3 विवरण (URL, फ़ाइल या ऑब्जेक्ट) | [एक वेब API](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | वेब पर खोजना, कोई पेज या PDF पढ़ना, arXiv, Wikipedia और GitHub में खोजना | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` | `web_fetch` मध्यम, बाकी कम; सभी केवल-पढ़ने-योग्य | शुरू करने के लिए कुछ नहीं (DuckDuckGo); PDF के लिए `unpdf`; code खोजने के लिए एक GitHub token | [वेब पर शोध](./web-research) |
 | `governedAgentTool(agent)`, `cognitiveAgentTool(agent)` | किसी दूसरे एजेंट से पूछना: नियंत्रित एजेंट किसी `message` का जवाब देता है, संज्ञानात्मक एजेंट किसी `problem` पर तर्क करता है और अपना निर्णय लौटाता है | `ask_<agent name>` | मध्यम, केवल-पढ़ने-योग्य चिह्नित नहीं | एक एजेंट, इसलिए एक मॉडल key | [एक एजेंट](./mcp-recipes#an-agent-your-reasoning-twin) |
 | `await connectMcpServer({ name, transport })` | किसी भी MCP सर्वर के टूल इस्तेमाल करना | सर्वर के नाम, `toolPrefix` के बाद | कुछ भी सेट नहीं: `metadata` हर इम्पोर्ट किए गए टूल पर लागू होता है | `@sdk-ai-agents/core/mcp` और `@modelcontextprotocol/sdk`; काम पूरा होने पर `close()` | [किसी MCP सर्वर के टूल इस्तेमाल करें](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
@@ -120,7 +120,7 @@ const order = await sdk.executeTool('lookup_order', { orderId: 'o-1042' }, { age
 1. **कॉल करने वाले के टूल।** जो टूल कॉल करने वाले को दिया नहीं गया, वह ठुकरा दिया जाता है: किसी एजेंट के टूल, किसी अध्ययन के स्रोत, किसी MCP सर्वर की सूची, या `allowedTools`। `allowedTools` के बिना `executeTool` कोई भी रजिस्टर टूल चला सकता है।
 2. **arguments**, जो स्कीमा के सामने जाँचे जाते हैं, किसी से कुछ भी पूछे जाने से पहले।
 3. **नीतियाँ**: हर ग्लोबल नीति और एजेंट की हर नीति (देखें [नियंत्रित एजेंट](./governed-agents#_3-policies))।
-4. **मंज़ूरी**, जब टूल या कोई नीति इसकी माँग करे।
+4. **मंज़ूरी**, जब टूल या कोई नीति इसकी माँग करे। जिस कॉल को कोई भी नीति ठुकराए, वह मंज़ूरी माँगे बिना ठुकरा दी जाती है: मंज़ूरी कभी किसी इनकार (deny), अनुमति-सूची या बजट पर हावी नहीं होती।
 5. **बजट**: कॉल शुरू होते ही गिन ली जाती है, उसका नतीजा चाहे जो हो।
 6. **टूल चलता है**, अपने दोबारा प्रयासों के साथ।
 
@@ -152,7 +152,7 @@ sdk.defineGlobalPolicy({
 
 ### मंज़ूरियाँ {#approvals}
 
-कोई कॉल किसी इंसान का इंतज़ार करती है जब टूल में `requiresApproval: true` हो (लिखने वाले operations के लिए `openApiTools` का डिफ़ॉल्ट) या किसी नीति का नियम `require_approval` कहे। वह `sdk.getPendingApprovals()` में दिखती है; `sdk.approveAction(id, who, reason?)` उसे चलने देता है, `sdk.rejectAction(id, who, reason?)` उसे ठुकरा देता है। अगर कॉल करने वाला पहले ही हार मान ले (रोका गया run, abort हुआ `signal`, `approvalTimeoutMs`, जो MCP सर्वरों पर डिफ़ॉल्ट रूप से 50 s है), तो मंज़ूरी रद्द हो जाती है और टूल कभी नहीं चलता। देखें [मंज़ूरियाँ](./mcp-deploy#approvals-a-human-says-yes-first)।
+कोई कॉल किसी इंसान का इंतज़ार करती है जब टूल में `requiresApproval: true` हो (लिखने वाले operations के लिए `openApiTools` का डिफ़ॉल्ट) या किसी नीति का नियम `require_approval` कहे। वह `sdk.getPendingApprovals()` में दिखती है; `sdk.approveAction(id, who, reason?)` उसे चलने देता है, `sdk.rejectAction(id, who, reason?)` उसे ठुकरा देता है। जिस कॉल को कोई भी नीति ठुकराए, वह मंज़ूरी माँगे बिना ठुकरा दी जाती है: मंज़ूरी कभी किसी इनकार (deny), अनुमति-सूची या बजट पर हावी नहीं होती। अगर कॉल करने वाला पहले ही हार मान ले (रोका गया run, abort हुआ `signal`, `approvalTimeoutMs`, जो MCP सर्वरों पर डिफ़ॉल्ट रूप से 50 s है), तो मंज़ूरी रद्द हो जाती है और टूल कभी नहीं चलता। देखें [मंज़ूरियाँ](./mcp-deploy#approvals-a-human-says-yes-first)।
 
 ### केवल-पढ़ने-योग्य टूल {#read-only-tools}
 
@@ -182,7 +182,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-`maxTokens` और `maxCost` मॉडल कॉल गिनते हैं, और बजट खर्च हो जाने पर टूल कॉल ठुकरा देते हैं। देखें [API लागत](./costs#budgets)।
+कोई `budgetLimit` `maxTokens` और `maxCost` की सीमा भी तय कर सकता है, जिनकी गिनती मॉडल कॉल पर होती है: जैसे ही अवधि की खपत किसी सीमा से ऊपर जाती है, टूल कॉल ठुकरा दी जाती हैं, और `maxCost` उन्हें तब भी ठुकरा देता है जैसे ही किसी कॉल की लागत अज्ञात हो (बिना कीमत वाला मॉडल, बिना token गिनती वाली कॉल)। देखें [API लागत](./costs#budgets)।
 
 ### अविश्वसनीय आउटपुट {#untrusted-output}
 
@@ -208,7 +208,7 @@ sdk.defineGlobalPolicy({
 | --- | --- |
 | मेरा अपना कोड या सेवा | `sdk.defineTool` |
 | किसी फ़ोल्डर के दस्तावेज़ | `folderTools` |
-| किसी SQL डेटाबेस से जवाब, लिखने के किसी भी जोखिम के बिना | `databaseTools`, `sqliteReadOnly` या `postgresReadOnly` के साथ |
+| किसी SQL डेटाबेस से जवाब, केवल-पढ़ने-योग्य | `databaseTools`, `sqliteReadOnly` या `postgresReadOnly` के साथ; PostgreSQL के लिए, ऐसे role से भी जुड़ें जो सिर्फ़ पढ़ सकता हो |
 | एक वेब API जो OpenAPI विवरण प्रकाशित करता है | `openApiTools` |
 | ऐसा वेब API जिसका ऐसा कोई विवरण नहीं है | `sdk.defineTool`, handler में `fetch` के साथ |
 | वेब, शोध-पत्र, विश्वकोश के लेख, GitHub पर code | `webTools` |

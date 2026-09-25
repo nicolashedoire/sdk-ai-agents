@@ -115,7 +115,7 @@ const agent = sdk.createAgent({
 Une **politique** (*policy*) définit les règles de gouvernance appliquées avant chaque action.
 
 **Types de politiques :**
-- **Budget** : limite du nombre d'étapes ou de tokens
+- **Budget** : limite du nombre d'étapes, de tokens, d'appels d'outils ou du coût (par exécution, ou par agent, par outil et par période)
 - **Délai maximal** (*timeout*) : durée d'exécution maximale
 - **Liste d'autorisation** (*allowlist*) : liste des outils autorisés
 - **Personnalisée** (*custom*) : validateur personnalisé
@@ -220,27 +220,8 @@ Le LLM génère des intentions, jamais des actions directes. Toutes les actions 
 
 Rien n'est autorisé par défaut. Tous les outils doivent être explicitement déclarés (enregistrés) avant que quoi que ce soit puisse les exécuter.
 
-::: warning Périmètre d'un agent gouverné
-Un agent gouverné peut exécuter **n'importe quel outil enregistré dans le SDK** que le modèle nomme : la liste `tools` de l'agent détermine ce qui est proposé au modèle, pas ce qu'il a le droit d'appeler. Restreignez-le avec une politique `allowlist` — tout autre outil est alors refusé avant son exécution :
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-Les agents cognitifs et les serveurs MCP sont automatiquement restreints à leur liste d'outils.
+::: info Périmètre d'un agent gouverné
+Un agent gouverné n'exécute **que ses propres outils** : ceux de ses `tools` et de ses `capabilities`. Si le modèle nomme un autre outil, même un outil enregistré dans le SDK pour un autre agent, l'appel est refusé avant son exécution (`policy.violated`, `allowed-tools`). Les agents cognitifs, les études et les serveurs MCP sont restreints de la même façon à leur liste d'outils. Une politique `allowlist` la réduit encore, pour un agent ou pour tous.
 :::
 
 ### 3. Event sourcing natif {#_3-native-event-sourcing}

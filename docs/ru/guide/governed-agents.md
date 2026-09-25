@@ -35,7 +35,6 @@ const sdk = createSDK({
 Инструмент — это возможность, которую может использовать агент. Он должен быть явно объявлен.
 
 ```typescript
-import { defineTool } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const calculatorTool = sdk.defineTool({
@@ -95,7 +94,7 @@ console.log(trace.summary);
 ## Полный пример (10 строк) {#complete-example-10-lines}
 
 ```typescript
-import { createSDK, defineTool } from '@sdk-ai-agents/core';
+import { createSDK } from '@sdk-ai-agents/core';
 import { z } from 'zod';
 
 const sdk = createSDK({ apiKey: process.env.OPENAI_API_KEY });
@@ -115,27 +114,8 @@ console.log(await sdk.getTrace(result.runId));
 
 Инструменты — единственные действия, которые может выполнять агент. **По умолчанию ничего не разрешено** (deny-by-default): инструмент должен быть зарегистрирован, прежде чем что-либо сможет его запустить.
 
-::: warning Область действия управляемого агента
-Управляемый агент может выполнить **любой инструмент, зарегистрированный в SDK**, который назовёт модель: список `tools` агента определяет, что модели предлагается, а не то, что она может вызвать. Ограничьте его политикой `allowlist` — любой другой инструмент будет отклонён до выполнения:
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-Когнитивные агенты и серверы MCP ограничены своим списком инструментов автоматически.
+::: info Область действия управляемого агента
+Управляемый агент запускает **только собственные инструменты** — из своих `tools` и своих `capabilities`. Если модель назовёт любой другой инструмент, даже зарегистрированный в SDK для другого агента, вызов отклоняется до выполнения (`policy.violated`, `allowed-tools`). Когнитивные агенты, исследования и серверы MCP так же ограничены своим списком инструментов. Политика `allowlist` сужает этот список ещё больше — для одного агента или для всех.
 :::
 
 **Характеристики:**
@@ -166,25 +146,35 @@ const weatherTool = sdk.defineTool({
 
 **Пример:**
 ```typescript
-// Option 1: With tool names (tools already registered)
-const mathCapability = sdk.defineCapability({
+import { defineTool } from '@sdk-ai-agents/core';
+
+// Option 1: With the names of tools already registered with sdk.defineTool
+sdk.defineCapability({
   name: 'math',
   description: 'Mathematical operations',
-  tools: ['calculator', 'scientific-calculator'],
+  tools: ['calculator'],
 });
 
-// Option 2: With Tool objects (auto-registration)
-const mathCapability = sdk.defineCapability({
-  name: 'math',
-  description: 'Mathematical operations',
-  tools: [calculatorTool, scientificTool],
+// Option 2: With Tool objects not registered yet (built with defineTool):
+// defineCapability registers them. A tool already registered would throw.
+const percentTool = defineTool({
+  name: 'percent',
+  description: 'Computes what percentage a part is of a total',
+  schema: z.object({ part: z.number(), total: z.number().positive() }),
+  handler: async ({ part, total }) => (part / total) * 100,
+});
+
+sdk.defineCapability({
+  name: 'percentages',
+  description: 'Percentages',
+  tools: [percentTool],
 });
 
 // Usage in an agent
 const agent = sdk.createAgent({
   name: 'assistant',
   model: 'gpt-5.4',
-  capabilities: ['math'],
+  capabilities: ['math', 'percentages'],
 });
 ```
 
@@ -193,7 +183,7 @@ const agent = sdk.createAgent({
 Политики определяют, что может делать агент.
 
 **Типы политик:**
-- **Бюджет** (budget): ограничение числа шагов или токенов
+- **Бюджет** (budget): ограничение числа шагов, токенов, вызовов инструментов или стоимости (на запуск либо на агента, инструмент и период)
 - **Тайм-аут** (timeout): максимальная длительность выполнения
 - **Список разрешённых** (allowlist): список авторизованных инструментов
 - **Пользовательская** (custom): собственный валидатор

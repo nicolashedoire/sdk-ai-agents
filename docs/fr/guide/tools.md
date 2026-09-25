@@ -49,8 +49,8 @@ const refundOrder = sdk.defineTool({
 | Champ | |
 | --- | --- |
 | `name`, `description` | Ce que voit le modèle, et ce à partir de quoi il décide. Utilisez des lettres, des chiffres, `_` et `-`, jusqu'à 64 caractères : les API des modèles et les clients MCP peuvent refuser d'autres noms. |
-| `schema` | Les arguments, sous forme de schéma zod ; les textes de `.describe()` sont montrés au modèle. Un appel qui n'y correspond pas est refusé avant toute autre chose. |
-| `handler(params, context?)` | Votre code. `context` contient `runId`, `agentId` et `signal`, interrompu quand l'appelant abandonne. |
+| `schema` | Les arguments, sous forme de schéma zod ; les textes de `.describe()` sont montrés au modèle. Un appel qui n'y correspond pas est refusé avant toute politique, toute approbation et tout budget. |
+| `handler(params, context?)` | Votre code. `context` contient `runId`, `agentId`, `signal` (interrompu quand l'appelant abandonne) et `onEvent` (défini quand l'appelant suit l'appel en direct). |
 | `metadata` | `riskLevel` (`low`, `medium`, `high`), `requiresApproval`, `readOnly`, `category` : voir [Comment les appels sont gouvernés](#how-calls-are-governed). Aucune par défaut. |
 | `retry` | `{ maxRetries, initialDelayMs? (200), maxDelayMs? (5,000), retryOn? }`, pour les outils idempotents uniquement. |
 | `version` | `1.0.0` par défaut. Elle entre dans l'empreinte de configuration de l'agent, si bien que les exécutions d'avant et d'après un changement peuvent être [comparées](../reference/sdk-api#comparisons-and-impact). |
@@ -65,8 +65,8 @@ Chaque source renvoie des définitions d'outils, prêtes pour `sdk.defineTool` (
 | Source | L'agent peut | Noms des outils | Risque, lecture seule | Ce qu'il faut | Détails |
 | --- | --- | --- | --- | --- | --- |
 | `folderTools({ root })` | Lister, lire et fouiller les fichiers texte d'un dossier, jamais en dehors | `list_files`, `read_file`, `search_files` | faible, lecture seule | Un dossier | [Un dossier de documents](./mcp-recipes#a-folder-of-documents) |
-| `databaseTools({ database })` | Lister les tables, en décrire une, exécuter un `SELECT` (100 lignes par défaut) | `list_tables`, `describe_table`, `query` | moyen, lecture seule | `sqliteReadOnly(db)` (`node:sqlite` ou `better-sqlite3`) ou `postgresReadOnly({ pool })` (`pg`) | [Une base de données en lecture seule](./mcp-recipes#a-read-only-database) |
-| `await openApiTools({ spec })` | Appeler une API web, un outil par opération ; uniquement les `GET`, sauf opérations listées dans `include` | Le `operationId`, sinon la méthode et le chemin (`get_pets_petId`) | `GET` : faible, lecture seule. Les autres : élevé, approbation requise | Une description OpenAPI 3 (URL, fichier ou objet) | [Une API web](./mcp-recipes#a-web-api-from-its-openapi-description) |
+| `databaseTools({ database })` | Lister les tables, en décrire une, exécuter une requête en lecture seule : `SELECT`, `WITH … SELECT` ou `VALUES` (au plus 100 lignes par défaut) | `list_tables`, `describe_table`, `query` | moyen, lecture seule | `sqliteReadOnly(db)` (`node:sqlite` ou `better-sqlite3`) ou `postgresReadOnly({ pool })` (`pg`) | [Une base de données en lecture seule](./mcp-recipes#a-read-only-database) |
+| `await openApiTools({ spec })` | Appeler une API web, un outil par opération : les opérations `GET` par défaut ; `include` les remplace par les opérations qu'il liste, seul moyen d'obtenir des écritures | Le `operationId`, sinon la méthode et le chemin (`get_pets_petId`) | `GET` : faible, lecture seule. Les autres : élevé, approbation requise | Une description OpenAPI 3 (URL, fichier ou objet) | [Une API web](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | Chercher sur le Web, lire une page ou un PDF, chercher dans arXiv, Wikipédia et GitHub | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` | `web_fetch` moyen, les autres faible ; tous en lecture seule | Rien pour commencer (DuckDuckGo) ; `unpdf` pour les PDF ; un jeton GitHub pour chercher dans le code | [Recherche sur le Web](./web-research) |
 | `governedAgentTool(agent)`, `cognitiveAgentTool(agent)` | Consulter un autre agent : un agent gouverné répond à un `message`, un agent cognitif raisonne sur un `problem` et renvoie sa décision | `ask_<agent name>` | moyen, non marqué en lecture seule | Un agent, donc une clé de modèle | [Un agent](./mcp-recipes#an-agent-your-reasoning-twin) |
 | `await connectMcpServer({ name, transport })` | Utiliser les outils de n'importe quel serveur MCP | Les noms du serveur, précédés de `toolPrefix` | Rien de défini : `metadata` s'applique à chaque outil importé | `@sdk-ai-agents/core/mcp` et `@modelcontextprotocol/sdk` ; `close()` une fois terminé | [Utiliser les outils d'un serveur MCP](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
@@ -120,7 +120,7 @@ Un appel passe par ces étapes, dans cet ordre, et s'arrête au premier refus :
 1. **Les outils de l'appelant.** Un outil qui n'a pas été donné à l'appelant est refusé : les outils d'un agent, les sources d'une étude, la liste d'un serveur MCP, ou `allowedTools`. `executeTool` sans `allowedTools` peut exécuter n'importe quel outil enregistré.
 2. **Les arguments**, vérifiés par rapport au schéma, avant que quiconque ne soit sollicité.
 3. **Les politiques** : chaque politique globale et chaque politique de l'agent (voir [Agents gouvernés](./governed-agents#_3-policies)).
-4. **L'approbation**, quand l'outil ou une politique en demande une.
+4. **L'approbation**, quand l'outil ou une politique en demande une. Un appel refusé par une politique, quelle qu'elle soit, est refusé sans qu'une approbation soit demandée : une approbation ne l'emporte jamais sur un refus, une liste d'autorisation ou un budget.
 5. **Le budget** : l'appel est décompté dès qu'il commence, quelle qu'en soit l'issue.
 6. **L'outil s'exécute**, avec ses nouvelles tentatives.
 
@@ -152,7 +152,7 @@ La liste est établie au moment où la politique est définie : définissez d'a
 
 ### Approbations {#approvals}
 
-Un appel attend un humain quand l'outil a `requiresApproval: true` (la valeur par défaut de `openApiTools` pour les opérations d'écriture) ou qu'une règle de politique dit `require_approval`. Il apparaît dans `sdk.getPendingApprovals()` ; `sdk.approveAction(id, who, reason?)` le laisse s'exécuter, `sdk.rejectAction(id, who, reason?)` le refuse. Si l'appelant abandonne avant (une exécution arrêtée, un `signal` interrompu, `approvalTimeoutMs`, 50 s par défaut sur les serveurs MCP), l'approbation est annulée et l'outil ne s'exécute jamais. Voir [Approbations](./mcp-deploy#approvals-a-human-says-yes-first).
+Un appel attend un humain quand l'outil a `requiresApproval: true` (la valeur par défaut de `openApiTools` pour les opérations d'écriture) ou qu'une règle de politique dit `require_approval`. Il apparaît dans `sdk.getPendingApprovals()` ; `sdk.approveAction(id, who, reason?)` le laisse s'exécuter, `sdk.rejectAction(id, who, reason?)` le refuse. Un appel refusé par une politique, quelle qu'elle soit, est refusé sans qu'une approbation soit demandée : une approbation ne l'emporte jamais sur un refus, une liste d'autorisation ou un budget. Si l'appelant abandonne avant (une exécution arrêtée, un `signal` interrompu, `approvalTimeoutMs`, 50 s par défaut sur les serveurs MCP), l'approbation est annulée et l'outil ne s'exécute jamais. Voir [Approbations](./mcp-deploy#approvals-a-human-says-yes-first).
 
 ### Outils en lecture seule {#read-only-tools}
 
@@ -182,7 +182,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-`maxTokens` et `maxCost` comptent les appels au modèle, et refusent les appels d'outils une fois le plafond atteint. Voir [Coûts d'API](./costs#budgets).
+Un `budgetLimit` peut aussi plafonner `maxTokens` et `maxCost`, comptés sur les appels au modèle : une fois un plafond dépassé par la consommation de la période, les appels d'outils sont refusés, et `maxCost` les refuse aussi dès que le coût d'un appel est inconnu (un modèle sans tarif, un appel sans nombres de tokens). Voir [Coûts d'API](./costs#budgets).
 
 ### Résultats non fiables {#untrusted-output}
 
@@ -208,7 +208,7 @@ Un appel fait avec `executeTool` est une exécution à part entière, sauf si vo
 | --- | --- |
 | Mon propre code ou mon propre service | `sdk.defineTool` |
 | Des documents dans un dossier | `folderTools` |
-| Des réponses tirées d'une base de données SQL, sans aucun risque d'écriture | `databaseTools` avec `sqliteReadOnly` ou `postgresReadOnly` |
+| Des réponses tirées d'une base de données SQL, en lecture seule | `databaseTools` avec `sqliteReadOnly` ou `postgresReadOnly` ; pour PostgreSQL, connectez-vous aussi avec un rôle qui ne peut que lire |
 | Une API web qui publie une description OpenAPI | `openApiTools` |
 | Une API web qui n'en publie pas | `sdk.defineTool`, avec `fetch` dans le gestionnaire |
 | Le Web, des articles scientifiques, des articles d'encyclopédie, du code sur GitHub | `webTools` |

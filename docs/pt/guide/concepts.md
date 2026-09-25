@@ -115,7 +115,7 @@ const agent = sdk.createAgent({
 Uma **política** (policy) define as regras de governança aplicadas antes de cada ação.
 
 **Tipos de política:**
-- **Budget** (orçamento): limite de etapas ou de tokens
+- **Budget** (orçamento): limite de etapas, de tokens, de chamadas de ferramentas ou de custo (por execução, ou por agente, ferramenta e período)
 - **Timeout**: duração máxima de execução
 - **Allowlist**: lista de ferramentas autorizadas
 - **Custom**: validador personalizado
@@ -220,27 +220,8 @@ O LLM gera intenções, nunca ações diretas. Todas as ações passam pelo moto
 
 Nada é autorizado por padrão. Todas as ferramentas precisam ser declaradas (registradas) explicitamente antes que algo possa executá-las.
 
-::: warning Alcance de um agente governado
-Um agente governado pode executar **qualquer ferramenta registrada no SDK** que o modelo mencionar: a lista `tools` do agente decide o que é oferecido ao modelo, não o que ele pode chamar. Restrinja-o com uma política `allowlist` — qualquer outra ferramenta é negada antes da execução:
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-Os agentes cognitivos e os servidores MCP ficam restritos à sua lista de ferramentas automaticamente.
+::: info Alcance de um agente governado
+Um agente governado executa **apenas as suas próprias ferramentas**: as de `tools` e as das suas `capabilities`. Se o modelo nomear qualquer outra ferramenta, mesmo uma registrada no SDK para outro agente, a chamada é recusada antes da execução (`policy.violated`, `allowed-tools`). Os agentes cognitivos, os estudos e os servidores MCP ficam restritos à sua lista de ferramentas da mesma forma. Uma política `allowlist` restringe essa lista ainda mais, para um agente ou para todos.
 :::
 
 ### 3. Event sourcing nativo {#_3-native-event-sourcing}

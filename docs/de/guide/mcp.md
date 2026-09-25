@@ -136,7 +136,7 @@ const crm = await connectMcpServer({
   transport: { type: 'http', url: 'https://mcp.acme.internal/crm', headers: { Authorization: `Bearer ${token}` } },
   toolPrefix: 'crm_',                         // avoid collisions between servers
   include: ['lookup_customer', 'list_invoices'],
-  metadata: { riskLevel: 'medium' },          // governance metadata for every tool
+  metadata: { riskLevel: 'medium' },          // for every tool; a label no policy reads unless you write one
   retry: { maxRetries: 2 },
 });
 

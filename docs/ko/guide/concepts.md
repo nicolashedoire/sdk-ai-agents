@@ -115,7 +115,7 @@ const agent = sdk.createAgent({
 **정책**(Policy)은 각 행동 전에 적용되는 거버넌스 규칙을 정의합니다.
 
 **정책 유형:**
-- **예산(Budget)**: 단계 수 또는 토큰 수의 한도
+- **예산(Budget)**: 단계 수, 토큰 수, 도구 호출 수 또는 비용의 한도(실행별, 또는 에이전트, 도구, 기간별)
 - **타임아웃(Timeout)**: 최대 실행 시간
 - **허용 목록(Allowlist)**: 허용된 도구 목록
 - **커스텀(Custom)**: 직접 만든 검증기
@@ -220,27 +220,8 @@ LLM은 의도를 생성할 뿐, 직접 행동하지 않습니다. 모든 행동�
 
 기본적으로 아무것도 허용되지 않습니다. 무엇이든 도구를 실행하려면, 그 전에 모든 도구가 명시적으로 선언(등록)되어야 합니다.
 
-::: warning 통제형 에이전트의 범위
-통제형 에이전트는 모델이 이름을 대는 **SDK에 등록된 모든 도구**를 실행할 수 있습니다. 에이전트의 `tools` 목록은 모델에게 무엇을 제시할지를 정할 뿐, 무엇을 호출할 수 있는지를 정하지 않습니다. `allowlist` 정책으로 제한하세요. 그 밖의 도구는 실행 전에 거부됩니다.
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-인지 에이전트와 MCP 서버는 자동으로 자신의 도구 목록으로 제한됩니다.
+::: info 통제형 에이전트의 범위
+통제형 에이전트는 **자신의 도구만** 실행합니다. `tools`에 있는 도구와 `capabilities`에 있는 도구입니다. 모델이 그 밖의 도구의 이름을 대면, 다른 에이전트를 위해 SDK에 등록된 도구라 해도 그 호출은 실행 전에 거부됩니다(`policy.violated`, `allowed-tools`). 인지 에이전트, 연구, MCP 서버도 같은 방식으로 자신의 도구 목록으로 제한됩니다. `allowlist` 정책은 에이전트 하나 또는 모든 에이전트에 대해 이 범위를 더 좁힙니다.
 :::
 
 ### 3. 네이티브 이벤트 소싱 {#_3-native-event-sourcing}

@@ -49,8 +49,8 @@ const refundOrder = sdk.defineTool({
 | 字段 | |
 | --- | --- |
 | `name`、`description` | 模型看到的内容，它据此做出决定。请使用字母、数字、`_` 和 `-`，最多 64 个字符：模型 API 和 MCP 客户端可能会拒绝其他名称。 |
-| `schema` | 参数，以 zod schema 表示；`.describe()` 中的文本会展示给模型。不匹配的调用会先于其他一切被拒绝。 |
-| `handler(params, context?)` | 你的代码。`context` 包含 `runId`、`agentId` 和 `signal`，当调用方放弃时 `signal` 会被中止。 |
+| `schema` | 参数，以 zod schema 表示；`.describe()` 中的文本会展示给模型。不匹配的调用会在任何策略、审批或预算之前被拒绝。 |
+| `handler(params, context?)` | 你的代码。`context` 包含 `runId`、`agentId`、`signal`（当调用方放弃时被中止）和 `onEvent`（当调用方实时观察这次调用时被设置）。 |
 | `metadata` | `riskLevel`（`low`、`medium`、`high`）、`requiresApproval`、`readOnly`、`category`：参见[调用如何受治理](#how-calls-are-governed)。默认一个都不设置。 |
 | `retry` | `{ maxRetries, initialDelayMs? (200), maxDelayMs? (5,000), retryOn? }`，仅适用于幂等的工具。 |
 | `version` | 默认为 `1.0.0`。它是智能体配置哈希的一部分，因此可以[比较](../reference/sdk-api#comparisons-and-impact)变更前后的运行。 |
@@ -65,8 +65,8 @@ const refundOrder = sdk.defineTool({
 | 工具源 | 智能体可以 | 工具名称 | 风险、只读 | 需要 | 详情 |
 | --- | --- | --- | --- | --- | --- |
 | `folderTools({ root })` | 列出、读取和搜索一个文件夹中的文本文件，从不越出该文件夹 | `list_files`、`read_file`、`search_files` | 低，只读 | 一个文件夹 | [一个文档文件夹](./mcp-recipes#a-folder-of-documents) |
-| `databaseTools({ database })` | 列出表、描述其中一张表、运行一条 `SELECT`（默认最多返回 100 行） | `list_tables`、`describe_table`、`query` | 中，只读 | `sqliteReadOnly(db)`（`node:sqlite` 或 `better-sqlite3`）或 `postgresReadOnly({ pool })`（`pg`） | [一个只读数据库](./mcp-recipes#a-read-only-database) |
-| `await openApiTools({ spec })` | 调用一个 Web API，每个操作一个工具；除非在 `include` 中列出，否则只有 `GET` 操作 | `operationId`，没有时则是方法加路径（`get_pets_petId`） | `GET`：低，只读。其他：高，需要审批 | 一份 OpenAPI 3 描述（URL、文件或对象） | [一个 Web API](./mcp-recipes#a-web-api-from-its-openapi-description) |
+| `databaseTools({ database })` | 列出表、描述其中一张表、运行一条只读查询：`SELECT`、`WITH … SELECT` 或 `VALUES`（默认最多返回 100 行） | `list_tables`、`describe_table`、`query` | 中，只读 | `sqliteReadOnly(db)`（`node:sqlite` 或 `better-sqlite3`）或 `postgresReadOnly({ pool })`（`pg`） | [一个只读数据库](./mcp-recipes#a-read-only-database) |
+| `await openApiTools({ spec })` | 调用一个 Web API，每个操作一个工具：默认是 `GET` 操作；`include` 会用它列出的操作取代它们，这是获得写操作的唯一方式 | `operationId`，没有时则是方法加路径（`get_pets_petId`） | `GET`：低，只读。其他：高，需要审批 | 一份 OpenAPI 3 描述（URL、文件或对象） | [一个 Web API](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | 搜索 Web，阅读一个网页或一份 PDF，搜索 arXiv、Wikipedia 和 GitHub | `web_search`、`web_fetch`、`arxiv_search`、`wikipedia_search`、`github_search` | `web_fetch` 为中，其他为低；全部只读 | 起步什么都不需要（DuckDuckGo）；读取 PDF 需要 `unpdf`；搜索代码需要一个 GitHub 令牌 | [Web 调研](./web-research) |
 | `governedAgentTool(agent)`、`cognitiveAgentTool(agent)` | 询问另一个智能体：受治理智能体回答一条 `message`，认知智能体针对一个 `problem` 进行推理并返回它的决策 | `ask_<agent name>` | 中，未标记为只读 | 一个智能体，因此需要一个模型密钥 | [一个智能体](./mcp-recipes#an-agent-your-reasoning-twin) |
 | `await connectMcpServer({ name, transport })` | 使用任何 MCP 服务器的工具 | 服务器自己的名称，前面加上 `toolPrefix` | 不设置：`metadata` 会应用到每一个导入的工具 | `@sdk-ai-agents/core/mcp` 和 `@modelcontextprotocol/sdk`；用完后调用 `close()` | [使用 MCP 服务器的工具](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
@@ -120,7 +120,7 @@ const order = await sdk.executeTool('lookup_order', { orderId: 'o-1042' }, { age
 1. **调用方的工具。** 没有交给调用方的工具会被拒绝：调用方的工具是指智能体的工具、研究的来源、MCP 服务器的列表或 `allowedTools`。不带 `allowedTools` 的 `executeTool` 可以运行任何已注册的工具。
 2. **参数**：对照 schema 检查，在向任何人询问任何事情之前进行。
 3. **策略**：每一条全局策略，以及智能体的每一条策略（参见[受治理智能体](./governed-agents#_3-policies)）。
-4. **审批**：当工具或某条策略要求审批时。
+4. **审批**：当工具或某条策略要求审批时。任何一条策略拒绝的调用都会直接被拒绝，不会请求审批：审批永远不会推翻拒绝、允许列表或预算。
 5. **预算**：调用在开始时就被计数，无论结果如何。
 6. **工具运行**，连同它的重试。
 
@@ -152,7 +152,7 @@ sdk.defineGlobalPolicy({
 
 ### 审批 {#approvals}
 
-当工具带有 `requiresApproval: true`（`openApiTools` 对写操作的默认设置），或者某条策略规则写着 `require_approval` 时，调用会等待人来决定。它会出现在 `sdk.getPendingApprovals()` 中；`sdk.approveAction(id, who, reason?)` 让它运行，`sdk.rejectAction(id, who, reason?)` 拒绝它。如果调用方先放弃了（运行被停止、`signal` 被中止、`approvalTimeoutMs` 到期，它在 MCP 服务器上默认为 50 秒），审批就会被取消，工具永远不会运行。参见[审批](./mcp-deploy#approvals-a-human-says-yes-first)。
+当工具带有 `requiresApproval: true`（`openApiTools` 对写操作的默认设置），或者某条策略规则写着 `require_approval` 时，调用会等待人来决定。它会出现在 `sdk.getPendingApprovals()` 中；`sdk.approveAction(id, who, reason?)` 让它运行，`sdk.rejectAction(id, who, reason?)` 拒绝它。任何一条策略拒绝的调用都会直接被拒绝，不会请求审批：审批永远不会推翻拒绝、允许列表或预算。如果调用方先放弃了（运行被停止、`signal` 被中止、`approvalTimeoutMs` 到期，它在 MCP 服务器上默认为 50 秒），审批就会被取消，工具永远不会运行。参见[审批](./mcp-deploy#approvals-a-human-says-yes-first)。
 
 ### 只读工具 {#read-only-tools}
 
@@ -182,7 +182,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-`maxTokens` 和 `maxCost` 统计的是模型调用，一旦用完就会拒绝工具调用。参见 [API 成本](./costs#budgets)。
+`budgetLimit` 还可以为 `maxTokens` 和 `maxCost` 设置上限，它们统计的是模型调用：一旦该时间段的用量超过某个上限，工具调用就会被拒绝；而只要有一次调用的成本未知（模型没有价格、调用没有报告 token 数），`maxCost` 也会拒绝工具调用。参见 [API 成本](./costs#budgets)。
 
 ### 不可信的输出 {#untrusted-output}
 
@@ -208,7 +208,7 @@ sdk.defineGlobalPolicy({
 | --- | --- |
 | 我自己的代码或服务 | `sdk.defineTool` |
 | 一个文件夹里的文档 | `folderTools` |
-| 从 SQL 数据库得到答案，而且没有任何写入的风险 | `databaseTools` 配合 `sqliteReadOnly` 或 `postgresReadOnly` |
+| 以只读方式从 SQL 数据库得到答案 | `databaseTools` 配合 `sqliteReadOnly` 或 `postgresReadOnly`；对于 PostgreSQL，还要用一个只能读取的角色来连接 |
 | 一个发布了 OpenAPI 描述的 Web API | `openApiTools` |
 | 一个没有 OpenAPI 描述的 Web API | `sdk.defineTool`，在处理函数中使用 `fetch` |
 | Web、论文、百科文章、GitHub 上的代码 | `webTools` |

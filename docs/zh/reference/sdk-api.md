@@ -489,7 +489,7 @@ interface ModelCostLine {
 
 ## 工具源 {#tool-sources}
 
-每个函数都返回现成的 `ToolDefinition`：可以把它们传给 `sdk.defineTool`、传给一个智能体，或者直接传给 MCP 服务器的 `tools`。参见[把任何系统变成 MCP 服务器](../guide/mcp-recipes)。
+每个函数都返回现成的 `ToolDefinition`：交给智能体之前，先让它们经过 `sdk.defineTool`（智能体接受的是 `Tool[]`），或者直接把它们传给 MCP 服务器的 `tools`。参见[工具](../guide/tools)和[把任何系统变成 MCP 服务器](../guide/mcp-recipes)。
 
 | 函数 | 返回值 | |
 | --- | --- | --- |

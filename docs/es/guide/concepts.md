@@ -115,7 +115,7 @@ const agent = sdk.createAgent({
 Una **política** define las reglas de gobernanza que se aplican antes de cada acción.
 
 **Tipos de política:**
-- **Budget** (presupuesto): límite de pasos o de tokens
+- **Budget** (presupuesto): límite de pasos, de tokens, de llamadas a herramientas o de coste (por ejecución, o por agente, herramienta y periodo)
 - **Timeout** (tiempo límite): duración máxima de ejecución
 - **Allowlist** (lista de permitidos): lista de herramientas autorizadas
 - **Custom** (personalizada): validador personalizado
@@ -220,27 +220,8 @@ El LLM genera intenciones, nunca acciones directas. Todas las acciones pasan por
 
 Nada está autorizado por defecto. Todas las herramientas deben declararse (registrarse) explícitamente antes de que algo pueda ejecutarlas.
 
-::: warning Alcance de un agente gobernado
-Un agente gobernado puede ejecutar **cualquier herramienta registrada en el SDK** que el modelo nombre: la lista `tools` del agente decide lo que se le ofrece al modelo, no lo que puede llamar. Restríngelo con una política `allowlist` — cualquier otra herramienta se deniega antes de ejecutarse:
-
-```ts
-const agent = sdk.createAgent({
-  name: 'support',
-  model: 'gpt-4o',
-  tools: [lookupCustomer],
-  policies: [
-    {
-      id: 'support-tools',
-      type: 'allowlist',
-      scope: 'agent',
-      enabled: true,
-      rules: [{ condition: 'allowedTools', action: 'deny', metadata: { tools: ['lookup_customer'] } }],
-    },
-  ],
-});
-```
-
-Los agentes cognitivos y los servidores MCP se limitan automáticamente a su lista de herramientas.
+::: info Alcance de un agente gobernado
+Un agente gobernado ejecuta **solo sus propias herramientas**: las de sus `tools` y las de sus `capabilities`. Si el modelo nombra cualquier otra herramienta, incluso una registrada en el SDK para otro agente, la llamada se rechaza antes de ejecutarse (`policy.violated`, `allowed-tools`). Los agentes cognitivos, los estudios y los servidores MCP se limitan de la misma forma a su lista de herramientas. Una política `allowlist` restringe todavía más esa lista, para un agente o para todos.
 :::
 
 ### 3. Event sourcing nativo {#_3-native-event-sourcing}

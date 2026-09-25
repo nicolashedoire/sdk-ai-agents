@@ -49,8 +49,8 @@ const refundOrder = sdk.defineTool({
 | الحقل | |
 | --- | --- |
 | `name`، `description` | ما يراه النموذج ويقرّر بناءً عليه. استخدم الأحرف، والأرقام، و`_`، و`-`، حتى 64 حرفًا: فقد ترفض واجهات API الخاصة بالنماذج وعملاء MCP الأسماء الأخرى. |
-| `schema` | المعاملات، في صورة مخطط zod؛ وتُعرَض نصوص `.describe()` على النموذج. والاستدعاء الذي لا يطابقه يُرفَض قبل أي شيء آخر. |
-| `handler(params, context?)` | شيفرتك. يحتوي `context` على `runId`، و`agentId`، و`signal` الذي يُلغى حين يتخلّى المستدعي. |
+| `schema` | المعاملات، في صورة مخطط zod؛ وتُعرَض نصوص `.describe()` على النموذج. والاستدعاء الذي لا يطابقه يُرفَض قبل أي سياسة أو موافقة أو ميزانية. |
+| `handler(params, context?)` | شيفرتك. يحتوي `context` على `runId`، و`agentId`، و`signal` (الذي يُلغى حين يتخلّى المستدعي)، و`onEvent` (الذي يُعيَّن حين يتابع المستدعي الاستدعاء مباشرةً). |
 | `metadata` | `riskLevel` (`low`، `medium`، `high`)، و`requiresApproval`، و`readOnly`، و`category`: انظر [كيف تخضع الاستدعاءات للحوكمة](#how-calls-are-governed). لا يُعيَّن أيٌّ منها افتراضيًا. |
 | `retry` | `{ maxRetries, initialDelayMs? (200), maxDelayMs? (5,000), retryOn? }`، للأدوات المتساوية القوة (idempotent) فقط. |
 | `version` | `1.0.0` افتراضيًا. وهو جزء من هاش إعداد الوكيل، فيمكن [مقارنة](../reference/sdk-api#comparisons-and-impact) عمليات التشغيل قبل التغيير وبعده. |
@@ -65,8 +65,8 @@ const refundOrder = sdk.defineTool({
 | المصدر | يستطيع الوكيل | أسماء الأدوات | المخاطر، القراءة فقط | يحتاج إلى | التفاصيل |
 | --- | --- | --- | --- | --- | --- |
 | `folderTools({ root })` | سرد الملفات النصية لمجلد واحد، وقراءتها، والبحث فيها، دون الخروج منه أبدًا | `list_files`، `read_file`، `search_files` | منخفضة، للقراءة فقط | مجلد | [مجلد مستندات](./mcp-recipes#a-folder-of-documents) |
-| `databaseTools({ database })` | سرد الجداول، ووصف أحدها، وتشغيل استعلام `SELECT` واحد (100 صف افتراضيًا) | `list_tables`، `describe_table`، `query` | متوسطة، للقراءة فقط | `sqliteReadOnly(db)` (`node:sqlite` أو `better-sqlite3`) أو `postgresReadOnly({ pool })` (`pg`) | [قاعدة بيانات للقراءة فقط](./mcp-recipes#a-read-only-database) |
-| `await openApiTools({ spec })` | استدعاء واجهة API على الويب، بأداة لكل عملية؛ `GET` فقط ما لم تُسرَد العملية في `include` | قيمة `operationId`، وإلا فالطريقة والمسار (`get_pets_petId`) | `GET`: منخفضة، للقراءة فقط. غيرها: عالية، مع موافقة إلزامية | وصف OpenAPI 3 (عنوان URL، أو ملف، أو كائن) | [واجهة API على الويب](./mcp-recipes#a-web-api-from-its-openapi-description) |
+| `databaseTools({ database })` | سرد الجداول، ووصف أحدها، وتشغيل استعلام واحد للقراءة فقط: `SELECT`، أو `WITH … SELECT`، أو `VALUES` (100 صف على الأكثر افتراضيًا) | `list_tables`، `describe_table`، `query` | متوسطة، للقراءة فقط | `sqliteReadOnly(db)` (`node:sqlite` أو `better-sqlite3`) أو `postgresReadOnly({ pool })` (`pg`) | [قاعدة بيانات للقراءة فقط](./mcp-recipes#a-read-only-database) |
+| `await openApiTools({ spec })` | استدعاء واجهة API على الويب، بأداة لكل عملية: عمليات `GET` افتراضيًا؛ ويستبدل بها `include` العمليات التي يسردها، وهو الطريقة الوحيدة للحصول على عمليات الكتابة | قيمة `operationId`، وإلا فالطريقة والمسار (`get_pets_petId`) | `GET`: منخفضة، للقراءة فقط. غيرها: عالية، مع موافقة إلزامية | وصف OpenAPI 3 (عنوان URL، أو ملف، أو كائن) | [واجهة API على الويب](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | البحث على الويب، وقراءة صفحة أو ملف PDF، والبحث في arXiv وWikipedia وGitHub | `web_search`، `web_fetch`، `arxiv_search`، `wikipedia_search`، `github_search` | `web_fetch` متوسطة، والأخرى منخفضة؛ وكلها للقراءة فقط | لا شيء للبدء (DuckDuckGo)؛ و`unpdf` لملفات PDF؛ ورمز GitHub (token) للبحث في الشيفرة | [البحث على الويب](./web-research) |
 | `governedAgentTool(agent)`، `cognitiveAgentTool(agent)` | سؤال وكيل آخر: يجيب الوكيل الخاضع للحوكمة عن `message`، ويستدلّ الوكيل المعرفي بشأن `problem` ويعيد قراره | `ask_<agent name>` | متوسطة، غير موسومة بأنها للقراءة فقط | وكيل، ومن ثَمّ مفتاح نموذج | [وكيل](./mcp-recipes#an-agent-your-reasoning-twin) |
 | `await connectMcpServer({ name, transport })` | استخدام أدوات أي خادم MCP | أسماء الخادم، مسبوقة بـ `toolPrefix` | لا شيء معيَّن: تنطبق `metadata` على كل أداة مستوردة | `@sdk-ai-agents/core/mcp` و`@modelcontextprotocol/sdk`؛ و`close()` عند الانتهاء | [استخدام أدوات خادم MCP](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
@@ -120,7 +120,7 @@ const order = await sdk.executeTool('lookup_order', { orderId: 'o-1042' }, { age
 1. **أدوات المستدعي.** تُرفَض الأداة التي لم تُعطَ للمستدعي: أدوات الوكيل، أو مصادر الدراسة، أو قائمة خادم MCP، أو `allowedTools`. ويستطيع `executeTool` دون `allowedTools` أن يشغّل أي أداة مسجَّلة.
 2. **المعاملات**، تُفحَص مقابل المخطط، قبل أن يُسأل أي أحد عن أي شيء.
 3. **السياسات**: كل سياسة عامة وكل سياسة خاصة بالوكيل (انظر [الوكلاء الخاضعون للحوكمة](./governed-agents#_3-policies)).
-4. **الموافقة**، حين تطلبها الأداة أو سياسة.
+4. **الموافقة**، حين تطلبها الأداة أو سياسة. والاستدعاء الذي ترفضه أي سياسة يُرفَض دون طلب موافقة: فالموافقة لا تتغلّب أبدًا على قاعدة رفض، ولا على قائمة سماح، ولا على ميزانية.
 5. **الميزانية**: يُحتسَب الاستدعاء حين يبدأ، أيًّا كانت نتيجته.
 6. **تشغيل الأداة**، مع إعادات المحاولة الخاصة بها.
 
@@ -152,7 +152,7 @@ sdk.defineGlobalPolicy({
 
 ### الموافقات {#approvals}
 
-ينتظر الاستدعاء إنسانًا حين يكون للأداة `requiresApproval: true` (وهو الافتراضي في `openApiTools` لعمليات الكتابة) أو حين تقول قاعدة في سياسة `require_approval`. ويظهر عندئذٍ في `sdk.getPendingApprovals()`؛ ويسمح `sdk.approveAction(id, who, reason?)` بتشغيله، ويرفضه `sdk.rejectAction(id, who, reason?)`. وإذا تخلّى المستدعي أولًا (تشغيل أُوقِف، أو `signal` أُلغي، أو انقضاء `approvalTimeoutMs`، وهو 50 ثانية افتراضيًا على خوادم MCP)، تُلغى الموافقة ولا تُشغَّل الأداة أبدًا. انظر [الموافقات](./mcp-deploy#approvals-a-human-says-yes-first).
+ينتظر الاستدعاء إنسانًا حين يكون للأداة `requiresApproval: true` (وهو الافتراضي في `openApiTools` لعمليات الكتابة) أو حين تقول قاعدة في سياسة `require_approval`. ويظهر عندئذٍ في `sdk.getPendingApprovals()`؛ ويسمح `sdk.approveAction(id, who, reason?)` بتشغيله، ويرفضه `sdk.rejectAction(id, who, reason?)`. والاستدعاء الذي ترفضه أي سياسة يُرفَض دون طلب موافقة: فالموافقة لا تتغلّب أبدًا على قاعدة رفض، ولا على قائمة سماح، ولا على ميزانية. وإذا تخلّى المستدعي أولًا (تشغيل أُوقِف، أو `signal` أُلغي، أو انقضاء `approvalTimeoutMs`، وهو 50 ثانية افتراضيًا على خوادم MCP)، تُلغى الموافقة ولا تُشغَّل الأداة أبدًا. انظر [الموافقات](./mcp-deploy#approvals-a-human-says-yes-first).
 
 ### الأدوات التي للقراءة فقط {#read-only-tools}
 
@@ -182,7 +182,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-أما `maxTokens` و`maxCost` فيحتسبان استدعاءات النموذج، ويرفضان استدعاءات الأدوات بمجرّد استنفاد الميزانية. انظر [تكاليف API](./costs#budgets).
+ويمكن لـ `budgetLimit` أيضًا أن يضع سقفًا بـ `maxTokens` و`maxCost`، يُحتسَبان على استدعاءات النموذج: فبمجرّد أن يتجاوز استهلاك الفترة أحد السقفين، تُرفَض استدعاءات الأدوات، ويرفضها `maxCost` أيضًا بمجرّد أن تكون كلفة استدعاء مجهولة (نموذج بلا سعر، أو استدعاء لم يُبلِغ عن عدد رموزه). انظر [تكاليف API](./costs#budgets).
 
 ### المخرجات غير الموثوقة {#untrusted-output}
 
@@ -208,7 +208,7 @@ sdk.defineGlobalPolicy({
 | --- | --- |
 | شيفرتي أو خدمتي الخاصة | `sdk.defineTool` |
 | مستندات في مجلد | `folderTools` |
-| إجابات من قاعدة بيانات SQL، دون أي خطر للكتابة | `databaseTools` مع `sqliteReadOnly` أو `postgresReadOnly` |
+| إجابات من قاعدة بيانات SQL، للقراءة فقط | `databaseTools` مع `sqliteReadOnly` أو `postgresReadOnly`؛ ومع PostgreSQL، اتصل أيضًا بدور لا يستطيع إلا القراءة |
 | واجهة API على الويب تنشر وصف OpenAPI | `openApiTools` |
 | واجهة API على الويب دون وصف كهذا | `sdk.defineTool`، مع `fetch` في المعالج |
 | الويب، والأبحاث العلمية، ومقالات الموسوعة، والشيفرة على GitHub | `webTools` |

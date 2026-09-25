@@ -147,7 +147,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-在等待期间，这次调用会出现在 `sdk.getPendingApprovals()` 中。你的代码通过 `sdk.approveAction(id, who, reason)` 或 `sdk.rejectAction(id, who, reason)` 作出决定；两者都会被记录（`approval.requested`、`approval.approved` 或 `approval.rejected`）。stdio 服务器无法在自己的终端里询问——标准输入承载的是协议——所以决定来自另一个渠道。例如，本机上的一个小型管理端点，与服务器运行在同一个进程中。
+任何一条策略拒绝的调用都会直接被拒绝，不会请求审批：审批永远不会推翻拒绝、允许列表或预算。在等待期间，这次调用会出现在 `sdk.getPendingApprovals()` 中。你的代码通过 `sdk.approveAction(id, who, reason)` 或 `sdk.rejectAction(id, who, reason)` 作出决定；两者都会被记录（`approval.requested`、`approval.approved` 或 `approval.rejected`）。stdio 服务器无法在自己的终端里询问——标准输入承载的是协议——所以决定来自另一个渠道。例如，本机上的一个小型管理端点，与服务器运行在同一个进程中。
 
 **管理端点决定什么会被运行：请像保护 MCP 端点一样保护它。** 否则，你浏览器中打开的某个页面可能会访问到 `localhost`（DNS 重绑定）并替你批准。因此它只监听 `127.0.0.1`，只接受它自己的 `Host`，拒绝任何带有 `Origin` 的请求（浏览器会加上它；脚本和 `curl` 不会），并要求提供一个秘密请求头：
 

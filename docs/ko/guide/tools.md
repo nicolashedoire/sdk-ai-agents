@@ -49,8 +49,8 @@ const refundOrder = sdk.defineTool({
 | 필드 | |
 | --- | --- |
 | `name`, `description` | 모델이 보고, 이를 바탕으로 결정하는 것입니다. 문자, 숫자, `_`, `-`를 써서 64자 이내로 지으세요. 모델 API와 MCP 클라이언트가 다른 이름을 거부할 수 있습니다. |
-| `schema` | zod 스키마로 표현한 인자입니다. `.describe()` 텍스트가 모델에게 보입니다. 맞지 않는 호출은 다른 무엇보다 먼저 거부됩니다. |
-| `handler(params, context?)` | 여러분의 코드입니다. `context`에는 `runId`, `agentId`, 그리고 호출하는 쪽이 포기하면 중단되는 `signal`이 들어 있습니다. |
+| `schema` | zod 스키마로 표현한 인자입니다. `.describe()` 텍스트가 모델에게 보입니다. 맞지 않는 호출은 어떤 정책, 승인, 예산보다도 먼저 거부됩니다. |
+| `handler(params, context?)` | 여러분의 코드입니다. `context`에는 `runId`, `agentId`, `signal`(호출하는 쪽이 포기하면 중단됨), `onEvent`(호출하는 쪽이 호출을 실시간으로 지켜볼 때 설정됨)가 들어 있습니다. |
 | `metadata` | `riskLevel`(`low`, `medium`, `high`), `requiresApproval`, `readOnly`, `category`입니다. [호출이 통제되는 방식](#how-calls-are-governed)을 보세요. 기본값은 없습니다. |
 | `retry` | `{ maxRetries, initialDelayMs? (200), maxDelayMs? (5,000), retryOn? }`이며, 멱등 도구에만 씁니다. |
 | `version` | 기본값은 `1.0.0`입니다. 에이전트의 설정 해시에 포함되므로, 변경 전후의 실행을 [비교](../reference/sdk-api#comparisons-and-impact)할 수 있습니다. |
@@ -65,8 +65,8 @@ const refundOrder = sdk.defineTool({
 | 소스 | 에이전트가 할 수 있는 것 | 도구 이름 | 위험, 읽기 전용 | 필요한 것 | 자세히 |
 | --- | --- | --- | --- | --- | --- |
 | `folderTools({ root })` | 한 폴더의 텍스트 파일을 나열하고, 읽고, 검색합니다. 폴더 밖으로는 절대 나가지 않습니다 | `list_files`, `read_file`, `search_files` | 낮음, 읽기 전용 | 폴더 하나 | [문서 폴더](./mcp-recipes#a-folder-of-documents) |
-| `databaseTools({ database })` | 테이블을 나열하고, 하나를 기술하고, `SELECT` 하나를 실행합니다(기본적으로 100행) | `list_tables`, `describe_table`, `query` | 중간, 읽기 전용 | `sqliteReadOnly(db)`(`node:sqlite` 또는 `better-sqlite3`) 또는 `postgresReadOnly({ pool })`(`pg`) | [읽기 전용 데이터베이스](./mcp-recipes#a-read-only-database) |
-| `await openApiTools({ spec })` | 웹 API를 호출합니다. 오퍼레이션마다 도구가 하나이며, `include`에 나열하지 않으면 `GET`만 호출합니다 | `operationId`, 없으면 메서드와 경로(`get_pets_petId`) | `GET`: 낮음, 읽기 전용. 그 밖: 높음, 승인 필요 | OpenAPI 3 기술(URL, 파일 또는 객체) | [웹 API](./mcp-recipes#a-web-api-from-its-openapi-description) |
+| `databaseTools({ database })` | 테이블을 나열하고, 하나를 기술하고, 읽기 전용 쿼리 하나를 실행합니다. `SELECT`, `WITH … SELECT` 또는 `VALUES`입니다(기본적으로 최대 100행) | `list_tables`, `describe_table`, `query` | 중간, 읽기 전용 | `sqliteReadOnly(db)`(`node:sqlite` 또는 `better-sqlite3`) 또는 `postgresReadOnly({ pool })`(`pg`) | [읽기 전용 데이터베이스](./mcp-recipes#a-read-only-database) |
+| `await openApiTools({ spec })` | 웹 API를 호출합니다. 오퍼레이션마다 도구가 하나이며, 기본적으로 `GET` 오퍼레이션입니다. `include`는 이를 자신이 나열한 오퍼레이션으로 대체하며, 쓰기 오퍼레이션을 얻는 유일한 방법입니다 | `operationId`, 없으면 메서드와 경로(`get_pets_petId`) | `GET`: 낮음, 읽기 전용. 그 밖: 높음, 승인 필요 | OpenAPI 3 기술(URL, 파일 또는 객체) | [웹 API](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | 웹을 검색하고, 페이지나 PDF를 읽고, arXiv, Wikipedia, GitHub를 검색합니다 | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` | `web_fetch`는 중간, 나머지는 낮음. 모두 읽기 전용 | 시작하는 데는 아무것도 필요 없음(DuckDuckGo). PDF에는 `unpdf`, 코드 검색에는 GitHub 토큰 | [웹 조사](./web-research) |
 | `governedAgentTool(agent)`, `cognitiveAgentTool(agent)` | 다른 에이전트에게 묻습니다. 통제형 에이전트는 `message`에 답하고, 인지 에이전트는 `problem`에 대해 추론한 뒤 결정을 반환합니다 | `ask_<agent name>` | 중간, 읽기 전용으로 표시되지 않음 | 에이전트, 따라서 모델 키 | [에이전트](./mcp-recipes#an-agent-your-reasoning-twin) |
 | `await connectMcpServer({ name, transport })` | 어떤 MCP 서버의 도구든 사용합니다 | 서버가 붙인 이름, 앞에 `toolPrefix`가 붙음 | 설정되지 않음. `metadata`가 가져온 모든 도구에 적용됩니다 | `@sdk-ai-agents/core/mcp`와 `@modelcontextprotocol/sdk`. 다 쓰면 `close()` | [MCP 서버의 도구 사용하기](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
@@ -120,7 +120,7 @@ const order = await sdk.executeTool('lookup_order', { orderId: 'o-1042' }, { age
 1. **호출하는 쪽의 도구.** 호출하는 쪽이 받지 않은 도구는 거부됩니다. 받은 도구란 에이전트의 도구, 연구의 소스, MCP 서버의 목록, 또는 `allowedTools`입니다. `allowedTools` 없이 쓴 `executeTool`은 등록된 어떤 도구든 실행할 수 있습니다.
 2. **인자.** 누구에게 무엇을 묻기 전에 스키마에 대해 검사됩니다.
 3. **정책.** 모든 전역 정책과 에이전트의 모든 정책입니다([통제형 에이전트](./governed-agents#_3-policies) 참고).
-4. **승인.** 도구나 정책이 승인을 요구할 때입니다.
+4. **승인.** 도구나 정책이 승인을 요구할 때입니다. 어떤 정책이든 거부하는 호출은 승인을 요청하지 않고 거부됩니다. 승인은 거부 규칙, 허용 목록, 예산을 절대 뒤집지 않습니다.
 5. **예산.** 호출은 결과가 어떻든 시작될 때 셉니다.
 6. **도구 실행.** 재시도도 이 단계에서 이루어집니다.
 
@@ -152,7 +152,7 @@ sdk.defineGlobalPolicy({
 
 ### 승인 {#approvals}
 
-도구에 `requiresApproval: true`가 있거나(`openApiTools`의 쓰기 오퍼레이션 기본값) 정책 규칙이 `require_approval`이라고 하면, 호출은 사람을 기다립니다. 그 호출은 `sdk.getPendingApprovals()`에 나타나며, `sdk.approveAction(id, who, reason?)`은 실행을 허락하고 `sdk.rejectAction(id, who, reason?)`은 거부합니다. 호출하는 쪽이 먼저 포기하면(중지된 실행, 중단된 `signal`, `approvalTimeoutMs`, MCP 서버에서는 기본값 50초) 승인은 취소되고 도구는 절대 실행되지 않습니다. [승인](./mcp-deploy#approvals-a-human-says-yes-first)을 보세요.
+도구에 `requiresApproval: true`가 있거나(`openApiTools`의 쓰기 오퍼레이션 기본값) 정책 규칙이 `require_approval`이라고 하면, 호출은 사람을 기다립니다. 그 호출은 `sdk.getPendingApprovals()`에 나타나며, `sdk.approveAction(id, who, reason?)`은 실행을 허락하고 `sdk.rejectAction(id, who, reason?)`은 거부합니다. 어떤 정책이든 거부하는 호출은 승인을 요청하지 않고 거부됩니다. 승인은 거부 규칙, 허용 목록, 예산을 절대 뒤집지 않습니다. 호출하는 쪽이 먼저 포기하면(중지된 실행, 중단된 `signal`, `approvalTimeoutMs`, MCP 서버에서는 기본값 50초) 승인은 취소되고 도구는 절대 실행되지 않습니다. [승인](./mcp-deploy#approvals-a-human-says-yes-first)을 보세요.
 
 ### 읽기 전용 도구 {#read-only-tools}
 
@@ -182,7 +182,7 @@ sdk.defineGlobalPolicy({
 });
 ```
 
-`maxTokens`와 `maxCost`는 모델 호출을 집계하며, 다 쓰고 나면 도구 호출을 거부합니다. [API 비용](./costs#budgets)을 보세요.
+`budgetLimit`은 모델 호출에서 집계하는 `maxTokens`와 `maxCost`에도 상한을 둘 수 있습니다. 기간 내 사용량이 상한을 넘으면 도구 호출이 거부되며, `maxCost`는 호출의 비용을 알 수 없게 되는 즉시(가격이 없는 모델, 토큰 수가 없는 호출) 도구 호출을 거부하기도 합니다. [API 비용](./costs#budgets)을 보세요.
 
 ### 신뢰할 수 없는 출력 {#untrusted-output}
 
@@ -208,7 +208,7 @@ sdk.defineGlobalPolicy({
 | --- | --- |
 | 직접 작성한 코드나 서비스 | `sdk.defineTool` |
 | 폴더에 든 문서 | `folderTools` |
-| 쓰기 위험 없이 SQL 데이터베이스에서 얻는 답 | `databaseTools`와 `sqliteReadOnly` 또는 `postgresReadOnly` |
+| SQL 데이터베이스에서 읽기 전용으로 얻는 답 | `databaseTools`와 `sqliteReadOnly` 또는 `postgresReadOnly`. PostgreSQL이라면 여기에 더해 읽기만 할 수 있는 롤로 연결하세요 |
 | OpenAPI 기술을 게시하는 웹 API | `openApiTools` |
 | OpenAPI 기술이 없는 웹 API | `sdk.defineTool`, 핸들러 안에서 `fetch` 사용 |
 | 웹, 논문, 백과사전 글, GitHub의 코드 | `webTools` |

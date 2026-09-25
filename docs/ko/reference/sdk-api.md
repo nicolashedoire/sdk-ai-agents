@@ -489,7 +489,7 @@ interface ModelCostLine {
 
 ## 도구 소스 {#tool-sources}
 
-각 함수는 바로 쓸 수 있는 `ToolDefinition`을 반환합니다. 이를 `sdk.defineTool`에, 에이전트에, 또는 MCP 서버의 `tools`에 바로 넘기세요. [무엇이든 MCP 서버로](../guide/mcp-recipes)를 보세요.
+각 함수는 바로 쓸 수 있는 `ToolDefinition`을 반환합니다. 에이전트에게 주기 전에 `sdk.defineTool`을 거치게 하거나(에이전트는 `Tool[]`을 받습니다), MCP 서버의 `tools`에 바로 넘기세요. [도구](../guide/tools)와 [무엇이든 MCP 서버로](../guide/mcp-recipes)를 보세요.
 
 | 함수 | 반환값 | |
 | --- | --- | --- |

@@ -489,7 +489,7 @@ interface ModelCostLine {
 
 ## مصادر الأدوات {#tool-sources}
 
-يعيد كل منها تعريفات `ToolDefinition` جاهزة: مرّرها إلى `sdk.defineTool`، أو إلى وكيل، أو مباشرةً إلى `tools` في خادم MCP. انظر [خادم MCP لأيّ شيء](../guide/mcp-recipes).
+يعيد كل منها تعريفات `ToolDefinition` جاهزة: مرّرها عبر `sdk.defineTool` قبل إعطائها لوكيل (فالوكلاء يأخذون `Tool[]`)، أو مباشرةً إلى `tools` في خادم MCP. انظر [الأدوات](../guide/tools) و[خادم MCP لأيّ شيء](../guide/mcp-recipes).
 
 | الدالة | تعيد | |
 | --- | --- | --- |
