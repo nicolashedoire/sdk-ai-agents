@@ -60,18 +60,19 @@ A study's runs (`mode: 'study'`) and the runs that classify its amendments (`mod
 
 | Type | Data |
 | --- | --- |
-| `study.started` | `name`, `charter` (`object`, `question`, `objective`, `needs`, `leads`, `scope`, `capability?`, `analogues`), `charterHash` (SHA-256), `language`, `model?`, `sources` (tool names), `limits`, `driftThreshold`, `amendments` (the accepted ones: `number`, `text`), `resumeAt?` (the passage a resumed run starts at) |
+| `study.started` | `name`, `charter` (`object`, `question`, `objective`, `needs`, `leads`, `scope`, `capability?`, `analogues`), `charterHash` (SHA-256), `language`, `model?`, `sources` (tool names), `limits`, `driftThreshold`, `amendments` (the accepted ones: `number`, `text`), `resumeAt?` (when a run resumes: the first passage with work left) |
 | `study.passage_started` | `passage`, `number` (1 to 7), `amendments` (numbers of the accepted amendments in force), and `reopenedBy?`, `focus?`, `reason?` when a later passage reopened it |
-| `study.passage_completed` | `passage`, `attempts` (2 when the guardian had it redone), `items` (each with its `collection`, `id`, `statement`, `status`, `sources`, `servesObjective`, the other fields of a claim and its own fields), `reopenedBy?`, `reopen?` (`passage`, `focus`, `reason`: the earlier passage it asks to reopen) |
+| `study.passage_completed` | `passage`, `attempts` (2 when the guardian had it redone), `keptAttempt?` (1 when the first attempt was better than the redo and was kept), `items` (each with its `collection`, `id`, `statement`, `status`, `sources`, `servesObjective`, the other fields of a claim and its own fields), `reopenedBy?`, `reopen?` (`passage`, `focus`, `reason`: the earlier passage it asks to reopen; it is not complete until it runs again), `resumed?` (a run resumed it only to finish it) |
 | `study.search` | `passage`, `purpose` (`research`, or `priorArt` for the prior art of novelties), `tool`, `query`, `servesObjective`, `claims?` (the novelties it looks for), `resultIds`, `results` (`id`, `title`, `locator`, `date?`), `error?` (the search failed), `skipped?` (`maxSearches`: not run) |
 | `study.model_called` | `purpose` (`passage`, `queries`, `check`, `priorArtQueries`, `priorArtCheck`, `amendment`), `passage?`, `model?`, `requestedModel?`, `usage` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?`, `unmeteredTokens?`: one event for a call and its repair), `failed?` (why the reply could not be used) — counted in costs and in budgets per period |
-| `study.drift_rejected` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason`, `by` (`guardian`: judged off the objective; `schema`: refused before, for example without `servesObjective`), `attempt` (2 in a redo) |
-| `study.amendment_accepted` / `study.amendment_refused` | `number?` (accepted only), `text`, `verdict` (`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason`, `charterHash` — in the amendment's own run |
+| `study.drift_rejected` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason` (`code`, `params?`, `message`), `by` (`guardian`: judged off the objective; `schema`: refused before, for example without `servesObjective`), `attempt` (2 in a redo) |
+| `study.capability_demoted` | `passage`, `item` (the architecture's id), `name`, `reason` (`code`, `params?`, `message`): a capability the guardian judged only faster or cheaper, now an improvement |
+| `study.amendment_accepted` / `study.amendment_refused` | `number?` (accepted only), `text`, `verdict` (`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason` (`code`, `params?`, `message`; for `unclassified`: `amendmentUnclassified`, `amendmentTimedOut`, `amendmentCancelled` or `amendmentPolicy`), `charterHash` — in the amendment's own run |
 | `study.result_recorded` | `card`, `resultAndError` (`result`, `error?`), `conclusionAndMemory?` — appended to the run that wrote the card, after its end |
-| `study.completed` | `status`, `passages` (`passage`, `state`), `stats` |
-| `study.failed` | `status` (`stopped`, `failed` or `cancelled`), `stoppedBy?`, `error`, `passages`, `stats`, `partial: true` — then `run.failed`, or `run.cancelled` |
+| `study.completed` | `status`, `passages` (`passage`, `state`), `stats` of this run (`modelCalls` the vendor answered, `searches`, `searchesSkipped`, `redos`, `loops`, `steps`) |
+| `study.failed` | `status` (`stopped`, `failed` or `cancelled`), `stoppedBy?`, `error`, `passages`, `stats` of this run, `partial: true` — then `run.failed`, or `run.cancelled` |
 
-`study.model_called` is what `getRunCost` and budgets read for a study. When two runs are compared, study events are paired by passage (`study.model_called` by purpose and passage), and the `usage` of `study.model_called` is not compared.
+`study.model_called` is what `getRunCost` and budgets read for a study. When two runs are compared, study events are paired by passage (`study.model_called` by purpose and passage), and the `usage` of `study.model_called` is not compared. An amendment's run holds `run.started`, `policy.violated` when a budget policy refused the classification, `study.model_called` when the vendor answered, the amendment's event and `run.completed`.
 
 ## Operations
 
