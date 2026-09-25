@@ -3,6 +3,8 @@ import { htmlToLine, quoteUntrusted, stripInvisible } from '../html-entities.js'
 import { isRecord, listOf, text } from '../json-fields.js';
 import { isoDate, oneLine } from '../results.js';
 import { trimBase } from '../search-provider.js';
+import { retryAfterOf } from '../throttle.js';
+import { SearchThrottledError } from '../web-errors.js';
 
 export interface WikipediaOptions {
   /**
@@ -61,6 +63,9 @@ export async function searchWikipedia(
     minIntervalMs: options.minIntervalMs ?? 0,
     ...(request.signal ? { signal: request.signal } : {}),
   });
+  if (response.status === 429) {
+    throw new SearchThrottledError('Wikipedia is rate limited (HTTP 429)', retryAfterOf(response));
+  }
   ensureOk(response, 'Wikipedia');
   const body = jsonBody(response, 'Wikipedia');
   if (isRecord(body) && isRecord(body.error)) {

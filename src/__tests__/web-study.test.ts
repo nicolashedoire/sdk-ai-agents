@@ -4,7 +4,7 @@ import { duckDuckGo, webTools } from '../index.js';
 import { json, ScriptedLLMProvider } from './support/scripted-llm-provider.js';
 import { scriptStudy, studyConfig } from './support/study-script.js';
 import { createTestSDK, type TestSDK } from './support/test-sdk.js';
-import { reply, WebServer } from './support/web-server.js';
+import { type Route, reply, WebServer } from './support/web-server.js';
 
 const fixture = (name: string) =>
   readFileSync(new URL(`./fixtures/web/${name}`, import.meta.url), 'utf8');
@@ -109,4 +109,109 @@ describe('a study with webTools() as its sources', () => {
     // The dossier links each source.
     expect(result.markdown).toContain('https://arxiv.org/abs/1706.03762');
   });
+});
+
+describe('a study whose prior-art searches are throttled', () => {
+  let server: WebServer;
+  let env: TestSDK | undefined;
+
+  beforeEach(async () => {
+    server = new WebServer();
+    await server.start();
+  });
+
+  afterEach(async () => {
+    await env?.dispose();
+    env = undefined;
+    await server.stop();
+  });
+
+  /** DuckDuckGo that answers prior-art queries with `priorArt` for `forMs` after the first one. */
+  function duckDuckGoServer(priorArt: Route, forMs: number) {
+    let since: number | undefined;
+    server.on('/html/', (request, response) => {
+      const query = new URLSearchParams(request.body).get('q') ?? '';
+      if (query.startsWith('prior art')) {
+        since ??= Date.now();
+        if (Date.now() - since < forMs) return priorArt(request, response);
+      }
+      return reply(fixture('duckduckgo-results.html'))(request, response);
+    });
+  }
+
+  async function runStudy() {
+    const provider = scriptStudy(new ScriptedLLMProvider());
+    env = createTestSDK({}, provider);
+    for (const tool of webTools({
+      include: ['web_search'],
+      search: duckDuckGo({ baseUrl: server.url, minIntervalMs: 0 }),
+      throttleWaitMs: 20,
+      circuitBreaker: { cooldownMs: 200 },
+      cache: false,
+    })) {
+      env.sdk.defineTool({ ...tool, name: 'search_web' });
+    }
+    return env.sdk.createStudy(studyConfig()).run();
+  }
+
+  it('tries them once more, later, and checks the novelties (a real study lost them all)', async () => {
+    // Throttled for 2 s: the tool's own two tries fail; the study's second try, later, works.
+    duckDuckGoServer(reply(fixture('duckduckgo-captcha.html')), 2_000);
+
+    const { report } = await runStudy();
+
+    const priorArt = report.searches.filter((search) => search.purpose === 'priorArt');
+    expect(priorArt.filter((search) => search.throttled && search.error).length).toBeGreaterThan(0);
+    const retried = priorArt.filter((search) => search.retry);
+    expect(retried.length).toBeGreaterThan(0);
+    expect(retried.every((search) => !search.error && search.resultIds.length > 0)).toBe(true);
+    expect(report.noveltyClaims[0]?.priorArt).toMatchObject({ verdict: 'partlyNovel' });
+    expect(report.noveltyClaims[0]?.statusReason).toBeUndefined();
+  }, 60_000);
+
+  it('keeps the honest marking when the second try is throttled too', async () => {
+    duckDuckGoServer(reply(fixture('duckduckgo-captcha.html')), 600_000);
+
+    const { report } = await runStudy();
+
+    const retried = report.searches.filter((search) => search.retry);
+    expect(retried.length).toBeGreaterThan(0);
+    expect(retried.every((search) => search.throttled)).toBe(true);
+    expect(report.noveltyClaims[0]).toMatchObject({
+      toVerify: true,
+      statusReason: { code: 'priorArtSearchFailed' },
+    });
+  }, 60_000);
+
+  it('never tries again sooner than a service asked, when that is longer than a study waits', async () => {
+    duckDuckGoServer((_request, response) => {
+      response.writeHead(429, { 'content-type': 'text/html', 'retry-after': '600' }).end('');
+    }, 600_000);
+    const started = Date.now();
+
+    const { report } = await runStudy();
+
+    expect(Date.now() - started).toBeLessThan(20_000);
+    const priorArt = report.searches.filter((search) => search.purpose === 'priorArt');
+    expect(priorArt.length).toBeGreaterThan(0);
+    expect(priorArt.every((search) => search.throttled && !search.retry)).toBe(true);
+    const priorArtHits = server
+      .hits('/html/')
+      .filter((request) => (new URLSearchParams(request.body).get('q') ?? '').startsWith('prior art'));
+    expect(priorArtHits).toHaveLength(1);
+    expect(report.noveltyClaims[0]).toMatchObject({
+      toVerify: true,
+      statusReason: { code: 'priorArtSearchFailed' },
+    });
+  }, 60_000);
+
+  it('does not try again a search that failed for another reason', async () => {
+    duckDuckGoServer(reply('down', { status: 500, type: 'text/plain' }), 600_000);
+
+    const { report } = await runStudy();
+
+    const priorArt = report.searches.filter((search) => search.purpose === 'priorArt');
+    expect(priorArt.every((search) => search.error && !search.throttled && !search.retry)).toBe(true);
+    expect(report.noveltyClaims[0]).toMatchObject({ statusReason: { code: 'priorArtSearchFailed' } });
+  }, 60_000);
 });

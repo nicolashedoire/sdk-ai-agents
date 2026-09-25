@@ -3,7 +3,6 @@ import type { ToolDefinition, ToolMetadata, ToolRetryPolicy } from '../../types/
 import { clip } from '../bounded-text.js';
 import { prefixed } from '../tool-names.js';
 import { GuardedHttpClient, type WebLookup } from './guarded-http.js';
-import { HostPacer } from './politeness.js';
 import { duckDuckGo } from './providers/duckduckgo.js';
 import { normalizeUrl, toWebResults, type WebResult } from './results.js';
 import { RobotsPolicy, untilAborted } from './robots.js';
@@ -22,6 +21,7 @@ import {
   type WikipediaOptions,
   type WikipediaResult,
 } from './sources/wikipedia.js';
+import { retryOnceIfThrottled, THROTTLE_WAIT_MS } from './throttle.js';
 import { TtlCache } from './web-cache.js';
 import { isRetryableWebError, WebTimeoutError } from './web-errors.js';
 import { fetchPage, type WebFetchOutput } from './web-fetch.js';
@@ -50,6 +50,13 @@ export interface WebToolsOptions {
   search?: SearchProvider | SearchProvider[];
   /** When a failing provider is skipped, and for how long. */
   circuitBreaker?: CircuitBreakerOptions;
+  /**
+   * A provider or source that throttles a call (DuckDuckGo's empty page, HTTP 429, arXiv's
+   * 406) gets a second try after this wait, or the `Retry-After` it gave, when the call's
+   * deadline leaves room. One that asks for more than 30 s gets no second try: the call fails
+   * at once, `throttled`, with the wait it asked for. Default 10 000 ms.
+   */
+  throttleWaitMs?: number;
   /** Language of searches that name none (BCP 47: `fr`, `en-GB`). */
   language?: string;
   /** Sent with every request. Default `sdk-ai-agents (+https://github.com/nicolashedoire/sdk-ai-agents)`. */
@@ -227,6 +234,7 @@ export interface WebSearchOutput {
 export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
   const runtime = createRuntime(options);
   const include = new Set<WebToolName>(options.include ?? ALL_TOOLS);
+  const throttleWaitMs = options.throttleWaitMs ?? THROTTLE_WAIT_MS;
   const retry = options.retry ? { retry: { retryOn: isRetryableWebError, ...options.retry } } : {};
   const tools: ToolDefinition[] = [];
   if (include.has('web_search')) {
@@ -235,7 +243,7 @@ export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
         ? options.search
         : [options.search]
       : [duckDuckGo()];
-    const chain = new SearchChain(providers, options.circuitBreaker);
+    const chain = new SearchChain(providers, options.circuitBreaker, throttleWaitMs);
     // Each provider's exemption is fixed here, from what it declared when it was made.
     const clients = new Map(
       providers.map((provider) => [provider, runtime.http.forOrigin(provider.configuredOrigin)])
@@ -273,7 +281,8 @@ export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
                 ...(language ? { language } : {}),
                 signal: call.signal,
               },
-              clientFor
+              clientFor,
+              call.deadline
             );
             return {
               query: args.query,
@@ -347,7 +356,7 @@ export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
     name: WebToolName,
     description: string,
     schema: Schema,
-    search: (args: z.infer<Schema>, signal: AbortSignal | undefined) => Promise<unknown>
+    search: (args: z.infer<Schema>, signal: AbortSignal) => Promise<unknown>
   ) => {
     if (!include.has(name)) return;
     tools.push({
@@ -359,7 +368,14 @@ export function webTools(options: WebToolsOptions = {}): ToolDefinition[] {
       ...retry,
       handler: (args: z.infer<Schema>, context) =>
         runtime.call(name, context?.signal, (call) =>
-          runtime.cached(JSON.stringify([name, args]), () => search(args, call.signal))
+          runtime.cached(JSON.stringify([name, args]), () =>
+            // A throttled source gets a second try after a wait, when the deadline leaves room.
+            retryOnceIfThrottled(() => search(args, call.signal), {
+              waitMs: throttleWaitMs,
+              deadline: call.deadline,
+              signal: call.signal,
+            })
+          )
         ),
     });
   };
@@ -455,13 +471,12 @@ interface WebRuntime {
 
 function createRuntime(options: WebToolsOptions): WebRuntime {
   const timeoutMs = options.timeoutMs ?? 15_000;
-  const pacer = new HostPacer(Math.max(30_000, timeoutMs));
   const http = new GuardedHttpClient({
     userAgent: options.userAgent ?? DEFAULT_USER_AGENT,
     timeoutMs,
     maxRedirects: options.maxRedirects ?? 5,
     maxBytes: options.maxResponseBytes ?? 2_000_000,
-    pacer,
+    maxPacingWaitMs: Math.max(30_000, timeoutMs),
     ...(options.allowPrivateNetwork !== undefined
       ? { allowPrivateNetwork: options.allowPrivateNetwork }
       : {}),

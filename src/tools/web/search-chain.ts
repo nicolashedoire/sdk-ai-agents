@@ -1,6 +1,7 @@
 import type { WebClient } from './guarded-http.js';
 import type { SearchHit, SearchProvider, SearchRequest } from './search-provider.js';
-import { SearchThrottledError, SearchUnavailableError, WebHttpError } from './web-errors.js';
+import { isThrottle, retryOnceIfThrottled, THROTTLE_WAIT_MS } from './throttle.js';
+import { SearchThrottledError, SearchUnavailableError } from './web-errors.js';
 
 /** A provider that did not answer a search, and why. */
 export interface ProviderFailure {
@@ -12,8 +13,8 @@ export interface CircuitBreakerOptions {
   /** How long a provider is left alone once its breaker opens. Default 120 000 ms. */
   cooldownMs?: number;
   /**
-   * Consecutive failures that open the breaker. Default 3. A throttled provider (429, captcha)
-   * opens it at once.
+   * Consecutive failures that open the breaker. Default 3. A provider still throttled after
+   * its second try (429, captcha, empty page) opens it at once.
    */
   failureThreshold?: number;
 }
@@ -22,6 +23,8 @@ interface Breaker {
   failures: number;
   openUntil: number;
   lastError: string;
+  /** It opened because the provider was throttled. */
+  throttled: boolean;
 }
 
 /**
@@ -33,16 +36,23 @@ export class SearchChain {
   private readonly breakers = new Map<SearchProvider, Breaker>();
   private readonly cooldownMs: number;
   private readonly failureThreshold: number;
+  private readonly throttleWaitMs: number;
 
+  /**
+   * @param throttleWaitMs how long to wait before a throttled provider's second try, when it
+   *   does not say (`Retry-After`)
+   */
   constructor(
     private readonly providers: SearchProvider[],
-    options: CircuitBreakerOptions = {}
+    options: CircuitBreakerOptions = {},
+    throttleWaitMs = THROTTLE_WAIT_MS
   ) {
     if (providers.length === 0) throw new Error('web_search needs at least one search provider');
     this.cooldownMs = options.cooldownMs ?? 120_000;
     this.failureThreshold = Math.max(1, options.failureThreshold ?? 3);
+    this.throttleWaitMs = throttleWaitMs;
     for (const provider of providers) {
-      this.breakers.set(provider, { failures: 0, openUntil: 0, lastError: '' });
+      this.breakers.set(provider, { failures: 0, openUntil: 0, lastError: '', throttled: false });
     }
   }
 
@@ -50,12 +60,18 @@ export class SearchChain {
     return this.providers.map((provider) => provider.name);
   }
 
-  /** `clientFor` gives each provider its HTTP client (with its `configuredOrigin`, if any). */
+  /**
+   * `clientFor` gives each provider its HTTP client (with its `configuredOrigin`, if any). A
+   * throttled provider gets a second try after a wait, when `deadline` leaves room.
+   */
   async search(
     request: SearchRequest,
-    clientFor: (provider: SearchProvider) => WebClient
+    clientFor: (provider: SearchProvider) => WebClient,
+    deadline?: number
   ): Promise<{ provider: string; hits: SearchHit[]; errors: ProviderFailure[] }> {
     const errors: ProviderFailure[] = [];
+    let allThrottled = true;
+    let retryAt: number | undefined;
     for (const provider of this.providers) {
       const breaker = this.breakers.get(provider) as Breaker;
       const now = Date.now();
@@ -64,10 +80,19 @@ export class SearchChain {
           provider: provider.name,
           message: `skipped until ${new Date(breaker.openUntil).toISOString()} after: ${breaker.lastError}`,
         });
+        allThrottled &&= breaker.throttled;
+        retryAt = Math.min(retryAt ?? breaker.openUntil, breaker.openUntil);
         continue;
       }
       try {
-        const hits = await provider.search(request, clientFor(provider));
+        const hits = await retryOnceIfThrottled(
+          () => provider.search(request, clientFor(provider)),
+          {
+            waitMs: this.throttleWaitMs,
+            ...(deadline !== undefined ? { deadline } : {}),
+            ...(request.signal ? { signal: request.signal } : {}),
+          }
+        );
         breaker.failures = 0;
         breaker.openUntil = 0;
         return { provider: provider.name, hits, errors };
@@ -78,17 +103,22 @@ export class SearchChain {
         errors.push({ provider: provider.name, message });
         breaker.failures++;
         breaker.lastError = message;
-        const throttled =
-          error instanceof SearchThrottledError ||
-          (error instanceof WebHttpError && error.status === 429);
+        const throttled = isThrottle(error);
+        allThrottled &&= throttled;
         if (throttled || breaker.failures >= this.failureThreshold) {
-          breaker.openUntil = Date.now() + this.cooldownMs;
+          // A provider that asked for a longer wait than the cooldown gets it.
+          const asked = error instanceof SearchThrottledError ? (error.retryAfterMs ?? 0) : 0;
+          breaker.openUntil = Date.now() + Math.max(this.cooldownMs, asked);
+          breaker.throttled = throttled;
+          retryAt = Math.min(retryAt ?? breaker.openUntil, breaker.openUntil);
         }
       }
     }
     throw new SearchUnavailableError(
       `no search provider answered: ${errors.map((failure) => `${failure.provider}: ${failure.message}`).join('; ')}`,
-      errors
+      errors,
+      allThrottled,
+      retryAt === undefined ? undefined : Math.max(0, retryAt - Date.now())
     );
   }
 }

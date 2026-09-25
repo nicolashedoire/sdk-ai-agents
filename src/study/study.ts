@@ -171,6 +171,8 @@ export class Study {
   private readonly model: StudyModel;
   private readonly recorder: StudyRecorder;
   private registry = new ResultRegistry();
+  /** The wait a throttled search's service asked for, by its entry. */
+  private readonly throttleWaits = new WeakMap<StudySearch, number>();
   private readonly searches: StudySearch[] = [];
   private readonly driftLog: StudyDriftEntry[] = [];
   private readonly amendmentLog: StudyAmendment[] = [];
@@ -248,6 +250,7 @@ export class Study {
     this.running = true;
     const { limits } = this.settings;
     const run = new StudyRun(runId, this.recorder, limits, this.environment.policyEngine, this.id);
+    run.deadline = Date.now() + limits.timeoutMs;
     if (options.restart) this.startOver();
     this.runIds.push(runId);
     const timer = setTimeout(() => {
@@ -1119,7 +1122,8 @@ export class Study {
     run: StudyRun,
     passage: StudyPassage,
     purpose: StudySearch['purpose'],
-    request: RequestedSearch
+    request: RequestedSearch,
+    options: { retry?: boolean } = {}
   ): Promise<StudySearch> {
     const base = {
       passage,
@@ -1128,6 +1132,7 @@ export class Study {
       query: request.query,
       servesObjective: request.servesObjective,
       ...(request.claim ? { claims: [request.claim] } : {}),
+      ...(options.retry ? { retry: true as const } : {}),
       runId: run.runId,
     };
     let entry: StudySearch;
@@ -1161,7 +1166,15 @@ export class Study {
       } catch (error) {
         const stop = run.stopFor(error);
         if (stop instanceof StudyStop) throw stop;
-        entry = { ...base, resultIds: [], error: truncate(searchError(error)) };
+        const throttle = throttleOf(error);
+        entry = {
+          ...base,
+          resultIds: [],
+          error: truncate(searchError(error)),
+          ...(throttle ? { throttled: true as const } : {}),
+        };
+        if (throttle?.retryAfterMs !== undefined)
+          this.throttleWaits.set(entry, throttle.retryAfterMs);
       }
     }
     this.searches.push(entry);
@@ -1216,14 +1229,41 @@ export class Study {
     });
     // For each claim, how its own searches went and the results they found.
     const searched = new Map<string, { ran: number; skipped: number; results: string[] }>();
-    for (const search of requested) {
-      if (!search.claim) continue;
-      const entry = await this.search(run, 'design', 'priorArt', search);
-      const tally = searched.get(search.claim) ?? { ran: 0, skipped: 0, results: [] };
+    const count = (claim: string, entry: StudySearch) => {
+      const tally = searched.get(claim) ?? { ran: 0, skipped: 0, results: [] };
       if (entry.skipped) tally.skipped++;
       else if (!entry.error) tally.ran++;
       tally.results.push(...entry.resultIds);
-      searched.set(search.claim, tally);
+      searched.set(claim, tally);
+    };
+    const throttled: Array<{ search: RequestedSearch; entry: StudySearch }> = [];
+    for (const search of requested) {
+      if (!search.claim) continue;
+      const entry = await this.search(run, 'design', 'priorArt', search);
+      count(search.claim, entry);
+      if (entry.throttled) throttled.push({ search, entry });
+    }
+    // A throttle is transient: a novelty check must not be lost to one. The searches it failed
+    // are tried once more, after the wait their services asked for, when the run has time left
+    // for it and for the second tries. A service that asked for more than a study waits
+    // (150 s), or for more than the run has left, is never tried again sooner than it asked:
+    // its claims stay to verify.
+    const room = run.deadline - Date.now() - STUDY_TIME_AFTER_RETRY_MS;
+    const waitFor = (entry: StudySearch) =>
+      Math.max(STUDY_THROTTLE_WAIT_MS, this.throttleWaits.get(entry) ?? 0);
+    const retried = throttled.filter(({ entry }) => {
+      const wait = waitFor(entry);
+      return wait <= STUDY_MAX_THROTTLE_WAIT_MS && wait <= room;
+    });
+    if (retried.length > 0 && run.searchesLeft > 0) {
+      await pause(Math.max(...retried.map(({ entry }) => waitFor(entry))), run.signal).catch(() =>
+        run.checkpoint()
+      );
+      run.checkpoint();
+      for (const { search } of retried) {
+        if (!search.claim) continue;
+        count(search.claim, await this.search(run, 'design', 'priorArt', search, { retry: true }));
+      }
     }
     for (const claim of claims) {
       const tally = searched.get(claim.id);
@@ -1429,6 +1469,51 @@ function claimedNovelty(claim: StudyClaim): ClaimedNovelty {
     combination: architecture.components.map((component) => component.name).join(' + '),
     capability: architecture.capability.what,
   };
+}
+
+/** How long a study waits before a throttled prior-art search's second try, at least. */
+const STUDY_THROTTLE_WAIT_MS = 5_000;
+/** The longest wait a study gives a service: one that asks for more is not tried again. */
+const STUDY_MAX_THROTTLE_WAIT_MS = 150_000;
+/** The time the run must still have after that wait for the second tries to be made. */
+const STUDY_TIME_AFTER_RETRY_MS = 60_000;
+
+/**
+ * Whether a search failed from a throttle: the tool's error, or what it wraps, says
+ * `throttled: true` (as the SDK's web tools do), with the wait it asked for, if any.
+ */
+function throttleOf(error: unknown): { retryAfterMs?: number } | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && typeof current === 'object' && current !== null; depth++) {
+    if (Reflect.get(current, 'throttled') === true) {
+      const after: unknown = Reflect.get(current, 'retryAfterMs');
+      return typeof after === 'number' && Number.isFinite(after) ? { retryAfterMs: after } : {};
+    }
+    current =
+      current instanceof SDKError && current.originalError
+        ? current.originalError
+        : Reflect.get(current, 'cause');
+  }
+  return undefined;
+}
+
+/** Waits `ms`, or rejects as soon as `signal` aborts. */
+function pause(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new Error('aborted'));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new Error('aborted'));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 /** Why a search failed: the tool's own error, not only the governed pipeline's wrapper. */

@@ -90,6 +90,7 @@
     "src/__tests__/web-sources.test.ts",
     "src/__tests__/web-safety.test.ts",
     "src/__tests__/web-study.test.ts",
+    "src/__tests__/web-pacing.test.ts",
     "src/__tests__/web-robots.test.ts",
     "src/__tests__/web-html-limits.test.ts",
     "src/__tests__/web-pdf-prescan.test.ts",

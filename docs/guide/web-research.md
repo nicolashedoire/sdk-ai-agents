@@ -69,7 +69,7 @@ arXiv results also have `authors`, `pdfUrl`, `updated` and `category`; repositor
 
 ## Search providers
 
-`web_search` asks its providers **in order**: a provider that fails, is rate limited or answers with a captcha page hands over to the next one. The answer says which provider answered (`provider`) and why the ones before did not (`errors`).
+`web_search` asks its providers **in order**: a provider that fails, or is still throttled after a second try, hands over to the next one. The answer says which provider answered (`provider`) and why the ones before did not (`errors`).
 
 ```ts
 import { brave, duckDuckGo, searxng, webTools } from '@sdk-ai-agents/core';
@@ -85,7 +85,7 @@ const tools = webTools({
 
 | Provider | Setup | Dates | Notes |
 | --- | --- | --- | --- |
-| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | none (the default) | some results | DuckDuckGo's HTML page, not an official API. Titles, links and snippets; ads skipped. A captcha page, or an empty page twice, hands over. 1.5 s between searches. |
+| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | none (the default) | some results | DuckDuckGo's HTML page, not an official API. Titles, links and snippets; ads skipped. A captcha page or an empty page is a throttle. 4 s between searches, from the end of the previous one. |
 | `searxng({ baseUrl, engines?, categories?, minIntervalMs? })` | your [SearXNG](https://docs.searxng.org/) instance, with `formats: [html, json]` in its `settings.yml` | `publishedDate` | Each result names the engine that found it (`searxng:bing`). An answer with no result because its engines failed hands over. |
 | `brave({ apiKey, baseUrl?, minIntervalMs? })` | a Brave Search API key | `page_age` | 1 s between searches, the free plan's rate. |
 | `tavily({ apiKey, baseUrl?, minIntervalMs? })` | a Tavily API key | `published_date` | `site` is sent as `include_domains`; no language. |
@@ -93,7 +93,9 @@ const tools = webTools({
 
 Each provider turns `site`, `freshness` and `language` into its own parameters (`site:` in the query, `df`, `time_range`, `freshness=pw`, `tbs=qdr:w`, `kl`, `search_lang`…). Results from another site than `site` are dropped, whichever provider found them.
 
-**Circuit breaker.** A rate-limited provider (HTTP 429, a captcha page) is left alone at once, any other one after three failures in a row: for two minutes, it is skipped without a request (`errors` says until when). Then it gets one more try. `circuitBreaker: { cooldownMs, failureThreshold }` changes both.
+**Throttling.** A provider that throttles a search (HTTP 429, DuckDuckGo's captcha or empty page) gets one more try, after the wait it asked for (`Retry-After`) or `throttleWaitMs` (10 s), when the call's deadline leaves room for it. One that asks for more than 30 s is never tried again sooner than it asked: it is skipped for that long (at least `circuitBreaker.cooldownMs`), and when no other provider answers, the call fails at once, `throttled`, with the wait asked for (`retryAfterMs`).
+
+**Circuit breaker.** A provider still throttled after that second try is left alone at once, any other one after three failures in a row: for two minutes, it is skipped without a request (`errors` says until when). Then it gets one more try. `circuitBreaker: { cooldownMs, failureThreshold }` changes both. When no provider answered, the error (`SearchUnavailableError`) says whether they were all throttled (`throttled`) and when a skipped one will be tried again (`retryAfterMs`): a study tries such a search once more, later.
 
 ### Your own provider
 
@@ -130,15 +132,16 @@ const intranetSearch: SearchProvider = {
 | `callTimeoutMs` | `60000` | The whole call, whatever it waits for: robots.txt, pacing, every redirect, the body, and the extraction of the page or PDF. Past it, all of it is aborted and the call fails with a `WebTimeoutError`. It bounds each attempt: with `retry`, a call can take up to `maxRetries + 1` times this, plus the delays between attempts. |
 | `maxResponseBytes` | `2000000` | Largest body read, after decompression. |
 | `maxRedirects` | `5` | Redirects followed, each checked again. |
-| `hostIntervalMs` | `1000` | Least time between two `web_fetch` requests to one host. |
+| `hostIntervalMs` | `1000` | Least time between the end of one `web_fetch` request to a host and the start of the next. |
+| `throttleWaitMs` | `10000` | How long a throttled provider or source waits before its second try, when it did not say (`Retry-After`). |
 | `robots` | `true` | `web_fetch` respects robots.txt; `false` turns it off. |
 | `allowPrivateNetwork` | `false` | `true`, or a list of hosts (`intranet.example`, `127.0.0.1:8080`) that may be on this machine or the private network. |
 | `lookup` | the system's resolver | Resolves host names: `(hostname) => Promise<Array<{ address, family }>>`. |
 | `maxPdfBytes` | `10000000` | Largest PDF read. A longer one is refused. |
 | `maxPdfPages` | `30` | Pages of a PDF read. |
 | `cache` | `{ ttlMs: 600000, maxEntries: 200, maxBytes: 20000000 }` | Results kept in memory per tool and arguments, at most `maxBytes` measured as JSON; `false` turns it off. |
-| `retry` | — | Retries of failed calls (`{ maxRetries }`): rate limits, server errors, timeouts and network failures; never a refusal, a missing setup (`WebConfigurationError`) or a search no provider answered (`SearchUnavailableError`). |
-| `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | The arXiv API asks for 3 s between requests. |
+| `retry` | — | Retries of failed calls (`{ maxRetries }`): server errors, timeouts and network failures; never a refusal, a missing setup (`WebConfigurationError`), a search no provider answered (`SearchUnavailableError`) or a throttle (HTTP 429, `SearchThrottledError`), which the tool already gave its second try. |
+| `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | The arXiv API asks for 3 s between requests, one at a time: they are counted from the end of the previous one. A refusal (HTTP 406, 429, 503) gets one more try after a wait. |
 | `wikipedia` | `{ baseUrl: 'https://{language}.wikipedia.org', language: 'en' }` | `{language}` is replaced by the search language. A `baseUrl` of yours is exempt from the private-network check only when `{language}` is not in its host. |
 | `github` | `{ baseUrl: 'https://api.github.com' }` | `token` raises the rate limit (10 searches a minute without one) and is needed to search code. |
 
@@ -148,7 +151,7 @@ const intranetSearch: SearchProvider = {
 2. **The escape hatch is explicit.** `allowPrivateNetwork: ['intranet.example']` lets through only the hosts listed, `true` all of them. A `baseUrl` you give a provider or a source comes from your code, not from the model: it is reachable even on this machine (a SearXNG on `localhost`), on its own origin only, for that provider's or source's requests — a redirect elsewhere is checked, and `web_fetch` still refuses it. The exemption is fixed when `webTools()` is called (a provider declares it as `configuredOrigin`), never by a request. The default public endpoints (DuckDuckGo, arXiv, Wikipedia, GitHub) are never exempt: you do not control their DNS.
 3. **http and https only**, https never downgraded to http by a redirect, at most `maxRedirects` redirects, TLS certificates always verified. An API key or a token is never sent to another origin a redirect points to.
 4. **Bounded.** A deadline for the whole call (`callTimeoutMs`) and a timeout per request; at most `maxResponseBytes` read, after decompression, and the rest never downloaded; PDFs within `maxPdfBytes` (a PDF that announces a larger size is refused before it is downloaded) and `maxPdfPages`, read one at a time in a worker that parses a PDF before pdf.js reads it and refuses it when its streams inflate past 256 MB or when it cannot read them, and that stops past 1 GB of growth or 20 s (the only bounds of an encrypted PDF, which cannot be measured); the extraction of a page within 100,000 elements and 5 s of work; content within `maxChars`. No work after the download can block the process: the robots.txt matcher runs in linear time, and the HTML path has no quadratic step.
-5. **Polite.** `web_fetch` reads robots.txt ([RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)) and never fetches what it disallows for `sdk-ai-agents`, redirects included: the group naming `sdk-ai-agents`, else `*`; the longest rule wins, `Allow` wins a tie; `*` and `$` patterns; escapes of unreserved characters decoded before comparing (`%7E` is `~`). A missing robots.txt (4xx) allows everything; one that fails (5xx, 429) or cannot be reached disallows everything. Reading robots.txt does not delay the first page; `Crawl-delay` spaces the requests after it, and a delay longer than 30 s refuses the next page until then. Requests to each host are paced (1 s for pages, 1.5 s for DuckDuckGo, 3 s for arXiv), answers are cached, and the user agent says who is asking. Search APIs are not crawled: robots.txt does not apply to them.
+5. **Polite.** `web_fetch` reads robots.txt ([RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)) and never fetches what it disallows for `sdk-ai-agents`, redirects included: the group naming `sdk-ai-agents`, else `*`; the longest rule wins, `Allow` wins a tie; `*` and `$` patterns; escapes of unreserved characters decoded before comparing (`%7E` is `~`). A missing robots.txt (4xx) allows everything; one that fails (5xx, 429) or cannot be reached disallows everything. Reading robots.txt does not delay the first page; `Crawl-delay` spaces the requests after it, and a delay longer than 30 s refuses the next page until then. Requests to each host go one at a time, each after an interval counted from the end of the previous one (1 s for pages, 4 s for DuckDuckGo, 3 s for arXiv), and every `webTools()` of the process shares this pacing; a throttle gets one more try after a wait, not a burst of them; answers are cached, and the user agent says who is asking. Search APIs are not crawled: robots.txt does not apply to them.
 6. **Content is data.** Every answer says `untrusted: true`, and the tool descriptions tell the model never to follow instructions found in it. Before extraction, `web_fetch` drops what a reader cannot see and a model would: elements that are `hidden`, `aria-hidden="true"`, `display:none`, `visibility:hidden`, of zero font size or zero opacity, HTML comments, and invisible characters: zero-width and bidirectional controls, the Tags block (which spells text invisibly) and variation selectors. Search results and error messages are stripped the same way; an error quotes at most one line of a server's answer, marked untrusted. A study shows the results to its model between untrusted-data marks.
 7. **Governed.** `web_fetch` has a medium risk, not low: the model chooses the URL, and a URL can carry data out (`https://attacker.example/?q=<secret>`). Keep it off agents that hold secrets, or have a human approve each call:
 
@@ -189,4 +192,4 @@ Each result becomes a numbered source (`S1`, `S2`…) with its title, its URL as
 - **A simple main-content rule.** `<main>`, the longest `<article>`, else `<body>`: boilerplate inside the main content stays.
 - **No OCR.** A scanned PDF has no text to read.
 - **DuckDuckGo's HTML page is not an API.** Its format can change and it throttles heavy use: configure another provider for volume.
-- **Caches and pacing live in memory**, per `webTools()` call, and are lost when the process ends.
+- **Caches and pacing live in memory**, and are lost when the process ends: caches per `webTools()` call, pacing for the whole process. Another process on the same machine is paced apart.

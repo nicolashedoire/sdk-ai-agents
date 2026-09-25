@@ -50,7 +50,16 @@ export class WebTimeoutError extends Error {
  * skips this one for a while (its circuit breaker opens at once).
  */
 export class SearchThrottledError extends Error {
-  constructor(message: string) {
+  /** A throttle: the same search may work later. Read by studies to try again. */
+  readonly throttled = true;
+
+  /**
+   * @param retryAfterMs how long the service asked to wait (`Retry-After`), when it said
+   */
+  constructor(
+    message: string,
+    readonly retryAfterMs?: number
+  ) {
     super(message);
     this.name = 'SearchThrottledError';
   }
@@ -72,9 +81,16 @@ export class WebConfigurationError extends Error {
  * Not retried at once: the same providers would be skipped or fail again.
  */
 export class SearchUnavailableError extends Error {
+  /**
+   * @param throttled every provider was throttled, or skipped because it was: the same search
+   *   may work later
+   * @param retryAfterMs when a skipped provider will be tried again, if one was
+   */
   constructor(
     message: string,
-    readonly failures: Array<{ provider: string; message: string }>
+    readonly failures: Array<{ provider: string; message: string }>,
+    readonly throttled = false,
+    readonly retryAfterMs?: number
   ) {
     super(message);
     this.name = 'SearchUnavailableError';
@@ -82,17 +98,20 @@ export class SearchUnavailableError extends Error {
 }
 
 /**
- * Worth retrying: 429, server errors, timeouts and network failures — not refusals, 4xx, a
- * missing setup or a search no provider could answer.
+ * Worth retrying: server errors, timeouts and network failures — not refusals, 4xx, a missing
+ * setup, a search no provider could answer, nor a throttle (429, captcha): the tool already
+ * gave a throttled call its one second try, after the wait the service asked for, and more
+ * tries would only lengthen the block.
  */
 export function isRetryableWebError(error: Error): boolean {
   if (
     error instanceof WebRequestRefusedError ||
     error instanceof WebConfigurationError ||
-    error instanceof SearchUnavailableError
+    error instanceof SearchUnavailableError ||
+    error instanceof SearchThrottledError
   ) {
     return false;
   }
-  if (error instanceof WebHttpError) return error.status === 429 || error.status >= 500;
+  if (error instanceof WebHttpError) return error.status >= 500;
   return true;
 }

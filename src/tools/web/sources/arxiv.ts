@@ -2,12 +2,16 @@ import { bodyText, ensureOk, type WebClient } from '../guarded-http.js';
 import { decodeEntities, quoteUntrusted, stripInvisible } from '../html-entities.js';
 import { isoDate, oneLine } from '../results.js';
 import { trimBase } from '../search-provider.js';
-import { WebHttpError } from '../web-errors.js';
+import { retryAfterOf } from '../throttle.js';
+import { SearchThrottledError } from '../web-errors.js';
 
 export interface ArxivOptions {
   /** Default `https://export.arxiv.org`. */
   baseUrl?: string;
-  /** Least time between two requests. Default 3 000 ms, as the arXiv API asks. */
+  /**
+   * Least time between the end of one request and the start of the next. Default 3 000 ms,
+   * as the arXiv API asks; requests are never sent at the same time.
+   */
   minIntervalMs?: number;
 }
 
@@ -62,11 +66,11 @@ export async function searchArxiv(
     ...(request.signal ? { signal: request.signal } : {}),
   });
   if ([403, 406, 429, 503].includes(response.status)) {
-    // arXiv's API refuses clients that go faster than one request every 3 s, sometimes with a
-    // 406 from its CDN.
-    throw new WebHttpError(
-      `arXiv refused the request (HTTP ${response.status}): it allows one request every 3 s; try again later`,
-      response.status
+    // arXiv's API refuses clients that go faster than one request every 3 s, one connection at
+    // a time, sometimes with a 406 from its CDN: a throttle, tried again once after a wait.
+    throw new SearchThrottledError(
+      `arXiv refused the request (HTTP ${response.status}): it allows one request every 3 s, one at a time; try again later`,
+      retryAfterOf(response)
     );
   }
   ensureOk(response, 'arXiv');

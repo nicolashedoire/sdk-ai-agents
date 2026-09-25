@@ -425,6 +425,13 @@ export interface StudySearch {
   claims?: string[];
   resultIds: string[];
   error?: string;
+  /**
+   * It failed because the service throttled it (it said so: `throttled` on the tool's error),
+   * so the same search may work later. A prior-art search that failed so is tried once more.
+   */
+  throttled?: true;
+  /** The second try of a prior-art search that was throttled. */
+  retry?: true;
   skipped?: 'maxSearches';
   runId: string;
 }

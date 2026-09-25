@@ -30,7 +30,8 @@ describe('web_search', () => {
   });
 
   function searchTool(options: WebToolsOptions): ToolDefinition {
-    const [tool] = webTools({ include: ['web_search'], cache: false, ...options });
+    // A throttled provider's second try comes after a short wait here (10 s by default).
+    const [tool] = webTools({ include: ['web_search'], cache: false, throttleWaitMs: 20, ...options });
     if (!tool) throw new Error('no web_search tool');
     return tool;
   }
@@ -126,6 +127,24 @@ describe('web_search', () => {
       expect(request?.headers['accept-language']).toBe('fr');
     });
 
+    it("reads DuckDuckGo's 2026 no-results page as no results, not a throttle (a real study lost its prior art)", async () => {
+      server.on('/html/', reply(fixture('duckduckgo-no-results-2026.html')));
+      backup.on('/search', replyJson(searxngResults));
+
+      const output = await search(searchTool({ search: [ddg(), searxng({ baseUrl: backup.url })] }), {
+        query: '"retained mode" browser accessibility tree',
+      });
+
+      expect(output).toMatchObject({ provider: 'duckduckgo', results: [] });
+      expect(output).not.toHaveProperty('errors');
+      expect(server.hits('/html/')).toHaveLength(1);
+      expect(backup.requests).toHaveLength(0);
+      expect(parseDuckDuckGoPage(fixture('duckduckgo-no-results-2026.html'))).toMatchObject({
+        noResults: true,
+        blocked: false,
+      });
+    });
+
     it('takes a no-results page that echoes a query about captchas for no results, not a block', async () => {
       const echo = (inside: string) =>
         `<html><head><title>zqxj captcha solver at DuckDuckGo</title></head><body><form><input name="q" value="zqxj captcha solver"></form>${inside}</body></html>`;
@@ -137,6 +156,32 @@ describe('web_search', () => {
       expect(output).toMatchObject({ provider: 'duckduckgo', results: [] });
       expect(parseDuckDuckGoPage(echo('')).blocked).toBe(false);
       expect(backup.requests).toHaveLength(0);
+    });
+
+    it('never takes a block for no results because the query in the title says "No results"', async () => {
+      // The title echoes the query: an empty page or a captcha must still read as a throttle.
+      const titled = (name: string, title: string) =>
+        fixture(name).replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
+      expect(
+        parseDuckDuckGoPage(titled('duckduckgo-empty.html', 'No results found at DuckDuckGo'))
+      ).toMatchObject({ noResults: false, blocked: false });
+      expect(
+        parseDuckDuckGoPage(titled('duckduckgo-captcha.html', 'No results. at DuckDuckGo'))
+      ).toMatchObject({ blocked: true });
+      server.on('/html/', reply(titled('duckduckgo-captcha.html', 'No results. at DuckDuckGo')));
+
+      const error = await search(searchTool({ search: ddg() }), { query: 'No results.' }).catch(
+        (caught: Error) => caught
+      );
+
+      expect(error).toMatchObject({ name: 'SearchUnavailableError', throttled: true });
+      // Nor a no-results page for a block because the query it echoes quotes the block's markup.
+      const quoted = 'duck/anomaly.js id=&quot;challenge-form&quot; class=&quot;anomaly-modal&quot;';
+      expect(
+        parseDuckDuckGoPage(
+          `<html><head><title>${quoted}</title></head><body><form><input name="q" value="${quoted}"></form><h1>No results found for <strong>${quoted}</strong></h1></body></html>`
+        )
+      ).toMatchObject({ noResults: true, blocked: false });
     });
 
     it('is not fooled by a results page that mentions a captcha', () => {
@@ -158,10 +203,11 @@ describe('web_search', () => {
       expect(first.errors).toEqual([
         { provider: 'duckduckgo', message: 'DuckDuckGo answered with a captcha page (unusual traffic)' },
       ]);
-      // Its circuit breaker is open: skipped without a request.
+      // Tried twice (a throttle gets a second try); then its circuit breaker is open: skipped
+      // without a request.
       expect(second.provider).toBe('searxng');
       expect(second.errors?.[0]?.message).toMatch(/^skipped until .+ after: DuckDuckGo answered with a captcha page/);
-      expect(server.hits('/html/')).toHaveLength(1);
+      expect(server.hits('/html/')).toHaveLength(2);
     });
 
     it('tries a throttled provider again once its cooldown is over', async () => {
@@ -182,7 +228,7 @@ describe('web_search', () => {
       expect((await search(tool, { query: 'layout' })).provider).toBe('duckduckgo');
     });
 
-    it('retries an empty page once, paced, then hands over', async () => {
+    it('tries an empty page once more after a wait, paced, then hands over', async () => {
       const started: number[] = [];
       server.on('/html/', (request, response) => {
         started.push(Date.now());
@@ -197,7 +243,7 @@ describe('web_search', () => {
 
       expect(output.provider).toBe('searxng');
       expect(output.errors).toEqual([
-        { provider: 'duckduckgo', message: 'DuckDuckGo answered an empty page twice (throttled)' },
+        { provider: 'duckduckgo', message: 'DuckDuckGo answered an empty page (throttled)' },
       ]);
       expect(started).toHaveLength(2);
       expect((started[1] ?? 0) - (started[0] ?? 0)).toBeGreaterThanOrEqual(50);

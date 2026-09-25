@@ -80,6 +80,8 @@ export class StudyRun {
   steps = 0;
   /** Passages that wanted to search once `maxSearches` was spent. */
   readonly unsearched = new Set<StudyPassage>();
+  /** When the run times out (`Date.now()` time); set when the run starts. */
+  deadline = Number.POSITIVE_INFINITY;
 
   constructor(
     readonly runId: string,

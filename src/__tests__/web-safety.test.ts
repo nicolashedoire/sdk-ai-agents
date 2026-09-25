@@ -250,7 +250,7 @@ describe('web tools safety', () => {
         timeoutMs: 1_000,
         maxRedirects: 5,
         maxBytes: 1_000,
-        pacer: new HostPacer(1_000),
+        pacer: new HostPacer(),
         allowPrivateNetwork: true,
       });
 
@@ -351,16 +351,16 @@ describe('web tools safety', () => {
     });
 
     it('frees the pacing slot of a caller that gives up', async () => {
-      const pacer = new HostPacer(10_000);
-      await pacer.wait('host', 1_000);
+      const pacer = new HostPacer();
+      (await pacer.acquire('host', 1_000, 10_000))();
       const giveUp = new AbortController();
-      const waiting = pacer.wait('host', 1_000, giveUp.signal);
+      const waiting = pacer.acquire('host', 1_000, 10_000, giveUp.signal);
       setTimeout(() => giveUp.abort(new Error('gave up')), 30);
       await expect(waiting).rejects.toThrow('gave up');
       const started = Date.now();
 
       // Paced after the first request, not after the slot the second one gave back.
-      await pacer.wait('host', 100);
+      (await pacer.acquire('host', 100, 10_000))();
 
       expect(Date.now() - started).toBeLessThan(400);
     });

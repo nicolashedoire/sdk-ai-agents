@@ -6,6 +6,7 @@ import {
   type SearchProvider,
   trimBase,
 } from '../search-provider.js';
+import { retryAfterOf } from '../throttle.js';
 import { SearchThrottledError } from '../web-errors.js';
 import { type KeyedProviderOptions, requireKey } from './brave.js';
 import { listOf, text } from '../json-fields.js';
@@ -42,7 +43,8 @@ export function tavily(options: KeyedProviderOptions): SearchProvider {
       });
       if (response.status === 429 || response.status === 432 || response.status === 433) {
         throw new SearchThrottledError(
-          `Tavily refused the search (HTTP ${response.status}: rate or plan limit)`
+          `Tavily refused the search (HTTP ${response.status}: rate or plan limit)`,
+          retryAfterOf(response)
         );
       }
       ensureOk(response, 'Tavily');
