@@ -46,7 +46,7 @@ interface Event {
 | --- | --- |
 | `cognition.started` | `schemaVersion`(2, 오래된 실행에는 없음), `goal`, `context?`, `observations`(문제와 함께 주어진 것), `commitRules`, `knowledge?`(`scope`, 이전 실행에서 불러온 `items`, 저장소가 실패한 경우 `error?`), `profile`, `controller`, `assessor`, `evaluator?`, `allowedTools`, `limits` |
 | `cognition.operation_selected` | `step`, `operation`, `controller`, `available`, `stepsRemaining`, `forced?`(엔진이 결정을 강제함), `confidence?`, `probabilities?`, `rationale?`, `fallbackFrom?` |
-| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?`(`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — 토큰 수를 보고하지 않은 호출, `totalOnlyTokens?` — 그중 일부가 단독으로 보고한 합계) |
+| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?`(`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — 입력 토큰 수와 출력 토큰 수를 모두 보고하지는 않은 호출, `unmeteredTokens?` — 그 호출들의 토큰) |
 | `cognition.operation_failed` | `step`, `operation`, `error`, `recovery?` — 청구된 시도 뒤에 중지나 타임아웃으로 중단된 연산이면 `model?`, `requestedModel?`, `usage?`도 |
 | `cognition.evaluated` | `step`, `predictionId`, `hypothesisId`, `evaluator`(`id`, `version`), `verdict`, `observed?`, `summary?`, `context?`, `metrics?`, `causeCandidates?`, `reason?`, `durationMs` — 예측 테스트의 전체 보고서 |
 | `cognition.concluded` | `decision`, `status`(`committed`, `provisional`, `abstain`), `confidence`, `steps`, `evidenceRevision`, `hypotheses`, `predictions` |

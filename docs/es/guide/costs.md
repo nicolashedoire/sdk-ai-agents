@@ -45,11 +45,11 @@ Las claves son identificadores exactos de modelo o prefijos que terminan en `*`.
 El SDK nunca se inventa un precio, ni un número de tokens. El coste de una llamada es desconocido en dos casos, y el informe lo dice:
 
 - **su modelo no tiene precio**: sus llamadas y sus tokens se siguen contabilizando, el modelo aparece en `unpricedModels`, esas llamadas en `unpricedCalls`, y su línea no tiene `costUsd`;
-- **no informó de ningún número de tokens** — ni de entrada ni de salida, como con un proveedor que no devuelve el consumo, o solo un total: se cuenta en `unmeteredCalls` (y en el `unmeteredCalls` de su línea), y su modelo en `unmeteredModels`. Nunca se toma como cero tokens, y una línea cuyas llamadas no informaron de ninguno tampoco tiene `costUsd`.
+- **no informó a la vez de sus tokens de entrada y de salida** — como con un proveedor que no devuelve el consumo, solo un total, o uno de los dos: se cuenta en `unmeteredCalls` (y en el `unmeteredCalls` de su línea), y su modelo en `unmeteredModels`. Nunca se toma como cero tokens, y una línea cuyas llamadas no informaron de ninguno tampoco tiene `costUsd`.
 
-Una llamada sin número de tokens cuenta como no medida aunque su modelo tenga precio, igual que en los presupuestos. En cuanto el coste de alguna llamada es desconocido, el informe se marca con `complete: false` y `totalUsd` solo suma las llamadas cuyo coste se conoce: es un mínimo, no el coste de la ejecución.
+Una llamada sin ambos números cuenta como no medida aunque su modelo tenga precio, igual que en los presupuestos. En cuanto el coste de alguna llamada es desconocido, el informe se marca con `complete: false` y `totalUsd` solo suma las llamadas cuyo coste se conoce: es un mínimo, no el coste de la ejecución.
 
-Los tokens de una llamada son sus tokens de entrada y de salida, sea cual sea el total que el fabricante dé además; si no, el total que informó por sí solo: ese total cuenta como tokens (en el `totalOnlyTokens` de la línea, en los presupuestos y en el `maxTokens` de una ejecución), nunca como un coste.
+Los tokens de una llamada medida son sus tokens de entrada y de salida, sea cual sea el total que el fabricante dé además. Los de una llamada no medida son el mayor entre su total y los tokens de entrada o de salida que informó, nunca menos de lo que dijo haber usado: cuentan como tokens (en el `unmeteredTokens` de la línea, en los presupuestos y en el `maxTokens` de una ejecución), nunca como un coste. Un valor que no es un número mayor o igual que 0 (`null`, un número negativo) se lee como ausente, y no oculta los demás.
 
 ## Llamadas que fallan {#failed-calls}
 
@@ -68,7 +68,7 @@ Un intento que falló sin respuesta — un error HTTP, un tiempo de espera agota
 | --- | --- | --- |
 | `intention.generated` | Razonamiento nativo, selección de herramientas | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
 | `provider.answer_discarded` | Una respuesta que el proveedor no pudo usar | `provider`, `model`, `requestedModel`, `usage` |
-| `cognition.thought` | Operaciones cognitivas, reparaciones e intentos fallidos incluidos | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.totalOnlyTokens` |
+| `cognition.thought` | Operaciones cognitivas, reparaciones e intentos fallidos incluidos (un intento al que respondió un modelo distinto del último, a través de un proveedor de respaldo, se registra como un `provider.answer_discarded`) | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.unmeteredTokens` |
 | `cognition.operation_failed` | Una operación interrumpida por una parada o un tiempo límite tras intentos facturados | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev y otros backends de decisiones tipadas, respuestas rechazadas incluidas | `model`, `usage.inputTokens`, `usage.outputTokens` |
 

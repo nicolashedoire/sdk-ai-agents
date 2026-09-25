@@ -36,7 +36,7 @@ SDK は Chat Completions を通じて OpenAI を呼び出します。Chat Comple
 | `defaultModel` | `gpt-5.4` | モデルを指定しないリクエストと、エージェントのモデルに対応していないフォールバックが使うモデル |
 | `reasoningModels` | 名前から判別 | `true` または `false`：このプロバイダーのすべてのモデルを推論モデルとして扱うか、扱わないか。リスト：挙げた名前（Azure のデプロイ、ゲートウェイのエイリアス）は推論モデルで、ほかは名前から判別される |
 | `reasoningEffort` | モデルのデフォルト | `none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max` のいずれか。推論モデルにだけ、そのまま送られる。各モデルが受け付けるのはこのうち一部の値で、API はそれ以外を拒否する |
-| `includeStreamUsage` | OpenAI 自身の API では有効 | `true`：ストリーミングされた回答に使用量を要求し（`stream_options`）、その費用が数えられる。`false`：要求しない。デフォルトでは `https://api.openai.com/v1` と、`https://eu.api.openai.com/v1` などのリージョンのホスト（`baseURL` または `OPENAI_BASE_URL` から判断）で有効になる。互換サーバーはこのフィールドを拒否する（その場合、リクエストはこのフィールドなしで再送される。ただし OpenAI 自身の API に再送するのは `includeStreamUsage` が設定されている場合だけ）か、無視することがあり、使用量のないストリーミングの呼び出しは未計測として扱われるためである。使用量を報告する互換サーバー（Azure OpenAI の v1 API は報告する）で費用予算を使う場合は `true` にする |
+| `includeStreamUsage` | OpenAI 自身の API では有効 | `true`：ストリーミングされた回答に使用量を要求し（`stream_options`）、その費用が数えられる。`false`：要求しない。デフォルトでは `https://api.openai.com/v1` と、`https://eu.api.openai.com/v1` などのリージョンのホスト（`baseURL` または `OPENAI_BASE_URL` から判断）で有効になる。互換サーバーはこのフィールドを拒否する（その場合、リクエストはこのフィールドなしで再送される。ただし、このフィールドを受け付ける OpenAI 自身の API には再送しない）か、無視することがあり、使用量のないストリーミングの呼び出しは未計測として扱われるためである。使用量を報告する互換サーバー（Azure OpenAI の v1 API は報告する）で費用予算を使う場合は `true` にする |
 | `nativeToolMessages` | `true` | 会話の中でアシスタントの `tool_calls` と `tool` メッセージを受け付けない互換サーバーでは `false`：それまでのツール呼び出しとその結果はテキストで送られる。ツールは引き続き提示され、応答に含まれるツール呼び出しも引き続き読み取られる。主プロバイダーまたはいずれかのフォールバックで `false` にすると、チェーン全体に適用される |
 
 これらのオプションは `providerConfig.openai`、または OpenAI のフォールバックの `config` に指定します。別のベンダーのフォールバックは、自身の `config` が指定していないオプションを `providerConfig.openai` から取ります。主プロバイダーと同じベンダーのフォールバックは何も引き継ぎません。エージェントや実行は、`providerSettings.openai.reasoningEffort` で独自の努力度を指定できます。実行の値が最優先で、次にエージェント、最後にプロバイダーの値が使われます。認知エージェントはこれをツール選択にだけ適用し、ツールを提示しない思考には、エージェントの `reasoningEffort` オプションが使われます。
@@ -180,7 +180,7 @@ interface ModelCostLine {
   unmeteredCalls?: number;
   inputTokens: number;
   outputTokens: number;
-  totalOnlyTokens?: number;
+  unmeteredTokens?: number;
   costUsd?: number;
 }
 ```
@@ -190,8 +190,8 @@ interface ModelCostLine {
 | `totalUsd` | コストのわかっている呼び出しのコスト。`complete` が `false` のときは下限にすぎない |
 | `complete` | 一部の呼び出しのコストが不明な場合、つまり `unpricedCalls` または `unmeteredCalls` が 0 より大きい場合は `false` |
 | `unpricedModels`、`unpricedCalls` | `pricing` に価格のないモデルと、そのうちトークン数を報告した呼び出し |
-| `unmeteredModels`、`unmeteredCalls` | 入力トークン数も出力トークン数も報告しなかった呼び出しのモデルと、その呼び出し |
-| `lines` | モデル、要求されたモデル、発生源ごとに 1 行。呼び出し回数、トークン数を報告した呼び出しのトークン数、該当する場合は `unmeteredCalls`、一部の呼び出しが単独で報告した合計の `totalOnlyTokens`、モデルに価格があり、その行のいずれかの呼び出しがトークン数を報告した場合は `costUsd`。モデル名を記録しなかった呼び出しの `model` は `(unknown)` |
+| `unmeteredModels`、`unmeteredCalls` | 入力トークン数と出力トークン数の両方は報告しなかった呼び出しのモデルと、その呼び出し |
+| `lines` | モデル、要求されたモデル、発生源ごとに 1 行。呼び出し回数、計測された呼び出しのトークン数、該当する場合は `unmeteredCalls`、それらの呼び出しのトークン数である `unmeteredTokens`、モデルに価格があり、その行のいずれかの呼び出しが計測されている場合は `costUsd`。モデル名を記録しなかった呼び出しの `model` は `(unknown)` |
 
 ## トレース、リプレイ、テスト {#traces-replay-and-testing}
 

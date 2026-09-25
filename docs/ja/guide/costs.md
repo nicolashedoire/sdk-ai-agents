@@ -45,11 +45,11 @@ const sdk = createSDK({
 SDK が価格やトークン数をでっち上げることは決してありません。呼び出しのコストが不明になるケースは 2 つあり、レポートはそれを明示します。
 
 - **モデルに価格がない**：呼び出し回数とトークン数はそれでも集計されます。モデルは `unpricedModels` に、その呼び出しは `unpricedCalls` に数えられ、その行には `costUsd` がありません。
-- **トークン数が報告されなかった**：入力トークン数も出力トークン数もない場合で、使用量を返さないプロバイダーや、合計だけを返すプロバイダーがこれにあたります。その呼び出しは `unmeteredCalls`（とその行の `unmeteredCalls`）に、モデルは `unmeteredModels` に数えられます。トークン数がゼロとみなされることはありません。また、どの呼び出しもトークン数を報告しなかった行には `costUsd` もありません。
+- **入力トークン数と出力トークン数の両方は報告されなかった**：使用量を返さないプロバイダーや、合計だけ、またはどちらか一方だけを返すプロバイダーがこれにあたります。その呼び出しは `unmeteredCalls`（とその行の `unmeteredCalls`）に、モデルは `unmeteredModels` に数えられます。トークン数がゼロとみなされることはありません。また、どの呼び出しもトークン数を報告しなかった行には `costUsd` もありません。
 
-トークン数のない呼び出しは、予算での扱いと同じく、モデルに価格があっても計測なし（unmetered）として数えられます。いずれかの呼び出しのコストが不明なとき、レポートには `complete: false` が付き、`totalUsd` はコストのわかっている呼び出しだけを合計します。これは実行のコストではなく、その下限です。
+この 2 つの数がそろっていない呼び出しは、予算での扱いと同じく、モデルに価格があっても計測なし（unmetered）として数えられます。いずれかの呼び出しのコストが不明なとき、レポートには `complete: false` が付き、`totalUsd` はコストのわかっている呼び出しだけを合計します。これは実行のコストではなく、その下限です。
 
-呼び出しのトークン数は、その入力トークン数と出力トークン数です。ベンダーが合計も返す場合でも、その合計は使いません。どちらも報告されなかった場合は、単独で報告された合計を使います。このような合計はトークンとして数えられます（行の `totalOnlyTokens`、予算、実行の `maxTokens`）が、費用としては決して数えられません。
+計測された呼び出しのトークン数は、その入力トークン数と出力トークン数です。ベンダーが合計も返す場合でも、その合計は使いません。計測なしの呼び出しのトークン数は、その合計と、報告された入力または出力のトークン数のうち大きいほうで、使ったと報告した量より少なくなることはありません。これはトークンとして数えられます（行の `unmeteredTokens`、予算、実行の `maxTokens`）が、費用としては決して数えられません。0 以上の数でない値（`null` や負の数）は、ないものとして読まれ、ほかの値を隠しません。
 
 ## 失敗した呼び出し {#failed-calls}
 
@@ -68,7 +68,7 @@ SDK が価格やトークン数をでっち上げることは決してありま�
 | --- | --- | --- |
 | `intention.generated` | ネイティブの推論、ツールの選択 | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
 | `provider.answer_discarded` | プロバイダーが使えなかった応答 | `provider`, `model`, `requestedModel`, `usage` |
-| `cognition.thought` | 認知オペレーション（修復と失敗した試行も含む） | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.totalOnlyTokens` |
+| `cognition.thought` | 認知オペレーション（修復と失敗した試行も含む。フォールバックを通じて最後の試行とは別のモデルが答えた試行は `provider.answer_discarded` として記録される） | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.unmeteredTokens` |
 | `cognition.operation_failed` | 課金された試行の後、停止やタイムアウトで打ち切られたオペレーション | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev とその他の型付き決定のバックエンド（拒否された回答も含む） | `model`, `usage.inputTokens`, `usage.outputTokens` |
 

@@ -33,11 +33,10 @@ export function asksForStreamUsage(baseURL: string, includeStreamUsage?: boolean
  * Whether a streamed request refused with a 400 or 422 is sent once more without
  * `stream_options`, in case the server refused the field. OpenAI's own API takes it: there, a
  * refusal is about something else (a context too long, a bad parameter), and sending the
- * request again would only fail again. Other servers get the second try, and so does OpenAI's
- * API when `includeStreamUsage` was set explicitly.
+ * request again would only fail again. Other servers get the second try.
  */
-export function retriesStreamWithoutUsage(baseURL: string, includeStreamUsage?: boolean): boolean {
-  return includeStreamUsage !== undefined || !OPENAI_API.test(baseURL);
+export function retriesStreamWithoutUsage(baseURL: string): boolean {
+  return !OPENAI_API.test(baseURL);
 }
 
 /** How the OpenAI provider shapes its requests, for OpenAI models and compatible servers. */
@@ -123,10 +122,7 @@ export class OpenAIProvider implements LLMProvider {
     this.reasoningModels = options.reasoningModels;
     this.reasoningEffort = options.reasoningEffort;
     this.streamUsage = asksForStreamUsage(this.client.baseURL, options.includeStreamUsage);
-    this.retryWithoutStreamUsage = retriesStreamWithoutUsage(
-      this.client.baseURL,
-      options.includeStreamUsage
-    );
+    this.retryWithoutStreamUsage = retriesStreamWithoutUsage(this.client.baseURL);
   }
 
   async generateCompletion(request: LLMRequest): Promise<LLMResponse> {
@@ -192,7 +188,8 @@ export class OpenAIProvider implements LLMProvider {
 
   /**
    * Tells the caller about an answer the vendor billed, with the usage it reported, that gives
-   * nothing to use: priced on the model that answered and the one the request body named.
+   * nothing to use: priced on the model that answered and the one the request named, as the
+   * answers that are used are (a request that named none asked for no name).
    */
   private reportDiscarded(
     request: LLMRequest,
@@ -204,7 +201,7 @@ export class OpenAIProvider implements LLMProvider {
     request.onDiscardedAnswer?.({
       provider: 'openai',
       model: completion.model || body.model,
-      requestedModel: body.model,
+      ...(request.model ? { requestedModel: request.model } : {}),
       usage: {
         promptTokens: completion.usage.prompt_tokens,
         completionTokens: completion.usage.completion_tokens,
@@ -371,7 +368,13 @@ export class OpenAIProvider implements LLMProvider {
 
     // The answer ended (its finish reason came) with its usage when asked for: a stream broken
     // off or stalled after that, before `[DONE]`, still gave the whole answer.
-    const whole = answered && finishReason !== null && (!withUsage || Boolean(usage));
+    // A server that sent the finish reason before the last piece of a tool call's arguments
+    // gave no whole answer: arguments that do not parse are the call cut short.
+    const whole =
+      answered &&
+      finishReason !== null &&
+      (!withUsage || Boolean(usage)) &&
+      [...toolCalls.values()].every(({ call }) => isWholeJson(call.function.arguments));
     if ((stalled || brokenOff) && !whole) {
       // Only the usage came: billed all the same, the caller is told before the call fails.
       if (!answered && usage && !signal?.aborted) onUsageOnly({ model, usage });
@@ -583,5 +586,16 @@ function toOpenAIMessage(message: LLMMessage): OpenAI.ChatCompletionMessageParam
         : { role: 'assistant', content: message.content };
     case 'tool':
       return { role: 'tool', tool_call_id: message.toolCallId, content: message.content };
+  }
+}
+
+/** Tool call arguments that arrived whole: none at all, or a JSON value that parses. */
+function isWholeJson(text: string): boolean {
+  if (text.trim() === '') return true;
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
   }
 }

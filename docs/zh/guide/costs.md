@@ -45,11 +45,11 @@ const sdk = createSDK({
 SDK 从不编造价格，也不编造 token 数。调用的成本在两种情况下是未知的，报告会明确指出：
 
 - **它的模型没有价格**：它的调用次数和 token 数仍然会被计数，模型列在 `unpricedModels` 中，这些调用计入 `unpricedCalls`，它所在的行没有 `costUsd`；
-- **它没有报告 token 数**——既没有输入 token 数也没有输出 token 数，例如提供商不返回用量，或者只返回一个总数：它会计入 `unmeteredCalls`（以及它所在行的 `unmeteredCalls`），它的模型列在 `unmeteredModels` 中。它永远不会被当作 0 个 token；如果某一行的调用都没有报告 token 数，这一行同样没有 `costUsd`。
+- **它没有同时报告输入和输出 token 数**——例如提供商不返回用量，只返回一个总数，或者只返回其中一个：它会计入 `unmeteredCalls`（以及它所在行的 `unmeteredCalls`），它的模型列在 `unmeteredModels` 中。它永远不会被当作 0 个 token；如果某一行的调用都没有报告 token 数，这一行同样没有 `costUsd`。
 
-没有 token 数的调用即使模型有价格，也会像预算中那样被算作未计量调用。只要有任何调用的成本未知，报告就会被标记为 `complete: false`，而 `totalUsd` 只累加成本已知的调用：它只是一个下限，而不是这次运行的成本。
+没有同时报告这两个数的调用即使模型有价格，也会像预算中那样被算作未计量调用。只要有任何调用的成本未知，报告就会被标记为 `complete: false`，而 `totalUsd` 只累加成本已知的调用：它只是一个下限，而不是这次运行的成本。
 
-一次调用的 token 数是它的输入和输出 token 数，无论厂商是否另外给出总数；如果两者都没有报告，则取它单独报告的总数：这样的总数计为 token（计入该行的 `totalOnlyTokens`、预算和运行的 `maxTokens`），但从不计为成本。
+已计量调用的 token 数是它的输入和输出 token 数，无论厂商是否另外给出总数。未计量调用的 token 数取它的总数与它报告的输入或输出 token 数中较大的一个，绝不少于它自己报告用掉的数量：这些 token 会被计入（该行的 `unmeteredTokens`、预算和运行的 `maxTokens`），但从不计为成本。不是大于或等于 0 的数的值（`null`、负数）按缺失处理，也不会掩盖其他值。
 
 ## 失败的调用 {#failed-calls}
 
@@ -68,7 +68,7 @@ SDK 从不编造价格，也不编造 token 数。调用的成本在两种情况
 | --- | --- | --- |
 | `intention.generated` | 原生推理、工具选择 | `model`、`requestedModel`、`usage.promptTokens`、`usage.completionTokens` |
 | `provider.answer_discarded` | 提供商无法使用的应答 | `provider`、`model`、`requestedModel`、`usage` |
-| `cognition.thought` | 认知操作，包括修复和失败的尝试 | `model`、`requestedModel`、`usage.calls`、`usage.unmeteredCalls`、`usage.totalOnlyTokens` |
+| `cognition.thought` | 认知操作，包括修复和失败的尝试（通过后备提供商由不同于最后一次尝试的模型回答的尝试，记录为 `provider.answer_discarded`） | `model`、`requestedModel`、`usage.calls`、`usage.unmeteredCalls`、`usage.unmeteredTokens` |
 | `cognition.operation_failed` | 在已计费的尝试之后被停止或超时打断的操作 | `model`、`requestedModel`、`usage` |
 | `decision.evaluated` | Jev 以及其他类型化决策后端，包括被拒绝的答案 | `model`、`usage.inputTokens`、`usage.outputTokens` |
 

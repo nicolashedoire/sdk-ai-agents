@@ -36,7 +36,7 @@ Le SDK appelle OpenAI par Chat Completions, où les modèles GPT-5.4 et suivants
 | `defaultModel` | `gpt-5.4` | Modèle d'une requête qui n'en nomme aucun, et d'un repli qui ne sert pas le modèle de l'agent |
 | `reasoningModels` | Déduit du nom | `true` ou `false` : tous les modèles de ce fournisseur sont, ou ne sont pas, des modèles de raisonnement. Une liste : ces noms en sont (déploiements Azure, alias de passerelle), les autres sont reconnus à leur nom |
 | `reasoningEffort` | Celui du modèle | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` ou `max`, envoyé tel quel aux seuls modèles de raisonnement. Chaque modèle accepte certaines de ces valeurs, et l'API refuse les autres |
-| `includeStreamUsage` | Sur l'API d'OpenAI elle-même | `true` : la consommation d'une réponse en streaming est demandée (`stream_options`), si bien que son coût est compté ; `false` : elle ne l'est pas. Par défaut sur `https://api.openai.com/v1` et sur les hôtes régionaux comme `https://eu.api.openai.com/v1` (dans `baseURL` ou `OPENAI_BASE_URL`), car un serveur compatible peut refuser ce champ (la requête est alors envoyée à nouveau sans lui, sauf à l'API d'OpenAI elle-même si `includeStreamUsage` n'est pas fixé) ou l'ignorer, et un appel en streaming sans consommation compte comme non mesuré. Avec un budget de coût sur un serveur compatible qui fournit la consommation (c'est le cas de l'API v1 d'Azure OpenAI), fixez `true` |
+| `includeStreamUsage` | Sur l'API d'OpenAI elle-même | `true` : la consommation d'une réponse en streaming est demandée (`stream_options`), si bien que son coût est compté ; `false` : elle ne l'est pas. Par défaut sur `https://api.openai.com/v1` et sur les hôtes régionaux comme `https://eu.api.openai.com/v1` (dans `baseURL` ou `OPENAI_BASE_URL`), car un serveur compatible peut refuser ce champ (la requête est alors envoyée à nouveau sans lui, sauf à l'API d'OpenAI elle-même, qui l'accepte) ou l'ignorer, et un appel en streaming sans consommation compte comme non mesuré. Avec un budget de coût sur un serveur compatible qui fournit la consommation (c'est le cas de l'API v1 d'Azure OpenAI), fixez `true` |
 | `nativeToolMessages` | `true` | `false` pour un serveur compatible qui n'accepte pas, dans la conversation, les `tool_calls` de l'assistant ni les messages `tool` : les appels d'outils précédents et leurs résultats sont alors envoyés en texte, tandis que les outils restent proposés et que les appels d'outils des réponses sont toujours lus. `false` sur le fournisseur principal ou sur n'importe quel repli s'applique à toute la chaîne |
 
 Ces options se placent dans `providerConfig.openai` ou dans le `config` d'un repli OpenAI. Un repli d'un autre éditeur prend dans `providerConfig.openai` chaque option que son `config` ne fixe pas ; un repli du même éditeur que le principal n'en prend aucune. Un agent ou une exécution fixe son propre effort dans `providerSettings.openai.reasoningEffort` : celui de l'exécution l'emporte, puis celui de l'agent, puis celui du fournisseur. Un agent cognitif ne l'applique qu'à la sélection d'outil ; ses pensées, qui ne proposent pas d'outils, prennent son option `reasoningEffort`.
@@ -180,7 +180,7 @@ interface ModelCostLine {
   unmeteredCalls?: number;
   inputTokens: number;
   outputTokens: number;
-  totalOnlyTokens?: number;
+  unmeteredTokens?: number;
   costUsd?: number;
 }
 ```
@@ -190,8 +190,8 @@ interface ModelCostLine {
 | `totalUsd` | Coût des appels dont le coût est connu ; seulement un minimum quand `complete` vaut `false` |
 | `complete` | `false` quand le coût de certains appels est inconnu : `unpricedCalls` ou `unmeteredCalls` supérieur à 0 |
 | `unpricedModels`, `unpricedCalls` | Modèles sans tarif dans `pricing`, et ceux de leurs appels qui ont rapporté leurs tokens |
-| `unmeteredModels`, `unmeteredCalls` | Modèles des appels qui n'ont rapporté aucun nombre de tokens en entrée ou en sortie, et ces appels |
-| `lines` | Une par modèle, par modèle demandé et par source : appels, tokens des appels qui les ont rapportés, `unmeteredCalls` s'il y en a, `totalOnlyTokens` pour les totaux que certains ont rapportés seuls, `costUsd` quand le modèle a un tarif et qu'une partie des appels de la ligne ont rapporté leurs tokens ; `model` vaut `(unknown)` pour un appel qui n'a enregistré aucun nom de modèle |
+| `unmeteredModels`, `unmeteredCalls` | Modèles des appels qui n'ont pas rapporté à la fois leurs tokens en entrée et en sortie, et ces appels |
+| `lines` | Une par modèle, par modèle demandé et par source : appels, tokens des appels mesurés, `unmeteredCalls` s'il y en a, `unmeteredTokens` pour les tokens de ceux-ci, `costUsd` quand le modèle a un tarif et qu'une partie des appels de la ligne sont mesurés ; `model` vaut `(unknown)` pour un appel qui n'a enregistré aucun nom de modèle |
 
 ## Traces, rejeu et tests {#traces-replay-and-testing}
 

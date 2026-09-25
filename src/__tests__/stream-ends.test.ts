@@ -163,6 +163,71 @@ describe('an OpenAI stream that breaks off', () => {
     expect((error as Error).message).toContain('sent nothing for 300 ms');
     expect(discarded).toHaveLength(1);
   });
+  it('still fails when the finish reason came before the whole arguments of a tool call', async () => {
+    // A server that is not OpenAI may send the finish reason before the last piece.
+    const chunk = (choice: object) => ({
+      data: JSON.stringify({
+        id: 'chatcmpl-test',
+        object: 'chat.completion.chunk',
+        created: 1_700_000_000,
+        model: 'gpt-4o',
+        choices: [choice],
+      }),
+    });
+    const events = [
+      chunk({
+        index: 0,
+        delta: {
+          role: 'assistant',
+          tool_calls: [
+            {
+              index: 0,
+              id: 'call_1',
+              type: 'function',
+              function: { name: 'lookup', arguments: '{"a":1,' },
+            },
+          ],
+        },
+        finish_reason: null,
+      }),
+      chunk({ index: 0, delta: {}, finish_reason: 'tool_calls' }),
+    ];
+    server.reply({ status: 200, stream: { events, then: 'cut' } });
+
+    const error = await failure(
+      provider().generateCompletion({ model: 'gpt-4o', messages: hello, onTextDelta: () => {} })
+    );
+
+    // Before: the call to lookup came back with the arguments '{"a":1,'.
+    expect(error).toBeInstanceOf(LLMProviderError);
+    expect(isTransientError(error)).toBe(true);
+  });
+
+  it('names no requested model for a discarded answer to a request that named none', async () => {
+    const events = beforeDone({
+      choices: [],
+      model: 'gpt-4o-2024-08-06',
+      usage: { prompt: 30, completion: 0 },
+    });
+    server.reply({ status: 200, stream: { events, then: 'cut' } });
+    const discarded: DiscardedAnswer[] = [];
+
+    await failure(
+      // What a fallback chain sends a fallback that uses its own default model.
+      provider({ includeStreamUsage: true }).generateCompletion({
+        model: '',
+        messages: hello,
+        onTextDelta: () => {},
+        onDiscardedAnswer: (answer) => discarded.push(answer),
+      })
+    );
+
+    // As an answer that is used: a request that named no model asked for no name. Before, it
+    // was priced on the provider's default, and the used answers of the same call were not.
+    expect(discarded).toHaveLength(1);
+    expect(discarded[0]).not.toHaveProperty('requestedModel');
+    expect(discarded[0]?.model).toBe('gpt-4o-2024-08-06');
+  });
 });
 
 describe('an Anthropic stream that breaks off after message_stop', () => {
@@ -230,6 +295,8 @@ describe('a streamed request OpenAI refuses', () => {
       ...options,
     });
     const client = Reflect.get(provider, 'client') as { baseURL: string };
+    // The vendor client still keeps its address in this field: else the test would reach out.
+    expect(client.baseURL).toBe('https://api.openai.com/v1');
     client.baseURL = `${await server.start()}/v1`;
     return provider;
   }
@@ -258,26 +325,21 @@ describe('a streamed request OpenAI refuses', () => {
     expect(server.jsonBody(0)).toMatchObject({ stream_options: { include_usage: true } });
   });
 
-  it('is sent again without it when includeStreamUsage was set explicitly', async () => {
-    server.reply(tooLong, openAIChatStream({ content: 'Answer' }));
+  it('is not sent again either when includeStreamUsage was set explicitly', async () => {
+    server.reply(tooLong, openAIChatStream({ content: 'never asked' }));
     const provider = await onOpenAIsAPI({ includeStreamUsage: true });
 
-    const response = await provider.generateCompletion({
-      model: 'gpt-4o',
-      messages: hello,
-      onTextDelta: () => {},
-    });
+    const error = await failure(
+      provider.generateCompletion({ model: 'gpt-4o', messages: hello, onTextDelta: () => {} })
+    );
 
-    expect(response.content).toBe('Answer');
-    expect(server.requests).toHaveLength(2);
-    expect(server.jsonBody(1)).not.toHaveProperty('stream_options');
+    expect((error as Error).message).toContain('maximum context length');
+    expect(server.requests).toHaveLength(1);
   });
 
   it('knows which addresses are sent a request again', () => {
     expect(retriesStreamWithoutUsage('https://api.openai.com/v1')).toBe(false);
     expect(retriesStreamWithoutUsage('https://eu.api.openai.com/v1/')).toBe(false);
-    expect(retriesStreamWithoutUsage('https://api.openai.com/v1', true)).toBe(true);
-    expect(retriesStreamWithoutUsage('https://api.openai.com/v1', false)).toBe(true);
     expect(retriesStreamWithoutUsage('https://proxy.example.net/v1')).toBe(true);
     expect(retriesStreamWithoutUsage('http://127.0.0.1:8080/v1')).toBe(true);
   });

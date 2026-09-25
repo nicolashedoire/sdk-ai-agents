@@ -73,7 +73,7 @@ describe('run cost report', () => {
         unmeteredCalls: 2,
         inputTokens: 3,
         outputTokens: 2,
-        totalOnlyTokens: 9,
+        unmeteredTokens: 9,
         costUsd: 5,
       },
       {

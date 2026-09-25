@@ -45,11 +45,11 @@ Les clés sont des identifiants de modèle exacts ou des préfixes terminés par
 Le SDK n'invente jamais un tarif, ni un nombre de tokens. Le coût d'un appel est inconnu dans deux cas, et le rapport le dit :
 
 - **son modèle n'a pas de tarif** : ses appels et ses tokens sont tout de même comptabilisés, le modèle est listé dans `unpricedModels`, ces appels dans `unpricedCalls`, et sa ligne n'a pas de `costUsd` ;
-- **il n'a rapporté aucun nombre de tokens** — ni en entrée ni en sortie, comme avec un fournisseur qui ne renvoie pas de consommation, ou seulement un total : il est compté dans `unmeteredCalls` (et dans le `unmeteredCalls` de sa ligne), et son modèle dans `unmeteredModels`. Il n'est jamais pris pour zéro token, et une ligne dont aucun appel ne les a rapportés n'a pas de `costUsd` non plus.
+- **il n'a pas rapporté à la fois ses tokens en entrée et en sortie** — comme avec un fournisseur qui ne renvoie pas de consommation, seulement un total, ou l'un des deux : il est compté dans `unmeteredCalls` (et dans le `unmeteredCalls` de sa ligne), et son modèle dans `unmeteredModels`. Il n'est jamais pris pour zéro token, et une ligne dont aucun appel ne les a rapportés n'a pas de `costUsd` non plus.
 
-Un appel sans nombre de tokens est compté comme non mesuré même si son modèle a un tarif, comme le font les budgets. Dès que le coût d'un appel est inconnu, le rapport est marqué `complete: false` et `totalUsd` n'additionne que les appels dont le coût est connu : c'est un minimum, pas le coût de l'exécution.
+Un appel sans ces deux nombres est compté comme non mesuré même si son modèle a un tarif, comme le font les budgets. Dès que le coût d'un appel est inconnu, le rapport est marqué `complete: false` et `totalUsd` n'additionne que les appels dont le coût est connu : c'est un minimum, pas le coût de l'exécution.
 
-Les tokens d'un appel sont ses tokens en entrée et en sortie, quel que soit le total que l'éditeur donne aussi, sinon le total qu'il a rapporté seul : un tel total compte comme des tokens (dans le `totalOnlyTokens` de la ligne, dans les budgets et dans le `maxTokens` d'une exécution), jamais comme un coût.
+Les tokens d'un appel mesuré sont ses tokens en entrée et en sortie, quel que soit le total que l'éditeur donne aussi. Ceux d'un appel non mesuré sont le plus grand de son total et des tokens en entrée ou en sortie qu'il a rapportés, jamais moins que ce qu'il a dit avoir utilisé : ils comptent comme des tokens (dans le `unmeteredTokens` de la ligne, dans les budgets et dans le `maxTokens` d'une exécution), jamais comme un coût. Une valeur qui n'est pas un nombre positif ou nul (`null`, un nombre négatif) est lue comme absente, et ne masque pas les autres.
 
 ## Appels qui échouent {#failed-calls}
 
@@ -68,7 +68,7 @@ Une tentative qui a échoué sans réponse — une erreur HTTP, un délai dépas
 | --- | --- | --- |
 | `intention.generated` | Raisonnement natif, sélection d'outil | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
 | `provider.answer_discarded` | Une réponse que le fournisseur n'a pas pu utiliser | `provider`, `model`, `requestedModel`, `usage` |
-| `cognition.thought` | Opérations cognitives, réparations et tentatives échouées comprises | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.totalOnlyTokens` |
+| `cognition.thought` | Opérations cognitives, réparations et tentatives échouées comprises (une tentative à laquelle un autre modèle que le dernier a répondu, par un fournisseur de secours, est enregistrée comme un `provider.answer_discarded`) | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.unmeteredTokens` |
 | `cognition.operation_failed` | Une opération interrompue par un arrêt ou un délai dépassé après des tentatives facturées | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev et les autres backends de décisions typées, réponses rejetées comprises | `model`, `usage.inputTokens`, `usage.outputTokens` |
 

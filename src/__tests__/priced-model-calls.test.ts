@@ -38,7 +38,7 @@ function counted(report: RunCostReport) {
     unpricedCalls: report.unpricedCalls,
     unmeteredCalls: report.unmeteredCalls,
     tokens: report.lines.reduce(
-      (sum, line) => sum + line.inputTokens + line.outputTokens + (line.totalOnlyTokens ?? 0),
+      (sum, line) => sum + line.inputTokens + line.outputTokens + (line.unmeteredTokens ?? 0),
       0
     ),
   };
@@ -288,6 +288,67 @@ describe('each model call priced on its own names', () => {
     });
     expect(budgets).toEqual(cost);
   });
+
+  it('prices a repair another model answered apart from the thought, on its own names', async () => {
+    // The primary answers the first attempt with a reply that is not a thought; the repair
+    // fails on it, and the fallback answers the repair (and every call after it).
+    openai.reply(
+      openAIChat({
+        model: 'gpt-4o-2024-08-06',
+        content: 'not json',
+        usage: { prompt: 1_000, completion: 200 },
+      }),
+      openAIError(500, 'The server had an error')
+    );
+    anthropic.reply(
+      anthropicMessage({
+        text: ['not json'],
+        model: 'claude-opus-5',
+        usage: { input: 10, output: 5 },
+      })
+    );
+    const primary = new OpenAIProvider('k', 'gpt-4o', {
+      baseURL: `${await openai.start()}/v1`,
+      maxRetries: 0,
+    });
+    const fallback = new AnthropicProvider('k', undefined, {
+      baseURL: await anthropic.start(),
+      maxRetries: 0,
+    });
+    // $1 per token for gpt-4o only.
+    env = createTestSDK({
+      llmProvider: new FallbackProvider(primary, [fallback]),
+      pricing: { 'gpt-4o': { inputPerMillion: 1_000_000, outputPerMillion: 1_000_000 } },
+    });
+    const agent = env.sdk.createCognitiveAgent({ name: 'analyst', model: 'gpt-4o' });
+
+    const result = await agent.think({ problem: PROBLEM });
+
+    const events = await env.sdk.getEvents(result.runId);
+    // Before: the first thought recorded 1 010 + 205 tokens under claude-opus-5 alone, and the
+    // gpt-4o attempt was priced at Claude's price (none here).
+    expect(ofType(events, 'provider.answer_discarded').map((event) => event.data)).toContainEqual(
+      expect.objectContaining({
+        provider: 'openai',
+        model: 'gpt-4o-2024-08-06',
+        requestedModel: 'gpt-4o',
+        usage: expect.objectContaining({ promptTokens: 1_000, completionTokens: 200 }),
+      })
+    );
+    const { report, budgets, cost } = await budgetsAndCost(env, agent.id, result.runId);
+    expect(report.lines).toContainEqual(
+      expect.objectContaining({
+        model: 'gpt-4o-2024-08-06',
+        requestedModel: 'gpt-4o',
+        calls: 1,
+        inputTokens: 1_000,
+        outputTokens: 200,
+        costUsd: 1_200,
+      })
+    );
+    expect(report).toMatchObject({ totalUsd: 1_200, unpricedModels: ['claude-opus-5'] });
+    expect(budgets).toEqual(cost);
+  });
 });
 
 describe('the tokens of a call, counted by one rule', () => {
@@ -330,11 +391,85 @@ describe('the tokens of a call, counted by one rule', () => {
         unmeteredCalls: 1,
         inputTokens: 10,
         outputTokens: 5,
-        totalOnlyTokens: 9,
+        unmeteredTokens: 9,
         costUsd: 15,
       },
     ]);
     expect(cost).toEqual({ costUsd: 15, unpricedCalls: 0, unmeteredCalls: 1, tokens: 24 });
+    expect(budgets).toEqual(cost);
+  });
+
+  /** A governed run of one tool call and its answer, with the usage `usageFor` gives each. */
+  async function governedRun(usageFor: (call: number) => LLMResponse['usage']) {
+    const scripted = new ScriptedLLMProvider({ model: 'vendor-1' });
+    scripted.enqueue(
+      'tool-selection',
+      { toolCall: { name: 'lookup', arguments: { key: 'a' } } },
+      { content: 'Found' }
+    );
+    env = createTestSDK({ llmProvider: new ReportedUsage(scripted, usageFor), pricing: PRICING });
+    const lookup = env.sdk.defineTool({
+      name: 'lookup',
+      description: 'Looks a key up',
+      schema: z.object({ key: z.string() }),
+      handler: async () => ({ value: 'found' }),
+    });
+    const agent = env.sdk.createAgent({ name: 'governed', model: 'vendor-1', tools: [lookup] });
+    const result = await agent.run({ message: 'Look a up' });
+    expect(result.status).toBe('completed');
+    return budgetsAndCost(env, agent.id, result.runId);
+  }
+
+  it('reads each token count on its own: a null total does not hide the split', async () => {
+    // A compatible server may send "total_tokens": null, which the provider passes on.
+    const { report, budgets, cost } = await governedRun((call) =>
+      call === 0
+        ? ({
+            promptTokens: 100,
+            completionTokens: 20,
+            totalTokens: null,
+          } as unknown as LLMResponse['usage'])
+        : { promptTokens: 10, completionTokens: 5, totalTokens: -1 }
+    );
+
+    // Before: getRunCost dropped both usages (0 tokens, 2 calls of unknown cost) while budgets
+    // priced them at $135.
+    expect(report.lines).toEqual([
+      {
+        model: 'vendor-1',
+        source: 'llm',
+        calls: 2,
+        inputTokens: 110,
+        outputTokens: 25,
+        costUsd: 135,
+      },
+    ]);
+    expect(cost).toEqual({ costUsd: 135, unpricedCalls: 0, unmeteredCalls: 0, tokens: 135 });
+    expect(budgets).toEqual(cost);
+  });
+
+  it('gives no cost to a call that reported one side only, and never fewer tokens than it said', async () => {
+    const { report, budgets, cost } = await governedRun((call) =>
+      call === 0
+        ? { promptTokens: 100, totalTokens: 600 }
+        : ({ promptTokens: Number.NaN, completionTokens: 30 } as LLMResponse['usage'])
+    );
+
+    // Before: 100 + 30 tokens priced as if complete ($130, complete: true), and NaN made the
+    // budget's tokens and cost NaN.
+    expect(report.lines).toEqual([
+      {
+        model: 'vendor-1',
+        source: 'llm',
+        calls: 2,
+        unmeteredCalls: 2,
+        inputTokens: 0,
+        outputTokens: 0,
+        unmeteredTokens: 630,
+      },
+    ]);
+    expect(report.complete).toBe(false);
+    expect(cost).toEqual({ costUsd: 0, unpricedCalls: 0, unmeteredCalls: 2, tokens: 630 });
     expect(budgets).toEqual(cost);
   });
 
@@ -355,7 +490,7 @@ describe('the tokens of a call, counted by one rule', () => {
       completionTokens: 0,
       calls: 1,
       unmeteredCalls: 1,
-      totalOnlyTokens: 7,
+      unmeteredTokens: 7,
     });
     const { budgets, cost } = await budgetsAndCost(env, agent.id, result.runId);
     expect(cost).toEqual({

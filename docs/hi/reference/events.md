@@ -46,7 +46,7 @@ interface Event {
 | --- | --- |
 | `cognition.started` | `schemaVersion` (2; पुराने runs में अनुपस्थित), `goal`, `context?`, `observations` (समस्या के साथ दिए गए), `commitRules`, `knowledge?` (`scope`, पहले के runs से याद किए गए `items`, स्टोर विफल होने पर `error?`), `profile`, `controller`, `assessor`, `evaluator?`, `allowedTools`, `limits` |
 | `cognition.operation_selected` | `step`, `operation`, `controller`, `available`, `stepsRemaining`, `forced?` (इंजन ने निर्णय थोपा), `confidence?`, `probabilities?`, `rationale?`, `fallbackFrom?` |
-| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — वे कॉल जिन्होंने tokens की गिनती नहीं बताई, `totalOnlyTokens?` — उनमें से कुछ द्वारा अकेले बताई गई कुल संख्याएँ) |
+| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — वे कॉल जिन्होंने इनपुट और आउटपुट tokens दोनों नहीं बताए, `unmeteredTokens?` — उनके tokens) |
 | `cognition.operation_failed` | `step`, `operation`, `error`, `recovery?` — और बिल हो चुके प्रयासों के बाद रोक या समय-सीमा से बीच में रुके ऑपरेशन के लिए `model?`, `requestedModel?`, `usage?` भी |
 | `cognition.evaluated` | `step`, `predictionId`, `hypothesisId`, `evaluator` (`id`, `version`), `verdict`, `observed?`, `summary?`, `context?`, `metrics?`, `causeCandidates?`, `reason?`, `durationMs` — किसी पूर्वानुमान के परीक्षण की पूरी रिपोर्ट |
 | `cognition.concluded` | `decision`, `status` (`committed`, `provisional`, `abstain`), `confidence`, `steps`, `evidenceRevision`, `hypotheses`, `predictions` |

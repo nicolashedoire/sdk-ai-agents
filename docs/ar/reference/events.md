@@ -46,7 +46,7 @@ interface Event {
 | --- | --- |
 | `cognition.started` | `schemaVersion` (2؛ غائب في عمليات التشغيل الأقدم)، و`goal`، و`context?`، و`observations` (المقدَّمة مع المشكلة)، و`commitRules`، و`knowledge?` (`scope`، و`items` المستدعاة من عمليات تشغيل سابقة، و`error?` حين يفشل المخزن)، و`profile`، و`controller`، و`assessor`، و`evaluator?`، و`allowedTools`، و`limits` |
 | `cognition.operation_selected` | `step`، و`operation`، و`controller`، و`available`، و`stepsRemaining`، و`forced?` (فرض المحرّك قرارًا)، و`confidence?`، و`probabilities?`، و`rationale?`، و`fallbackFrom?` |
-| `cognition.thought` | `step`، و`operation`، و`patch`، و`issues`، و`failed`، و`ignoredFields?`، و`model?`، و`requestedModel?`، و`usage?` (`promptTokens`، `completionTokens`، `calls`، `unmeteredCalls?` — الاستدعاءات التي لم تُبلِغ عن عدد الرموز، `totalOnlyTokens?` — المجاميع التي أبلغ عنها بعضها وحدها) |
+| `cognition.thought` | `step`، و`operation`، و`patch`، و`issues`، و`failed`، و`ignoredFields?`، و`model?`، و`requestedModel?`، و`usage?` (`promptTokens`، `completionTokens`، `calls`، `unmeteredCalls?` — الاستدعاءات التي لم تُبلِغ عن رموز الإدخال والإخراج كليهما، `unmeteredTokens?` — رموزها) |
 | `cognition.operation_failed` | `step`، و`operation`، و`error`، و`recovery?` — وكذلك `model?`، و`requestedModel?`، و`usage?` لعملية قطعها إيقاف أو انتهاء مهلة بعد محاولات مدفوعة |
 | `cognition.evaluated` | `step`، و`predictionId`، و`hypothesisId`، و`evaluator` (`id`، `version`)، و`verdict`، و`observed?`، و`summary?`، و`context?`، و`metrics?`، و`causeCandidates?`، و`reason?`، و`durationMs` — التقرير الكامل لاختبار تنبؤ |
 | `cognition.concluded` | `decision`، و`status` (`committed`، `provisional`، `abstain`)، و`confidence`، و`steps`، و`evidenceRevision`، و`hypotheses`، و`predictions` |

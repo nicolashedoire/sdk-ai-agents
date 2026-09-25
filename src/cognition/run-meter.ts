@@ -70,10 +70,10 @@ export class CognitiveRunMeter {
       });
     }
     if (record.unmeteredCalls > 0) {
-      // Their tokens are the totals some of them reported alone; their cost is unknown.
+      // Their tokens are counted (see `tokensOfCall`); their cost is unknown.
       await this.onModelCall({
         ...names,
-        ...(record.totalOnlyTokens > 0 ? { usage: { totalTokens: record.totalOnlyTokens } } : {}),
+        ...(record.unmeteredTokens > 0 ? { usage: { totalTokens: record.unmeteredTokens } } : {}),
         calls: record.unmeteredCalls,
       });
     }

@@ -46,7 +46,7 @@ interface Event {
 | --- | --- |
 | `cognition.started` | `schemaVersion`（2；较早的运行中没有）、`goal`、`context?`、`observations`（随问题提供的）、`commitRules`、`knowledge?`（`scope`、从之前运行中召回的 `items`，存储出错时为 `error?`）、`profile`、`controller`、`assessor`、`evaluator?`、`allowedTools`、`limits` |
 | `cognition.operation_selected` | `step`、`operation`、`controller`、`available`、`stepsRemaining`、`forced?`（引擎强制要求决策）、`confidence?`、`probabilities?`、`rationale?`、`fallbackFrom?` |
-| `cognition.thought` | `step`、`operation`、`patch`、`issues`、`failed`、`ignoredFields?`、`model?`、`requestedModel?`、`usage?`（`promptTokens`、`completionTokens`、`calls`、`unmeteredCalls?`——没有报告 token 数的调用，`totalOnlyTokens?`——其中部分调用单独报告的总数） |
+| `cognition.thought` | `step`、`operation`、`patch`、`issues`、`failed`、`ignoredFields?`、`model?`、`requestedModel?`、`usage?`（`promptTokens`、`completionTokens`、`calls`、`unmeteredCalls?`——没有同时报告输入和输出 token 数的调用，`unmeteredTokens?`——这些调用的 token 数） |
 | `cognition.operation_failed` | `step`、`operation`、`error`、`recovery?`——对于在已计费的尝试之后被停止或超时打断的操作，还有 `model?`、`requestedModel?`、`usage?` |
 | `cognition.evaluated` | `step`、`predictionId`、`hypothesisId`、`evaluator`（`id`、`version`）、`verdict`、`observed?`、`summary?`、`context?`、`metrics?`、`causeCandidates?`、`reason?`、`durationMs`——一次预测检验的完整报告 |
 | `cognition.concluded` | `decision`、`status`（`committed`、`provisional`、`abstain`）、`confidence`、`steps`、`evidenceRevision`、`hypotheses`、`predictions` |

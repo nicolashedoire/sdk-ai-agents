@@ -45,11 +45,11 @@ Schlüssel sind exakte Modellkennungen oder Präfixe, die auf `*` enden. Anbiete
 Das SDK erfindet nie einen Preis und nie eine Token-Anzahl. Die Kosten eines Aufrufs sind in zwei Fällen unbekannt, und der Bericht sagt es:
 
 - **sein Modell hat keinen Preis**: Seine Aufrufe und Tokens werden trotzdem gezählt, das Modell wird in `unpricedModels` aufgeführt, diese Aufrufe in `unpricedCalls`, und seine Zeile hat kein `costUsd`;
-- **er hat keine Token-Anzahl gemeldet** – weder Eingabe- noch Ausgabe-Tokens, etwa bei einem Anbieter, der keinen Verbrauch zurückgibt oder nur eine Summe: Er wird in `unmeteredCalls` gezählt (und im `unmeteredCalls` seiner Zeile), sein Modell in `unmeteredModels`. Er wird nie als null Tokens gewertet, und eine Zeile, von deren Aufrufen keiner sie gemeldet hat, hat ebenfalls kein `costUsd`.
+- **er hat nicht sowohl seine Eingabe- als auch seine Ausgabe-Tokens gemeldet** – etwa bei einem Anbieter, der keinen Verbrauch zurückgibt, nur eine Summe oder nur eine der beiden Zahlen: Er wird in `unmeteredCalls` gezählt (und im `unmeteredCalls` seiner Zeile), sein Modell in `unmeteredModels`. Er wird nie als null Tokens gewertet, und eine Zeile, von deren Aufrufen keiner sie gemeldet hat, hat ebenfalls kein `costUsd`.
 
-Ein Aufruf ohne Token-Anzahl gilt als ungemessen, auch wenn sein Modell einen Preis hat, so wie Budgets ihn zählen. Sobald die Kosten eines Aufrufs unbekannt sind, wird der Bericht mit `complete: false` markiert, und `totalUsd` addiert nur die Aufrufe mit bekannten Kosten: eine Untergrenze, nicht die Kosten des Laufs.
+Ein Aufruf ohne diese beiden Zahlen gilt als ungemessen, auch wenn sein Modell einen Preis hat, so wie Budgets ihn zählen. Sobald die Kosten eines Aufrufs unbekannt sind, wird der Bericht mit `complete: false` markiert, und `totalUsd` addiert nur die Aufrufe mit bekannten Kosten: eine Untergrenze, nicht die Kosten des Laufs.
 
-Die Tokens eines Aufrufs sind seine Eingabe- und Ausgabe-Tokens, gleich welche Summe der Hersteller außerdem angibt, sonst die Summe, die er allein gemeldet hat: Eine solche Summe zählt als Tokens (im `totalOnlyTokens` der Zeile, in den Budgets und im `maxTokens` eines Laufs), nie als Kosten.
+Die Tokens eines gemessenen Aufrufs sind seine Eingabe- und Ausgabe-Tokens, gleich welche Summe der Hersteller außerdem angibt. Die eines ungemessenen Aufrufs sind das Größere aus seiner Summe und den Eingabe- oder Ausgabe-Tokens, die er gemeldet hat, nie weniger, als er nach eigener Angabe verbraucht hat: Sie zählen als Tokens (im `unmeteredTokens` der Zeile, in den Budgets und im `maxTokens` eines Laufs), nie als Kosten. Ein Wert, der keine Zahl größer oder gleich 0 ist (`null`, eine negative Zahl), gilt als fehlend und verdeckt die anderen nicht.
 
 ## Fehlgeschlagene Aufrufe {#failed-calls}
 
@@ -68,7 +68,7 @@ Ein Versuch, der ohne Antwort fehlschlug – ein HTTP-Fehler, eine Zeitüberschr
 | --- | --- | --- |
 | `intention.generated` | Natives Reasoning, Tool-Auswahl | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
 | `provider.answer_discarded` | Eine Antwort, die der Anbieter nicht verwenden konnte | `provider`, `model`, `requestedModel`, `usage` |
-| `cognition.thought` | Kognitive Operationen, einschließlich Reparaturen und fehlgeschlagener Versuche | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.totalOnlyTokens` |
+| `cognition.thought` | Kognitive Operationen, einschließlich Reparaturen und fehlgeschlagener Versuche (ein Versuch, den über einen Ausweichanbieter ein anderes Modell als das des letzten beantwortet hat, wird als `provider.answer_discarded` aufgezeichnet) | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.unmeteredTokens` |
 | `cognition.operation_failed` | Eine Operation, die ein Stopp oder ein Zeitlimit nach berechneten Versuchen abgebrochen hat | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev und andere Backends für typisierte Entscheidungen, einschließlich abgelehnter Antworten | `model`, `usage.inputTokens`, `usage.outputTokens` |
 

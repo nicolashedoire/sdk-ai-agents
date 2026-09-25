@@ -135,8 +135,8 @@ export interface DiscardedAnswer {
   /** Model that answered, else the one requested. */
   model: string;
   /**
-   * Model the request asked this provider for (its own default when the request named none):
-   * the answer is priced on it too, as the calls whose answer is used are.
+   * Model the request asked for, when it named one: the answer is priced on it too, as the
+   * calls whose answer is used are.
    */
   requestedModel?: string;
   usage: NonNullable<LLMResponse['usage']>;

@@ -12,7 +12,7 @@ export interface BudgetUsage {
   costUsd: number;
   /** Model calls of a model without a price: their cost is unknown, maxCost cannot be checked. */
   unpricedCalls: number;
-  /** Model calls that reported no input/output token counts: their cost is unknown too. */
+  /** Model calls without both input and output token counts: their cost is unknown too. */
   unmeteredCalls: number;
   lastUpdated: number;
 }
@@ -321,7 +321,7 @@ export class BudgetTracker {
     } else if (costUnknown && spend.unpricedCalls > 0) {
       reason = `Cost budget cannot be checked: ${spend.unpricedCalls} model call(s) of a model without a price (add it to SDKConfig.pricing)`;
     } else if (costUnknown) {
-      reason = `Cost budget cannot be checked: ${spend.unmeteredCalls} model call(s) reported no token counts`;
+      reason = `Cost budget cannot be checked: ${spend.unmeteredCalls} model call(s) without input and output token counts`;
     } else if (wouldExceedCost) {
       const [spent, cap] = usdOverCap(spend.costUsd, limit.maxCost ?? 0);
       reason = `Cost budget exceeded: $${spent} > $${cap}`;

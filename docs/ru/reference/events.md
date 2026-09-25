@@ -46,7 +46,7 @@ interface Event {
 | --- | --- |
 | `cognition.started` | `schemaVersion` (2; отсутствует в более старых запусках), `goal`, `context?`, `observations` (переданные вместе с задачей), `commitRules`, `knowledge?` (`scope`, `items`, вспомненные из предыдущих запусков, `error?`, если хранилище дало сбой), `profile`, `controller`, `assessor`, `evaluator?`, `allowedTools`, `limits` |
 | `cognition.operation_selected` | `step`, `operation`, `controller`, `available`, `stepsRemaining`, `forced?` (движок навязал решение), `confidence?`, `probabilities?`, `rationale?`, `fallbackFrom?` |
-| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — вызовы, не сообщившие число токенов, `totalOnlyTokens?` — итоги, которые некоторые из них сообщили отдельно) |
+| `cognition.thought` | `step`, `operation`, `patch`, `issues`, `failed`, `ignoredFields?`, `model?`, `requestedModel?`, `usage?` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?` — вызовы, не сообщившие и входные, и выходные токены, `unmeteredTokens?` — их токены) |
 | `cognition.operation_failed` | `step`, `operation`, `error`, `recovery?` — а также `model?`, `requestedModel?`, `usage?` для операции, прерванной остановкой или тайм-аутом после оплаченных попыток |
 | `cognition.evaluated` | `step`, `predictionId`, `hypothesisId`, `evaluator` (`id`, `version`), `verdict`, `observed?`, `summary?`, `context?`, `metrics?`, `causeCandidates?`, `reason?`, `durationMs` — полный отчёт о проверке предсказания |
 | `cognition.concluded` | `decision`, `status` (`committed`, `provisional`, `abstain`), `confidence`, `steps`, `evidenceRevision`, `hypotheses`, `predictions` |

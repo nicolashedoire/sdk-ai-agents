@@ -36,7 +36,7 @@ SDK 通过 Chat Completions 调用 OpenAI，而在 Chat Completions 中，GPT-5.
 | `defaultModel` | `gpt-5.4` | 未指定模型的请求所用的模型，以及不支持智能体模型的回退所用的模型 |
 | `reasoningModels` | 按名称识别 | `true` 或 `false`：此提供商的所有模型都是（或都不是）推理模型。列表：列出的名称是推理模型（Azure 部署、网关别名），其他名称按名称识别 |
 | `reasoningEffort` | 模型自身的默认值 | `none`、`minimal`、`low`、`medium`、`high`、`xhigh` 或 `max`，只原样发送给推理模型。每个模型只接受其中部分值，API 会拒绝其余的值 |
-| `includeStreamUsage` | 在 OpenAI 自己的 API 上启用 | `true`：为流式输出的回答请求其用量（`stream_options`），从而计入它的成本；`false`：不请求。默认在 `https://api.openai.com/v1` 以及 `https://eu.api.openai.com/v1` 等区域主机上启用（根据 `baseURL` 或 `OPENAI_BASE_URL` 判断），因为兼容的服务器可能会拒绝该字段（此时请求会去掉它重新发送；对 OpenAI 自己的 API，只有设置了 `includeStreamUsage` 时才会这样做）或忽略它，而没有用量的流式调用按未计量处理。在会报告用量的兼容服务器（Azure OpenAI 的 v1 API 就会报告）上使用费用预算时，应设为 `true` |
+| `includeStreamUsage` | 在 OpenAI 自己的 API 上启用 | `true`：为流式输出的回答请求其用量（`stream_options`），从而计入它的成本；`false`：不请求。默认在 `https://api.openai.com/v1` 以及 `https://eu.api.openai.com/v1` 等区域主机上启用（根据 `baseURL` 或 `OPENAI_BASE_URL` 判断），因为兼容的服务器可能会拒绝该字段（此时请求会去掉它重新发送，但 OpenAI 自己的 API 接受该字段，不会重新发送）或忽略它，而没有用量的流式调用按未计量处理。在会报告用量的兼容服务器（Azure OpenAI 的 v1 API 就会报告）上使用费用预算时，应设为 `true` |
 | `nativeToolMessages` | `true` | 对于不接受对话中的助手 `tool_calls` 和 `tool` 消息的兼容服务器，设为 `false`：之前的工具调用及其结果将以文本形式发送，而工具仍会提供，回复中的工具调用也仍会读取。在主提供商或任一回退上设为 `false`，都会作用于整条链 |
 
 这些选项写在 `providerConfig.openai` 中，或写在 OpenAI 回退的 `config` 中。其他厂商的回退会从 `providerConfig.openai` 获取其 `config` 未设置的每个选项；与主提供商同一厂商的回退则一个也不获取。智能体或运行可以在 `providerSettings.openai.reasoningEffort` 中设置自己的推理强度：运行的设置优先，其次是智能体的，最后是提供商的。认知智能体只把它用于工具选择；它的思维不提供工具，使用它的 `reasoningEffort` 选项。
@@ -180,7 +180,7 @@ interface ModelCostLine {
   unmeteredCalls?: number;
   inputTokens: number;
   outputTokens: number;
-  totalOnlyTokens?: number;
+  unmeteredTokens?: number;
   costUsd?: number;
 }
 ```
@@ -190,8 +190,8 @@ interface ModelCostLine {
 | `totalUsd` | 成本已知的调用的成本；当 `complete` 为 `false` 时只是一个下限 |
 | `complete` | 当部分调用的成本未知，即 `unpricedCalls` 或 `unmeteredCalls` 大于 0 时为 `false` |
 | `unpricedModels`、`unpricedCalls` | 在 `pricing` 中没有价格的模型，以及它们报告了 token 数的调用 |
-| `unmeteredModels`、`unmeteredCalls` | 既没有报告输入 token 数也没有报告输出 token 数的调用所用的模型，以及这些调用 |
-| `lines` | 每个模型、所请求的模型和来源一行：调用次数、报告了 token 数的调用的 token 数、存在时的 `unmeteredCalls`、部分调用单独报告的总数 `totalOnlyTokens`、模型有价格且该行有调用报告了 token 数时的 `costUsd`；没有记录模型名的调用，其 `model` 为 `(unknown)` |
+| `unmeteredModels`、`unmeteredCalls` | 没有同时报告输入和输出 token 数的调用所用的模型，以及这些调用 |
+| `lines` | 每个模型、所请求的模型和来源一行：调用次数、已计量调用的 token 数、存在时的 `unmeteredCalls`、这些调用的 token 数 `unmeteredTokens`、模型有价格且该行有已计量调用时的 `costUsd`；没有记录模型名的调用，其 `model` 为 `(unknown)` |
 
 ## 追踪记录、回放与测试 {#traces-replay-and-testing}
 

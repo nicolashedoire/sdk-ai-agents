@@ -45,11 +45,11 @@ As chaves são ids exatos de modelo ou prefixos terminados em `*`. Os provedores
 O SDK nunca inventa um preço, nem uma contagem de tokens. O custo de uma chamada é desconhecido em dois casos, e o relatório diz isso:
 
 - **o modelo dela não tem preço**: as chamadas e os tokens continuam sendo contabilizados, o modelo é listado em `unpricedModels`, essas chamadas em `unpricedCalls`, e a linha dele não tem `costUsd`;
-- **ela não informou nenhuma contagem de tokens** — nem de entrada nem de saída, como com um provedor que não devolve o consumo, ou só um total: ela é contada em `unmeteredCalls` (e no `unmeteredCalls` da sua linha), e o modelo em `unmeteredModels`. Ela nunca é tomada como zero token, e uma linha em que nenhuma chamada os informou também não tem `costUsd`.
+- **ela não informou ao mesmo tempo os tokens de entrada e de saída** — como com um provedor que não devolve o consumo, só um total, ou só um dos dois: ela é contada em `unmeteredCalls` (e no `unmeteredCalls` da sua linha), e o modelo em `unmeteredModels`. Ela nunca é tomada como zero token, e uma linha em que nenhuma chamada os informou também não tem `costUsd`.
 
-Uma chamada sem contagem de tokens conta como não medida mesmo que o modelo tenha preço, como nos orçamentos. Assim que o custo de alguma chamada é desconhecido, o relatório é marcado com `complete: false` e `totalUsd` soma apenas as chamadas cujo custo é conhecido: é um mínimo, não o custo da execução.
+Uma chamada sem as duas contagens conta como não medida mesmo que o modelo tenha preço, como nos orçamentos. Assim que o custo de alguma chamada é desconhecido, o relatório é marcado com `complete: false` e `totalUsd` soma apenas as chamadas cujo custo é conhecido: é um mínimo, não o custo da execução.
 
-Os tokens de uma chamada são os seus tokens de entrada e de saída, qualquer que seja o total que o fornecedor também informe; senão, o total que ela informou sozinho: esse total conta como tokens (no `totalOnlyTokens` da linha, nos orçamentos e no `maxTokens` de uma execução), nunca como custo.
+Os tokens de uma chamada medida são os seus tokens de entrada e de saída, qualquer que seja o total que o fornecedor também informe. Os de uma chamada não medida são o maior entre o seu total e os tokens de entrada ou de saída que ela informou, nunca menos do que ela disse ter usado: eles contam como tokens (no `unmeteredTokens` da linha, nos orçamentos e no `maxTokens` de uma execução), nunca como custo. Um valor que não é um número maior ou igual a 0 (`null`, um número negativo) é lido como ausente, e não esconde os outros.
 
 ## Chamadas que falham {#failed-calls}
 
@@ -68,7 +68,7 @@ Uma tentativa que falhou sem resposta — um erro HTTP, um tempo esgotado, uma c
 | --- | --- | --- |
 | `intention.generated` | Raciocínio nativo, seleção de ferramentas | `model`, `requestedModel`, `usage.promptTokens`, `usage.completionTokens` |
 | `provider.answer_discarded` | Uma resposta que o provedor não pôde usar | `provider`, `model`, `requestedModel`, `usage` |
-| `cognition.thought` | Operações cognitivas, incluindo correções e tentativas que falharam | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.totalOnlyTokens` |
+| `cognition.thought` | Operações cognitivas, incluindo correções e tentativas que falharam (uma tentativa respondida, por meio de um provedor de reserva, por outro modelo que não o da última é registrada como um `provider.answer_discarded`) | `model`, `requestedModel`, `usage.calls`, `usage.unmeteredCalls`, `usage.unmeteredTokens` |
 | `cognition.operation_failed` | Uma operação interrompida por uma parada ou um tempo limite depois de tentativas cobradas | `model`, `requestedModel`, `usage` |
 | `decision.evaluated` | Jev e outros backends de decisões tipadas, incluindo respostas rejeitadas | `model`, `usage.inputTokens`, `usage.outputTokens` |
 
