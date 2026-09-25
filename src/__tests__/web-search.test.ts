@@ -127,6 +127,24 @@ describe('web_search', () => {
       expect(request?.headers['accept-language']).toBe('fr');
     });
 
+    it("reads DuckDuckGo's 2026 no-results page as no results, not a throttle (a real study lost its prior art)", async () => {
+      server.on('/html/', reply(fixture('duckduckgo-no-results-2026.html')));
+      backup.on('/search', replyJson(searxngResults));
+
+      const output = await search(searchTool({ search: [ddg(), searxng({ baseUrl: backup.url })] }), {
+        query: '"retained mode" browser accessibility tree',
+      });
+
+      expect(output).toMatchObject({ provider: 'duckduckgo', results: [] });
+      expect(output).not.toHaveProperty('errors');
+      expect(server.hits('/html/')).toHaveLength(1);
+      expect(backup.requests).toHaveLength(0);
+      expect(parseDuckDuckGoPage(fixture('duckduckgo-no-results-2026.html'))).toMatchObject({
+        noResults: true,
+        blocked: false,
+      });
+    });
+
     it('takes a no-results page that echoes a query about captchas for no results, not a block', async () => {
       const echo = (inside: string) =>
         `<html><head><title>zqxj captcha solver at DuckDuckGo</title></head><body><form><input name="q" value="zqxj captcha solver"></form>${inside}</body></html>`;

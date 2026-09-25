@@ -119,6 +119,15 @@ const RESULT_LINK = /<a\b[^>]*\bclass="[^"]*\bresult__a\b[^"]*"[^>]*>([\s\S]*?)<
 const SNIPPET = /\bclass="[^"]*\bresult__snippet\b[^"]*"[^>]*>([\s\S]*?)<\/(?:a|div|td|span)>/i;
 const DATE = /\b(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}:\d{2}/;
 /**
+ * DuckDuckGo's "no results" page, in its markups: `<div class="no-results">No results.</div>`,
+ * and since 2026 `result--no-result`, `<span class='no-results'>`, `no-results__message`, and
+ * "No results found for …". Read as an empty page, it was taken for a throttle, which opened the
+ * circuit breaker: exact-phrase searches often find nothing.
+ */
+const NO_RESULTS =
+  /\bclass=["'][^"']{0,200}\b(?:no-results(?:__[a-z-]+)?|result--no-result)["'\s]|>\s*No\s+results(?:\.|\s+found\b)/i;
+
+/**
  * The markup of DuckDuckGo's block page (its "anomaly" challenge), never words the page could
  * echo from the query. Looked for only when the page has no result (see `blocked`).
  */
@@ -152,7 +161,7 @@ export function parseDuckDuckGoPage(html: string): DuckDuckGoPage {
   return {
     results,
     blocked: results.length === 0 && BLOCK_MARKUP.test(html),
-    noResults: /\bclass="[^"]*\bno-results\b/i.test(html) || />\s*No\s+results\.?\s*</i.test(html),
+    noResults: NO_RESULTS.test(html),
   };
 }
 
