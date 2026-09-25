@@ -329,8 +329,8 @@ interface RenderContext {
 }
 
 /** Indentation of nested list lines, kept apart from the spaces the clean-up trims. */
-const INDENT = '';
-const BLOCK_MARK = '';
+const INDENT = '\ue000';
+const BLOCK_MARK = '\ue001';
 
 const BLOCKS = new Set([
   'p',
@@ -395,8 +395,8 @@ function renderNode(node: HtmlNode, context: RenderContext): string {
   if (node.type === 'text') {
     // Private-use characters are icon-font glyphs: nothing to read, and the renderer's marks.
     return stripInvisible(node.text)
-      .replace(/[-]/g, '')
-      .replace(/[\s ]+/g, ' ');
+      .replace(/[\ue000-\uf8ff]/g, '')
+      .replace(/[\s\u00a0]+/g, ' ');
   }
   const { tag } = node;
   const md = context.markdown;

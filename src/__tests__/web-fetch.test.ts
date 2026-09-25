@@ -110,8 +110,8 @@ describe('web_fetch', () => {
         'Related posts',
         'Subscribe',
         'Privacy',
-        '​',
-        '‮',
+        '\u200b',
+        '\u202e',
       ]) {
         expect(content).not.toContain(hidden);
       }
@@ -208,7 +208,7 @@ describe('web_fetch', () => {
     it('returns text types as they are, dated by Last-Modified', async () => {
       server.on(
         '/notes.txt',
-        reply('Plain notes​.\n', {
+        reply('Plain notes\u200b.\n', {
           type: 'text/plain; charset=utf-8',
           headers: { 'last-modified': 'Wed, 21 Oct 2015 07:28:00 GMT' },
         })

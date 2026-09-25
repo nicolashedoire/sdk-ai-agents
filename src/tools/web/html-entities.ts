@@ -5,15 +5,15 @@ const NAMED: Record<string, string> = {
   gt: '>',
   quot: '"',
   apos: "'",
-  nbsp: ' ',
-  ensp: ' ',
-  emsp: ' ',
-  thinsp: ' ',
-  shy: '­',
-  zwnj: '‌',
-  zwj: '‍',
-  lrm: '‎',
-  rlm: '‏',
+  nbsp: '\u00a0',
+  ensp: '\u2002',
+  emsp: '\u2003',
+  thinsp: '\u2009',
+  shy: '\u00ad',
+  zwnj: '\u200c',
+  zwj: '\u200d',
+  lrm: '\u200e',
+  rlm: '\u200f',
   copy: '©',
   reg: '®',
   trade: '™',
@@ -261,7 +261,7 @@ export function decodeEntities(text: string): string {
  */
 const INVISIBLE =
   // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what it removes.
-  /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f­؜᠎​-‏‪-‮⁠-⁤⁦-⁯﻿￹-￻]/g;
+  /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff\ufff9-\ufffb]/g;
 
 /** Removes the invisible characters that could smuggle text past a human reader. */
 export function stripInvisible(text: string): string {
