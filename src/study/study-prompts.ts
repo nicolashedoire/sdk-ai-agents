@@ -31,6 +31,7 @@ const RESEARCHER = [
   'You are a researcher. You understand an object, then propose how to organise it with the knowledge and techniques available today, following a method of seven passages. You build, run and measure nothing: you investigate, propose, and design the experiments that would decide.',
   'Knowledge status: tag every item "established" only when it cites the id of a search result listed in the prompt ("sources": ["S1"]); "hypothesis" when it is plausible but not documented by such a result; "novelty" for an idea that does not exist yet (it will be checked against prior art). Never cite an id that is not listed: the study checks every citation.',
   'Stay on the objective. Every item says in "servesObjective", in one sentence, which part of the objective or which need it serves. Items that serve neither are removed.',
+  'Look for a change of principle that makes possible something difficult or impossible today, not only something faster or cheaper. Breakthroughs often come from assembling earlier techniques rather than from a technique without precedent: the components of a proposal are prior techniques, established from sources; what may be new is their assembly and the capability it produces.',
 ].join('\n');
 
 const GUARDIAN = [
@@ -53,6 +54,10 @@ export function charterBlock(frame: PromptFrame): string {
     ...listBlock('Needs and criteria of today', charter.needs),
     ...listBlock('The user’s leads (examples to verify, not truths)', charter.leads),
     ...listBlock('Out of scope', charter.scope.exclude),
+    charter.capability
+      ? `New capability aimed at: ${charter.capability}`
+      : 'New capability aimed at: none named; propose candidates: what a change of principle would make possible that is difficult today, not only faster.',
+    ...listBlock('Breakthroughs by assembly to deconstruct as analogues', charter.analogues),
   ];
   if (frame.amendments.length > 0) {
     lines.push('Accepted amendments (subordinate to the objective):');
@@ -136,7 +141,7 @@ export function queriesPrompt(frame: PromptFrame, input: QueriesPromptInput): LL
   const { spec } = input;
   const focus =
     spec.passage === 'changes'
-      ? 'Search to verify each of the user’s leads, to find other tools beyond them (in this domain and in others), and to find the best current realisations.'
+      ? 'Search to verify each of the user’s leads, to find other tools beyond them (in this domain and in others), to find the best current realisations, and to document breakthroughs by assembly (those the charter names first): their components and dates.'
       : 'Search for the documents that explain the choices of their time.';
   const parts = [
     `Study queries: ${spec.passage}`,
@@ -160,29 +165,51 @@ export function queriesPrompt(frame: PromptFrame, input: QueriesPromptInput): LL
   );
 }
 
-/** The guardian's check of a passage's items: only the charter, amendments and items. */
+/**
+ * The guardian's check of a passage's items: only the charter, amendments and items. For the
+ * design, it also judges whether each architecture opens a new capability or only improves.
+ */
 export function guardianPrompt(
   frame: PromptFrame,
   passage: StudyPassage,
   items: Array<{ id: string; statement: string; servesObjective: string }>,
   rejection?: string
 ): LLMMessage[] {
+  const design = passage === 'design';
   const parts = [
     `Study check: ${passage}`,
     'Judge each item below against the charter: is it on the objective?',
+    ...(design
+      ? [
+          'For each architecture (an item with a "kind"), say also with "newCapability" whether it makes possible something difficult or impossible today by a change of principle (true), or only makes something faster or cheaper (false). A design that offers no new capability is off the objective.',
+        ]
+      : []),
     `Items to check (JSON):\n${JSON.stringify(items)}`,
     [
       'Reply with one JSON object, with one verdict for every item:',
-      '{ "verdicts": [{ "id": string, "onObjective": boolean, "reason": string }] }',
+      design
+        ? '{ "verdicts": [{ "id": string, "onObjective": boolean, "reason": string, "newCapability"?: boolean }] }'
+        : '{ "verdicts": [{ "id": string, "onObjective": boolean, "reason": string }] }',
     ].join('\n'),
   ];
   return messages(frame, GUARDIAN, parts, rejection, 'a verdict on the objective for every item');
 }
 
+/** A claimed novelty as prior-art prompts show it: an assembly shows its combination. */
+export type ClaimedNovelty = {
+  id: string;
+  statement: string;
+  combination?: string;
+  capability?: string;
+};
+
+const COMBINATIONS =
+  'An assembly is new or not as a combination: its components are known techniques. Search for work that already combines them to produce the same capability, not for each component.';
+
 /** Asks what to search to find work that already does each claimed novelty. */
 export function priorArtQueriesPrompt(
   frame: PromptFrame,
-  claims: Array<{ id: string; statement: string }>,
+  claims: ClaimedNovelty[],
   sources: Array<{ name: string; description: string }>,
   maxQueries: number,
   rejection?: string
@@ -190,6 +217,7 @@ export function priorArtQueriesPrompt(
   const parts = [
     'Study prior-art queries: design',
     'These ideas are claimed as novelties. Choose searches that would find existing work doing them, or the closest to them.',
+    COMBINATIONS,
     `Claimed novelties (JSON):\n${JSON.stringify(claims)}`,
     sourcesBlock(sources),
     [
@@ -209,13 +237,14 @@ export function priorArtQueriesPrompt(
 /** Asks what the prior-art searches found for each claimed novelty. */
 export function priorArtCheckPrompt(
   frame: PromptFrame,
-  claims: Array<{ id: string; statement: string }>,
+  claims: ClaimedNovelty[],
   results: StudySearchResult[],
   rejection?: string
 ): LLMMessage[] {
   const parts = [
     'Study prior-art check: design',
     'For each claimed novelty, name the closest existing work among the results, and say whether the idea is novel, partly novel, or already exists.',
+    'An assembly already exists only when some work combines the same components to produce the same capability; that each component exists is expected.',
     `Claimed novelties (JSON):\n${JSON.stringify(claims)}`,
     resultsBlock(results, [], true),
     [

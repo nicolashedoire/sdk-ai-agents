@@ -197,6 +197,9 @@ describe('sdk.createStudy', () => {
         architectures: [
           item('One architecture only', {
             name: 'Alone',
+            kind: 'improvement',
+            capability: { what: 'w', forWhom: 'f', liftedConstraint: 'l' },
+            components: [{ name: 'c', statement: 's', status: 'hypothesis' }],
             mechanism: 'm',
             conditions: 'c',
             benefit: 'b',
@@ -833,7 +836,7 @@ describe('sdk.createStudy', () => {
         (study.charter as { objective: string }).objective = 'Something else';
       }).toThrow(TypeError);
       expect(study.charter.question).toBe(
-        'Si nous devions satisfaire les besoins d’aujourd’hui avec les connaissances et les techniques disponibles aujourd’hui, comment organiserions-nous cet objet ?'
+        'Si nous devions satisfaire les besoins d’aujourd’hui avec les connaissances et les techniques disponibles aujourd’hui, comment organiserions-nous cet objet ? Quel changement de principe rendrait possible quelque chose de difficile aujourd’hui, pas seulement plus rapide ?'
       );
       expect(study.charterHash).toMatch(/^[0-9a-f]{64}$/);
       const same = env.sdk.createStudy(studyConfig({ language: 'fr', name: 'another name' }));
@@ -1075,6 +1078,7 @@ function emptyReport(): StudyReport {
       needs: [],
       leads: [],
       scope: { exclude: [] },
+      analogues: [],
     },
     charterHash: 'h',
     amendments: [],
@@ -1091,6 +1095,9 @@ function emptyReport(): StudyReport {
     unverifiedLeads: [],
     independentLeads: [],
     references: [],
+    analogues: [],
+    undeconstructedAnalogues: [],
+    capabilities: [],
     constraints: [],
     revisableDecisions: [],
     combinations: [],

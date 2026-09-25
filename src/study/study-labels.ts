@@ -5,6 +5,7 @@ import type {
   StudyNoticeCode,
   StudyPassage,
   StudyPassageState,
+  StudyPrinciple,
   StudyStats,
   StudyStopReason,
 } from './study-types.js';
@@ -24,6 +25,8 @@ export type StudyLabelLanguage =
   | 'hi';
 
 type Collection =
+  | 'analogues'
+  | 'capabilities'
   | 'observations'
   | 'pieces'
   | 'chain'
@@ -148,6 +151,32 @@ export interface StudyLabels {
   noResults: string;
   statistics: string;
   stats: Record<Exclude<keyof StudyStats, 'byStatus' | 'searchesSkipped'>, string>;
+  /** Appended to the guiding question when the charter names no capability. */
+  capabilityQuestion: string;
+  /** Appended to it when the charter names one (`{capability}`). */
+  capabilityAim: string;
+  capabilityAimed: string;
+  noCapabilityNamed: string;
+  analoguesNamed: string;
+  newCapability: string;
+  /** What an improvement makes faster or cheaper. */
+  improves: string;
+  forWhom: string;
+  liftedConstraint: string;
+  hardToday: string;
+  principleChange: string;
+  principles: Record<StudyPrinciple, string>;
+  componentsAssembly: string;
+  assembly: string;
+  gives: string;
+  capabilityOpened: string;
+  pattern: string;
+  components: string;
+  domain: string;
+  /** Points from components to assembly to capability, in the reading direction. */
+  arrow: string;
+  architectureKinds: Record<'capability' | 'improvement', string>;
+  judgedImprovement: string;
   none: string;
 }
 
@@ -176,6 +205,8 @@ const en: StudyLabels = {
   refused: 'refused',
   notices: 'Before reading',
   noticeTexts: {
+    analoguesNotDeconstructed: 'Breakthroughs not deconstructed: {detail}.',
+    noCapability: 'No architecture aims at a new capability: the design offers only improvements.',
     noSources:
       'The study had no search source: no claim could be established, and no novelty checked against prior art.',
     stopped: 'The run was stopped ({detail}); this dossier is partial.',
@@ -214,6 +245,8 @@ const en: StudyLabels = {
     notRun: 'not run',
   },
   collections: {
+    analogues: 'Breakthroughs by assembly',
+    capabilities: 'Candidate new capabilities',
     observations: 'Observations',
     pieces: 'Pieces and their unknowns',
     chain: 'The whole chain',
@@ -341,6 +374,40 @@ const en: StudyLabels = {
     redos: 'Passages redone',
     loops: 'Passages reopened',
   },
+  capabilityQuestion:
+    'Which change of principle would make possible something difficult today, not only faster?',
+  capabilityAim:
+    'Which change of principle would make this possible, difficult today: {capability}?',
+  capabilityAimed: 'Capability aimed at',
+  noCapabilityNamed: 'none named: the study proposes candidates',
+  analoguesNamed: 'Breakthroughs to deconstruct',
+  newCapability: 'New capability aimed at',
+  improves: 'What improves',
+  forWhom: 'For whom',
+  liftedConstraint: 'Constraint lifted',
+  hardToday: 'Why it is hard today',
+  principleChange: 'Change of principle',
+  principles: {
+    representation: 'representation',
+    distribution: 'distribution of work',
+    responsibility: 'responsibility',
+    trust: 'trust',
+    verification: 'what is verified',
+    other: 'other',
+  },
+  componentsAssembly: 'Components → assembly',
+  assembly: 'assembly',
+  gives: 'gives the others',
+  capabilityOpened: 'Capability opened',
+  pattern: 'Assembly pattern',
+  components: 'Components',
+  domain: 'Domain',
+  arrow: '→',
+  architectureKinds: {
+    capability: 'new capability',
+    improvement: 'improvement: faster or cheaper',
+  },
+  judgedImprovement: 'the guardian judged it only faster or cheaper',
   none: 'none',
 };
 
@@ -370,6 +437,9 @@ const fr: StudyLabels = {
   refused: 'refusé',
   notices: 'Avant de lire',
   noticeTexts: {
+    analoguesNotDeconstructed: 'Ruptures non déconstruites : {detail}.',
+    noCapability:
+      'Aucune architecture ne vise une capacité nouvelle : la conception n’offre que des améliorations.',
     noSources:
       'L’étude n’avait aucune source de recherche : aucune affirmation n’a pu être établie, et aucune nouveauté confrontée à l’existant.',
     stopped: 'L’exécution a été arrêtée ({detail}) ; ce dossier est partiel.',
@@ -408,6 +478,8 @@ const fr: StudyLabels = {
     notRun: 'non exécuté',
   },
   collections: {
+    analogues: 'Ruptures par assemblage',
+    capabilities: 'Capacités nouvelles candidates',
     observations: 'Observations',
     pieces: 'Pièces et inconnues',
     chain: 'La chaîne complète',
@@ -535,6 +607,40 @@ const fr: StudyLabels = {
     redos: 'Passages refaits',
     loops: 'Passages rouverts',
   },
+  capabilityQuestion:
+    'Quel changement de principe rendrait possible quelque chose de difficile aujourd’hui, pas seulement plus rapide ?',
+  capabilityAim:
+    'Quel changement de principe rendrait possible ceci, difficile aujourd’hui : {capability} ?',
+  capabilityAimed: 'Capacité visée',
+  noCapabilityNamed: 'aucune nommée : l’étude propose des candidates',
+  analoguesNamed: 'Ruptures à déconstruire',
+  newCapability: 'Capacité nouvelle visée',
+  improves: 'Ce qui s’améliore',
+  forWhom: 'Pour qui',
+  liftedConstraint: 'Contrainte levée',
+  hardToday: 'Pourquoi c’est difficile aujourd’hui',
+  principleChange: 'Changement de principe',
+  principles: {
+    representation: 'représentation',
+    distribution: 'répartition du travail',
+    responsibility: 'responsabilité',
+    trust: 'confiance',
+    verification: 'ce qui est vérifié',
+    other: 'autre',
+  },
+  componentsAssembly: 'Composants → assemblage',
+  assembly: 'assemblage',
+  gives: 'apporte aux autres',
+  capabilityOpened: 'Capacité ouverte',
+  pattern: 'Motif d’assemblage',
+  components: 'Composants',
+  domain: 'Domaine',
+  arrow: '→',
+  architectureKinds: {
+    capability: 'capacité nouvelle',
+    improvement: 'amélioration : plus rapide ou moins cher',
+  },
+  judgedImprovement: 'le gardien l’a jugée seulement plus rapide ou moins chère',
   none: 'aucun',
 };
 
@@ -563,6 +669,8 @@ const es: StudyLabels = {
   refused: 'rechazada',
   notices: 'Antes de leer',
   noticeTexts: {
+    analoguesNotDeconstructed: 'Rupturas no deconstruidas: {detail}.',
+    noCapability: 'Ninguna arquitectura busca una nueva capacidad: el diseño solo ofrece mejoras.',
     noSources:
       'El estudio no tenía ninguna fuente de búsqueda: no se pudo establecer ninguna afirmación ni contrastar ninguna novedad con lo existente.',
     stopped: 'La ejecución se detuvo ({detail}); este dosier es parcial.',
@@ -601,6 +709,8 @@ const es: StudyLabels = {
     notRun: 'no ejecutado',
   },
   collections: {
+    analogues: 'Rupturas por ensamblaje',
+    capabilities: 'Nuevas capacidades candidatas',
     observations: 'Observaciones',
     pieces: 'Piezas y sus incógnitas',
     chain: 'La cadena completa',
@@ -728,6 +838,39 @@ const es: StudyLabels = {
     redos: 'Pasajes rehechos',
     loops: 'Pasajes reabiertos',
   },
+  capabilityQuestion:
+    '¿Qué cambio de principio haría posible algo difícil hoy, no solo más rápido?',
+  capabilityAim: '¿Qué cambio de principio haría posible esto, difícil hoy: {capability}?',
+  capabilityAimed: 'Capacidad buscada',
+  noCapabilityNamed: 'ninguna nombrada: el estudio propone candidatas',
+  analoguesNamed: 'Rupturas por deconstruir',
+  newCapability: 'Nueva capacidad buscada',
+  improves: 'Lo que mejora',
+  forWhom: 'Para quién',
+  liftedConstraint: 'Restricción levantada',
+  hardToday: 'Por qué es difícil hoy',
+  principleChange: 'Cambio de principio',
+  principles: {
+    representation: 'representación',
+    distribution: 'reparto del trabajo',
+    responsibility: 'responsabilidad',
+    trust: 'confianza',
+    verification: 'lo que se verifica',
+    other: 'otro',
+  },
+  componentsAssembly: 'Componentes → ensamblaje',
+  assembly: 'ensamblaje',
+  gives: 'aporta a los demás',
+  capabilityOpened: 'Capacidad abierta',
+  pattern: 'Patrón de ensamblaje',
+  components: 'Componentes',
+  domain: 'Dominio',
+  arrow: '→',
+  architectureKinds: {
+    capability: 'nueva capacidad',
+    improvement: 'mejora: más rápido o más barato',
+  },
+  judgedImprovement: 'el guardián la juzgó solo más rápida o más barata',
   none: 'ninguno',
 };
 
@@ -756,6 +899,9 @@ const de: StudyLabels = {
   refused: 'abgelehnt',
   notices: 'Vor dem Lesen',
   noticeTexts: {
+    analoguesNotDeconstructed: 'Nicht zerlegte Durchbrüche: {detail}.',
+    noCapability:
+      'Keine Architektur zielt auf eine neue Fähigkeit: Der Entwurf bietet nur Verbesserungen.',
     noSources:
       'Die Studie hatte keine Suchquelle: Keine Aussage konnte belegt und keine Neuheit mit dem Stand der Technik abgeglichen werden.',
     stopped: 'Der Lauf wurde angehalten ({detail}); dieses Dossier ist unvollständig.',
@@ -794,6 +940,8 @@ const de: StudyLabels = {
     notRun: 'nicht ausgeführt',
   },
   collections: {
+    analogues: 'Durchbrüche durch Zusammenbau',
+    capabilities: 'Kandidaten für neue Fähigkeiten',
     observations: 'Beobachtungen',
     pieces: 'Bauteile und ihre Unbekannten',
     chain: 'Die ganze Kette',
@@ -921,6 +1069,40 @@ const de: StudyLabels = {
     redos: 'Wiederholte Schritte',
     loops: 'Wieder geöffnete Schritte',
   },
+  capabilityQuestion:
+    'Welche Änderung des Prinzips würde etwas möglich machen, das heute schwierig ist, nicht nur schneller?',
+  capabilityAim:
+    'Welche Änderung des Prinzips würde dies möglich machen, das heute schwierig ist: {capability}?',
+  capabilityAimed: 'Angestrebte Fähigkeit',
+  noCapabilityNamed: 'keine benannt: Die Studie schlägt Kandidaten vor',
+  analoguesNamed: 'Zu zerlegende Durchbrüche',
+  newCapability: 'Angestrebte neue Fähigkeit',
+  improves: 'Was sich verbessert',
+  forWhom: 'Für wen',
+  liftedConstraint: 'Aufgehobene Beschränkung',
+  hardToday: 'Warum es heute schwierig ist',
+  principleChange: 'Änderung des Prinzips',
+  principles: {
+    representation: 'Darstellung',
+    distribution: 'Arbeitsteilung',
+    responsibility: 'Verantwortung',
+    trust: 'Vertrauen',
+    verification: 'was geprüft wird',
+    other: 'Sonstiges',
+  },
+  componentsAssembly: 'Bausteine → Zusammenbau',
+  assembly: 'Zusammenbau',
+  gives: 'bringt den anderen',
+  capabilityOpened: 'Eröffnete Fähigkeit',
+  pattern: 'Muster des Zusammenbaus',
+  components: 'Bausteine',
+  domain: 'Gebiet',
+  arrow: '→',
+  architectureKinds: {
+    capability: 'neue Fähigkeit',
+    improvement: 'Verbesserung: schneller oder billiger',
+  },
+  judgedImprovement: 'der Wächter hat sie nur als schneller oder billiger beurteilt',
   none: 'keine',
 };
 
@@ -950,6 +1132,9 @@ const pt: StudyLabels = {
   refused: 'recusada',
   notices: 'Antes de ler',
   noticeTexts: {
+    analoguesNotDeconstructed: 'Rupturas não desconstruídas: {detail}.',
+    noCapability:
+      'Nenhuma arquitetura visa uma nova capacidade: o projeto oferece apenas melhorias.',
     noSources:
       'O estudo não tinha nenhuma fonte de pesquisa: nenhuma afirmação pôde ser estabelecida, e nenhuma novidade confrontada com o existente.',
     stopped: 'A execução foi interrompida ({detail}); este dossiê é parcial.',
@@ -988,6 +1173,8 @@ const pt: StudyLabels = {
     notRun: 'não executada',
   },
   collections: {
+    analogues: 'Rupturas por montagem',
+    capabilities: 'Novas capacidades candidatas',
     observations: 'Observações',
     pieces: 'Peças e suas incógnitas',
     chain: 'A cadeia completa',
@@ -1115,6 +1302,39 @@ const pt: StudyLabels = {
     redos: 'Passagens refeitas',
     loops: 'Passagens reabertas',
   },
+  capabilityQuestion:
+    'Que mudança de princípio tornaria possível algo difícil hoje, e não apenas mais rápido?',
+  capabilityAim: 'Que mudança de princípio tornaria isto possível, difícil hoje: {capability}?',
+  capabilityAimed: 'Capacidade visada',
+  noCapabilityNamed: 'nenhuma nomeada: o estudo propõe candidatas',
+  analoguesNamed: 'Rupturas a desconstruir',
+  newCapability: 'Nova capacidade visada',
+  improves: 'O que melhora',
+  forWhom: 'Para quem',
+  liftedConstraint: 'Restrição removida',
+  hardToday: 'Por que é difícil hoje',
+  principleChange: 'Mudança de princípio',
+  principles: {
+    representation: 'representação',
+    distribution: 'divisão do trabalho',
+    responsibility: 'responsabilidade',
+    trust: 'confiança',
+    verification: 'o que é verificado',
+    other: 'outro',
+  },
+  componentsAssembly: 'Componentes → montagem',
+  assembly: 'montagem',
+  gives: 'traz aos outros',
+  capabilityOpened: 'Capacidade aberta',
+  pattern: 'Padrão de montagem',
+  components: 'Componentes',
+  domain: 'Domínio',
+  arrow: '→',
+  architectureKinds: {
+    capability: 'nova capacidade',
+    improvement: 'melhoria: mais rápido ou mais barato',
+  },
+  judgedImprovement: 'o guardião a julgou apenas mais rápida ou mais barata',
   none: 'nenhum',
 };
 
@@ -1143,6 +1363,8 @@ const ja: StudyLabels = {
   refused: '却下',
   notices: '読む前に',
   noticeTexts: {
+    analoguesNotDeconstructed: '分解されなかったブレークスルー：{detail}。',
+    noCapability: '新しい能力を目指すアーキテクチャがありません。設計は改善だけです。',
     noSources:
       'この研究には検索ソースがありませんでした。どの主張も確立できず、どの新規性も先行事例と照合できませんでした。',
     stopped: '実行は停止しました（{detail}）。この資料は部分的です。',
@@ -1181,6 +1403,8 @@ const ja: StudyLabels = {
     notRun: '未実行',
   },
   collections: {
+    analogues: '組み立てによるブレークスルー',
+    capabilities: '新しい能力の候補',
     observations: '観察',
     pieces: '部品とその未知',
     chain: '全体の連鎖',
@@ -1296,6 +1520,36 @@ const ja: StudyLabels = {
     redos: 'やり直した段階',
     loops: '再び開いた段階',
   },
+  capabilityQuestion:
+    'どのような原理の変更が、単に速くするだけでなく、今日難しいことを可能にするか？',
+  capabilityAim: 'どのような原理の変更が、今日難しいこれを可能にするか：{capability}？',
+  capabilityAimed: '目指す能力',
+  noCapabilityNamed: '指定なし：研究が候補を提案する',
+  analoguesNamed: '分解するブレークスルー',
+  newCapability: '目指す新しい能力',
+  improves: '改善されるもの',
+  forWhom: '誰のために',
+  liftedConstraint: '取り除かれる制約',
+  hardToday: '今日難しい理由',
+  principleChange: '原理の変更',
+  principles: {
+    representation: '表現',
+    distribution: '作業の分担',
+    responsibility: '責任',
+    trust: '信頼',
+    verification: '検証の対象',
+    other: 'その他',
+  },
+  componentsAssembly: '構成要素 → 組み立て',
+  assembly: '組み立て',
+  gives: '他にもたらすもの',
+  capabilityOpened: '開かれた能力',
+  pattern: '組み立てのパターン',
+  components: '構成要素',
+  domain: '分野',
+  arrow: '→',
+  architectureKinds: { capability: '新しい能力', improvement: '改善：より速いか安いだけ' },
+  judgedImprovement: '守護者はより速いか安いだけと判定した',
   none: 'なし',
 };
 
@@ -1323,6 +1577,8 @@ const zh: StudyLabels = {
   refused: '已拒绝',
   notices: '阅读之前',
   noticeTexts: {
+    analoguesNotDeconstructed: '未拆解的突破：{detail}。',
+    noCapability: '没有架构以新能力为目标：设计只提供了改进。',
     noSources: '本研究没有检索来源：任何论断都无法确立，任何新颖性都无法与已有工作比对。',
     stopped: '运行已停止（{detail}）；本档案不完整。',
     failed: '运行失败（{detail}）；本档案不完整。',
@@ -1356,6 +1612,8 @@ const zh: StudyLabels = {
     notRun: '未运行',
   },
   collections: {
+    analogues: '由组装带来的突破',
+    capabilities: '候选新能力',
     observations: '观察',
     pieces: '部件及其未知',
     chain: '完整链条',
@@ -1467,6 +1725,35 @@ const zh: StudyLabels = {
     redos: '重做的环节',
     loops: '重新打开的环节',
   },
+  capabilityQuestion: '什么样的原理变化能让今天难以做到的事成为可能，而不只是更快？',
+  capabilityAim: '什么样的原理变化能让这件今天难以做到的事成为可能：{capability}？',
+  capabilityAimed: '目标能力',
+  noCapabilityNamed: '未指定：由研究提出候选',
+  analoguesNamed: '待拆解的突破',
+  newCapability: '目标新能力',
+  improves: '改进的内容',
+  forWhom: '为谁',
+  liftedConstraint: '解除的约束',
+  hardToday: '为何今天难以做到',
+  principleChange: '原理的变化',
+  principles: {
+    representation: '表示方式',
+    distribution: '工作分配',
+    responsibility: '职责',
+    trust: '信任',
+    verification: '验证的对象',
+    other: '其他',
+  },
+  componentsAssembly: '组件 → 组装',
+  assembly: '组装',
+  gives: '为其他组件带来',
+  capabilityOpened: '开启的能力',
+  pattern: '组装模式',
+  components: '组件',
+  domain: '领域',
+  arrow: '→',
+  architectureKinds: { capability: '新能力', improvement: '改进：更快或更便宜' },
+  judgedImprovement: '守护者判定它只是更快或更便宜',
   none: '无',
 };
 
@@ -1495,6 +1782,8 @@ const ko: StudyLabels = {
   refused: '거부됨',
   notices: '읽기 전에',
   noticeTexts: {
+    analoguesNotDeconstructed: '분해되지 않은 돌파구: {detail}.',
+    noCapability: '새로운 능력을 목표로 하는 아키텍처가 없습니다. 설계는 개선만 제공합니다.',
     noSources:
       '이 연구에는 검색 소스가 없었습니다. 어떤 주장도 확립할 수 없었고, 어떤 새로움도 선행 사례와 대조할 수 없었습니다.',
     stopped: '실행이 중지되었습니다 ({detail}). 이 자료는 부분적입니다.',
@@ -1529,6 +1818,8 @@ const ko: StudyLabels = {
     notRun: '미실행',
   },
   collections: {
+    analogues: '조립에 의한 돌파구',
+    capabilities: '새로운 능력 후보',
     observations: '관찰',
     pieces: '부품과 그 미지',
     chain: '전체 사슬',
@@ -1644,6 +1935,35 @@ const ko: StudyLabels = {
     redos: '다시 한 단계',
     loops: '다시 연 단계',
   },
+  capabilityQuestion: '어떤 원리의 변화가 단지 더 빠르게가 아니라 오늘 어려운 일을 가능하게 할까?',
+  capabilityAim: '어떤 원리의 변화가 오늘 어려운 이것을 가능하게 할까: {capability}?',
+  capabilityAimed: '목표 능력',
+  noCapabilityNamed: '지정 없음: 연구가 후보를 제안함',
+  analoguesNamed: '분해할 돌파구',
+  newCapability: '목표로 하는 새로운 능력',
+  improves: '개선되는 것',
+  forWhom: '누구를 위해',
+  liftedConstraint: '해제되는 제약',
+  hardToday: '오늘 어려운 이유',
+  principleChange: '원리의 변화',
+  principles: {
+    representation: '표현',
+    distribution: '작업 분담',
+    responsibility: '책임',
+    trust: '신뢰',
+    verification: '검증 대상',
+    other: '기타',
+  },
+  componentsAssembly: '구성 요소 → 조립',
+  assembly: '조립',
+  gives: '다른 요소에 주는 것',
+  capabilityOpened: '열린 능력',
+  pattern: '조립 패턴',
+  components: '구성 요소',
+  domain: '분야',
+  arrow: '→',
+  architectureKinds: { capability: '새로운 능력', improvement: '개선: 더 빠르거나 더 저렴함' },
+  judgedImprovement: '수호자가 더 빠르거나 더 저렴할 뿐이라고 판단함',
   none: '없음',
 };
 
@@ -1672,6 +1992,9 @@ const ru: StudyLabels = {
   refused: 'отклонена',
   notices: 'Перед чтением',
   noticeTexts: {
+    analoguesNotDeconstructed: 'Неразобранные прорывы: {detail}.',
+    noCapability:
+      'Ни одна архитектура не нацелена на новую возможность: проект предлагает только улучшения.',
     noSources:
       'У исследования не было источника поиска: ни одно утверждение не удалось обосновать, ни одну новизну не удалось сверить с существующими работами.',
     stopped: 'Запуск остановлен ({detail}); досье неполное.',
@@ -1710,6 +2033,8 @@ const ru: StudyLabels = {
     notRun: 'не выполнен',
   },
   collections: {
+    analogues: 'Прорывы через сборку',
+    capabilities: 'Кандидаты в новые возможности',
     observations: 'Наблюдения',
     pieces: 'Части и их неизвестные',
     chain: 'Вся цепочка',
@@ -1842,6 +2167,40 @@ const ru: StudyLabels = {
     redos: 'Переделанные этапы',
     loops: 'Вновь открытые этапы',
   },
+  capabilityQuestion:
+    'Какое изменение принципа сделало бы возможным то, что сегодня трудно, а не просто ускорило бы?',
+  capabilityAim:
+    'Какое изменение принципа сделало бы возможным то, что сегодня трудно: {capability}?',
+  capabilityAimed: 'Искомая возможность',
+  noCapabilityNamed: 'не названа: исследование предлагает кандидатов',
+  analoguesNamed: 'Прорывы для разбора',
+  newCapability: 'Искомая новая возможность',
+  improves: 'Что улучшается',
+  forWhom: 'Для кого',
+  liftedConstraint: 'Снятое ограничение',
+  hardToday: 'Почему это трудно сегодня',
+  principleChange: 'Изменение принципа',
+  principles: {
+    representation: 'представление',
+    distribution: 'распределение работы',
+    responsibility: 'ответственность',
+    trust: 'доверие',
+    verification: 'что проверяется',
+    other: 'другое',
+  },
+  componentsAssembly: 'Компоненты → сборка',
+  assembly: 'сборка',
+  gives: 'даёт остальным',
+  capabilityOpened: 'Открытая возможность',
+  pattern: 'Схема сборки',
+  components: 'Компоненты',
+  domain: 'Область',
+  arrow: '→',
+  architectureKinds: {
+    capability: 'новая возможность',
+    improvement: 'улучшение: быстрее или дешевле',
+  },
+  judgedImprovement: 'страж счёл её лишь более быстрой или дешёвой',
   none: 'нет',
 };
 
@@ -1870,6 +2229,8 @@ const ar: StudyLabels = {
   refused: 'مرفوض',
   notices: 'قبل القراءة',
   noticeTexts: {
+    analoguesNotDeconstructed: 'اختراقات لم تُفكَّك: {detail}.',
+    noCapability: 'لا تستهدف أي بنية قدرة جديدة: التصميم لا يقدّم سوى تحسينات.',
     noSources:
       'لم يكن للدراسة أي مصدر بحث: لم يمكن إثبات أي ادعاء، ولا مقارنة أي جِدّة بالأعمال السابقة.',
     stopped: 'توقف التشغيل ({detail})؛ هذا الملف جزئي.',
@@ -1908,6 +2269,8 @@ const ar: StudyLabels = {
     notRun: 'لم تُنفَّذ',
   },
   collections: {
+    analogues: 'اختراقات بالتجميع',
+    capabilities: 'قدرات جديدة مرشحة',
     observations: 'الملاحظات',
     pieces: 'القطع ومجهولاتها',
     chain: 'السلسلة الكاملة',
@@ -2027,6 +2390,35 @@ const ar: StudyLabels = {
     redos: 'مراحل أُعيدت',
     loops: 'مراحل أُعيد فتحها',
   },
+  capabilityQuestion: 'أي تغيير في المبدأ يجعل ممكنًا ما هو صعب اليوم، لا مجرد أسرع؟',
+  capabilityAim: 'أي تغيير في المبدأ يجعل هذا ممكنًا، وهو صعب اليوم: {capability}؟',
+  capabilityAimed: 'القدرة المستهدفة',
+  noCapabilityNamed: 'لم تُسمَّ: تقترح الدراسة مرشحات',
+  analoguesNamed: 'اختراقات يجب تفكيكها',
+  newCapability: 'القدرة الجديدة المستهدفة',
+  improves: 'ما الذي يتحسن',
+  forWhom: 'لمن',
+  liftedConstraint: 'القيد المرفوع',
+  hardToday: 'لماذا هو صعب اليوم',
+  principleChange: 'تغيير المبدأ',
+  principles: {
+    representation: 'التمثيل',
+    distribution: 'توزيع العمل',
+    responsibility: 'المسؤولية',
+    trust: 'الثقة',
+    verification: 'ما يُتحقَّق منه',
+    other: 'أخرى',
+  },
+  componentsAssembly: 'المكوّنات ← التجميع',
+  assembly: 'التجميع',
+  gives: 'يقدّم للبقية',
+  capabilityOpened: 'القدرة التي انفتحت',
+  pattern: 'نمط التجميع',
+  components: 'المكوّنات',
+  domain: 'المجال',
+  arrow: '←',
+  architectureKinds: { capability: 'قدرة جديدة', improvement: 'تحسين: أسرع أو أرخص' },
+  judgedImprovement: 'حكم الحارس بأنها أسرع أو أرخص فقط',
   none: 'لا شيء',
 };
 
@@ -2055,6 +2447,8 @@ const hi: StudyLabels = {
   refused: 'अस्वीकृत',
   notices: 'पढ़ने से पहले',
   noticeTexts: {
+    analoguesNotDeconstructed: 'जिन सफलताओं को विघटित नहीं किया गया: {detail}।',
+    noCapability: 'कोई आर्किटेक्चर नई क्षमता को लक्ष्य नहीं करता: डिज़ाइन केवल सुधार देता है।',
     noSources:
       'इस अध्ययन के पास कोई खोज स्रोत नहीं था: कोई दावा स्थापित नहीं हो सका, और किसी नवीनता की पूर्व कार्य से तुलना नहीं हो सकी।',
     stopped: 'रन रोका गया ({detail}); यह दस्तावेज़ अधूरा है।',
@@ -2093,6 +2487,8 @@ const hi: StudyLabels = {
     notRun: 'नहीं चला',
   },
   collections: {
+    analogues: 'संयोजन से मिली सफलताएँ',
+    capabilities: 'संभावित नई क्षमताएँ',
     observations: 'अवलोकन',
     pieces: 'हिस्से और उनके अज्ञात',
     chain: 'पूरी शृंखला',
@@ -2220,6 +2616,35 @@ const hi: StudyLabels = {
     redos: 'दोबारा किए गए चरण',
     loops: 'फिर खोले गए चरण',
   },
+  capabilityQuestion: 'सिद्धांत में कौन-सा बदलाव आज कठिन किसी चीज़ को संभव बनाएगा, केवल तेज़ नहीं?',
+  capabilityAim: 'सिद्धांत में कौन-सा बदलाव इसे संभव बनाएगा, जो आज कठिन है: {capability}?',
+  capabilityAimed: 'लक्षित क्षमता',
+  noCapabilityNamed: 'कोई नाम नहीं: अध्ययन उम्मीदवार प्रस्तावित करता है',
+  analoguesNamed: 'विघटित करने योग्य सफलताएँ',
+  newCapability: 'लक्षित नई क्षमता',
+  improves: 'क्या बेहतर होता है',
+  forWhom: 'किसके लिए',
+  liftedConstraint: 'हटाई गई बाधा',
+  hardToday: 'आज यह कठिन क्यों है',
+  principleChange: 'सिद्धांत में बदलाव',
+  principles: {
+    representation: 'निरूपण',
+    distribution: 'काम का बँटवारा',
+    responsibility: 'ज़िम्मेदारी',
+    trust: 'भरोसा',
+    verification: 'जिसकी जाँच होती है',
+    other: 'अन्य',
+  },
+  componentsAssembly: 'घटक → संयोजन',
+  assembly: 'संयोजन',
+  gives: 'दूसरों को देता है',
+  capabilityOpened: 'खुली क्षमता',
+  pattern: 'संयोजन का पैटर्न',
+  components: 'घटक',
+  domain: 'क्षेत्र',
+  arrow: '→',
+  architectureKinds: { capability: 'नई क्षमता', improvement: 'सुधार: तेज़ या सस्ता' },
+  judgedImprovement: 'संरक्षक ने इसे केवल तेज़ या सस्ता माना',
   none: 'कोई नहीं',
 };
 
@@ -2247,7 +2672,14 @@ export function studyLabels(language: string): StudyLabels {
   return LABELS[labelLanguage(language)];
 }
 
-/** The method's guiding question, the default question of a study. */
-export function guidingQuestion(language: string): string {
-  return studyLabels(language).guidingQuestion;
+/**
+ * The default question of a study: the method's guiding question, and the aim of a new
+ * capability, the one the charter names or one to find.
+ */
+export function guidingQuestion(language: string, capability?: string): string {
+  const labels = studyLabels(language);
+  const aim = capability
+    ? labels.capabilityAim.replace('{capability}', capability)
+    : labels.capabilityQuestion;
+  return `${labels.guidingQuestion} ${aim}`;
 }

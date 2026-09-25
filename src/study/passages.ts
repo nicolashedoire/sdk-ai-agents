@@ -2,9 +2,12 @@ import { z } from 'zod';
 import type {
   MechanismCard,
   StudyAdvance,
+  StudyAnalogue,
   StudyArchitecture,
+  StudyCapability,
   StudyChainStage,
   StudyClaim,
+  StudyClaimStatus,
   StudyCombination,
   StudyConstraint,
   StudyExperiment,
@@ -22,6 +25,8 @@ import type {
 
 /** The items each collection holds. */
 export interface StudyCollections {
+  analogues: StudyAnalogue;
+  capabilities: StudyCapability;
   observations: StudyObservation;
   pieces: StudyPiece;
   chain: StudyChainStage;
@@ -75,6 +80,31 @@ const optionalText = z.preprocess(
   text.optional()
 );
 const texts = z.array(text).default([]);
+
+const STATUSES: readonly StudyClaimStatus[] = ['established', 'hypothesis', 'novelty'];
+
+/**
+ * A claim's status as the model wrote it. One the study cannot read counts as none: the claim
+ * is then a hypothesis, the weakest, never a stronger one.
+ */
+export const claimStatus = z.preprocess((value) => {
+  const status = typeof value === 'string' ? value.trim().toLowerCase() : undefined;
+  return STATUSES.find((known) => known === status);
+}, z.enum(['established', 'hypothesis', 'novelty']).optional());
+
+/** Result ids as the model may write them: `S1`, `[S1]`, `s1`, or "S1, S2" in one string. */
+export const resultIds = z.preprocess((value) => {
+  const list = typeof value === 'string' ? value.split(/[,;\s]+/) : value;
+  if (!Array.isArray(list)) return list;
+  return list
+    .filter((entry) => typeof entry === 'string' || typeof entry === 'number')
+    .map((entry) =>
+      String(entry)
+        .replace(/[[\]\s]/g, '')
+        .toUpperCase()
+    )
+    .filter((entry) => entry !== '');
+}, z.array(z.string()).default([]));
 
 /** An enum that accepts other spellings and cases (`partly relevant`, `behavior`). */
 function looseEnum<const Values extends readonly [string, ...string[]]>(
@@ -201,15 +231,83 @@ const combinationFields: FieldsSchema<StudyCombination> = z.object({
     .default([]),
 });
 
-const architectureFields: FieldsSchema<StudyArchitecture, 'uncoveredStages'> = z.object({
+const principle = looseEnum(
+  ['representation', 'distribution', 'responsibility', 'trust', 'verification', 'other'],
+  {
+    responsibilities: 'responsibility',
+    distributionOfWork: 'distribution',
+    verified: 'verification',
+  }
+);
+
+/** A prior technique of an assembly, as the model writes it: a claim of its own. */
+export const componentSchema = z.object({
   name: text,
-  mechanism: text,
-  conditions: text,
-  benefit: text,
-  addedCost: text,
-  counterexample: text,
-  chain: z.array(z.object({ stage: text, how: text })).min(1),
-  predictions: z.array(text).min(1),
+  statement: text,
+  date: optionalText,
+  status: claimStatus,
+  sources: resultIds,
+});
+
+// Components are settled by the study (their statuses checked), so they are left out of the
+// fields checked against the item's type.
+const architectureFields: FieldsSchema<
+  StudyArchitecture,
+  'uncoveredStages' | 'declaredKind' | 'components'
+> = z
+  .object({
+    name: text,
+    // Only faster or cheaper unless it says otherwise: never a stronger claim than written.
+    kind: looseEnum(['capability', 'improvement'], { newCapability: 'capability' }).default(
+      'improvement'
+    ),
+    capability: z.object({ what: text, forWhom: text, liftedConstraint: text }),
+    principleChange: z.object({ principle, change: text }).optional(),
+    mechanism: text,
+    components: z.array(componentSchema).min(1),
+    assembly: z
+      .array(z.object({ component: text, gives: text, exchanges: text, cost: text }))
+      .default([]),
+    conditions: text,
+    benefit: text,
+    addedCost: text,
+    counterexample: text,
+    chain: z.array(z.object({ stage: text, how: text })).min(1),
+    predictions: z.array(text).min(1),
+  })
+  .superRefine((architecture, context) => {
+    if (architecture.kind !== 'capability') return;
+    if (!architecture.principleChange) {
+      context.addIssue({
+        code: 'custom',
+        path: ['principleChange'],
+        message: 'a capability states the principle it changes',
+      });
+    }
+    if (architecture.assembly.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        path: ['assembly'],
+        message: 'a capability says how its components are assembled',
+      });
+    }
+  });
+
+const capabilityFields: FieldsSchema<StudyCapability> = z.object({
+  capability: text,
+  forWhom: text,
+  hardToday: text,
+  principle: principle.optional(),
+});
+
+const analogueFields: FieldsSchema<StudyAnalogue> = z.object({
+  breakthrough: text,
+  domain: optionalText,
+  date: optionalText,
+  components: z.array(z.object({ name: text, date: optionalText })).min(2),
+  liftedConstraint: text,
+  capability: text,
+  pattern: text,
 });
 
 const threeStateFields: FieldsSchema<StudyThreeState> = z.object({
@@ -322,9 +420,9 @@ export const PASSAGES: readonly PassageSpec[] = [
   {
     passage: 'changes',
     number: 4,
-    task: 'Examine what changed: research, realisations, libraries, hardware and methods that appeared or became usable since, in the object’s domain and in other domains. For each advance give its mechanism, date, evidence, conditions of use and availability. Verify each of the user’s leads, which are examples and not truths: relevant, partly relevant or not relevant, with reasons. Search independently for other mathematical and technical tools, beyond the user’s leads. List the best current realisations: they are the reference for "better". A technique introduced earlier and already in use is not new: say when it appeared.',
+    task: 'Examine what changed: research, realisations, libraries, hardware and methods that appeared or became usable since, in the object’s domain and in other domains. For each advance give its mechanism, date, evidence, conditions of use and availability. Verify each of the user’s leads, which are examples and not truths: relevant, partly relevant or not relevant, with reasons. Search independently for other mathematical and technical tools, beyond the user’s leads. List the best current realisations: they are the reference for "better". A technique introduced earlier and already in use is not new: say when it appeared. Look also, in any domain, for past breakthroughs that came from assembling earlier techniques rather than from a technique without precedent (Bitcoin assembled public-key signatures, hash chains and timestamping, proof of work, Merkle trees and a peer-to-peer network, all prior, into a shared ledger without a trusted third party): for each, the earlier techniques and their dates, the constraint it lifted, the capability that opened, and the assembly pattern. Deconstruct every breakthrough the charter names.',
     produces:
-      'advances (mechanism, date, evidence, conditions, availability), a verdict on every user lead, independent leads, and the best current realisations',
+      'advances (mechanism, date, evidence, conditions, availability), a verdict on every user lead, independent leads, the best current realisations, and breakthroughs by assembly with their patterns',
     collections: [
       collection(
         'advances',
@@ -351,6 +449,12 @@ export const PASSAGES: readonly PassageSpec[] = [
         '"statement": string (what it does best), "name": string, "piece"?: string, "date"?: string',
         referenceFields
       ),
+      collection(
+        'analogues',
+        'B',
+        '"statement": string, "breakthrough": string, "domain"?: string, "date"?: string, "components": [{ "name": string, "date"?: string }] (the earlier techniques it assembled), "liftedConstraint": string, "capability": string (what opened), "pattern": string (the assembly pattern)',
+        analogueFields
+      ),
     ],
     researches: true,
     needs: ['pieces', 'chain', 'historicalChoices'],
@@ -358,9 +462,9 @@ export const PASSAGES: readonly PassageSpec[] = [
   {
     passage: 'cross',
     number: 5,
-    task: 'Cross past and present: which constraints remain, which have weakened, which new requirements have appeared. Derive the decisions that became revisable and the possibilities they open. Propose combinations A + B: what A lets B do, what they must exchange, and what it costs (conversions, synchronisation); two pieces fast on their own can lose their time converting or synchronising once joined. Look for crossings that change the representation, the distribution of work or the responsibilities of the object.',
+    task: 'Cross past and present: which constraints remain, which have weakened, which new requirements have appeared. Derive the decisions that became revisable and the possibilities they open. Propose combinations A + B: what A lets B do, what they must exchange, and what it costs (conversions, synchronisation); two pieces fast on their own can lose their time converting or synchronising once joined. Look for crossings that change the representation, the distribution of work or the responsibilities of the object, as the breakthroughs by assembly did. Then name the new capabilities they could open: what would become possible that is difficult or impossible today, not only faster or cheaper, for whom, why it is hard today (the constraint to lift) and which principle would change. When the charter names the capability aimed at, examine that one.',
     produces:
-      'the constraints that remain, weakened or appeared, the decisions that became revisable, and combinations with their exchanges and costs',
+      'the constraints that remain, weakened or appeared, the decisions that became revisable, combinations with their exchanges and costs, and candidate new capabilities',
     collections: [
       collection(
         'constraints',
@@ -381,6 +485,12 @@ export const PASSAGES: readonly PassageSpec[] = [
         '"statement": string, "a": string, "b": string, "enables": string (what A lets B do), "exchange": string, "cost": string, "changes": ["representation" | "distribution" | "responsibilities"]',
         combinationFields
       ),
+      collection(
+        'capabilities',
+        'Y',
+        '"statement": string, "capability": string (what would become possible), "forWhom": string, "hardToday": string (the constraint to lift), "principle"?: "representation" | "distribution" | "responsibility" | "trust" | "verification" | "other"',
+        capabilityFields
+      ),
     ],
     researches: false,
     needs: [
@@ -390,19 +500,20 @@ export const PASSAGES: readonly PassageSpec[] = [
       'leadVerdicts',
       'independentLeads',
       'references',
+      'analogues',
     ],
   },
   {
     passage: 'design',
     number: 6,
-    task: 'Design several organisations: at least two architectures. Replace, merge, split or remove pieces; change their representation, their interfaces or the distribution of work. Each architecture gives its mechanism, its necessary conditions, its expected benefit, its added cost, a possible counterexample, how it covers every stage of the whole chain, and its predictions. For each main piece, give its three states: the object at its time, the best relevant current realisations, and our proposal. Say what is novel and what is not: an idea that does not exist yet has the status "novelty" and will be checked against prior art; what is not novel has another status.',
+    task: 'Design several organisations: at least two architectures. Aim at a new capability: a change of principle that makes possible something difficult or impossible today, not only something faster or cheaper. Replace, merge, split or remove pieces; change their representation, their interfaces, the distribution of work, who holds responsibility or trust, or what is verified. Each architecture gives its kind ("capability", or "improvement" when it is only faster or cheaper), the capability it opens (what, for whom, the constraint it lifts), the principle it changes, its mechanism (how the assembly produces the capability), its components (the prior techniques it assembles, each with its status and the results that document it) and its assembly (what each component gives the others, what they exchange, what it costs); then its necessary conditions, expected benefit, added cost, a possible counterexample, how it covers every stage of the whole chain, and its predictions. Use the patterns of the breakthroughs by assembly. The novelty lies in the assembly and the capability it produces, not in the components: an architecture whose assembly does not exist yet has the status "novelty" and will be checked against prior art as a combination. For each main piece, give its three states: the object at its time, the best relevant current realisations, and our proposal. Say what is novel and what is not.',
     produces:
-      'at least two architectures that cover the whole chain, with their predictions; the three states of each main piece; what is novel and what is not',
+      'at least two architectures, at least one aiming at a new capability, each with its components, assembly, mechanism and predictions, covering the whole chain; the three states of each main piece; what is novel and what is not',
     collections: [
       collection(
         'architectures',
         'A',
-        '"statement": string, "name": string, "mechanism": string, "conditions": string, "benefit": string, "addedCost": string, "counterexample": string, "chain": [{ "stage": string, "how": string }] (every stage of the whole chain), "predictions": [string]',
+        '"statement": string, "name": string, "kind": "capability" | "improvement", "capability": { "what": string, "forWhom": string, "liftedConstraint": string }, "principleChange": { "principle": "representation" | "distribution" | "responsibility" | "trust" | "verification" | "other", "change": string } (required for a capability), "mechanism": string (how the assembly produces the capability), "components": [{ "name": string, "statement": string, "date"?: string, "status": "established" | "hypothesis", "sources": [string] }] (prior techniques), "assembly": [{ "component": string, "gives": string, "exchanges": string, "cost": string }], "conditions": string, "benefit": string, "addedCost": string, "counterexample": string, "chain": [{ "stage": string, "how": string }] (every stage of the whole chain), "predictions": [string]',
         architectureFields,
         2
       ),
@@ -427,9 +538,11 @@ export const PASSAGES: readonly PassageSpec[] = [
       'historicalChoices',
       'advances',
       'references',
+      'analogues',
       'constraints',
       'revisableDecisions',
       'combinations',
+      'capabilities',
     ],
   },
   {

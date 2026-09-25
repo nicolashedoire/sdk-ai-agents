@@ -168,9 +168,71 @@ export interface StudyCombination extends StudyClaim {
   changes: Array<'representation' | 'distribution' | 'responsibilities'>;
 }
 
+/** A principle an architecture changes: what makes a capability possible, not only faster. */
+export type StudyPrinciple =
+  | 'representation'
+  | 'distribution'
+  | 'responsibility'
+  | 'trust'
+  | 'verification'
+  | 'other';
+
+/**
+ * A prior technique an architecture assembles. Its status is checked in code like any claim's,
+ * and a component cannot be a novelty: the novelty of a proposal lies in its assembly.
+ */
+export interface StudyComponent {
+  name: string;
+  statement: string;
+  date?: string;
+  status: StudyClaimStatus;
+  declaredStatus?: StudyClaimStatus;
+  statusReason?: string;
+  sources: string[];
+  unretrievedSources?: string[];
+}
+
+/** What one component of an assembly gives the others, exchanges with them, and costs. */
+export interface StudyAssemblyLink {
+  component: string;
+  gives: string;
+  exchanges: string;
+  cost: string;
+}
+
+/**
+ * What an architecture makes possible. For a `capability`, what is difficult or impossible
+ * today, for whom, and the constraint it lifts; for an `improvement`, what gets faster or
+ * cheaper.
+ */
+export interface StudyCapabilityTarget {
+  what: string;
+  forWhom: string;
+  liftedConstraint: string;
+}
+
+/**
+ * A design of the object. Its components are prior techniques; its status is that of its
+ * assembly and of the capability the assembly produces: a `novelty` is checked against prior
+ * art as a combination.
+ */
 export interface StudyArchitecture extends StudyClaim {
   name: string;
+  /**
+   * `capability`: it makes possible something difficult or impossible today, by a change of
+   * principle. `improvement`: it only makes something faster or cheaper. Improvements come
+   * after capabilities in the report.
+   */
+  kind: 'capability' | 'improvement';
+  /** The kind the model gave, when the guardian judged it only an improvement. */
+  declaredKind?: 'capability';
+  capability: StudyCapabilityTarget;
+  /** The principle that changes (required for a capability). */
+  principleChange?: { principle: StudyPrinciple; change: string };
+  /** How the assembly produces the capability. */
   mechanism: string;
+  components: StudyComponent[];
+  assembly: StudyAssemblyLink[];
   conditions: string;
   benefit: string;
   addedCost: string;
@@ -180,6 +242,33 @@ export interface StudyArchitecture extends StudyClaim {
   /** Stages of the chain (passage `decompose`) it does not cover, as the study checked. */
   uncoveredStages: string[];
   predictions: string[];
+}
+
+/** A candidate new capability, proposed when the charter names none. */
+export interface StudyCapability extends StudyClaim {
+  capability: string;
+  forWhom: string;
+  /** Why it is difficult or impossible today: the constraint to lift. */
+  hardToday: string;
+  principle?: StudyPrinciple;
+}
+
+/**
+ * A past breakthrough, in any domain, that came from assembling earlier techniques (Bitcoin:
+ * signatures, hash chains, proof of work, Merkle trees and a P2P network, all prior, gave a
+ * shared ledger without a trusted third party). Its pattern feeds the design.
+ */
+export interface StudyAnalogue extends StudyClaim {
+  breakthrough: string;
+  domain?: string;
+  date?: string;
+  /** The earlier techniques it assembled, with their dates. */
+  components: Array<{ name: string; date?: string }>;
+  liftedConstraint: string;
+  /** The capability that opened. */
+  capability: string;
+  /** The assembly pattern, reusable elsewhere. */
+  pattern: string;
 }
 
 /** One of the three states of a piece. */
@@ -304,6 +393,13 @@ export interface StudyCharter {
   /** The user's leads: examples to verify, not truths. */
   readonly leads: readonly string[];
   readonly scope: { readonly exclude: readonly string[] };
+  /**
+   * The new capability aimed at: what should become possible that is difficult today, not only
+   * faster. Without it, the study proposes candidates.
+   */
+  readonly capability?: string;
+  /** Breakthroughs by assembly to deconstruct as analogues (`Bitcoin`…). */
+  readonly analogues: readonly string[];
 }
 
 export interface StudyLimits {
@@ -332,6 +428,16 @@ export interface StudyConfig {
   /** Your leads, to verify: the study also looks beyond them. */
   leads?: string[];
   scope?: { exclude?: string[] };
+  /**
+   * The new capability you aim at: something difficult or impossible today that a change of
+   * principle would make possible. Without it, the study proposes candidates.
+   */
+  capability?: string;
+  /**
+   * Breakthroughs by assembly to deconstruct (`['Bitcoin']`): their components, the constraint
+   * they lifted, the capability that opened and the pattern. The study may find others.
+   */
+  analogues?: string[];
   /**
    * Names of SDK tools the study searches with (typically tools of an MCP search server added
    * with `connectMcpServer` and `sdk.defineTool`). They run through `executeTool`, governed.
@@ -398,6 +504,8 @@ export type StudyNoticeCode =
   | 'uncheckedItems'
   | 'searchesSkipped'
   | 'leadsNotVerified'
+  | 'analoguesNotDeconstructed'
+  | 'noCapability'
   | 'noveltiesToVerify';
 
 /** What the reader must know before reading the dossier. */
@@ -462,9 +570,16 @@ export interface StudyReport {
   unverifiedLeads: string[];
   independentLeads: StudyIndependentLead[];
   references: StudyReference[];
+  /** Breakthroughs by assembly, the named ones and those the study found. */
+  analogues: StudyAnalogue[];
+  /** The named breakthroughs the study did not deconstruct. */
+  undeconstructedAnalogues: string[];
   constraints: StudyConstraint[];
   revisableDecisions: StudyRevisableDecision[];
   combinations: StudyCombination[];
+  /** Candidate new capabilities (when the charter names none). */
+  capabilities: StudyCapability[];
+  /** Capabilities first, then improvements. */
   architectures: StudyArchitecture[];
   noveltyClaims: StudyNoveltyClaim[];
   experiments: StudyExperiment[];

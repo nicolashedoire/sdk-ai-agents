@@ -1,4 +1,5 @@
 import { PASSAGES, type StudyCollection, type StudyCollections } from './passages.js';
+import { deconstructs } from './study-replies.js';
 import type {
   StudyAmendment,
   StudyCharter,
@@ -67,6 +68,16 @@ export function buildStudyReport(state: StudyState): StudyReport {
     );
   const judgedLeads = new Set(items('leadVerdicts').map((verdict) => verdict.lead));
   const unverifiedLeads = state.charter.leads.filter((lead) => !judgedLeads.has(lead));
+  const analogues = items('analogues');
+  const undeconstructedAnalogues = state.charter.analogues.filter(
+    (named) => !analogues.some((analogue) => deconstructs(analogue.breakthrough, named))
+  );
+  // A new capability comes first; an improvement, only faster or cheaper, after.
+  const architectures = items('architectures');
+  const ranked = [
+    ...architectures.filter((architecture) => architecture.kind === 'capability'),
+    ...architectures.filter((architecture) => architecture.kind !== 'capability'),
+  ];
   const all = PASSAGES.flatMap((spec) =>
     (state.records.get(spec.passage)?.items ?? []).map((item) => item.claim)
   );
@@ -83,7 +94,11 @@ export function buildStudyReport(state: StudyState): StudyReport {
     status: state.last?.status ?? 'notRun',
     ...(state.last?.stoppedBy ? { stoppedBy: state.last.stoppedBy } : {}),
     ...(state.last?.error ? { error: state.last.error } : {}),
-    notices: noticesOf(state, passages, unverifiedLeads, stats),
+    notices: noticesOf(state, passages, stats, {
+      unverifiedLeads,
+      undeconstructedAnalogues,
+      withoutCapability: architectures.length > 0 && ranked[0]?.kind !== 'capability',
+    }),
     passages,
     observations: items('observations'),
     pieces: items('pieces'),
@@ -95,10 +110,13 @@ export function buildStudyReport(state: StudyState): StudyReport {
     unverifiedLeads,
     independentLeads: items('independentLeads'),
     references: items('references'),
+    analogues,
+    undeconstructedAnalogues,
     constraints: items('constraints'),
     revisableDecisions: items('revisableDecisions'),
     combinations: items('combinations'),
-    architectures: items('architectures'),
+    capabilities: items('capabilities'),
+    architectures: ranked,
     noveltyClaims: items('noveltyClaims'),
     experiments: items('experiments'),
     cards: items('cards'),
@@ -165,9 +183,14 @@ function statsOf(state: StudyState, all: StudyClaim[]): StudyStats {
 function noticesOf(
   state: StudyState,
   passages: StudyPassageState[],
-  unverifiedLeads: string[],
-  stats: StudyStats
+  stats: StudyStats,
+  gaps: {
+    unverifiedLeads: string[];
+    undeconstructedAnalogues: string[];
+    withoutCapability: boolean;
+  }
 ): StudyNotice[] {
+  const { unverifiedLeads, undeconstructedAnalogues } = gaps;
   const notices: StudyNotice[] = [];
   if (!state.hasSources) {
     notices.push({
@@ -214,6 +237,19 @@ function noticesOf(
       code: 'leadsNotVerified',
       message: `Leads without a verdict: ${unverifiedLeads.join(', ')}.`,
       details: unverifiedLeads,
+    });
+  }
+  if (undeconstructedAnalogues.length > 0 && (changesRan || last)) {
+    notices.push({
+      code: 'analoguesNotDeconstructed',
+      message: `Breakthroughs not deconstructed: ${undeconstructedAnalogues.join(', ')}.`,
+      details: undeconstructedAnalogues,
+    });
+  }
+  if (gaps.withoutCapability) {
+    notices.push({
+      code: 'noCapability',
+      message: 'No architecture aims at a new capability: the design offers only improvements.',
     });
   }
   if (stats.noveltiesToVerify > 0) {

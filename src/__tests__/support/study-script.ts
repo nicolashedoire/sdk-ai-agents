@@ -12,6 +12,9 @@ export const TRANSCRIPT_MARKER = 'TRANSCRIPT-MARKER-7f3a';
 /** Items whose statement holds it are judged off the objective by the scripted guardian. */
 export const OFF_OBJECTIVE = 'OFF-OBJECTIVE';
 
+/** Architectures whose statement holds it are judged only faster, not a new capability. */
+export const FASTER_ONLY = 'FASTER-ONLY';
+
 export function studyConfig(overrides: Partial<StudyConfig> = {}): StudyConfig {
   return {
     name: 'browser',
@@ -162,6 +165,23 @@ export const REPLIES = {
       }),
     ],
     references: [item('Blink with LayoutNG', { name: 'Blink' })],
+    analogues: [
+      item('Bitcoin assembled prior techniques into a ledger without a trusted third party', {
+        breakthrough: 'Bitcoin',
+        date: '2008',
+        domain: 'money',
+        components: [
+          { name: 'Public-key signatures', date: '1976' },
+          { name: 'Hash chains and timestamping', date: '1991' },
+          { name: 'Hashcash proof of work', date: '1997' },
+          { name: 'Merkle trees', date: '1979' },
+          { name: 'Peer-to-peer networks', date: '1999' },
+        ],
+        liftedConstraint: 'A shared ledger needed a trusted third party',
+        capability: 'A shared ledger without a trusted third party',
+        pattern: 'Replace a trusted party by verifiable work and signatures replicated by peers',
+      }),
+    ],
   }),
   cross: passage({
     constraints: [
@@ -187,11 +207,53 @@ export const REPLIES = {
         changes: ['representation'],
       }),
     ],
+    capabilities: [
+      item('Rendering results shared across devices', {
+        capability: 'Reuse rendering results across devices and users',
+        forWhom: 'People on weak devices',
+        hardToday: 'Every client renders everything alone',
+        principle: 'distribution',
+      }),
+    ],
   }),
   design: passage({
     architectures: [
       item('One explicit representation of rendering results', {
         name: 'Shared results',
+        kind: 'capability',
+        capability: {
+          what: 'Pages whose rendering results are reused across tabs and devices',
+          forWhom: 'People on weak devices',
+          liftedConstraint: 'Every client recomputes everything alone',
+        },
+        principleChange: {
+          principle: 'distribution',
+          change: 'Rendering results become shared data instead of private state of a tab',
+        },
+        components: [
+          {
+            name: 'Immutable fragments',
+            statement: 'Layout produces immutable fragments',
+            date: '2021',
+            status: 'established',
+            sources: ['S2'],
+          },
+          { name: 'Content addressing', statement: 'A hash names a content', status: 'hypothesis' },
+        ],
+        assembly: [
+          {
+            component: 'Immutable fragments',
+            gives: 'Results that never change once computed',
+            exchanges: 'Fragment trees',
+            cost: 'Memory for versions',
+          },
+          {
+            component: 'Content addressing',
+            gives: 'A name to find a result again',
+            exchanges: 'Hashes',
+            cost: 'Hashing each fragment',
+          },
+        ],
         mechanism: 'Every stage reads and writes immutable results',
         conditions: 'Memory for several versions',
         benefit: 'Reuse and fewer conversions',
@@ -206,6 +268,15 @@ export const REPLIES = {
       }),
       item('An existing engine as a library', {
         name: 'Reused engine',
+        kind: 'improvement',
+        capability: {
+          what: 'A working browser sooner',
+          forWhom: 'The team',
+          liftedConstraint: 'Building an engine takes years',
+        },
+        components: [
+          { name: 'Servo', statement: 'Servo is published as a library', status: 'hypothesis' },
+        ],
         mechanism: 'Embed Servo and redesign around it',
         conditions: 'A stable embedding API',
         benefit: 'Less to build',
@@ -302,14 +373,19 @@ function firstSource(request: LLMRequest): string {
   return /Search sources:\n- ([^:]+):/.exec(request.messages.at(-1)?.content ?? '')?.[1] ?? '';
 }
 
-/** The ids and statements of the items a guardian prompt shows. */
-export function checkedItems(request: LLMRequest): Array<{ id: string; statement: string }> {
+/** The items a guardian prompt shows: an architecture also shows its kind. */
+export function checkedItems(
+  request: LLMRequest
+): Array<{ id: string; statement: string; kind?: string }> {
   const task = request.messages.at(-1)?.content ?? '';
   const shown = /Items to check \(JSON\):\n(.*)/.exec(task)?.[1];
   return shown ? (JSON.parse(shown) as Array<{ id: string; statement: string }>) : [];
 }
 
-/** A guardian that judges off the objective exactly the items marked `OFF-OBJECTIVE`. */
+/**
+ * A guardian that judges off the objective exactly the items marked `OFF-OBJECTIVE`, and an
+ * architecture a new capability unless it is an improvement or marked `FASTER-ONLY`.
+ */
 export const guardian: ScriptedReply = {
   respond: (request) =>
     json({
@@ -319,6 +395,12 @@ export const guardian: ScriptedReply = {
           id: shown.id,
           onObjective: !off,
           reason: off ? 'It is about another subject' : 'It serves the objective',
+          ...(shown.kind
+            ? {
+                newCapability:
+                  shown.kind === 'capability' && !shown.statement.includes(FASTER_ONLY),
+              }
+            : {}),
         };
       }),
     }),

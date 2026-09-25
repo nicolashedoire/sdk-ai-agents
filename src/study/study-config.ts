@@ -40,6 +40,8 @@ const configSchema = z.object({
   needs: z.array(text).default([]),
   leads: z.array(text).default([]),
   scope: z.object({ exclude: z.array(text).default([]) }).default({}),
+  capability: text.optional(),
+  analogues: z.array(text).default([]),
   sources: z.array(text).default([]),
   model: z.string().default(''),
   language: z
@@ -86,11 +88,13 @@ export function studySettings(config: StudyConfig): StudySettings {
   const settings = parsed.data;
   const charter = freezeCharter({
     object: settings.object,
-    question: settings.question ?? guidingQuestion(settings.language),
+    question: settings.question ?? guidingQuestion(settings.language, settings.capability),
     objective: settings.objective,
     needs: distinct(settings.needs),
     leads: distinct(settings.leads),
     scope: { exclude: distinct(settings.scope.exclude) },
+    ...(settings.capability ? { capability: settings.capability } : {}),
+    analogues: distinct(settings.analogues),
   });
   return {
     name: settings.name,
@@ -116,6 +120,7 @@ export function charterHash(charter: StudyCharter): string {
 function freezeCharter(charter: StudyCharter): StudyCharter {
   Object.freeze(charter.needs);
   Object.freeze(charter.leads);
+  Object.freeze(charter.analogues);
   Object.freeze(charter.scope.exclude);
   Object.freeze(charter.scope);
   return Object.freeze(charter);

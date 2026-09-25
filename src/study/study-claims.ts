@@ -1,5 +1,11 @@
 import type { ProposedItem } from './study-replies.js';
-import type { StudyClaim, StudyClaimStatus, StudyPassage, StudyPriorArt } from './study-types.js';
+import type {
+  StudyClaim,
+  StudyClaimStatus,
+  StudyComponent,
+  StudyPassage,
+  StudyPriorArt,
+} from './study-types.js';
 
 /** What the study knows when it settles a claim's status. */
 export interface ClaimContext {
@@ -43,6 +49,51 @@ export function settleClaim(id: string, proposed: ProposedItem, context: ClaimCo
       : 'Novelty to verify: the study has no source to search its prior art.';
   }
   return claim;
+}
+
+/** A component of an assembly as the model wrote it. */
+export interface ProposedComponent {
+  name: string;
+  statement: string;
+  date?: string;
+  status?: StudyClaimStatus;
+  sources: string[];
+}
+
+/**
+ * Settles a component of an assembly. A component is a prior technique: `established` only by
+ * a result this study retrieved, and never a novelty, since the novelty of a proposal lies in
+ * its assembly. One presented as new is established when a retrieved result documents it, and
+ * a hypothesis otherwise.
+ */
+export function settleComponent(
+  proposed: ProposedComponent,
+  context: Pick<ClaimContext, 'retrieved' | 'hasSources'>
+): StudyComponent {
+  const sources = proposed.sources.filter((source) => context.retrieved(source));
+  const unretrieved = proposed.sources.filter((source) => !context.retrieved(source));
+  const declared = proposed.status ?? 'hypothesis';
+  const component: StudyComponent = {
+    name: proposed.name,
+    statement: proposed.statement,
+    ...(proposed.date ? { date: proposed.date } : {}),
+    status: declared,
+    sources,
+    ...(unretrieved.length > 0 ? { unretrievedSources: unretrieved } : {}),
+  };
+  if (declared === 'novelty') {
+    const documented = sources.length > 0;
+    component.declaredStatus = 'novelty';
+    component.status = documented ? 'established' : 'hypothesis';
+    component.statusReason = documented
+      ? 'Presented as new, but a component is a prior technique, and a retrieved result documents it: the novelty lies in the assembly.'
+      : 'Presented as new without a retrieved source: a component is a prior technique, and this one stays a hypothesis.';
+  } else if (declared === 'established' && sources.length === 0) {
+    component.declaredStatus = 'established';
+    component.status = 'hypothesis';
+    component.statusReason = unsupported(unretrieved, context.hasSources);
+  }
+  return component;
 }
 
 /** Why an `established` claim is only a hypothesis. */

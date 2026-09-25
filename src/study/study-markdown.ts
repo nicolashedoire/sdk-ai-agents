@@ -31,6 +31,8 @@ export function renderStudyMarkdown(report: StudyReport): string {
   if (charter.scope.exclude.length > 0) {
     out.field(l.outOfScope, charter.scope.exclude.join(l.list));
   }
+  out.field(l.capabilityAimed, charter.capability ?? l.noCapabilityNamed);
+  if (charter.analogues.length > 0) out.field(l.analoguesNamed, charter.analogues.join(l.list));
   out.line(`- **${l.charterHash}**${l.sep}\`${report.charterHash}\``, '');
   if (report.amendments.length > 0) {
     out.line(`### ${l.amendments}`, '');
@@ -65,6 +67,7 @@ export function renderStudyMarkdown(report: StudyReport): string {
   passagesSection(out, report, l);
   threeStatesSection(out, report, l);
   combinationsSection(out, report, l);
+  analoguesSection(out, report, l);
   designSection(out, report, l);
   experimentsSection(out, report, l);
   cardsSection(out, report, l);
@@ -95,7 +98,7 @@ class Writer {
     this.notes(claim, '  ');
   }
 
-  status(claim: StudyClaim): string {
+  status(claim: Pick<StudyClaim, 'status' | 'sources' | 'toVerify'>): string {
     const l = this.l;
     const status =
       claim.status === 'novelty' && claim.toVerify ? l.noveltyToVerify : l.statuses[claim.status];
@@ -103,7 +106,10 @@ class Writer {
     return `_(${status}${sources})_`;
   }
 
-  notes(claim: StudyClaim, indent: string): void {
+  notes(
+    claim: Pick<StudyClaim, 'statusReason' | 'declaredStatus' | 'priorArt' | 'unchecked'>,
+    indent: string
+  ): void {
     const l = this.l;
     if (claim.statusReason) {
       const declared = claim.declaredStatus
@@ -222,6 +228,36 @@ function passagesSection(out: Writer, report: StudyReport, l: StudyLabels): void
     out.field(l.opens, decision.opens, '  ');
   }
   out.line('');
+  if (report.capabilities.length > 0) {
+    out.heading(4, l.collections.capabilities);
+    for (const candidate of report.capabilities) {
+      out.claim(candidate, candidate.capability);
+      out.field(l.forWhom, candidate.forWhom, '  ');
+      out.field(l.hardToday, candidate.hardToday, '  ');
+      if (candidate.principle)
+        out.field(l.principleChange, l.principles[candidate.principle], '  ');
+    }
+    out.line('');
+  }
+}
+
+function analoguesSection(out: Writer, report: StudyReport, l: StudyLabels): void {
+  out.heading(2, l.collections.analogues);
+  for (const analogue of report.analogues) {
+    out.claim(
+      analogue,
+      analogue.date ? `${analogue.breakthrough} (${analogue.date})` : analogue.breakthrough
+    );
+    const components = analogue.components.map((component) =>
+      component.date ? `${component.name} (${component.date})` : component.name
+    );
+    out.field(l.components, components.join(l.list), '  ');
+    out.field(l.liftedConstraint, analogue.liftedConstraint, '  ');
+    out.field(l.capabilityOpened, analogue.capability, '  ');
+    out.field(l.pattern, analogue.pattern, '  ');
+    if (analogue.domain) out.field(l.domain, analogue.domain, '  ');
+  }
+  out.line('');
 }
 
 function threeStatesSection(out: Writer, report: StudyReport, l: StudyLabels): void {
@@ -256,10 +292,44 @@ function combinationsSection(out: Writer, report: StudyReport, l: StudyLabels): 
 function designSection(out: Writer, report: StudyReport, l: StudyLabels): void {
   out.heading(2, l.designLeads);
   for (const architecture of report.architectures) {
-    out.heading(3, `${architecture.id}. ${inline(architecture.name)} ${out.status(architecture)}`);
+    out.heading(
+      3,
+      `${architecture.id}. ${inline(architecture.name)} ${out.status(architecture)} — **${l.architectureKinds[architecture.kind]}**`
+    );
     out.line(inline(architecture.statement), '');
     out.notes(architecture, '');
+    if (architecture.declaredKind) {
+      out.line(
+        `- _${l.declared} ${l.architectureKinds[architecture.declaredKind]}${l.sep}${l.judgedImprovement}_`
+      );
+    }
+    const { capability } = architecture;
+    out.field(architecture.kind === 'capability' ? l.newCapability : l.improves, capability.what);
+    out.field(l.forWhom, capability.forWhom, '  ');
+    out.field(l.liftedConstraint, capability.liftedConstraint, '  ');
+    if (architecture.principleChange) {
+      const { principle, change } = architecture.principleChange;
+      out.line(`- **${l.principleChange}** (${l.principles[principle]})${l.sep}${inline(change)}`);
+    }
     out.field(l.mechanism, architecture.mechanism);
+    // The path: known components, their assembly (new or not), the capability it produces.
+    out.line(`- **${l.componentsAssembly}**`);
+    for (const component of architecture.components) {
+      const date = component.date ? ` (${inline(component.date)})` : '';
+      out.line(
+        `  - **${inline(component.name)}**${date} — ${inline(component.statement)} ${out.status(component)}`
+      );
+      out.notes(component, '    ');
+    }
+    for (const link of architecture.assembly) {
+      out.line(
+        `  - ${inline(link.component)} ${l.arrow} ${l.gives}${l.sep}${inline(link.gives)}${l.list}${l.exchange}${l.sep}${inline(link.exchanges)}${l.list}${l.cost}${l.sep}${inline(link.cost)}`
+      );
+    }
+    const names = architecture.components.map((component) => inline(component.name));
+    out.line(
+      `  - ${names.join(' + ')} ${l.arrow} ${l.assembly} ${out.status(architecture)} ${l.arrow} ${inline(capability.what)}`
+    );
     out.field(l.conditions, architecture.conditions);
     out.field(l.benefit, architecture.benefit);
     out.field(l.addedCost, architecture.addedCost);
@@ -393,6 +463,7 @@ function noticeText(notice: StudyNotice, report: StudyReport, l: StudyLabels): s
       detail = passageNames(notice.details).join(l.list) || String(report.stats.searchesSkipped);
       break;
     case 'leadsNotVerified':
+    case 'analoguesNotDeconstructed':
       detail = inline((notice.details ?? []).join(l.list));
       break;
     case 'noveltiesToVerify':

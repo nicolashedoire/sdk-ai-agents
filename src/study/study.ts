@@ -16,12 +16,19 @@ import {
   type StudyCollection,
   type StudyCollections,
 } from './passages.js';
-import { applyPriorArt, leaveToVerify, settleClaim } from './study-claims.js';
+import {
+  applyPriorArt,
+  leaveToVerify,
+  type ProposedComponent,
+  settleClaim,
+  settleComponent,
+} from './study-claims.js';
 import { type StudySettings, studySettings } from './study-config.js';
 import { renderStudyMarkdown } from './study-markdown.js';
 import { StudyModel } from './study-model.js';
 import {
   amendmentPrompt,
+  type ClaimedNovelty,
   guardianPrompt,
   passagePrompt,
   type PromptFrame,
@@ -437,16 +444,18 @@ export class Study {
         ...batch.filter((item) => !removed.some((entry) => entry.item === item)),
       ];
 
-      // Past the threshold, the passage is redone once, told what was rejected and why.
+      // A design that aims at no new capability is off the objective as a whole.
+      const aimless =
+        spec.passage === 'design' ? await this.guardCapability(run, record, attempt) : [];
+
+      // Past the threshold, or without a capability, the passage is redone once, told what
+      // was rejected and why.
       const rejected = [...refused, ...removed.map((entry) => entry.drift)];
       const produced = batch.length + refused.length;
-      if (
-        attempt === 1 &&
-        produced > 0 &&
-        rejected.length / produced > this.settings.driftThreshold
-      ) {
+      const drifted = produced > 0 && rejected.length / produced > this.settings.driftThreshold;
+      if (attempt === 1 && (drifted || aimless.length > 0)) {
         run.redos++;
-        feedback = rejected.map((entry) => ({
+        feedback = [...rejected, ...aimless].map((entry) => ({
           statement: entry.item.statement ?? '(no statement)',
           reason: entry.reason,
         }));
@@ -533,24 +542,36 @@ export class Study {
           ...(rejection ? { rejection } : {}),
         }),
       parse: (reply, final) =>
-        parsePassageReply(spec, reply, { leads: this.charter.leads, reopenable: earlier, final }),
+        parsePassageReply(spec, reply, {
+          leads: this.charter.leads,
+          analogues: this.charter.analogues,
+          reopenable: earlier,
+          // Without a capability named in the charter, the study proposes candidates.
+          minimums: { capabilities: this.charter.capability ? 0 : 1 },
+          final,
+        }),
     });
   }
 
   /** Gives each proposed item its id and a status the study checked. */
   private settle(run: StudyRun, spec: PassageSpec, reply: PassageReply): StoredItem[] {
     const chain = this.itemsOf('chain').map((stage) => stage.stage);
+    const context = {
+      passage: spec.passage,
+      runId: run.runId,
+      retrieved: (id: string) => this.registry.has(id),
+      hasSources: this.sources.length > 0,
+    };
     return reply.items.map((proposed) => {
       const collection = COLLECTIONS.find((candidate) => candidate.key === proposed.collection);
-      const claim = settleClaim(this.nextId(collection?.prefix ?? '?'), proposed, {
-        passage: spec.passage,
-        runId: run.runId,
-        retrieved: (id) => this.registry.has(id),
-        hasSources: this.sources.length > 0,
-      });
+      const claim = settleClaim(this.nextId(collection?.prefix ?? '?'), proposed, context);
       claim.unchecked = true;
       if (proposed.collection === 'architectures') {
         const architecture = claim as StudyArchitecture;
+        // Each component is a claim of its own; the architecture's status is its assembly's.
+        architecture.components = (proposed.fields.components as ProposedComponent[]).map(
+          (component) => settleComponent(component, context)
+        );
         const covered = new Set(architecture.chain.map((entry) => stageKey(entry.stage)));
         architecture.uncoveredStages = chain.filter((stage) => !covered.has(stageKey(stage)));
       }
@@ -592,10 +613,11 @@ export class Study {
     attempt: number
   ): Promise<Array<{ item: StoredItem; drift: StudyDriftEntry }>> {
     if (batch.length === 0) return [];
-    const shown = batch.map(({ claim }) => ({
+    const shown = batch.map(({ collection, claim }) => ({
       id: claim.id,
       statement: claim.statement,
       servesObjective: claim.servesObjective,
+      ...(collection === 'architectures' ? aimOf(claim as StudyArchitecture) : {}),
     }));
     const ids = shown.map((item) => item.id);
     const verdicts = await this.model.ask(run, {
@@ -625,9 +647,48 @@ export class Study {
         removed.push({ item, drift });
       } else {
         item.claim.unchecked = undefined;
+        const architecture = item.claim as StudyArchitecture;
+        // A capability the guardian judged only faster or cheaper is an improvement.
+        if (
+          item.collection === 'architectures' &&
+          architecture.kind === 'capability' &&
+          verdict?.newCapability === false
+        ) {
+          architecture.kind = 'improvement';
+          architecture.declaredKind = 'capability';
+        }
       }
     }
     return removed;
+  }
+
+  /**
+   * A design whose architectures are all improvements (only faster or cheaper, as declared or
+   * as the guardian judged them) is off the objective as a whole: logged, and redone once.
+   */
+  private async guardCapability(
+    run: StudyRun,
+    record: PassageRecord,
+    attempt: number
+  ): Promise<StudyDriftEntry[]> {
+    const aims = record.items.some(
+      (item) =>
+        item.collection === 'architectures' &&
+        (item.claim as StudyArchitecture).kind === 'capability'
+    );
+    if (aims) return [];
+    return [
+      await this.logDrift(run, {
+        passage: 'design',
+        collection: 'architectures',
+        item: { statement: 'The design as a whole' },
+        reason:
+          'It offers no new capability, only improvements (faster or cheaper): the design must aim at something difficult or impossible today.',
+        by: 'guardian',
+        attempt,
+        runId: run.runId,
+      }),
+    ];
   }
 
   private async logDrift(run: StudyRun, entry: StudyDriftEntry): Promise<StudyDriftEntry> {
@@ -760,7 +821,7 @@ export class Study {
       return;
     }
     const ids = claims.map((claim) => claim.id);
-    const shown = claims.map(({ id, statement }) => ({ id, statement }));
+    const shown = claims.map(claimedNovelty);
     const max = Math.min(MAX_QUERIES_PER_REQUEST, run.searchesLeft);
     const requested = await this.model.ask(run, {
       purpose: 'priorArtQueries',
@@ -794,12 +855,7 @@ export class Study {
       passage: 'design',
       temperature: 0,
       messages: (rejection) =>
-        priorArtCheckPrompt(
-          this.frame(),
-          checked.map(({ id, statement }) => ({ id, statement })),
-          results,
-          rejection
-        ),
+        priorArtCheckPrompt(this.frame(), checked.map(claimedNovelty), results, rejection),
       parse: (reply) => parsePriorArtReply(reply, checkedIds),
     });
     for (const claim of checked) {
@@ -895,6 +951,28 @@ function outcomeOf(stopped: unknown): {
   return {
     status: 'failed',
     error: stopped instanceof Error ? stopped : new Error(String(stopped)),
+  };
+}
+
+/** What the guardian sees of an architecture's aim: its kind, capability and principle. */
+function aimOf(architecture: StudyArchitecture): Record<string, unknown> {
+  return {
+    kind: architecture.kind,
+    capability: architecture.capability,
+    ...(architecture.principleChange ? { principleChange: architecture.principleChange } : {}),
+    components: architecture.components.map((component) => component.name),
+  };
+}
+
+/** A novelty as prior-art prompts show it: an architecture as the combination it assembles. */
+function claimedNovelty(claim: StudyClaim): ClaimedNovelty {
+  const shown = { id: claim.id, statement: claim.statement };
+  if (!('assembly' in claim && 'kind' in claim)) return shown;
+  const architecture = claim as StudyArchitecture;
+  return {
+    ...shown,
+    combination: architecture.components.map((component) => component.name).join(' + '),
+    capability: architecture.capability.what,
   };
 }
 

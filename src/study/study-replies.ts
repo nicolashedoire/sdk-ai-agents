@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extractJsonObject } from '../cognition/llm-thought-generator.js';
-import type { PassageSpec, StudyCollection } from './passages.js';
+import { claimStatus, type PassageSpec, resultIds, type StudyCollection } from './passages.js';
 import type {
   StudyAmendmentVerdict,
   StudyClaimStatus,
@@ -44,33 +44,10 @@ export interface PassageReply {
 
 const text = z.string().trim().min(1);
 
-const STATUSES: readonly StudyClaimStatus[] = ['established', 'hypothesis', 'novelty'];
-
-// A status the study cannot read counts as none: the item is then a hypothesis, the weakest
-// claim, never a stronger one.
-const statusSchema = z.preprocess((value) => {
-  const status = typeof value === 'string' ? value.trim().toLowerCase() : undefined;
-  return STATUSES.find((known) => known === status);
-}, z.enum(['established', 'hypothesis', 'novelty']).optional());
-
-/** Result ids as the model may write them: `S1`, `[S1]`, `s1`, or "S1, S2" in one string. */
-const sourceIds = z.preprocess((value) => {
-  const list = typeof value === 'string' ? value.split(/[,;\s]+/) : value;
-  if (!Array.isArray(list)) return list;
-  return list
-    .filter((entry) => typeof entry === 'string' || typeof entry === 'number')
-    .map((entry) =>
-      String(entry)
-        .replace(/[[\]\s]/g, '')
-        .toUpperCase()
-    )
-    .filter((entry) => entry !== '');
-}, z.array(z.string()).default([]));
-
 const claimSchema = z.object({
   statement: text,
-  status: statusSchema,
-  sources: sourceIds,
+  status: claimStatus,
+  sources: resultIds,
   servesObjective: z
     .string({
       required_error: 'no "servesObjective": the item does not say what it serves in the objective',
@@ -80,16 +57,28 @@ const claimSchema = z.object({
     .min(1, '"servesObjective" is empty: the item does not say what it serves in the objective'),
 });
 
+/** What a passage's reply is read against. */
+export interface PassageReplyContext {
+  leads: readonly string[];
+  /** Breakthroughs the charter names, to deconstruct in `changes`. */
+  analogues: readonly string[];
+  reopenable: StudyPassage[];
+  /** Items a collection needs in this study, when it differs from the passage's own. */
+  minimums?: Partial<Record<StudyCollection, number>>;
+  final: boolean;
+}
+
 /**
  * Reads a passage's reply. Each item is checked on its own: an item the schema refuses (no
  * `servesObjective`, a missing field) is dropped and reported, the others are kept. The reply
  * itself is refused when a collection is not a list, or holds fewer valid items than the
- * passage needs; and, before the last attempt, when a user lead has no verdict.
+ * passage needs; and, before the last attempt, when a user lead has no verdict or a named
+ * breakthrough was not deconstructed.
  */
 export function parsePassageReply(
   spec: PassageSpec,
   reply: string,
-  context: { leads: readonly string[]; reopenable: StudyPassage[]; final: boolean }
+  context: PassageReplyContext
 ): Parsed<PassageReply> {
   const json = extractJsonObject(reply);
   if (!isRecord(json)) return { ok: false, error: 'the reply does not contain a JSON object' };
@@ -108,14 +97,15 @@ export function parsePassageReply(
       else items.push(read);
     }
     const valid = items.length - before;
-    if (valid < collection.min) {
+    const min = context.minimums?.[collection.key] ?? collection.min;
+    if (valid < min) {
       const why = refused
         .filter((item) => item.collection === collection.key)
         .slice(0, 3)
         .map((item) => item.reason);
       return {
         ok: false,
-        error: `"${collection.key}" needs at least ${collection.min} valid item(s), got ${valid}${why.length > 0 ? ` (${why.join('; ')})` : ''}`,
+        error: `"${collection.key}" needs at least ${min} valid item(s), got ${valid}${why.length > 0 ? ` (${why.join('; ')})` : ''}`,
       };
     }
   }
@@ -132,6 +122,21 @@ export function parsePassageReply(
       ok: false,
       error: `"leadVerdicts" must judge every one of the user's leads; missing: ${leadsWithoutVerdict.join(', ')}`,
     };
+  }
+
+  if (spec.passage === 'changes' && !context.final) {
+    const deconstructed = items
+      .filter((item) => item.collection === 'analogues')
+      .map((item) => String(item.fields.breakthrough));
+    const missing = context.analogues.filter(
+      (named) => !deconstructed.some((breakthrough) => deconstructs(breakthrough, named))
+    );
+    if (missing.length > 0) {
+      return {
+        ok: false,
+        error: `"analogues" must deconstruct every breakthrough the charter names; missing: ${missing.join(', ')}`,
+      };
+    }
   }
 
   const reopen = readReopen(json.reopen, context.reopenable);
@@ -201,6 +206,8 @@ function readReopen(value: unknown, reopenable: StudyPassage[]): ReopenRequest |
 export interface GuardianVerdict {
   onObjective: boolean;
   reason: string;
+  /** For an architecture: it makes possible something difficult today, not only faster. */
+  newCapability?: boolean;
 }
 
 /**
@@ -224,9 +231,11 @@ export function parseGuardianReply(
     const onObjective = readBoolean(entry.onObjective);
     if (onObjective === undefined) continue;
     const reason = typeof entry.reason === 'string' ? entry.reason.trim() : '';
+    const newCapability = readBoolean(entry.newCapability);
     verdicts.set(id, {
       onObjective,
       reason: reason || (onObjective ? 'on the objective' : 'judged off the objective'),
+      ...(newCapability !== undefined ? { newCapability } : {}),
     });
   }
   const missing = ids.filter((id) => !verdicts.has(id));
@@ -305,7 +314,7 @@ export function parsePriorArtReply(reply: string, claims: string[]): Parsed<Prio
 const priorArtSchema = z.object({
   claim: z.string().trim().toUpperCase(),
   closest: text,
-  sources: sourceIds,
+  sources: resultIds,
   verdict: z.preprocess(
     (value) =>
       typeof value === 'string'
@@ -352,6 +361,11 @@ function readBoolean(value: unknown): boolean | undefined {
   if (value === 'true' || value === 'yes') return true;
   if (value === 'false' || value === 'no') return false;
   return undefined;
+}
+
+/** Whether an analogue deconstructs a breakthrough the charter names (`Bitcoin (2008)`). */
+export function deconstructs(breakthrough: string, named: string): boolean {
+  return leadKey(breakthrough).includes(leadKey(named));
 }
 
 /** How leads are matched: case, accents and spacing aside. */
