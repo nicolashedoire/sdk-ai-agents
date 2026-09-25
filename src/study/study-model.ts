@@ -77,6 +77,7 @@ export class StudyModel {
           onDiscardedAnswer,
         });
         attempts.push(answered);
+        run.answered++;
         const parsed = call.parse(answered.response.content ?? '', attempt === MAX_ATTEMPTS - 1);
         if (parsed.ok) answer = { value: parsed.value };
         else rejection = parsed.error;

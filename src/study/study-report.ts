@@ -1,11 +1,13 @@
 import { PASSAGES, type StudyCollection, type StudyCollections } from './passages.js';
-import { deconstructs } from './study-replies.js';
+import { deconstructsNamed } from './study-replies.js';
 import type {
   StudyAmendment,
+  StudyArchitecture,
   StudyCharter,
   StudyClaim,
   StudyDriftEntry,
   StudyNotice,
+  StudyNoticeCode,
   StudyPassage,
   StudyPassageState,
   StudyPieceStates,
@@ -30,7 +32,15 @@ export interface PassageRecord {
   items: StoredItem[];
   /** It ran to its end: guardian, redo and, for design, the prior-art search. */
   complete: boolean;
+  /**
+   * It asked to reopen an earlier passage: it runs again once that passage has, so it is not
+   * complete until then (nor is its prior-art search run).
+   */
+  awaitingLoop?: boolean;
+  /** Attempts of its last generation: 2 when the guardian made it redo. */
   attempts: number;
+  /** The attempt whose items it kept, when the redo was worse than the first. */
+  keptAttempt?: number;
   reopenedBy: StudyPassage[];
   runId: string;
 }
@@ -52,7 +62,12 @@ export interface StudyState {
   /** Passages that could not search: `maxSearches` was spent. */
   unsearched: readonly StudyPassage[];
   totals: { modelCalls: number; redos: number; loops: number };
+  /** Amendments classified, and the model calls the vendor answered for them. */
+  amendmentTotals: { count: number; modelCalls: number };
+  /** Runs of `run()` since the last restart. */
   runIds: readonly string[];
+  /** Items a collection needs in this study, when it differs from the passage's own. */
+  minimums: Partial<Record<StudyCollection, number>>;
 }
 
 /**
@@ -70,7 +85,7 @@ export function buildStudyReport(state: StudyState): StudyReport {
   const unverifiedLeads = state.charter.leads.filter((lead) => !judgedLeads.has(lead));
   const analogues = items('analogues');
   const undeconstructedAnalogues = state.charter.analogues.filter(
-    (named) => !analogues.some((analogue) => deconstructs(analogue.breakthrough, named))
+    (named, index) => !analogues.some((analogue) => deconstructsNamed(analogue, named, index))
   );
   // A new capability comes first; an improvement, only faster or cheaper, after.
   const architectures = items('architectures');
@@ -97,7 +112,7 @@ export function buildStudyReport(state: StudyState): StudyReport {
     notices: noticesOf(state, passages, stats, {
       unverifiedLeads,
       undeconstructedAnalogues,
-      withoutCapability: architectures.length > 0 && ranked[0]?.kind !== 'capability',
+      architectures: ranked,
     }),
     passages,
     observations: items('observations'),
@@ -167,6 +182,7 @@ function statsOf(state: StudyState, all: StudyClaim[]): StudyStats {
   return {
     runs: state.runIds.length,
     modelCalls: state.totals.modelCalls,
+    amendments: { ...state.amendmentTotals },
     searches: ran.length,
     searchesSkipped: state.searches.length - ran.length,
     results: state.results.length,
@@ -180,83 +196,176 @@ function statsOf(state: StudyState, all: StudyClaim[]): StudyStats {
   };
 }
 
+/** A notice, its English message built from the same parameters the dossier renders. */
+function notice(
+  code: StudyNoticeCode,
+  message: string,
+  extra: { params?: Record<string, string>; details?: string[] } = {}
+): StudyNotice {
+  return {
+    code,
+    ...(extra.params ? { params: extra.params } : {}),
+    ...(extra.details ? { details: extra.details } : {}),
+    message,
+  };
+}
+
 function noticesOf(
   state: StudyState,
   passages: StudyPassageState[],
   stats: StudyStats,
-  gaps: {
+  found: {
     unverifiedLeads: string[];
     undeconstructedAnalogues: string[];
-    withoutCapability: boolean;
+    architectures: StudyArchitecture[];
   }
 ): StudyNotice[] {
-  const { unverifiedLeads, undeconstructedAnalogues } = gaps;
   const notices: StudyNotice[] = [];
   if (!state.hasSources) {
-    notices.push({
-      code: 'noSources',
-      message:
-        'The study had no search source: no claim could be established, and no novelty checked against prior art.',
-    });
+    notices.push(
+      notice(
+        'noSources',
+        'The study had no search source: no claim could be established, and no novelty checked against prior art.'
+      )
+    );
   }
   const last = state.last;
   if (last && last.status !== 'completed') {
+    const params = {
+      ...(last.stoppedBy ? { limit: last.stoppedBy } : {}),
+      ...(last.error ? { error: last.error } : {}),
+    };
     const stopped = last.status === 'stopped';
-    notices.push({
-      code: last.status,
-      message: `The last run ${stopped ? `was stopped (${last.stoppedBy})` : last.status}${last.error ? `: ${last.error}` : ''}. The report keeps what was done.`,
-      ...(last.stoppedBy ? { details: [last.stoppedBy] } : {}),
-    });
+    notices.push(
+      notice(
+        last.status,
+        `The last run ${stopped ? `was stopped (${last.stoppedBy})` : last.status}${last.error ? `: ${last.error}` : ''}. The report keeps what was done.`,
+        { params, ...(last.stoppedBy ? { details: [last.stoppedBy] } : {}) }
+      )
+    );
   }
   const notRun = passages.filter((passage) => passage.state === 'notRun');
   if (last && notRun.length > 0) {
-    notices.push({
-      code: 'passagesNotRun',
-      message: `Passages not run: ${notRun.map((passage) => passage.passage).join(', ')}.`,
-      details: notRun.map((passage) => passage.passage),
-    });
+    const names = notRun.map((passage) => passage.passage);
+    notices.push(
+      notice('passagesNotRun', `Passages not run: ${names.join(', ')}.`, { details: names })
+    );
   }
   const unchecked = passages.filter((passage) => passage.state === 'unchecked');
   if (unchecked.length > 0) {
-    notices.push({
-      code: 'uncheckedItems',
-      message: `Items the guardian did not judge, the run having stopped first, in: ${unchecked.map((passage) => passage.passage).join(', ')}.`,
-      details: unchecked.map((passage) => passage.passage),
-    });
+    const names = unchecked.map((passage) => passage.passage);
+    notices.push(
+      notice(
+        'uncheckedItems',
+        `Items the guardian has not judged, kept apart from every later prompt, in: ${names.join(', ')}.`,
+        { details: names }
+      )
+    );
   }
   if (stats.searchesSkipped > 0 || state.unsearched.length > 0) {
-    notices.push({
-      code: 'searchesSkipped',
-      message: `The search budget (maxSearches) ran out: ${[...state.unsearched].join(', ') || `${stats.searchesSkipped} search(es) skipped`}.`,
-      details: [...state.unsearched],
-    });
+    const names = [...state.unsearched];
+    notices.push(
+      notice(
+        'searchesSkipped',
+        `The search budget (maxSearches) ran out: ${names.join(', ') || `${stats.searchesSkipped} search(es) skipped`}.`,
+        { params: { count: String(stats.searchesSkipped) }, details: names }
+      )
+    );
   }
-  const changesRan = state.records.has('changes');
-  if (unverifiedLeads.length > 0 && (changesRan || last)) {
-    notices.push({
-      code: 'leadsNotVerified',
-      message: `Leads without a verdict: ${unverifiedLeads.join(', ')}.`,
-      details: unverifiedLeads,
-    });
+  // The leads and breakthroughs are owed by the passage on changes: only once it ran.
+  if (state.records.has('changes')) {
+    if (found.unverifiedLeads.length > 0) {
+      notices.push(
+        notice(
+          'leadsNotVerified',
+          `Leads without a verdict: ${found.unverifiedLeads.join(', ')}.`,
+          {
+            details: found.unverifiedLeads,
+          }
+        )
+      );
+    }
+    if (found.undeconstructedAnalogues.length > 0) {
+      notices.push(
+        notice(
+          'analoguesNotDeconstructed',
+          `Breakthroughs not deconstructed: ${found.undeconstructedAnalogues.join(', ')}.`,
+          { details: found.undeconstructedAnalogues }
+        )
+      );
+    }
   }
-  if (undeconstructedAnalogues.length > 0 && (changesRan || last)) {
-    notices.push({
-      code: 'analoguesNotDeconstructed',
-      message: `Breakthroughs not deconstructed: ${undeconstructedAnalogues.join(', ')}.`,
-      details: undeconstructedAnalogues,
-    });
+  const design = state.records.get('design');
+  const judged = found.architectures.filter((architecture) => !architecture.unchecked);
+  if (design && judged.length === 0) {
+    notices.push(notice('noDesign', 'The design passage kept no architecture.'));
+  } else if (
+    judged.length > 0 &&
+    judged.every((architecture) => architecture.kind !== 'capability')
+  ) {
+    notices.push(
+      notice(
+        'noCapability',
+        'No architecture aims at a new capability: the design offers only improvements.'
+      )
+    );
   }
-  if (gaps.withoutCapability) {
-    notices.push({
-      code: 'noCapability',
-      message: 'No architecture aims at a new capability: the design offers only improvements.',
-    });
+  const unmet = unmetMinimums(state);
+  if (unmet.length > 0) {
+    notices.push(
+      notice(
+        'minimumsNotMet',
+        `Fewer items than required once the guardian judged them, in: ${unmet.join(', ')}.`,
+        { details: unmet }
+      )
+    );
+  }
+  const untraced = judged
+    .filter(
+      (architecture) =>
+        architecture.components.some((component) => component.untraced) ||
+        architecture.assembly.some((link) => link.untraced)
+    )
+    .map((architecture) => architecture.id);
+  if (untraced.length > 0) {
+    notices.push(
+      notice(
+        'untracedAssembly',
+        `Parts of the design cite no record of the investigation, in: ${untraced.join(', ')}.`,
+        { details: untraced }
+      )
+    );
   }
   if (stats.noveltiesToVerify > 0) {
-    notices.push({
-      code: 'noveltiesToVerify',
-      message: `${stats.noveltiesToVerify} claimed novelty(ies) still to verify against prior art.`,
-    });
+    notices.push(
+      notice(
+        'noveltiesToVerify',
+        `${stats.noveltiesToVerify} claimed novelty(ies) still to verify against prior art.`,
+        { params: { count: String(stats.noveltiesToVerify) } }
+      )
+    );
   }
   return notices;
+}
+
+/**
+ * The collections of passages that ran with fewer judged items than they need (`passage.key`):
+ * the guardian may have removed what the reply held.
+ */
+function unmetMinimums(state: StudyState): string[] {
+  const unmet: string[] = [];
+  for (const spec of PASSAGES) {
+    const record = state.records.get(spec.passage);
+    // A passage with items the guardian has not judged is reported as such (`uncheckedItems`).
+    if (!record || record.items.some((item) => item.claim.unchecked)) continue;
+    for (const collection of spec.collections) {
+      const min = state.minimums[collection.key] ?? collection.min;
+      if (min === 0) continue;
+      const judged = record.items.filter(
+        (item) => item.collection === collection.key && !item.claim.unchecked
+      ).length;
+      if (judged < min) unmet.push(`${spec.passage}.${collection.key}`);
+    }
+  }
+  return unmet;
 }

@@ -105,7 +105,8 @@ describe('study runs', () => {
         tokensUsed: meteredTokens,
         unmeteredCalls: cost.unmeteredCalls,
         unpricedCalls: cost.unpricedCalls,
-        toolCallsCount: 4,
+        // Three searches of the passages, and the prior art of the capability A1 and novelty N1.
+        toolCallsCount: 5,
       });
       // Nothing else was counted: the budget for every caller is the study's.
       const all = await env.sdk.getBudgetUsage({ period: 'all' });
@@ -219,7 +220,7 @@ describe('study runs', () => {
       // S2 was never retrieved: the advance citing it is only a hypothesis.
       expect(result.report.advances[0]).toMatchObject({
         status: 'hypothesis',
-        unretrievedSources: ['S2'],
+        unlistedSources: ['S2'],
       });
     });
 

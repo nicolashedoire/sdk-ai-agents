@@ -43,6 +43,10 @@ describe('sdk.createStudy', () => {
   const lastMessage = (request: LLMRequest | undefined) =>
     request?.messages.at(-1)?.content ?? '';
 
+  /** A reason the study wrote: its code, and its English message when given. */
+  const reason = (code: string, message?: string) =>
+    expect.objectContaining({ code, ...(message ? { message } : {}) });
+
   describe('passages', () => {
     it('runs the seven passages in order and brings their items to the report', async () => {
       const { study, provider, env } = setup();
@@ -186,7 +190,7 @@ describe('sdk.createStudy', () => {
         expect.objectContaining({
           passage: 'changes',
           by: 'schema',
-          reason: expect.stringContaining('"quantum" is not one of the user\'s leads'),
+          reason: reason('notAUserLead', '"quantum" is not one of the user’s leads (a tool found beyond them is an independent lead).'),
         })
       );
     });
@@ -331,19 +335,25 @@ describe('sdk.createStudy', () => {
       expect(sgml).toMatchObject({
         status: 'established',
         sources: ['S1'],
-        unretrievedSources: ['S99'],
+        unlistedSources: ['S99'],
       });
       expect(small).toMatchObject({
         status: 'hypothesis',
         declaredStatus: 'established',
         sources: [],
-        unretrievedSources: ['S99'],
-        statusReason: 'Declared established, but it cites S99, never retrieved in this study.',
+        unlistedSources: ['S99'],
+        statusReason: reason(
+          'citesUnlisted',
+          'Declared established, but it cites S99, not listed in its prompt.'
+        ),
       });
       expect(styles).toMatchObject({
         status: 'hypothesis',
         declaredStatus: 'established',
-        statusReason: 'Declared established, but it cites no result retrieved in this study.',
+        statusReason: reason(
+          'citesNothing',
+          'Declared established, but it cites no result listed in its prompt.'
+        ),
       });
       expect(result.report.stats.downgraded).toBe(2);
 
@@ -395,13 +405,15 @@ describe('sdk.createStudy', () => {
 
       const { report } = await study.run();
 
+      // Then the prior art of the capability A1 and of the novelty N1: new results.
       expect(report.searches.map((search) => search.resultIds)).toEqual([
         ['S1'],
         ['S1'],
         ['S2'],
         ['S3'],
+        ['S4'],
       ]);
-      expect(report.results.map((result) => result.id)).toEqual(['S1', 'S2', 'S3']);
+      expect(report.results.map((result) => result.id)).toEqual(['S1', 'S2', 'S3', 'S4']);
     });
 
     it('establishes nothing without sources, and says so first', async () => {
@@ -418,8 +430,10 @@ describe('sdk.createStudy', () => {
       expect(result.report.historicalChoices[0]).toMatchObject({
         status: 'hypothesis',
         declaredStatus: 'established',
-        statusReason:
-          'Declared established, but the study has no source: nothing can be established.',
+        statusReason: reason(
+          'noSourceConfigured',
+          'Declared established, but the study has no source: nothing can be established.'
+        ),
       });
       expect(result.report.stats.byStatus.established).toBe(0);
       expect(result.report.notices[0]?.code).toBe('noSources');
@@ -441,7 +455,10 @@ describe('sdk.createStudy', () => {
       expect(report.noveltyClaims[0]).toMatchObject({
         status: 'novelty',
         toVerify: true,
-        statusReason: 'Novelty to verify: the study has no source to search its prior art.',
+        statusReason: reason(
+          'noveltyNoSource',
+          'Novelty to verify: the study has no source to search its prior art.'
+        ),
       });
       expect(report.noveltyClaims[0]?.priorArt).toBeUndefined();
       expect(report.stats.noveltiesToVerify).toBe(1);
@@ -456,14 +473,15 @@ describe('sdk.createStudy', () => {
       expect(searches.queries.at(-1)).toBe(
         'prior art of Fragments as the common currency of every stage'
       );
+      // The capability A1's own search found S4, the novelty N1's S5: each keeps its own.
       expect(lastMessage(requestsOf(provider, 'study-prior-art-check:design')[0])).toContain(
-        '[S4] About prior art of Fragments as the common currency of every stage'
+        '"id":"S5","title":"About prior art of Fragments as the common currency of every stage"'
       );
       expect(report.noveltyClaims[0]).toMatchObject({
         status: 'novelty',
         priorArt: {
           closest: 'WebRender batches display lists, not layout fragments',
-          sources: ['S4'],
+          sources: ['S5'],
           verdict: 'partlyNovel',
         },
       });
@@ -477,7 +495,8 @@ describe('sdk.createStudy', () => {
         'study-prior-art-check:design',
         json({
           checks: [
-            { claim: 'N1', closest: 'Servo already shares fragments', sources: ['S4'], verdict: 'exists' },
+            // N1's own prior-art search found S5 (the capability A1's found S4).
+            { claim: 'N1', closest: 'Servo already shares fragments', sources: ['S5'], verdict: 'exists' },
           ],
         })
       );
@@ -488,7 +507,7 @@ describe('sdk.createStudy', () => {
       expect(report.noveltyClaims[0]).toMatchObject({
         status: 'hypothesis',
         declaredStatus: 'novelty',
-        statusReason: 'Not a novelty: Servo already shares fragments',
+        statusReason: reason('priorArtExists', 'Not a novelty: Servo already shares fragments'),
       });
     });
 
@@ -503,8 +522,7 @@ describe('sdk.createStudy', () => {
       expect(result.report.noveltyClaims[0]).toMatchObject({
         status: 'novelty',
         toVerify: true,
-        statusReason:
-          'Novelty to verify: the search budget (maxSearches) ran out before its prior-art search.',
+        statusReason: reason('noveltySearchBudget'),
       });
       expect(result.report.notices).toContainEqual(
         expect.objectContaining({ code: 'searchesSkipped', details: ['design'] })
@@ -520,7 +538,10 @@ describe('sdk.createStudy', () => {
 
       expect(report.noveltyClaims[0]).toMatchObject({
         toVerify: true,
-        statusReason: 'Novelty to verify: no prior-art search was run for it.',
+        statusReason: reason(
+          'noveltyNotSearched',
+          'Novelty to verify: no prior-art search was asked for it.'
+        ),
       });
       expect(provider.channels()).not.toContain('study-prior-art-check:design');
     });
@@ -631,7 +652,7 @@ describe('sdk.createStudy', () => {
           passage: 'observe',
           collection: 'observations',
           item: expect.objectContaining({ id: 'O2' }),
-          reason: 'It is about another subject',
+          reason: reason('judged', 'It is about another subject'),
           by: 'guardian',
           attempt: 1,
         }),
@@ -711,7 +732,10 @@ describe('sdk.createStudy', () => {
           passage: 'observe',
           by: 'schema',
           item: { statement: 'Browsers have tabs' },
-          reason: 'no "servesObjective": the item does not say what it serves in the objective',
+          reason: reason(
+            'noServesObjective',
+            'No "servesObjective": the item does not say what it serves in the objective.'
+          ),
         }),
       ]);
       // The guardian never sees it.
@@ -799,17 +823,20 @@ describe('sdk.createStudy', () => {
       expect(conflicting).toMatchObject({
         verdict: 'conflicts',
         accepted: false,
-        reason: 'Accessibility is a need of the charter',
+        reason: reason('judged', 'Accessibility is a need of the charter'),
       });
       expect(conflicting.number).toBeUndefined();
       expect(changing).toMatchObject({
         verdict: 'changesObjective',
         accepted: false,
-        reason:
-          'It studies another object A new objective is a new study: create one with sdk.createStudy.',
+        reason: reason('judged', 'It studies another object'),
       });
-      expect(unclassified).toMatchObject({ verdict: 'unclassified', accepted: false });
-      expect(unclassified.reason).toContain('the vendor is down');
+      expect(unclassified).toMatchObject({
+        verdict: 'unclassified',
+        accepted: false,
+        reason: reason('amendmentUnclassified'),
+      });
+      expect(unclassified.reason.params?.error).toContain('the vendor is down');
       const refused = await env.sdk.getEvents(changing.runId, { type: 'study.amendment_refused' });
       expect(refused[0]?.data).toMatchObject({ verdict: 'changesObjective', accepted: false });
 
@@ -1006,9 +1033,13 @@ describe('sdk.createStudy', () => {
       expect(markdown).toContain(`\`${study.charterHash}\``);
       expect(markdown).toContain('## Le principe');
       expect(markdown).toContain('**Reuse** — Reused the NeXT editor _(établi · S1)_');
-      expect(markdown).toContain('**Small** — Kept HTML small _(hypothèse)_');
+      // The citation the prompt did not list supports nothing, but the reader sees it.
       expect(markdown).toContain(
-        '_déclaré établi : Declared established, but it cites S99, never retrieved in this study._'
+        '**Small** — Kept HTML small _(hypothèse · cite aussi, hors de la liste de son prompt : S99)_'
+      );
+      expect(markdown).toContain(
+        // The study's reason, in the study's language.
+        '_Déclaré établi, mais il cite S99, absent de la liste de son prompt._'
       );
       expect(markdown).toContain('Fragments as the common currency of every stage _(nouveauté)_');
       expect(markdown).toContain(
@@ -1022,7 +1053,7 @@ describe('sdk.createStudy', () => {
       expect(markdown).toContain('9. **Expérience** : Scroll benchmark');
       expect(markdown).toContain('## Sources');
       expect(markdown).toContain(
-        '- **S1** [About WorldWideWeb NeXT text editor](https://example.org/WorldWideWeb%20NeXT%20text%20editor) (2021) — _via search\\_web : “WorldWideWeb NeXT text editor”_'
+        '- **S1** [About WorldWideWeb NeXT text editor](<https://example.org/WorldWideWeb%20NeXT%20text%20editor>) (2021) — _via search\\_web : “WorldWideWeb NeXT text editor”_'
       );
       expect(markdown).toContain('## Journal de dérive');
       expect(markdown).toContain('Aucun élément n’a quitté l’objectif.');
@@ -1111,6 +1142,7 @@ function emptyReport(): StudyReport {
     stats: {
       runs: 0,
       modelCalls: 0,
+      amendments: { count: 0, modelCalls: 0 },
       searches: 0,
       searchesSkipped: 0,
       results: 0,

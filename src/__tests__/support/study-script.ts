@@ -324,7 +324,10 @@ export const REPLIES = {
         checks: claimsShown(request).map((claim) => ({
           claim: claim.id,
           closest: 'WebRender batches display lists, not layout fragments',
-          sources: [/\[(S\d+)\]/.exec(request.messages.at(-1)?.content ?? '')?.[1]],
+          // Every result listed: the study keeps those of the claim's own searches.
+          sources: [...(request.messages.at(-1)?.content ?? '').matchAll(/"id":"(S\d+)"/g)].map(
+            (match) => match[1]
+          ),
           verdict: 'partlyNovel',
         })),
       }),
@@ -399,6 +402,9 @@ export const guardian: ScriptedReply = {
             ? {
                 newCapability:
                   shown.kind === 'capability' && !shown.statement.includes(FASTER_ONLY),
+                ...(shown.statement.includes(FASTER_ONLY)
+                  ? { capabilityReason: 'It only makes rendering faster' }
+                  : {}),
               }
             : {}),
         };

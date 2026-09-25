@@ -92,7 +92,7 @@ export const claimStatus = z.preprocess((value) => {
   return STATUSES.find((known) => known === status);
 }, z.enum(['established', 'hypothesis', 'novelty']).optional());
 
-/** Result ids as the model may write them: `S1`, `[S1]`, `s1`, or "S1, S2" in one string. */
+/** Ids as the model may write them: `S1`, `[S1]`, `s1`, or "S1, S2" in one string. */
 export const resultIds = z.preprocess((value) => {
   const list = typeof value === 'string' ? value.split(/[,;\s]+/) : value;
   if (!Array.isArray(list)) return list;
@@ -182,8 +182,10 @@ const advanceFields: FieldsSchema<StudyAdvance> = z.object({
   piece: optionalText,
 });
 
+// A lead is named by its number in the charter (the model may write in another language), or
+// by its text; the study writes it back as the charter does.
 const leadVerdictFields: FieldsSchema<StudyLeadVerdict> = z.object({
-  lead: text,
+  lead: z.preprocess((value) => (typeof value === 'number' ? String(value) : value), text),
   verdict: looseEnum(['relevant', 'partlyRelevant', 'notRelevant'], {
     partly: 'partlyRelevant',
     irrelevant: 'notRelevant',
@@ -240,14 +242,29 @@ const principle = looseEnum(
   }
 );
 
-/** A prior technique of an assembly, as the model writes it: a claim of its own. */
+/**
+ * A prior technique of an assembly, as the model writes it: a claim of its own, and the ids of
+ * the records of the investigation it comes from.
+ */
 export const componentSchema = z.object({
   name: text,
   statement: text,
   date: optionalText,
   status: claimStatus,
   sources: resultIds,
+  from: resultIds,
 });
+
+/** The collections a part of a design may come from: the investigation's records. */
+export const TRACEABLE: readonly StudyCollection[] = [
+  'advances',
+  'independentLeads',
+  'references',
+  'analogues',
+  'revisableDecisions',
+  'combinations',
+  'capabilities',
+];
 
 // Components are settled by the study (their statuses checked), so they are left out of the
 // fields checked against the item's type.
@@ -266,7 +283,9 @@ const architectureFields: FieldsSchema<
     mechanism: text,
     components: z.array(componentSchema).min(1),
     assembly: z
-      .array(z.object({ component: text, gives: text, exchanges: text, cost: text }))
+      .array(
+        z.object({ component: text, gives: text, exchanges: text, cost: text, from: resultIds })
+      )
       .default([]),
     conditions: text,
     benefit: text,
@@ -302,6 +321,7 @@ const capabilityFields: FieldsSchema<StudyCapability> = z.object({
 
 const analogueFields: FieldsSchema<StudyAnalogue> = z.object({
   breakthrough: text,
+  named: z.number().int().positive().optional(),
   domain: optionalText,
   date: optionalText,
   components: z.array(z.object({ name: text, date: optionalText })).min(2),
@@ -434,7 +454,7 @@ export const PASSAGES: readonly PassageSpec[] = [
       collection(
         'leadVerdicts',
         'L',
-        '"statement": string, "lead": string (one of the user’s leads, copied exactly), "verdict": "relevant" | "partlyRelevant" | "notRelevant", "reasons": string',
+        '"statement": string, "lead": number (the number of one of the user’s leads), "verdict": "relevant" | "partlyRelevant" | "notRelevant", "reasons": string',
         leadVerdictFields
       ),
       collection(
@@ -452,7 +472,7 @@ export const PASSAGES: readonly PassageSpec[] = [
       collection(
         'analogues',
         'B',
-        '"statement": string, "breakthrough": string, "domain"?: string, "date"?: string, "components": [{ "name": string, "date"?: string }] (the earlier techniques it assembled), "liftedConstraint": string, "capability": string (what opened), "pattern": string (the assembly pattern)',
+        '"statement": string, "breakthrough": string, "named"?: number (the number of the breakthrough in the charter, when it is one of them), "domain"?: string, "date"?: string, "components": [{ "name": string, "date"?: string }] (the earlier techniques it assembled), "liftedConstraint": string, "capability": string (what opened), "pattern": string (the assembly pattern)',
         analogueFields
       ),
     ],
@@ -513,7 +533,7 @@ export const PASSAGES: readonly PassageSpec[] = [
       collection(
         'architectures',
         'A',
-        '"statement": string, "name": string, "kind": "capability" | "improvement", "capability": { "what": string, "forWhom": string, "liftedConstraint": string }, "principleChange": { "principle": "representation" | "distribution" | "responsibility" | "trust" | "verification" | "other", "change": string } (required for a capability), "mechanism": string (how the assembly produces the capability), "components": [{ "name": string, "statement": string, "date"?: string, "status": "established" | "hypothesis", "sources": [string] }] (prior techniques), "assembly": [{ "component": string, "gives": string, "exchanges": string, "cost": string }], "conditions": string, "benefit": string, "addedCost": string, "counterexample": string, "chain": [{ "stage": string, "how": string }] (every stage of the whole chain), "predictions": [string]',
+        '"statement": string, "name": string, "kind": "capability" | "improvement", "capability": { "what": string, "forWhom": string, "liftedConstraint": string }, "principleChange": { "principle": "representation" | "distribution" | "responsibility" | "trust" | "verification" | "other", "change": string } (required for a capability), "mechanism": string (how the assembly produces the capability), "components": [{ "name": string, "statement": string, "date"?: string, "status": "established" | "hypothesis", "sources": [string], "from": [string] (ids of the records above it comes from: advances, independent leads, references, breakthroughs, revisable decisions, combinations, capabilities) }] (prior techniques), "assembly": [{ "component": string, "gives": string, "exchanges": string, "cost": string, "from": [string] (ids of the records it comes from) }], "conditions": string, "benefit": string, "addedCost": string, "counterexample": string, "chain": [{ "stage": string, "how": string }] (every stage of the whole chain), "predictions": [string]',
         architectureFields,
         2
       ),
@@ -537,6 +557,7 @@ export const PASSAGES: readonly PassageSpec[] = [
       'chain',
       'historicalChoices',
       'advances',
+      'independentLeads',
       'references',
       'analogues',
       'constraints',

@@ -22,11 +22,51 @@ export type StudyPassage =
  */
 export type StudyClaimStatus = 'established' | 'hypothesis' | 'novelty';
 
+/**
+ * Why the study set a status, removed an item or refused an amendment: a code the dossier
+ * renders in the study's language (`studyLabels(language).reasons`), its parameters, and the
+ * same reason in English. A reason the guardian or the model wrote is `judged`, its text in
+ * `params.text`.
+ */
+export interface StudyReason {
+  code: StudyReasonCode;
+  params?: Record<string, string>;
+  /** The reason in English. */
+  message: string;
+}
+
+export type StudyReasonCode =
+  | 'judged'
+  | 'noSourceConfigured'
+  | 'citesUnlisted'
+  | 'citesNothing'
+  | 'noveltyNotSearchedYet'
+  | 'noveltyNoSource'
+  | 'noveltySearchBudget'
+  | 'noveltyNotSearched'
+  | 'noveltySearchFailed'
+  | 'noveltyNoResult'
+  | 'noveltyNotAssessed'
+  | 'noveltyUnsupported'
+  | 'priorArtExists'
+  | 'componentDocumented'
+  | 'componentUndocumented'
+  | 'noServesObjective'
+  | 'invalidItem'
+  | 'notAnObject'
+  | 'notAUserLead'
+  | 'leadAlreadyJudged'
+  | 'designWithoutCapability'
+  | 'amendmentUnclassified'
+  | 'amendmentCancelled'
+  | 'amendmentTimedOut'
+  | 'amendmentPolicy';
+
 /** What the closest existing work says of a novelty, after a search for prior art. */
 export interface StudyPriorArt {
   /** The closest existing work found, or why none is close. */
   closest: string;
-  /** Results retrieved by the prior-art search that show it. */
+  /** Results of this claim's own prior-art searches that show it: at least one. */
   sources: string[];
   /** `exists`: the idea is already done, so it is not a novelty. */
   verdict: 'novel' | 'partlyNovel' | 'exists';
@@ -45,18 +85,22 @@ export interface StudyClaim {
   /** The status the model gave, when the study changed it. */
   declaredStatus?: StudyClaimStatus;
   /** Why the status was changed, or why a novelty is still to verify. */
-  statusReason?: string;
-  /** Ids of results retrieved in this study that support it (`S1`…). */
+  statusReason?: StudyReason;
+  /** Ids of the results listed in the prompt that wrote it, which support it (`S1`…). */
   sources: string[];
-  /** Ids the model cited that this study never retrieved: they support nothing. */
-  unretrievedSources?: string[];
+  /** Ids it cited that its prompt did not list: they support nothing. */
+  unlistedSources?: string[];
   /** Which part of the objective, or which need, it serves, in one sentence. */
   servesObjective: string;
   /** A novelty whose prior art was not searched and assessed yet. */
   toVerify?: boolean;
   /** The prior art found for a novelty. */
   priorArt?: StudyPriorArt;
-  /** The guardian has not judged it yet (the run stopped first). */
+  /**
+   * The guardian has not judged it (the run stopped first, or the guardian gave it no valid
+   * verdict). It stays in the report, flagged, and never reaches a later prompt; the next run
+   * has the guardian judge it first.
+   */
   unchecked?: boolean;
   /** The run that produced it. */
   runId: string;
@@ -181,19 +225,34 @@ export type StudyPrinciple =
  * A prior technique an architecture assembles. Its status is checked in code like any claim's,
  * and a component cannot be a novelty: the novelty of a proposal lies in its assembly.
  */
-export interface StudyComponent {
+export interface StudyComponent extends StudyTrace {
   name: string;
   statement: string;
   date?: string;
   status: StudyClaimStatus;
   declaredStatus?: StudyClaimStatus;
-  statusReason?: string;
+  statusReason?: StudyReason;
   sources: string[];
-  unretrievedSources?: string[];
+  unlistedSources?: string[];
+}
+
+/**
+ * The records of the investigation a part of a design comes from: advances (`V`), independent
+ * leads (`I`), references (`R`), breakthroughs (`B`), revisable decisions (`D`), combinations
+ * (`X`) and candidate capabilities (`Y`), as the design's prompt listed them. Checked in code:
+ * a part that cites none of them is `untraced`, flagged in the report, not trusted.
+ */
+export interface StudyTrace {
+  /** Ids of the records it comes from, among those its prompt listed. */
+  from: string[];
+  /** Ids it cited that its prompt did not list. */
+  unknownFrom?: string[];
+  /** It cites no record of the investigation its prompt listed. */
+  untraced?: boolean;
 }
 
 /** What one component of an assembly gives the others, exchanges with them, and costs. */
-export interface StudyAssemblyLink {
+export interface StudyAssemblyLink extends StudyTrace {
   component: string;
   gives: string;
   exchanges: string;
@@ -226,6 +285,8 @@ export interface StudyArchitecture extends StudyClaim {
   kind: 'capability' | 'improvement';
   /** The kind the model gave, when the guardian judged it only an improvement. */
   declaredKind?: 'capability';
+  /** Why the guardian judged it only an improvement (faster or cheaper). */
+  kindReason?: StudyReason;
   capability: StudyCapabilityTarget;
   /** The principle that changes (required for a capability). */
   principleChange?: { principle: StudyPrinciple; change: string };
@@ -260,6 +321,8 @@ export interface StudyCapability extends StudyClaim {
  */
 export interface StudyAnalogue extends StudyClaim {
   breakthrough: string;
+  /** The number of the breakthrough it deconstructs among the charter's `analogues`. */
+  named?: number;
   domain?: string;
   date?: string;
   /** The earlier techniques it assembled, with their dates. */
@@ -354,7 +417,7 @@ export interface StudyDriftEntry {
   collection: string;
   /** The item as the model gave it. */
   item: { id?: string; statement?: string; servesObjective?: string };
-  reason: string;
+  reason: StudyReason;
   /** `guardian`: judged off the objective; `schema`: refused before (no `servesObjective`…). */
   by: 'guardian' | 'schema';
   /** 2 when the passage was redone. */
@@ -374,7 +437,7 @@ export interface StudyAmendment {
   text: string;
   verdict: StudyAmendmentVerdict;
   accepted: boolean;
-  reason: string;
+  reason: StudyReason;
   /** The run that recorded its classification. */
   runId: string;
 }
@@ -469,8 +532,20 @@ export interface StudyRunOptions {
    * with `agent.run`: a promise it returns is awaited before its next event.
    */
   onEvent?: LiveEventListener;
-  /** Runs every passage again, instead of resuming at the first one not complete. */
+  /**
+   * Starts the study over: its passages, results, searches, drift log and numbers are cleared
+   * (its charter and amendments stay). Without it, a run resumes where the last one stopped:
+   * the guardian first judges what it had not judged, then the passages not complete run.
+   */
   restart?: boolean;
+}
+
+/** How long an amendment's classification may take, and a signal to cancel it. */
+export interface StudyAmendOptions {
+  /** Cancels the classification: the amendment is then refused (`amendmentCancelled`). */
+  signal?: AbortSignal;
+  /** Longest wait, in milliseconds (default 60 000): past it, the amendment is refused. */
+  timeoutMs?: number;
 }
 
 /**
@@ -505,15 +580,25 @@ export type StudyNoticeCode =
   | 'searchesSkipped'
   | 'leadsNotVerified'
   | 'analoguesNotDeconstructed'
+  | 'noDesign'
   | 'noCapability'
+  | 'minimumsNotMet'
+  | 'untracedAssembly'
   | 'noveltiesToVerify';
 
-/** What the reader must know before reading the dossier. */
+/**
+ * What the reader must know before reading the dossier: a code the dossier renders in the
+ * study's language (`studyLabels(language).noticeTexts`), with its parameters and details, and
+ * the same notice in English.
+ */
 export interface StudyNotice {
   code: StudyNoticeCode;
-  message: string;
-  /** The passages, leads or limit concerned. */
+  /** Values the notice names: `limit`, `error`, `count`. */
+  params?: Record<string, string>;
+  /** The passages, collections, leads or breakthroughs concerned. */
   details?: string[];
+  /** The notice in English. */
+  message: string;
 }
 
 /** For each piece, the object at its time, the best current realisations and our proposal. */
@@ -524,9 +609,17 @@ export interface StudyPieceStates {
   proposal: StudyThreeState[];
 }
 
+/**
+ * The numbers of a study since its last `restart`. Amendments are classified in runs of their
+ * own: they are counted apart, in `amendments`.
+ */
 export interface StudyStats {
+  /** Runs of `run()`. */
   runs: number;
+  /** Model calls the vendor answered in those runs (repairs and checks included). */
   modelCalls: number;
+  /** Amendments classified, and the model calls the vendor answered for them. */
+  amendments: { count: number; modelCalls: number };
   searches: number;
   searchesSkipped: number;
   results: number;

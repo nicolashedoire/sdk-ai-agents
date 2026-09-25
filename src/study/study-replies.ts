@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import { extractJsonObject } from '../cognition/llm-thought-generator.js';
 import { claimStatus, type PassageSpec, resultIds, type StudyCollection } from './passages.js';
+import { studyReason } from './study-labels.js';
 import type {
   StudyAmendmentVerdict,
   StudyClaimStatus,
   StudyPassage,
   StudyPriorArt,
+  StudyReason,
 } from './study-types.js';
 
 /** A reply read, or why it cannot be used (the model is then asked once to repair it). */
@@ -25,7 +27,7 @@ export interface ProposedItem {
 export interface RefusedItem {
   collection: StudyCollection;
   item: { statement?: string; servesObjective?: string };
-  reason: string;
+  reason: StudyReason;
 }
 
 export interface ReopenRequest {
@@ -38,8 +40,6 @@ export interface PassageReply {
   items: ProposedItem[];
   refused: RefusedItem[];
   reopen?: ReopenRequest;
-  /** The user's leads the reply gave no verdict on (accepted on the last attempt only). */
-  leadsWithoutVerdict: string[];
 }
 
 const text = z.string().trim().min(1);
@@ -48,23 +48,24 @@ const claimSchema = z.object({
   statement: text,
   status: claimStatus,
   sources: resultIds,
-  servesObjective: z
-    .string({
-      required_error: 'no "servesObjective": the item does not say what it serves in the objective',
-      invalid_type_error: '"servesObjective" must say in one sentence what the item serves',
-    })
-    .trim()
-    .min(1, '"servesObjective" is empty: the item does not say what it serves in the objective'),
+  servesObjective: text,
 });
 
 /** What a passage's reply is read against. */
 export interface PassageReplyContext {
   leads: readonly string[];
+  /** Leads that already have a verdict: a reopened passage does not judge them again. */
+  judgedLeads?: readonly string[];
   /** Breakthroughs the charter names, to deconstruct in `changes`. */
   analogues: readonly string[];
   reopenable: StudyPassage[];
   /** Items a collection needs in this study, when it differs from the passage's own. */
   minimums?: Partial<Record<StudyCollection, number>>;
+  /**
+   * A passage reopened on one unknown adds only what that unknown needs: it has no minimum,
+   * owes no verdict on the leads and no breakthrough.
+   */
+  reopened?: boolean;
   final: boolean;
 }
 
@@ -85,6 +86,7 @@ export function parsePassageReply(
 
   const items: ProposedItem[] = [];
   const refused: RefusedItem[] = [];
+  const judged = new Set((context.judgedLeads ?? []).map(leadKey));
   for (const collection of spec.collections) {
     const entries = json[collection.key] ?? [];
     if (!Array.isArray(entries)) {
@@ -92,17 +94,17 @@ export function parsePassageReply(
     }
     const before = items.length;
     for (const entry of entries) {
-      const read = readItem(collection.key, collection.fields, entry, context.leads);
+      const read = readItem(collection.key, collection.fields, entry, context, judged);
       if ('reason' in read) refused.push(read);
       else items.push(read);
     }
     const valid = items.length - before;
-    const min = context.minimums?.[collection.key] ?? collection.min;
+    const min = context.reopened ? 0 : (context.minimums?.[collection.key] ?? collection.min);
     if (valid < min) {
       const why = refused
         .filter((item) => item.collection === collection.key)
         .slice(0, 3)
-        .map((item) => item.reason);
+        .map((item) => item.reason.message);
       return {
         ok: false,
         error: `"${collection.key}" needs at least ${min} valid item(s), got ${valid}${why.length > 0 ? ` (${why.join('; ')})` : ''}`,
@@ -110,47 +112,36 @@ export function parsePassageReply(
     }
   }
 
-  const judged = new Set(
-    items
-      .filter((item) => item.collection === 'leadVerdicts')
-      .map((item) => leadKey(String(item.fields.lead)))
-  );
-  const leadsWithoutVerdict =
-    spec.passage === 'changes' ? context.leads.filter((lead) => !judged.has(leadKey(lead))) : [];
-  if (leadsWithoutVerdict.length > 0 && !context.final) {
-    return {
-      ok: false,
-      error: `"leadVerdicts" must judge every one of the user's leads; missing: ${leadsWithoutVerdict.join(', ')}`,
-    };
-  }
-
-  if (spec.passage === 'changes' && !context.final) {
-    const deconstructed = items
-      .filter((item) => item.collection === 'analogues')
-      .map((item) => String(item.fields.breakthrough));
-    const missing = context.analogues.filter(
-      (named) => !deconstructed.some((breakthrough) => deconstructs(breakthrough, named))
-    );
+  if (spec.passage === 'changes' && !context.final && !context.reopened) {
+    const missing = context.leads.filter((lead) => !judged.has(leadKey(lead)));
     if (missing.length > 0) {
       return {
         ok: false,
-        error: `"analogues" must deconstruct every breakthrough the charter names; missing: ${missing.join(', ')}`,
+        error: `"leadVerdicts" must judge every one of the user's leads; missing: ${missing.join(', ')}`,
+      };
+    }
+    const analogues = items.filter((item) => item.collection === 'analogues');
+    const undone = context.analogues.filter(
+      (named, index) => !analogues.some((item) => deconstructsNamed(item.fields, named, index))
+    );
+    if (undone.length > 0) {
+      return {
+        ok: false,
+        error: `"analogues" must deconstruct every breakthrough the charter names; missing: ${undone.join(', ')}`,
       };
     }
   }
 
   const reopen = readReopen(json.reopen, context.reopenable);
-  return {
-    ok: true,
-    value: { items, refused, leadsWithoutVerdict, ...(reopen ? { reopen } : {}) },
-  };
+  return { ok: true, value: { items, refused, ...(reopen ? { reopen } : {}) } };
 }
 
 function readItem(
   collection: StudyCollection,
   fields: PassageSpec['collections'][number]['fields'],
   entry: unknown,
-  leads: readonly string[]
+  context: PassageReplyContext,
+  judgedLeads: Set<string>
 ): ProposedItem | RefusedItem {
   const shown = isRecord(entry)
     ? {
@@ -160,7 +151,7 @@ function readItem(
           : {}),
       }
     : {};
-  if (!isRecord(entry)) return { collection, item: shown, reason: 'not a JSON object' };
+  if (!isRecord(entry)) return { collection, item: shown, reason: studyReason('notAnObject') };
   const claim = claimSchema.safeParse(entry);
   if (!claim.success) return { collection, item: shown, reason: issueOf(claim.error) };
   const own = fields.safeParse(entry);
@@ -168,16 +159,25 @@ function readItem(
 
   const itemFields = own.data;
   if (collection === 'leadVerdicts') {
-    // A verdict names one of the user's leads as the charter writes it.
-    const lead = leads.find((candidate) => leadKey(candidate) === leadKey(String(itemFields.lead)));
+    // A verdict names one of the user's leads, by its number or its text, and the study
+    // writes it back as the charter does; a lead gets one verdict.
+    const lead = leadOf(String(itemFields.lead), context.leads);
     if (!lead) {
       return {
         collection,
         item: shown,
-        reason: `"${String(itemFields.lead)}" is not one of the user's leads (a tool found beyond them is an independent lead)`,
+        reason: studyReason('notAUserLead', { lead: String(itemFields.lead) }),
       };
     }
+    if (judgedLeads.has(leadKey(lead))) {
+      return { collection, item: shown, reason: studyReason('leadAlreadyJudged', { lead }) };
+    }
+    judgedLeads.add(leadKey(lead));
     itemFields.lead = lead;
+  }
+  if (collection === 'analogues' && typeof itemFields.named === 'number') {
+    // A number that names no breakthrough of the charter names none.
+    if (!context.analogues[itemFields.named - 1]) itemFields.named = undefined;
   }
   return {
     collection,
@@ -187,6 +187,13 @@ function readItem(
     servesObjective: claim.data.servesObjective,
     fields: itemFields,
   };
+}
+
+/** The charter's lead a verdict names: its number (from 1), or its text. */
+function leadOf(named: string, leads: readonly string[]): string | undefined {
+  const number = /^\d+$/.test(named.trim()) ? Number(named) : undefined;
+  if (number !== undefined) return leads[number - 1];
+  return leads.find((lead) => leadKey(lead) === leadKey(named));
 }
 
 function readReopen(value: unknown, reopenable: StudyPassage[]): ReopenRequest | undefined {
@@ -208,11 +215,14 @@ export interface GuardianVerdict {
   reason: string;
   /** For an architecture: it makes possible something difficult today, not only faster. */
   newCapability?: boolean;
+  /** Why an architecture is, or is not, a new capability. */
+  capabilityReason?: string;
 }
 
 /**
- * Reads the guardian's verdicts. Before the last attempt, every item must have one; after it,
- * an item without a verdict is kept.
+ * Reads the guardian's verdicts: only a verdict with the id of an item shown and a boolean
+ * `onObjective` counts. Before the last attempt every item must have one; after it, an item
+ * without a valid verdict is left out of the map, and stays unchecked (never taken as judged).
  */
 export function parseGuardianReply(
   reply: string,
@@ -232,15 +242,21 @@ export function parseGuardianReply(
     if (onObjective === undefined) continue;
     const reason = typeof entry.reason === 'string' ? entry.reason.trim() : '';
     const newCapability = readBoolean(entry.newCapability);
+    const capabilityReason =
+      typeof entry.capabilityReason === 'string' ? entry.capabilityReason.trim() : '';
     verdicts.set(id, {
       onObjective,
       reason: reason || (onObjective ? 'on the objective' : 'judged off the objective'),
       ...(newCapability !== undefined ? { newCapability } : {}),
+      ...(capabilityReason ? { capabilityReason } : {}),
     });
   }
   const missing = ids.filter((id) => !verdicts.has(id));
   if (missing.length > 0 && !final) {
-    return { ok: false, error: `give a verdict for every item; missing: ${missing.join(', ')}` };
+    return {
+      ok: false,
+      error: `give a valid verdict (a boolean "onObjective") for every item; missing: ${missing.join(', ')}`,
+    };
   }
   return { ok: true, value: verdicts };
 }
@@ -368,17 +384,29 @@ export function deconstructs(breakthrough: string, named: string): boolean {
   return leadKey(breakthrough).includes(leadKey(named));
 }
 
+/**
+ * Whether an analogue deconstructs the charter's breakthrough `named` (at `index`): by its
+ * number, which holds in any language, or by its name.
+ */
+export function deconstructsNamed(
+  analogue: { breakthrough?: unknown; named?: unknown },
+  named: string,
+  index: number
+): boolean {
+  if (analogue.named === index + 1) return true;
+  return typeof analogue.breakthrough === 'string' && deconstructs(analogue.breakthrough, named);
+}
+
 /** How leads are matched: case, accents and spacing aside. */
 function leadKey(lead: string): string {
   return lead.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
-function issueOf(error: z.ZodError): string {
+function issueOf(error: z.ZodError): StudyReason {
   const issue = error.issues[0];
-  if (!issue) return 'invalid item';
-  // The message of a missing `servesObjective` already says what is wrong.
-  if (issue.path[0] === 'servesObjective') return issue.message;
-  return `${issue.path.join('.') || 'item'}: ${issue.message}`;
+  if (issue?.path[0] === 'servesObjective') return studyReason('noServesObjective');
+  const detail = issue ? `${issue.path.join('.') || 'item'}: ${issue.message}` : 'item';
+  return studyReason('invalidItem', { detail });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

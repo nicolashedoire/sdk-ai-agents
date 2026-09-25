@@ -359,9 +359,11 @@ export interface SDK {
   /**
    * Creates a study: a researcher that understands an object, then proposes a redesign of it
    * with today's means, through the seven passages of the method, and designs the experiments
-   * that would decide. Its charter (object, question, objective, needs, leads, scope) is frozen
-   * and hashed. It searches only with `sources`, SDK tools already defined, run through
-   * `executeTool`. Its model calls count in `getRunCost` and in budgets per period. Throws a
+   * that would decide. Its charter (object, question, objective, needs, leads, scope, the
+   * capability aimed at and the breakthroughs to deconstruct as analogues) is frozen and
+   * hashed. It searches only with `sources`, SDK tools already defined, run through
+   * `executeTool`. Its model calls count in `getRunCost` and in budgets per period (under the
+   * study's id as `agentId`), and budget policies are checked before each step. Throws a
    * `ValidationError` for a bad configuration or a source that is not a defined tool.
    */
   createStudy(config: StudyConfig): Study;

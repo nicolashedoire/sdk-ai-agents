@@ -33,6 +33,8 @@ describe('studies aim at a new capability', () => {
   const requestsOf = (provider: ScriptedLLMProvider, channel: string) =>
     provider.requests.filter((request) => channelOf(request) === channel);
   const lastMessage = (request: LLMRequest | undefined) => request?.messages.at(-1)?.content ?? '';
+  const reason = (code: string, message?: string) =>
+    expect.objectContaining({ code, ...(message ? { message } : {}) });
 
   /** The scripted design, its architectures changed by `edit`. */
   function design(edit: (architectures: Array<Record<string, unknown>>) => unknown[]) {
@@ -54,7 +56,7 @@ describe('studies aim at a new capability', () => {
       const attempts = requestsOf(provider, 'study:design');
       expect(attempts).toHaveLength(2);
       expect(lastMessage(attempts[1])).toContain(
-        '- "The design as a whole": It offers no new capability, only improvements (faster or cheaper)'
+        '- "The design as a whole": The design offers no new capability, only improvements (faster or cheaper)'
       );
       expect(result.report.driftLog).toContainEqual(
         expect.objectContaining({
@@ -62,7 +64,7 @@ describe('studies aim at a new capability', () => {
           collection: 'architectures',
           by: 'guardian',
           attempt: 1,
-          reason: expect.stringContaining('It offers no new capability'),
+          reason: reason('designWithoutCapability'),
         })
       );
       expect(result.report.architectures.map((architecture) => architecture.kind)).toEqual([
@@ -91,7 +93,7 @@ describe('studies aim at a new capability', () => {
       expect(requestsOf(provider, 'study:design')).toHaveLength(2);
       // The guardian was asked, and saw each architecture's aim.
       const check = lastMessage(requestsOf(provider, 'study-check:design')[0]);
-      expect(check).toContain('say also with "newCapability"');
+      expect(check).toContain('"newCapability" says whether its mechanism and assembly');
       expect(check).toContain(
         '"kind":"capability","capability":{"what":"Pages whose rendering results are reused across tabs and devices"'
       );
@@ -103,7 +105,8 @@ describe('studies aim at a new capability', () => {
         expect.objectContaining({ code: 'noCapability' })
       );
       expect(result.markdown).toContain(
-        '- _declared new capability: the guardian judged it only faster or cheaper_'
+        // The guardian's reason is carried into the dossier.
+        '- _declared new capability: the guardian judged it only faster or cheaper: It only makes rendering faster_'
       );
       expect(result.markdown).toContain(
         '> - No architecture aims at a new capability: the design offers only improvements.'
@@ -150,7 +153,10 @@ describe('studies aim at a new capability', () => {
       expect(report.driftLog).toContainEqual(
         expect.objectContaining({
           by: 'schema',
-          reason: 'principleChange: a capability states the principle it changes',
+          reason: reason(
+            'invalidItem',
+            'Invalid item (principleChange: a capability states the principle it changes).'
+          ),
         })
       );
     });
@@ -213,6 +219,7 @@ describe('studies aim at a new capability', () => {
               statement: 'Layout produces immutable fragments',
               status: 'established',
               sources: ['S2'],
+              from: ['V1'],
             },
             {
               name: 'Content addressing',
@@ -252,6 +259,7 @@ describe('studies aim at a new capability', () => {
           statement: 'Layout produces immutable fragments',
           status: 'established',
           sources: ['S2'],
+          from: ['V1'],
         },
         {
           name: 'Content addressing',
@@ -259,14 +267,22 @@ describe('studies aim at a new capability', () => {
           status: 'hypothesis',
           declaredStatus: 'novelty',
           sources: [],
-          statusReason:
-            'Presented as new without a retrieved source: a component is a prior technique, and this one stays a hypothesis.',
+          from: [],
+          untraced: true,
+          statusReason: {
+            code: 'componentUndocumented',
+            message:
+              'Presented as new without a listed source: a component is a prior technique, and this one stays a hypothesis.',
+          },
         },
       ]);
       expect(shared).toMatchObject({
         status: 'novelty',
         toVerify: true,
-        statusReason: 'Novelty to verify: no prior-art search was run for it.',
+        statusReason: reason(
+          'noveltyNotSearched',
+          'Novelty to verify: no prior-art search was asked for it.'
+        ),
       });
       // The prior-art search was offered the assembly as a combination.
       expect(lastMessage(requestsOf(provider, 'study-prior-art-queries:design')[0])).toContain(
@@ -353,7 +369,7 @@ describe('studies aim at a new capability', () => {
       });
       expect(report.analogues[1]).toMatchObject({
         declaredStatus: 'established',
-        unretrievedSources: ['S42'],
+        unlistedSources: ['S42'],
       });
       expect(report.undeconstructedAnalogues).toEqual([]);
       expect(lastMessage(requestsOf(provider, 'study:design')[0])).toContain(

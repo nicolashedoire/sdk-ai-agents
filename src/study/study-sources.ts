@@ -128,17 +128,21 @@ const EXCERPT_KEYS = [
 
 /**
  * The results in what a search tool returned, whatever its shape: a list of results, an object
- * holding one (`results`, `items`, `web.results`…), JSON text, MCP text parts, or plain text
- * (one result). Each keeps a title, a URL or other locator, a date when given, and an excerpt.
+ * holding one (`results`, `items`, `web.results`…), JSON text, MCP text parts, text in blocks
+ * of `Title:`, `Description:` and `URL:` lines (one result per block, as MCP search servers
+ * write them), or plain text (one result). Each keeps a title, a URL or other locator, a date
+ * when given, and an excerpt, on one line each: a result is data, never layout.
  */
 export function readResults(output: unknown, depth = 0): FoundResult[] {
   if (depth > 4) return [];
   if (typeof output === 'string') {
     const parsed = parseJson(output);
     if (parsed !== undefined) return readResults(parsed, depth + 1);
+    const blocks = labelledBlocks(output);
+    if (blocks.length > 0) return blocks.flatMap((block) => readRecord(block, depth));
     const content = output.trim();
     return content
-      ? [{ title: truncate(firstLine(content), 200), excerpt: excerptOf(content) }]
+      ? [{ title: oneLine(firstLine(content), 200), excerpt: excerptOf(content) }]
       : [];
   }
   if (Array.isArray(output)) {
@@ -174,12 +178,60 @@ function readRecord(record: Record<string, unknown>, depth: number): FoundResult
   if (!title && !locator && !excerpt) return [];
   return [
     {
-      title: truncate(title ?? locator ?? firstLine(excerpt ?? ''), 200),
-      ...(locator ? { locator: truncate(locator, 500) } : {}),
-      ...(date ? { date: truncate(date, 40) } : {}),
+      title: oneLine(title ?? locator ?? firstLine(excerpt ?? ''), 200),
+      ...(locator ? { locator: oneLine(locator, 500) } : {}),
+      ...(date ? { date: oneLine(date, 40) } : {}),
       excerpt: excerptOf(excerpt ?? ''),
     },
   ];
+}
+
+/** A line like `Title: …` or `URL: …`: a known field name, then its value. */
+const FIELD_LINE = /^\s*([A-Za-z][A-Za-z ]{0,20}?)\s*:\s*(.*)$/;
+const FIELD_NAMES = new Map<string, string>([
+  ...[...TITLE_KEYS, ...LOCATOR_KEYS, ...DATE_KEYS, ...EXCERPT_KEYS].map(
+    (key) => [key.toLowerCase(), key] as [string, string]
+  ),
+  ['source', 'url'],
+  ['published date', 'date'],
+  ['page age', 'date'],
+]);
+
+/**
+ * The results of a text written as blocks of labelled lines, separated by blank lines (or by a
+ * new `Title:` line), as MCP search servers often return them. None when the text is not so.
+ */
+function labelledBlocks(text: string): Array<Record<string, unknown>> {
+  const blocks: Array<Record<string, unknown>> = [];
+  let current: Record<string, unknown> | undefined;
+  let lastField: string | undefined;
+  for (const line of text.split(/\r?\n/)) {
+    if (line.trim() === '') {
+      current = undefined;
+      continue;
+    }
+    const match = FIELD_LINE.exec(line);
+    const field = match?.[1] ? FIELD_NAMES.get(match[1].trim().toLowerCase()) : undefined;
+    if (!field) {
+      // A line that continues the value of the field before it.
+      if (current && lastField) current[lastField] = `${String(current[lastField])} ${line.trim()}`;
+      continue;
+    }
+    if (!current || (TITLE_KEYS.includes(field) && current[field] !== undefined)) {
+      current = {};
+      blocks.push(current);
+    }
+    current[field] = match?.[2]?.trim() ?? '';
+    lastField = field;
+  }
+  // Blocks that name a result: a title with a locator or an excerpt.
+  const results = blocks.filter(
+    (block) =>
+      firstString(block, TITLE_KEYS) !== undefined &&
+      (firstString(block, LOCATOR_KEYS) !== undefined ||
+        firstString(block, EXCERPT_KEYS) !== undefined)
+  );
+  return results;
 }
 
 /**
@@ -236,7 +288,12 @@ function firstString(record: Record<string, unknown>, keys: string[]): string | 
 }
 
 function excerptOf(text: string): string {
-  return truncate(text.replace(/\s+/g, ' ').trim(), 600);
+  return oneLine(text, 600);
+}
+
+/** Text on one line, whitespace collapsed, at most `max` characters. */
+function oneLine(text: string, max: number): string {
+  return truncate(text.replace(/\s+/g, ' ').trim(), max);
 }
 
 function firstLine(text: string): string {

@@ -262,6 +262,7 @@ export function eventSubject(event: Event): string {
     case 'study.passage_completed':
     case 'study.search':
     case 'study.drift_rejected':
+    case 'study.capability_demoted':
       return stringField(data, 'passage') ?? '';
     case 'study.model_called':
       return [stringField(data, 'purpose'), stringField(data, 'passage')].filter(Boolean).join(':');

@@ -178,8 +178,8 @@ export type {
 } from './cognition/thinker-profile.js';
 
 // Studies: understand an object, then redesign it with today's means
-export { Study } from './study/study.js';
-export type { StudyEnvironment } from './study/study.js';
+// `Study` is created by `sdk.createStudy`; the environment it is built with is internal.
+export { MAX_AMENDMENTS, MAX_AMENDMENT_LENGTH, Study } from './study/study.js';
 export { DEFAULT_STUDY_LIMITS, DEFAULT_DRIFT_THRESHOLD } from './study/study-config.js';
 export { renderStudyMarkdown } from './study/study-markdown.js';
 export { studyLabels } from './study/study-labels.js';
@@ -189,6 +189,7 @@ export type {
   StudyAdvance,
   StudyAmendment,
   StudyAmendmentVerdict,
+  StudyAmendOptions,
   StudyAnalogue,
   StudyArchitecture,
   StudyAssemblyLink,
@@ -220,6 +221,8 @@ export type {
   StudyPieceStates,
   StudyPrinciple,
   StudyPriorArt,
+  StudyReason,
+  StudyReasonCode,
   StudyReference,
   StudyReport,
   StudyResult,
@@ -231,6 +234,7 @@ export type {
   StudyStatus,
   StudyStopReason,
   StudyThreeState,
+  StudyTrace,
 } from './study/study-types.js';
 
 // Typed decisions (TypeSafe Jev and compatible backends)

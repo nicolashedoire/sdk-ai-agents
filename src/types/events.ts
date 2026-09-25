@@ -47,6 +47,7 @@ export type EventType =
   | 'study.search'
   | 'study.model_called'
   | 'study.drift_rejected'
+  | 'study.capability_demoted'
   | 'study.amendment_accepted'
   | 'study.amendment_refused'
   | 'study.result_recorded'

@@ -59,11 +59,19 @@ export class StudyRun {
   readonly abort = new AbortController();
   readonly meter: CognitiveRunMeter;
   timedOut = false;
+  /** Model calls admitted (`maxModelCalls` counts them). */
   modelCalls = 0;
+  /** Model calls the vendor answered (what the report and the run's events count). */
+  answered = 0;
+  /** Searches run (`maxSearches` counts them), and searches skipped once it was spent. */
   searches = 0;
+  skipped = 0;
   loops = 0;
   redos = 0;
-  /** Passages performed, reopenings and redos included: the steps budget policies see. */
+  /**
+   * Steps admitted by the budget policies: each passage performed, reopenings, redos and the
+   * guardian's check of what a stopped run left unjudged included.
+   */
   steps = 0;
   /** Passages that wanted to search once `maxSearches` was spent. */
   readonly unsearched = new Set<StudyPassage>();

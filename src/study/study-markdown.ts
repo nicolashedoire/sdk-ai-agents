@@ -1,11 +1,14 @@
 import { PASSAGES } from './passages.js';
-import { type StudyLabels, studyLabels } from './study-labels.js';
+import { fillLabel, type StudyLabels, studyLabels } from './study-labels.js';
 import type {
   MechanismCard,
   StudyClaim,
   StudyNotice,
   StudyPassage,
+  StudyReason,
   StudyReport,
+  StudyStopReason,
+  StudyTrace,
 } from './study-types.js';
 
 /**
@@ -41,7 +44,7 @@ export function renderStudyMarkdown(report: StudyReport): string {
       out.line(
         amendment.accepted
           ? `${amendment.number}. ${inline(amendment.text)} — _${verdict}_`
-          : `- ~~${inline(amendment.text)}~~ — _${l.refused}, ${verdict}_${l.sep}${inline(amendment.reason)}`
+          : `- ~~${inline(amendment.text)}~~ — _${l.refused}, ${verdict}_${l.sep}${inline(reasonText(amendment.reason, l))}${amendment.verdict === 'changesObjective' ? ` ${inline(l.newObjectiveNewStudy)}` : ''}`
       );
     }
     out.line('');
@@ -49,7 +52,7 @@ export function renderStudyMarkdown(report: StudyReport): string {
 
   if (report.notices.length > 0) {
     out.line(`## ${l.notices}`, '');
-    for (const notice of report.notices) out.line(`> - ${noticeText(notice, report, l)}`);
+    for (const notice of report.notices) out.line(`> - ${noticeText(notice, l)}`);
     out.line('');
   }
 
@@ -98,24 +101,23 @@ class Writer {
     this.notes(claim, '  ');
   }
 
-  status(claim: Pick<StudyClaim, 'status' | 'sources' | 'toVerify'>): string {
+  status(claim: Pick<StudyClaim, 'status' | 'sources' | 'toVerify' | 'unlistedSources'>): string {
     const l = this.l;
     const status =
       claim.status === 'novelty' && claim.toVerify ? l.noveltyToVerify : l.statuses[claim.status];
     const sources = claim.sources.length > 0 ? ` · ${claim.sources.join(', ')}` : '';
-    return `_(${status}${sources})_`;
+    // A citation the prompt did not list supports nothing, but the reader sees it.
+    const unlisted = claim.unlistedSources?.length
+      ? ` · ${l.unlisted}${l.sep}${claim.unlistedSources.map((id) => inline(id)).join(', ')}`
+      : '';
+    return `_(${status}${sources}${unlisted})_`;
   }
 
-  notes(
-    claim: Pick<StudyClaim, 'statusReason' | 'declaredStatus' | 'priorArt' | 'unchecked'>,
-    indent: string
-  ): void {
+  notes(claim: Pick<StudyClaim, 'statusReason' | 'priorArt' | 'unchecked'>, indent: string): void {
     const l = this.l;
+    // The reason names the declared status itself ("Declared established, but…").
     if (claim.statusReason) {
-      const declared = claim.declaredStatus
-        ? `${l.declared} ${l.statuses[claim.declaredStatus]}${l.sep}`
-        : '';
-      this.lines.push(`${indent}- _${declared}${inline(claim.statusReason)}_`);
+      this.lines.push(`${indent}- _${inline(reasonText(claim.statusReason, l))}_`);
     }
     if (claim.priorArt) {
       const { priorArt } = claim;
@@ -125,6 +127,19 @@ class Writer {
       );
     }
     if (claim.unchecked) this.lines.push(`${indent}- _${l.unchecked}_`);
+  }
+
+  /** Where a part of a design comes from, or that it comes from nothing listed. */
+  trace(part: StudyTrace, indent: string): void {
+    const l = this.l;
+    if (part.from.length > 0) {
+      this.lines.push(`${indent}- _${l.traceFrom}${l.sep}${part.from.join(', ')}_`);
+    }
+    if (part.unknownFrom?.length) {
+      const ids = part.unknownFrom.map((id) => inline(id)).join(', ');
+      this.lines.push(`${indent}- _${l.unknownFrom}${l.sep}${ids}_`);
+    }
+    if (part.untraced) this.lines.push(`${indent}- **${l.untraced}**`);
   }
 
   heading(level: number, text: string): void {
@@ -299,8 +314,9 @@ function designSection(out: Writer, report: StudyReport, l: StudyLabels): void {
     out.line(inline(architecture.statement), '');
     out.notes(architecture, '');
     if (architecture.declaredKind) {
+      const why = architecture.kindReason ? inline(reasonText(architecture.kindReason, l)) : '';
       out.line(
-        `- _${l.declared} ${l.architectureKinds[architecture.declaredKind]}${l.sep}${l.judgedImprovement}_`
+        `- _${l.declared} ${l.architectureKinds[architecture.declaredKind]}${l.sep}${fillLabel(l.judgedImprovement, { reason: why })}_`
       );
     }
     const { capability } = architecture;
@@ -320,11 +336,13 @@ function designSection(out: Writer, report: StudyReport, l: StudyLabels): void {
         `  - **${inline(component.name)}**${date} — ${inline(component.statement)} ${out.status(component)}`
       );
       out.notes(component, '    ');
+      out.trace(component, '    ');
     }
     for (const link of architecture.assembly) {
       out.line(
         `  - ${inline(link.component)} ${l.arrow} ${l.gives}${l.sep}${inline(link.gives)}${l.list}${l.exchange}${l.sep}${inline(link.exchanges)}${l.list}${l.cost}${l.sep}${inline(link.cost)}`
       );
+      out.trace(link, '    ');
     }
     const names = architecture.components.map((component) => inline(component.name));
     out.line(
@@ -410,7 +428,7 @@ function driftSection(out: Writer, report: StudyReport, l: StudyLabels): void {
     const id = entry.item.id ? `${entry.item.id} ` : '';
     const statement = entry.item.statement ? `“${inline(entry.item.statement)}”` : '';
     out.line(
-      `- **${l.passageNames[entry.passage]}** · ${id}${statement} — _${l.driftBy[entry.by]}_${l.sep}${inline(entry.reason)}`
+      `- **${l.passageNames[entry.passage]}** · ${id}${statement} — _${l.driftBy[entry.by]}_${l.sep}${inline(reasonText(entry.reason, l))}`
     );
   }
   out.line('');
@@ -420,8 +438,9 @@ function sourcesSection(out: Writer, report: StudyReport, l: StudyLabels): void 
   out.heading(2, l.sources);
   if (report.results.length === 0) out.line(l.noResults);
   for (const result of report.results) {
-    const title = /^https?:\/\//.test(result.locator)
-      ? `[${inline(result.title)}](${result.locator})`
+    const href = safeLink(result.locator);
+    const title = href
+      ? `[${inline(result.title)}](<${href}>)`
       : `${inline(result.title)} — ${inline(result.locator)}`;
     const date = result.date ? ` (${inline(result.date)})` : '';
     out.line(
@@ -437,43 +456,86 @@ function statsSection(out: Writer, report: StudyReport, l: StudyLabels): void {
   for (const key of Object.keys(l.stats) as Array<keyof StudyLabels['stats']>) {
     out.line(`- ${l.stats[key]}${l.sep}${stats[key]}`);
   }
+  out.line(
+    `- ${l.amendments}${l.sep}${stats.amendments.count} (${l.stats.modelCalls}${l.sep}${stats.amendments.modelCalls})`
+  );
   const statuses = (['established', 'hypothesis', 'novelty'] as const)
     .map((status) => `${l.statuses[status]} ${stats.byStatus[status]}`)
     .join(' · ');
   out.line(`- ${statuses}`);
 }
 
-/** A notice in the dossier's language, its detail in the words of the dossier. */
-function noticeText(notice: StudyNotice, report: StudyReport, l: StudyLabels): string {
-  const passageNames = (details: string[] | undefined) =>
-    (details ?? []).map((passage) => l.passageNames[passage as StudyPassage] ?? passage);
+/**
+ * A notice in the dossier's language, from its code, parameters and details alone: passages,
+ * limits and collections in the words of the dossier.
+ */
+function noticeText(notice: StudyNotice, l: StudyLabels): string {
+  const details = notice.details ?? [];
+  const passages = () =>
+    details.map((passage) => l.passageNames[passage as StudyPassage] ?? inline(passage));
   let detail: string;
   switch (notice.code) {
-    case 'stopped':
-      detail = report.stoppedBy ? l.stopReasons[report.stoppedBy] : '';
+    case 'stopped': {
+      const limit = notice.params?.limit as StudyStopReason | undefined;
+      detail = limit ? (l.stopReasons[limit] ?? inline(limit)) : '';
       break;
+    }
     case 'failed':
-      detail = inline(report.error ?? '');
+      detail = inline(notice.params?.error ?? '');
       break;
     case 'passagesNotRun':
     case 'uncheckedItems':
-      detail = passageNames(notice.details).join(l.list);
+      detail = passages().join(l.list);
       break;
     case 'searchesSkipped':
-      detail = passageNames(notice.details).join(l.list) || String(report.stats.searchesSkipped);
+      detail = passages().join(l.list) || (notice.params?.count ?? '');
+      break;
+    case 'minimumsNotMet':
+      detail = details
+        .map((entry) => {
+          const [passage, collection] = entry.split('.');
+          const passageName = l.passageNames[passage as StudyPassage] ?? passage;
+          const collectionName =
+            l.collections[collection as keyof StudyLabels['collections']] ?? collection;
+          return `${passageName} (${collectionName})`;
+        })
+        .join(l.list);
       break;
     case 'leadsNotVerified':
     case 'analoguesNotDeconstructed':
-      detail = inline((notice.details ?? []).join(l.list));
+    case 'untracedAssembly':
+      detail = inline(details.join(l.list));
       break;
     case 'noveltiesToVerify':
-      detail = String(report.stats.noveltiesToVerify);
+      detail = notice.params?.count ?? '';
       break;
     default:
       detail = '';
   }
-  return l.noticeTexts[notice.code].replace('{detail}', detail);
+  return fillLabel(l.noticeTexts[notice.code], { detail });
 }
+
+/** A reason in the dossier's language, its parameters as the study recorded them. */
+function reasonText(reason: StudyReason, l: StudyLabels): string {
+  return fillLabel(l.reasons[reason.code] ?? reason.message, reason.params);
+}
+
+/**
+ * A locator as a link target, only for an http(s) URL, written so that Markdown cannot end
+ * the link early (no space, parenthesis or angle bracket left raw).
+ */
+function safeLink(locator: string): string | undefined {
+  let url: URL;
+  try {
+    url = new URL(locator);
+  } catch {
+    return undefined;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return undefined;
+  return url.href.replace(/[()<>\s]/g, (character) => LINK_ESCAPES[character] ?? '%20');
+}
+
+const LINK_ESCAPES: Record<string, string> = { '(': '%28', ')': '%29', '<': '%3C', '>': '%3E' };
 
 /** Text from the model or the user, kept from breaking the dossier's Markdown. */
 function inline(text: string): string {

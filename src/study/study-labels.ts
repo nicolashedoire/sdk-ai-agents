@@ -6,6 +6,8 @@ import type {
   StudyPassage,
   StudyPassageState,
   StudyPrinciple,
+  StudyReason,
+  StudyReasonCode,
   StudyStats,
   StudyStopReason,
 } from './study-types.js';
@@ -150,7 +152,7 @@ export interface StudyLabels {
   via: string;
   noResults: string;
   statistics: string;
-  stats: Record<Exclude<keyof StudyStats, 'byStatus' | 'searchesSkipped'>, string>;
+  stats: Record<Exclude<keyof StudyStats, 'byStatus' | 'searchesSkipped' | 'amendments'>, string>;
   /** Appended to the guiding question when the charter names no capability. */
   capabilityQuestion: string;
   /** Appended to it when the charter names one (`{capability}`). */
@@ -176,7 +178,17 @@ export interface StudyLabels {
   /** Points from components to assembly to capability, in the reading direction. */
   arrow: string;
   architectureKinds: Record<'capability' | 'improvement', string>;
+  /** Why the guardian judged a declared capability only an improvement (`{reason}`). */
   judgedImprovement: string;
+  /** Every reason the study writes, with its parameters in braces (`{ids}`, `{lead}`…). */
+  reasons: Record<StudyReasonCode, string>;
+  traceFrom: string;
+  untraced: string;
+  unknownFrom: string;
+  unlisted: string;
+  newObjectiveNewStudy: string;
+  capabilityAimReminder: string;
+  noCapabilityReminder: string;
   none: string;
 }
 
@@ -205,6 +217,9 @@ const en: StudyLabels = {
   refused: 'refused',
   notices: 'Before reading',
   noticeTexts: {
+    noDesign: 'The design passage kept no architecture.',
+    minimumsNotMet: 'Fewer items than required once the guardian judged them, in: {detail}.',
+    untracedAssembly: 'Parts of the design cite no record of the investigation, in: {detail}.',
     analoguesNotDeconstructed: 'Breakthroughs not deconstructed: {detail}.',
     noCapability: 'No architecture aims at a new capability: the design offers only improvements.',
     noSources:
@@ -407,7 +422,51 @@ const en: StudyLabels = {
     capability: 'new capability',
     improvement: 'improvement: faster or cheaper',
   },
-  judgedImprovement: 'the guardian judged it only faster or cheaper',
+  judgedImprovement: 'the guardian judged it only faster or cheaper: {reason}',
+  reasons: {
+    judged: '{text}',
+    noSourceConfigured:
+      'Declared established, but the study has no source: nothing can be established.',
+    citesUnlisted: 'Declared established, but it cites {ids}, not listed in its prompt.',
+    citesNothing: 'Declared established, but it cites no result listed in its prompt.',
+    noveltyNotSearchedYet: 'Novelty to verify: its prior art has not been searched yet.',
+    noveltyNoSource: 'Novelty to verify: the study has no source to search its prior art.',
+    noveltySearchBudget:
+      'Novelty to verify: the search budget (maxSearches) ran out before its prior-art search.',
+    noveltyNotSearched: 'Novelty to verify: no prior-art search was asked for it.',
+    noveltySearchFailed: 'Novelty to verify: its prior-art searches failed.',
+    noveltyNoResult: 'Novelty to verify: its prior-art searches found no result.',
+    noveltyNotAssessed:
+      'Novelty to verify: its prior-art search ran, but its results were not assessed.',
+    noveltyUnsupported: 'Novelty to verify: the prior-art check cited none of its own results.',
+    priorArtExists: 'Not a novelty: {closest}',
+    componentDocumented:
+      'Presented as new, but a component is a prior technique, and a result listed in its prompt documents it: the novelty lies in the assembly.',
+    componentUndocumented:
+      'Presented as new without a listed source: a component is a prior technique, and this one stays a hypothesis.',
+    noServesObjective:
+      'No "servesObjective": the item does not say what it serves in the objective.',
+    invalidItem: 'Invalid item ({detail}).',
+    notAnObject: 'Not a JSON object.',
+    notAUserLead:
+      '"{lead}" is not one of the user’s leads (a tool found beyond them is an independent lead).',
+    leadAlreadyJudged: 'The lead "{lead}" already has a verdict.',
+    designWithoutCapability:
+      'The design offers no new capability, only improvements (faster or cheaper): it must aim at something difficult or impossible today.',
+    amendmentUnclassified:
+      'It could not be classified ({error}), so it is refused: the objective comes first.',
+    amendmentCancelled: 'Its classification was cancelled, so it is refused.',
+    amendmentTimedOut: 'Its classification took too long, so it is refused.',
+    amendmentPolicy: 'A budget policy refused its classification ({reason}), so it is refused.',
+  },
+  traceFrom: 'From',
+  untraced: 'not traced to the investigation',
+  unknownFrom: 'cites records not listed',
+  unlisted: 'also cited, not listed in its prompt',
+  newObjectiveNewStudy: 'A new objective is a new study: create one with sdk.createStudy.',
+  capabilityAimReminder: 'Capability aimed at',
+  noCapabilityReminder:
+    'none named: propose what a change of principle would make possible that is difficult today, not only faster',
   none: 'none',
 };
 
@@ -437,6 +496,10 @@ const fr: StudyLabels = {
   refused: 'refusé',
   notices: 'Avant de lire',
   noticeTexts: {
+    noDesign: 'Le passage de conception n’a gardé aucune architecture.',
+    minimumsNotMet: 'Moins d’éléments que requis une fois jugés par le gardien, dans : {detail}.',
+    untracedAssembly:
+      'Des parties de la conception ne citent aucun élément de l’enquête, dans : {detail}.',
     analoguesNotDeconstructed: 'Ruptures non déconstruites : {detail}.',
     noCapability:
       'Aucune architecture ne vise une capacité nouvelle : la conception n’offre que des améliorations.',
@@ -640,7 +703,56 @@ const fr: StudyLabels = {
     capability: 'capacité nouvelle',
     improvement: 'amélioration : plus rapide ou moins cher',
   },
-  judgedImprovement: 'le gardien l’a jugée seulement plus rapide ou moins chère',
+  judgedImprovement: 'le gardien l’a jugée seulement plus rapide ou moins chère : {reason}',
+  reasons: {
+    judged: '{text}',
+    noSourceConfigured:
+      'Déclaré établi, mais l’étude n’a aucune source : rien ne peut être établi.',
+    citesUnlisted: 'Déclaré établi, mais il cite {ids}, absent de la liste de son prompt.',
+    citesNothing: 'Déclaré établi, mais il ne cite aucun résultat de la liste de son prompt.',
+    noveltyNotSearchedYet: 'Nouveauté à vérifier : l’existant n’a pas encore été recherché.',
+    noveltyNoSource: 'Nouveauté à vérifier : l’étude n’a aucune source pour rechercher l’existant.',
+    noveltySearchBudget:
+      'Nouveauté à vérifier : le budget de recherches (maxSearches) s’est épuisé avant sa recherche de l’existant.',
+    noveltyNotSearched:
+      'Nouveauté à vérifier : aucune recherche de l’existant n’a été demandée pour elle.',
+    noveltySearchFailed: 'Nouveauté à vérifier : ses recherches de l’existant ont échoué.',
+    noveltyNoResult:
+      'Nouveauté à vérifier : ses recherches de l’existant n’ont trouvé aucun résultat.',
+    noveltyNotAssessed:
+      'Nouveauté à vérifier : sa recherche de l’existant a eu lieu, mais ses résultats n’ont pas été évalués.',
+    noveltyUnsupported:
+      'Nouveauté à vérifier : l’évaluation de l’existant ne cite aucun de ses propres résultats.',
+    priorArtExists: 'Pas une nouveauté : {closest}',
+    componentDocumented:
+      'Présenté comme nouveau, mais un composant est une technique antérieure, et un résultat de la liste de son prompt le documente : la nouveauté est dans l’assemblage.',
+    componentUndocumented:
+      'Présenté comme nouveau sans source listée : un composant est une technique antérieure, et celui-ci reste une hypothèse.',
+    noServesObjective:
+      'Pas de « servesObjective » : l’élément ne dit pas ce qu’il sert dans l’objectif.',
+    invalidItem: 'Élément invalide ({detail}).',
+    notAnObject: 'Pas un objet JSON.',
+    notAUserLead:
+      '« {lead} » n’est pas une piste de l’utilisateur (un outil trouvé au-delà est une piste indépendante).',
+    leadAlreadyJudged: 'La piste « {lead} » a déjà un verdict.',
+    designWithoutCapability:
+      'La conception n’offre aucune capacité nouvelle, seulement des améliorations (plus rapide ou moins cher) : elle doit viser quelque chose de difficile ou d’impossible aujourd’hui.',
+    amendmentUnclassified:
+      'Il n’a pas pu être classé ({error}), il est donc refusé : l’objectif passe d’abord.',
+    amendmentCancelled: 'Son classement a été annulé, il est donc refusé.',
+    amendmentTimedOut: 'Son classement a pris trop de temps, il est donc refusé.',
+    amendmentPolicy:
+      'Une politique de budget a refusé son classement ({reason}), il est donc refusé.',
+  },
+  traceFrom: 'Issu de',
+  untraced: 'non relié à l’enquête',
+  unknownFrom: 'cite des éléments hors liste',
+  unlisted: 'cite aussi, hors de la liste de son prompt',
+  newObjectiveNewStudy:
+    'Un nouvel objectif est une nouvelle étude : créez-la avec sdk.createStudy.',
+  capabilityAimReminder: 'Capacité visée',
+  noCapabilityReminder:
+    'aucune nommée : proposer ce qu’un changement de principe rendrait possible, difficile aujourd’hui, pas seulement plus rapide',
   none: 'aucun',
 };
 
@@ -669,6 +781,11 @@ const es: StudyLabels = {
   refused: 'rechazada',
   notices: 'Antes de leer',
   noticeTexts: {
+    noDesign: 'El pasaje de diseño no conservó ninguna arquitectura.',
+    minimumsNotMet:
+      'Menos elementos de los requeridos una vez juzgados por el guardián, en: {detail}.',
+    untracedAssembly:
+      'Partes del diseño no citan ningún registro de la investigación, en: {detail}.',
     analoguesNotDeconstructed: 'Rupturas no deconstruidas: {detail}.',
     noCapability: 'Ninguna arquitectura busca una nueva capacidad: el diseño solo ofrece mejoras.',
     noSources:
@@ -870,7 +987,56 @@ const es: StudyLabels = {
     capability: 'nueva capacidad',
     improvement: 'mejora: más rápido o más barato',
   },
-  judgedImprovement: 'el guardián la juzgó solo más rápida o más barata',
+  judgedImprovement: 'el guardián la juzgó solo más rápida o más barata: {reason}',
+  reasons: {
+    judged: '{text}',
+    noSourceConfigured:
+      'Declarado establecido, pero el estudio no tiene ninguna fuente: no se puede establecer nada.',
+    citesUnlisted:
+      'Declarado establecido, pero cita {ids}, que no figura en la lista de su prompt.',
+    citesNothing: 'Declarado establecido, pero no cita ningún resultado de la lista de su prompt.',
+    noveltyNotSearchedYet: 'Novedad por verificar: aún no se ha buscado lo existente.',
+    noveltyNoSource:
+      'Novedad por verificar: el estudio no tiene ninguna fuente para buscar lo existente.',
+    noveltySearchBudget:
+      'Novedad por verificar: el presupuesto de búsquedas (maxSearches) se agotó antes de su búsqueda de lo existente.',
+    noveltyNotSearched:
+      'Novedad por verificar: no se pidió ninguna búsqueda de lo existente para ella.',
+    noveltySearchFailed: 'Novedad por verificar: sus búsquedas de lo existente fallaron.',
+    noveltyNoResult:
+      'Novedad por verificar: sus búsquedas de lo existente no encontraron ningún resultado.',
+    noveltyNotAssessed:
+      'Novedad por verificar: su búsqueda de lo existente se hizo, pero sus resultados no se evaluaron.',
+    noveltyUnsupported:
+      'Novedad por verificar: la evaluación de lo existente no cita ninguno de sus propios resultados.',
+    priorArtExists: 'No es una novedad: {closest}',
+    componentDocumented:
+      'Presentado como nuevo, pero un componente es una técnica anterior, y un resultado de la lista de su prompt lo documenta: la novedad está en el ensamblaje.',
+    componentUndocumented:
+      'Presentado como nuevo sin fuente listada: un componente es una técnica anterior, y este sigue siendo una hipótesis.',
+    noServesObjective: 'Sin «servesObjective»: el elemento no dice a qué sirve en el objetivo.',
+    invalidItem: 'Elemento no válido ({detail}).',
+    notAnObject: 'No es un objeto JSON.',
+    notAUserLead:
+      '«{lead}» no es una de las pistas del usuario (una herramienta encontrada más allá es una pista independiente).',
+    leadAlreadyJudged: 'La pista «{lead}» ya tiene un veredicto.',
+    designWithoutCapability:
+      'El diseño no ofrece ninguna capacidad nueva, solo mejoras (más rápido o más barato): debe apuntar a algo difícil o imposible hoy.',
+    amendmentUnclassified:
+      'No se pudo clasificar ({error}), así que se rechaza: el objetivo es lo primero.',
+    amendmentCancelled: 'Su clasificación se canceló, así que se rechaza.',
+    amendmentTimedOut: 'Su clasificación tardó demasiado, así que se rechaza.',
+    amendmentPolicy:
+      'Una política de presupuesto rechazó su clasificación ({reason}), así que se rechaza.',
+  },
+  traceFrom: 'Procede de',
+  untraced: 'no vinculado a la investigación',
+  unknownFrom: 'cita registros fuera de la lista',
+  unlisted: 'también cita, fuera de la lista de su prompt',
+  newObjectiveNewStudy: 'Un objetivo nuevo es un estudio nuevo: créelo con sdk.createStudy.',
+  capabilityAimReminder: 'Capacidad buscada',
+  noCapabilityReminder:
+    'ninguna nombrada: proponer lo que un cambio de principio haría posible, difícil hoy, no solo más rápido',
   none: 'ninguno',
 };
 
@@ -899,6 +1065,10 @@ const de: StudyLabels = {
   refused: 'abgelehnt',
   notices: 'Vor dem Lesen',
   noticeTexts: {
+    noDesign: 'Der Entwurfsschritt hat keine Architektur behalten.',
+    minimumsNotMet:
+      'Weniger Einträge als verlangt, nachdem der Wächter sie beurteilt hat, in: {detail}.',
+    untracedAssembly: 'Teile des Entwurfs zitieren keinen Eintrag der Untersuchung, in: {detail}.',
     analoguesNotDeconstructed: 'Nicht zerlegte Durchbrüche: {detail}.',
     noCapability:
       'Keine Architektur zielt auf eine neue Fähigkeit: Der Entwurf bietet nur Verbesserungen.',
@@ -1102,7 +1272,59 @@ const de: StudyLabels = {
     capability: 'neue Fähigkeit',
     improvement: 'Verbesserung: schneller oder billiger',
   },
-  judgedImprovement: 'der Wächter hat sie nur als schneller oder billiger beurteilt',
+  judgedImprovement: 'der Wächter hat sie nur als schneller oder billiger beurteilt: {reason}',
+  reasons: {
+    judged: '{text}',
+    noSourceConfigured:
+      'Als belegt angegeben, aber die Studie hat keine Quelle: Nichts kann belegt werden.',
+    citesUnlisted:
+      'Als belegt angegeben, aber es zitiert {ids}, nicht in der Liste seines Prompts.',
+    citesNothing:
+      'Als belegt angegeben, aber es zitiert kein Ergebnis aus der Liste seines Prompts.',
+    noveltyNotSearchedYet: 'Zu prüfende Neuheit: Der Stand der Technik wurde noch nicht gesucht.',
+    noveltyNoSource:
+      'Zu prüfende Neuheit: Die Studie hat keine Quelle, um den Stand der Technik zu suchen.',
+    noveltySearchBudget:
+      'Zu prüfende Neuheit: Das Suchbudget (maxSearches) war vor ihrer Suche nach dem Stand der Technik aufgebraucht.',
+    noveltyNotSearched:
+      'Zu prüfende Neuheit: Für sie wurde keine Suche nach dem Stand der Technik verlangt.',
+    noveltySearchFailed:
+      'Zu prüfende Neuheit: Ihre Suchen nach dem Stand der Technik sind fehlgeschlagen.',
+    noveltyNoResult:
+      'Zu prüfende Neuheit: Ihre Suchen nach dem Stand der Technik fanden kein Ergebnis.',
+    noveltyNotAssessed:
+      'Zu prüfende Neuheit: Ihre Suche nach dem Stand der Technik lief, aber die Ergebnisse wurden nicht bewertet.',
+    noveltyUnsupported:
+      'Zu prüfende Neuheit: Die Prüfung des Stands der Technik zitiert keines ihrer eigenen Ergebnisse.',
+    priorArtExists: 'Keine Neuheit: {closest}',
+    componentDocumented:
+      'Als neu dargestellt, aber ein Baustein ist eine frühere Technik, und ein Ergebnis aus der Liste seines Prompts belegt ihn: Die Neuheit liegt im Zusammenbau.',
+    componentUndocumented:
+      'Ohne aufgeführte Quelle als neu dargestellt: Ein Baustein ist eine frühere Technik, und dieser bleibt eine Hypothese.',
+    noServesObjective: 'Kein „servesObjective“: Der Eintrag sagt nicht, wozu er im Ziel dient.',
+    invalidItem: 'Ungültiger Eintrag ({detail}).',
+    notAnObject: 'Kein JSON-Objekt.',
+    notAUserLead:
+      '„{lead}“ ist kein Ansatz des Nutzers (ein darüber hinaus gefundenes Werkzeug ist ein unabhängiger Ansatz).',
+    leadAlreadyJudged: 'Der Ansatz „{lead}“ hat bereits ein Urteil.',
+    designWithoutCapability:
+      'Der Entwurf bietet keine neue Fähigkeit, nur Verbesserungen (schneller oder billiger): Er muss auf etwas zielen, das heute schwierig oder unmöglich ist.',
+    amendmentUnclassified:
+      'Sie konnte nicht eingeordnet werden ({error}) und wird daher abgelehnt: Das Ziel geht vor.',
+    amendmentCancelled: 'Ihre Einordnung wurde abgebrochen, daher wird sie abgelehnt.',
+    amendmentTimedOut: 'Ihre Einordnung dauerte zu lange, daher wird sie abgelehnt.',
+    amendmentPolicy:
+      'Eine Budgetrichtlinie hat ihre Einordnung verweigert ({reason}), daher wird sie abgelehnt.',
+  },
+  traceFrom: 'Stammt aus',
+  untraced: 'nicht auf die Untersuchung zurückgeführt',
+  unknownFrom: 'zitiert nicht aufgeführte Einträge',
+  unlisted: 'zitiert auch, nicht in der Liste seines Prompts',
+  newObjectiveNewStudy:
+    'Ein neues Ziel ist eine neue Studie: Erstellen Sie sie mit sdk.createStudy.',
+  capabilityAimReminder: 'Angestrebte Fähigkeit',
+  noCapabilityReminder:
+    'keine benannt: vorschlagen, was eine Änderung des Prinzips möglich machen würde, das heute schwierig ist, nicht nur schneller',
   none: 'keine',
 };
 
@@ -1132,6 +1354,9 @@ const pt: StudyLabels = {
   refused: 'recusada',
   notices: 'Antes de ler',
   noticeTexts: {
+    noDesign: 'A passagem de concepção não manteve nenhuma arquitetura.',
+    minimumsNotMet: 'Menos itens do que o exigido depois de julgados pelo guardião, em: {detail}.',
+    untracedAssembly: 'Partes do projeto não citam nenhum registro da investigação, em: {detail}.',
     analoguesNotDeconstructed: 'Rupturas não desconstruídas: {detail}.',
     noCapability:
       'Nenhuma arquitetura visa uma nova capacidade: o projeto oferece apenas melhorias.',
@@ -1334,7 +1559,54 @@ const pt: StudyLabels = {
     capability: 'nova capacidade',
     improvement: 'melhoria: mais rápido ou mais barato',
   },
-  judgedImprovement: 'o guardião a julgou apenas mais rápida ou mais barata',
+  judgedImprovement: 'o guardião a julgou apenas mais rápida ou mais barata: {reason}',
+  reasons: {
+    judged: '{text}',
+    noSourceConfigured:
+      'Declarado estabelecido, mas o estudo não tem nenhuma fonte: nada pode ser estabelecido.',
+    citesUnlisted: 'Declarado estabelecido, mas cita {ids}, fora da lista do seu prompt.',
+    citesNothing: 'Declarado estabelecido, mas não cita nenhum resultado da lista do seu prompt.',
+    noveltyNotSearchedYet: 'Novidade a verificar: o existente ainda não foi pesquisado.',
+    noveltyNoSource:
+      'Novidade a verificar: o estudo não tem nenhuma fonte para pesquisar o existente.',
+    noveltySearchBudget:
+      'Novidade a verificar: o orçamento de pesquisas (maxSearches) se esgotou antes da sua pesquisa do existente.',
+    noveltyNotSearched: 'Novidade a verificar: nenhuma pesquisa do existente foi pedida para ela.',
+    noveltySearchFailed: 'Novidade a verificar: suas pesquisas do existente falharam.',
+    noveltyNoResult:
+      'Novidade a verificar: suas pesquisas do existente não encontraram nenhum resultado.',
+    noveltyNotAssessed:
+      'Novidade a verificar: sua pesquisa do existente foi feita, mas os resultados não foram avaliados.',
+    noveltyUnsupported:
+      'Novidade a verificar: a avaliação do existente não cita nenhum dos seus próprios resultados.',
+    priorArtExists: 'Não é uma novidade: {closest}',
+    componentDocumented:
+      'Apresentado como novo, mas um componente é uma técnica anterior, e um resultado da lista do seu prompt o documenta: a novidade está na montagem.',
+    componentUndocumented:
+      'Apresentado como novo sem fonte listada: um componente é uma técnica anterior, e este continua sendo uma hipótese.',
+    noServesObjective: 'Sem "servesObjective": o item não diz a que serve no objetivo.',
+    invalidItem: 'Item inválido ({detail}).',
+    notAnObject: 'Não é um objeto JSON.',
+    notAUserLead:
+      '"{lead}" não é uma das pistas do usuário (uma ferramenta encontrada além delas é uma pista independente).',
+    leadAlreadyJudged: 'A pista "{lead}" já tem um veredito.',
+    designWithoutCapability:
+      'O projeto não oferece nenhuma nova capacidade, apenas melhorias (mais rápido ou mais barato): ele deve visar algo difícil ou impossível hoje.',
+    amendmentUnclassified:
+      'Ela não pôde ser classificada ({error}), por isso é recusada: o objetivo vem primeiro.',
+    amendmentCancelled: 'Sua classificação foi cancelada, por isso ela é recusada.',
+    amendmentTimedOut: 'Sua classificação demorou demais, por isso ela é recusada.',
+    amendmentPolicy:
+      'Uma política de orçamento recusou sua classificação ({reason}), por isso ela é recusada.',
+  },
+  traceFrom: 'Vem de',
+  untraced: 'não ligado à investigação',
+  unknownFrom: 'cita registros fora da lista',
+  unlisted: 'também cita, fora da lista do seu prompt',
+  newObjectiveNewStudy: 'Um novo objetivo é um novo estudo: crie-o com sdk.createStudy.',
+  capabilityAimReminder: 'Capacidade visada',
+  noCapabilityReminder:
+    'nenhuma nomeada: propor o que uma mudança de princípio tornaria possível, difícil hoje, e não apenas mais rápido',
   none: 'nenhum',
 };
 
@@ -1363,6 +1635,9 @@ const ja: StudyLabels = {
   refused: '却下',
   notices: '読む前に',
   noticeTexts: {
+    noDesign: '設計の段階はアーキテクチャを一つも残さなかった。',
+    minimumsNotMet: '守護者の判定後、必要な数に満たない項目：{detail}。',
+    untracedAssembly: '調査のどの記録も引用していない設計の部分：{detail}。',
     analoguesNotDeconstructed: '分解されなかったブレークスルー：{detail}。',
     noCapability: '新しい能力を目指すアーキテクチャがありません。設計は改善だけです。',
     noSources:
@@ -1549,7 +1824,46 @@ const ja: StudyLabels = {
   domain: '分野',
   arrow: '→',
   architectureKinds: { capability: '新しい能力', improvement: '改善：より速いか安いだけ' },
-  judgedImprovement: '守護者はより速いか安いだけと判定した',
+  judgedImprovement: '守護者はより速いか安いだけと判定した：{reason}',
+  reasons: {
+    judged: '{text}',
+    noSourceConfigured: '確立と申告されたが、研究に情報源がない。何も確立できない。',
+    citesUnlisted: '確立と申告されたが、プロンプトの一覧にない {ids} を引用している。',
+    citesNothing: '確立と申告されたが、プロンプトの一覧にある結果を引用していない。',
+    noveltyNotSearchedYet: '要検証の新規性：先行事例はまだ検索されていない。',
+    noveltyNoSource: '要検証の新規性：研究に先行事例を検索する情報源がない。',
+    noveltySearchBudget: '要検証の新規性：先行事例の検索の前に検索の予算（maxSearches）が尽きた。',
+    noveltyNotSearched: '要検証の新規性：先行事例の検索が求められなかった。',
+    noveltySearchFailed: '要検証の新規性：先行事例の検索が失敗した。',
+    noveltyNoResult: '要検証の新規性：先行事例の検索で結果が見つからなかった。',
+    noveltyNotAssessed: '要検証の新規性：先行事例の検索は行われたが、結果は評価されなかった。',
+    noveltyUnsupported: '要検証の新規性：先行事例の評価が自身の検索結果を一つも引用していない。',
+    priorArtExists: '新規性ではない：{closest}',
+    componentDocumented:
+      '新しいものとして示されたが、構成要素は既存の技術であり、プロンプトの一覧にある結果がそれを裏付けている。新規性は組み立てにある。',
+    componentUndocumented:
+      '一覧にある情報源なしに新しいものとして示された。構成要素は既存の技術であり、これは仮説のままである。',
+    noServesObjective: '「servesObjective」がない：項目が目的の何に役立つかを述べていない。',
+    invalidItem: '無効な項目（{detail}）。',
+    notAnObject: 'JSON オブジェクトではない。',
+    notAUserLead:
+      '「{lead}」はユーザーの手がかりではない（その先で見つけた道具は独立した手がかりである）。',
+    leadAlreadyJudged: '手がかり「{lead}」にはすでに判定がある。',
+    designWithoutCapability:
+      '設計は新しい能力を示さず、改善（より速いか安い）だけである。今日難しいか不可能なことを目指す必要がある。',
+    amendmentUnclassified: '分類できなかった（{error}）ため却下する。目的が優先される。',
+    amendmentCancelled: '分類が取り消されたため却下する。',
+    amendmentTimedOut: '分類に時間がかかりすぎたため却下する。',
+    amendmentPolicy: '予算ポリシーが分類を拒否した（{reason}）ため却下する。',
+  },
+  traceFrom: '出典',
+  untraced: '調査に結び付いていない',
+  unknownFrom: '一覧にない記録を引用',
+  unlisted: 'プロンプトの一覧にないものも引用',
+  newObjectiveNewStudy: '新しい目的は新しい研究である。sdk.createStudy で作成する。',
+  capabilityAimReminder: '目指す能力',
+  noCapabilityReminder:
+    '指定なし：単に速くするだけでなく、今日難しいことを可能にする原理の変更を提案する',
   none: 'なし',
 };
 
@@ -1577,6 +1891,9 @@ const zh: StudyLabels = {
   refused: '已拒绝',
   notices: '阅读之前',
   noticeTexts: {
+    noDesign: '设计环节没有保留任何架构。',
+    minimumsNotMet: '经守护者判断后，条目少于要求：{detail}。',
+    untracedAssembly: '设计中有部分没有引用调查的任何记录：{detail}。',
     analoguesNotDeconstructed: '未拆解的突破：{detail}。',
     noCapability: '没有架构以新能力为目标：设计只提供了改进。',
     noSources: '本研究没有检索来源：任何论断都无法确立，任何新颖性都无法与已有工作比对。',
@@ -1753,7 +2070,43 @@ const zh: StudyLabels = {
   domain: '领域',
   arrow: '→',
   architectureKinds: { capability: '新能力', improvement: '改进：更快或更便宜' },
-  judgedImprovement: '守护者判定它只是更快或更便宜',
+  judgedImprovement: '守护者判定它只是更快或更便宜：{reason}',
+  reasons: {
+    judged: '{text}',
+    noSourceConfigured: '声称已确立，但本研究没有来源：任何论断都无法确立。',
+    citesUnlisted: '声称已确立，但引用了其提示词列表之外的 {ids}。',
+    citesNothing: '声称已确立，但没有引用其提示词列表中的任何结果。',
+    noveltyNotSearchedYet: '待验证的新颖性：尚未检索已有工作。',
+    noveltyNoSource: '待验证的新颖性：本研究没有可用于检索已有工作的来源。',
+    noveltySearchBudget: '待验证的新颖性：在检索已有工作之前，检索预算（maxSearches）已用完。',
+    noveltyNotSearched: '待验证的新颖性：没有为它请求检索已有工作。',
+    noveltySearchFailed: '待验证的新颖性：它的已有工作检索失败了。',
+    noveltyNoResult: '待验证的新颖性：它的已有工作检索没有找到结果。',
+    noveltyNotAssessed: '待验证的新颖性：已检索已有工作，但结果未被评估。',
+    noveltyUnsupported: '待验证的新颖性：已有工作的评估没有引用它自己的任何结果。',
+    priorArtExists: '不是新颖：{closest}',
+    componentDocumented:
+      '被当作新的，但组件是已有技术，且其提示词列表中的结果记载了它：新颖性在于组装。',
+    componentUndocumented: '在没有列出来源的情况下被当作新的：组件是已有技术，这一项仍是假设。',
+    noServesObjective: '没有「servesObjective」：该条目没有说明它为目标的哪一部分服务。',
+    invalidItem: '无效条目（{detail}）。',
+    notAnObject: '不是 JSON 对象。',
+    notAUserLead: '「{lead}」不是用户的线索（另外找到的工具是独立线索）。',
+    leadAlreadyJudged: '线索「{lead}」已经有结论。',
+    designWithoutCapability:
+      '设计没有提供新能力，只有改进（更快或更便宜）：它必须以今天难以或无法做到的事为目标。',
+    amendmentUnclassified: '无法分类（{error}），因此被拒绝：目标优先。',
+    amendmentCancelled: '分类被取消，因此被拒绝。',
+    amendmentTimedOut: '分类耗时过长，因此被拒绝。',
+    amendmentPolicy: '预算策略拒绝了它的分类（{reason}），因此被拒绝。',
+  },
+  traceFrom: '来自',
+  untraced: '未关联到调查',
+  unknownFrom: '引用了列表之外的记录',
+  unlisted: '还引用了其提示词列表之外的',
+  newObjectiveNewStudy: '新的目标就是新的研究：用 sdk.createStudy 创建。',
+  capabilityAimReminder: '目标能力',
+  noCapabilityReminder: '未指定：提出一种原理变化，让今天难以做到的事成为可能，而不只是更快',
   none: '无',
 };
 
@@ -1782,6 +2135,9 @@ const ko: StudyLabels = {
   refused: '거부됨',
   notices: '읽기 전에',
   noticeTexts: {
+    noDesign: '설계 단계가 아키텍처를 하나도 남기지 않았습니다.',
+    minimumsNotMet: '수호자의 판단 후 요구보다 적은 항목: {detail}.',
+    untracedAssembly: '조사의 어떤 기록도 인용하지 않는 설계의 부분: {detail}.',
     analoguesNotDeconstructed: '분해되지 않은 돌파구: {detail}.',
     noCapability: '새로운 능력을 목표로 하는 아키텍처가 없습니다. 설계는 개선만 제공합니다.',
     noSources:
@@ -1963,7 +2319,50 @@ const ko: StudyLabels = {
   domain: '분야',
   arrow: '→',
   architectureKinds: { capability: '새로운 능력', improvement: '개선: 더 빠르거나 더 저렴함' },
-  judgedImprovement: '수호자가 더 빠르거나 더 저렴할 뿐이라고 판단함',
+  judgedImprovement: '수호자가 더 빠르거나 더 저렴할 뿐이라고 판단함: {reason}',
+  reasons: {
+    judged: '{text}',
+    noSourceConfigured:
+      '확립으로 선언되었지만 연구에 출처가 없습니다. 아무것도 확립할 수 없습니다.',
+    citesUnlisted: '확립으로 선언되었지만 프롬프트 목록에 없는 {ids}을(를) 인용합니다.',
+    citesNothing: '확립으로 선언되었지만 프롬프트 목록의 결과를 인용하지 않습니다.',
+    noveltyNotSearchedYet: '검증할 새로움: 선행 사례를 아직 검색하지 않았습니다.',
+    noveltyNoSource: '검증할 새로움: 연구에 선행 사례를 검색할 출처가 없습니다.',
+    noveltySearchBudget:
+      '검증할 새로움: 선행 사례 검색 전에 검색 예산(maxSearches)이 소진되었습니다.',
+    noveltyNotSearched: '검증할 새로움: 선행 사례 검색이 요청되지 않았습니다.',
+    noveltySearchFailed: '검증할 새로움: 선행 사례 검색이 실패했습니다.',
+    noveltyNoResult: '검증할 새로움: 선행 사례 검색에서 결과를 찾지 못했습니다.',
+    noveltyNotAssessed: '검증할 새로움: 선행 사례를 검색했지만 결과를 평가하지 않았습니다.',
+    noveltyUnsupported:
+      '검증할 새로움: 선행 사례 평가가 자신의 검색 결과를 하나도 인용하지 않습니다.',
+    priorArtExists: '새로움이 아닙니다: {closest}',
+    componentDocumented:
+      '새로운 것으로 제시되었지만 구성 요소는 이전의 기술이며, 프롬프트 목록의 결과가 이를 뒷받침합니다. 새로움은 조립에 있습니다.',
+    componentUndocumented:
+      '목록의 출처 없이 새로운 것으로 제시되었습니다. 구성 요소는 이전의 기술이며, 이것은 가설로 남습니다.',
+    noServesObjective:
+      '"servesObjective"가 없습니다: 항목이 목표에서 무엇에 기여하는지 말하지 않습니다.',
+    invalidItem: '유효하지 않은 항목({detail}).',
+    notAnObject: 'JSON 객체가 아닙니다.',
+    notAUserLead:
+      '"{lead}"은(는) 사용자의 단서가 아닙니다(그 너머에서 찾은 도구는 독립적인 단서입니다).',
+    leadAlreadyJudged: '단서 "{lead}"에는 이미 판정이 있습니다.',
+    designWithoutCapability:
+      '설계가 새로운 능력 없이 개선(더 빠르거나 더 저렴함)만 제공합니다. 오늘 어렵거나 불가능한 것을 목표로 해야 합니다.',
+    amendmentUnclassified: '분류할 수 없어({error}) 거부됩니다. 목표가 우선입니다.',
+    amendmentCancelled: '분류가 취소되어 거부됩니다.',
+    amendmentTimedOut: '분류에 너무 오래 걸려 거부됩니다.',
+    amendmentPolicy: '예산 정책이 분류를 거부하여({reason}) 거부됩니다.',
+  },
+  traceFrom: '출처',
+  untraced: '조사와 연결되지 않음',
+  unknownFrom: '목록에 없는 기록을 인용',
+  unlisted: '프롬프트 목록에 없는 것도 인용',
+  newObjectiveNewStudy: '새로운 목표는 새로운 연구입니다. sdk.createStudy로 만드세요.',
+  capabilityAimReminder: '목표 능력',
+  noCapabilityReminder:
+    '지정 없음: 단지 더 빠르게가 아니라 오늘 어려운 일을 가능하게 할 원리의 변화를 제안',
   none: '없음',
 };
 
@@ -1992,6 +2391,9 @@ const ru: StudyLabels = {
   refused: 'отклонена',
   notices: 'Перед чтением',
   noticeTexts: {
+    noDesign: 'Этап проектирования не сохранил ни одной архитектуры.',
+    minimumsNotMet: 'Меньше элементов, чем требуется, после оценки стражем, в: {detail}.',
+    untracedAssembly: 'Части проекта не ссылаются ни на одну запись исследования, в: {detail}.',
     analoguesNotDeconstructed: 'Неразобранные прорывы: {detail}.',
     noCapability:
       'Ни одна архитектура не нацелена на новую возможность: проект предлагает только улучшения.',
@@ -2200,7 +2602,55 @@ const ru: StudyLabels = {
     capability: 'новая возможность',
     improvement: 'улучшение: быстрее или дешевле',
   },
-  judgedImprovement: 'страж счёл её лишь более быстрой или дешёвой',
+  judgedImprovement: 'страж счёл её лишь более быстрой или дешёвой: {reason}',
+  reasons: {
+    judged: '{text}',
+    noSourceConfigured:
+      'Заявлено как установленное, но у исследования нет источника: ничего нельзя установить.',
+    citesUnlisted:
+      'Заявлено как установленное, но ссылается на {ids}, которых нет в списке его промпта.',
+    citesNothing:
+      'Заявлено как установленное, но не ссылается ни на один результат из списка его промпта.',
+    noveltyNotSearchedYet: 'Новизна для проверки: существующие работы ещё не искались.',
+    noveltyNoSource:
+      'Новизна для проверки: у исследования нет источника для поиска существующих работ.',
+    noveltySearchBudget:
+      'Новизна для проверки: бюджет поиска (maxSearches) исчерпан до поиска существующих работ.',
+    noveltyNotSearched: 'Новизна для проверки: поиск существующих работ для неё не запрашивался.',
+    noveltySearchFailed: 'Новизна для проверки: её поиски существующих работ завершились ошибкой.',
+    noveltyNoResult: 'Новизна для проверки: её поиски существующих работ не дали результатов.',
+    noveltyNotAssessed:
+      'Новизна для проверки: поиск существующих работ выполнен, но результаты не оценены.',
+    noveltyUnsupported:
+      'Новизна для проверки: оценка существующих работ не ссылается ни на один из её собственных результатов.',
+    priorArtExists: 'Не новизна: {closest}',
+    componentDocumented:
+      'Представлено как новое, но компонент — это прежняя технология, и результат из списка его промпта её подтверждает: новизна — в сборке.',
+    componentUndocumented:
+      'Представлено как новое без источника из списка: компонент — это прежняя технология, и этот остаётся гипотезой.',
+    noServesObjective: 'Нет «servesObjective»: элемент не говорит, чему он служит в цели.',
+    invalidItem: 'Недопустимый элемент ({detail}).',
+    notAnObject: 'Не объект JSON.',
+    notAUserLead:
+      '«{lead}» — не идея пользователя (инструмент, найденный помимо них, — независимая идея).',
+    leadAlreadyJudged: 'У идеи «{lead}» уже есть вердикт.',
+    designWithoutCapability:
+      'Проект не даёт новой возможности, только улучшения (быстрее или дешевле): он должен быть нацелен на то, что сегодня трудно или невозможно.',
+    amendmentUnclassified:
+      'Её не удалось классифицировать ({error}), поэтому она отклонена: цель важнее.',
+    amendmentCancelled: 'Её классификация отменена, поэтому она отклонена.',
+    amendmentTimedOut: 'Её классификация заняла слишком много времени, поэтому она отклонена.',
+    amendmentPolicy:
+      'Бюджетная политика отказала в её классификации ({reason}), поэтому она отклонена.',
+  },
+  traceFrom: 'Из',
+  untraced: 'не связано с исследованием',
+  unknownFrom: 'ссылается на записи вне списка',
+  unlisted: 'также ссылается вне списка своего промпта',
+  newObjectiveNewStudy: 'Новая цель — это новое исследование: создайте его через sdk.createStudy.',
+  capabilityAimReminder: 'Искомая возможность',
+  noCapabilityReminder:
+    'не названа: предложить, какое изменение принципа сделало бы возможным то, что сегодня трудно, а не просто быстрее',
   none: 'нет',
 };
 
@@ -2229,6 +2679,9 @@ const ar: StudyLabels = {
   refused: 'مرفوض',
   notices: 'قبل القراءة',
   noticeTexts: {
+    noDesign: 'لم تحتفظ مرحلة التصميم بأي بنية.',
+    minimumsNotMet: 'عناصر أقل من المطلوب بعد حكم الحارس، في: {detail}.',
+    untracedAssembly: 'أجزاء من التصميم لا تستشهد بأي سجل من التحقيق، في: {detail}.',
     analoguesNotDeconstructed: 'اختراقات لم تُفكَّك: {detail}.',
     noCapability: 'لا تستهدف أي بنية قدرة جديدة: التصميم لا يقدّم سوى تحسينات.',
     noSources:
@@ -2418,7 +2871,44 @@ const ar: StudyLabels = {
   domain: 'المجال',
   arrow: '←',
   architectureKinds: { capability: 'قدرة جديدة', improvement: 'تحسين: أسرع أو أرخص' },
-  judgedImprovement: 'حكم الحارس بأنها أسرع أو أرخص فقط',
+  judgedImprovement: 'حكم الحارس بأنها أسرع أو أرخص فقط: {reason}',
+  reasons: {
+    judged: '{text}',
+    noSourceConfigured: 'أُعلن ثابتًا، لكن الدراسة بلا مصدر: لا يمكن إثبات أي شيء.',
+    citesUnlisted: 'أُعلن ثابتًا، لكنه يستشهد بـ {ids}، وهي ليست في قائمة الموجِّه الخاص به.',
+    citesNothing: 'أُعلن ثابتًا، لكنه لا يستشهد بأي نتيجة من قائمة الموجِّه الخاص به.',
+    noveltyNotSearchedYet: 'جِدّة يجب التحقق منها: لم يُبحث عن الأعمال السابقة بعد.',
+    noveltyNoSource: 'جِدّة يجب التحقق منها: لا تملك الدراسة مصدرًا للبحث عن الأعمال السابقة.',
+    noveltySearchBudget:
+      'جِدّة يجب التحقق منها: نفدت ميزانية البحث (maxSearches) قبل البحث عن أعمالها السابقة.',
+    noveltyNotSearched: 'جِدّة يجب التحقق منها: لم يُطلب لها أي بحث عن الأعمال السابقة.',
+    noveltySearchFailed: 'جِدّة يجب التحقق منها: فشلت عمليات البحث عن أعمالها السابقة.',
+    noveltyNoResult: 'جِدّة يجب التحقق منها: لم تجد عمليات البحث عن أعمالها السابقة أي نتيجة.',
+    noveltyNotAssessed: 'جِدّة يجب التحقق منها: جرى البحث عن أعمالها السابقة، لكن نتائجه لم تُقيَّم.',
+    noveltyUnsupported: 'جِدّة يجب التحقق منها: لا يستشهد تقييم الأعمال السابقة بأي من نتائجها.',
+    priorArtExists: 'ليست جِدّة: {closest}',
+    componentDocumented:
+      'قُدِّم على أنه جديد، لكن المكوّن تقنية سابقة، وتوثّقه نتيجة من قائمة الموجِّه الخاص به: الجِدّة في التجميع.',
+    componentUndocumented: 'قُدِّم على أنه جديد بلا مصدر مُدرج: المكوّن تقنية سابقة، ويبقى هذا فرضية.',
+    noServesObjective: 'لا يوجد «servesObjective»: لا يقول العنصر ما الذي يخدمه في الهدف.',
+    invalidItem: 'عنصر غير صالح ({detail}).',
+    notAnObject: 'ليس كائن JSON.',
+    notAUserLead: '«{lead}» ليس من مسارات المستخدم (الأداة التي وُجدت خارجها مسار مستقل).',
+    leadAlreadyJudged: 'للمسار «{lead}» حكم بالفعل.',
+    designWithoutCapability:
+      'لا يقدّم التصميم أي قدرة جديدة، بل تحسينات فقط (أسرع أو أرخص): يجب أن يستهدف ما هو صعب أو مستحيل اليوم.',
+    amendmentUnclassified: 'تعذّر تصنيفه ({error})، لذا رُفض: الهدف أولًا.',
+    amendmentCancelled: 'أُلغي تصنيفه، لذا رُفض.',
+    amendmentTimedOut: 'استغرق تصنيفه وقتًا أطول مما ينبغي، لذا رُفض.',
+    amendmentPolicy: 'رفضت سياسة الميزانية تصنيفه ({reason})، لذا رُفض.',
+  },
+  traceFrom: 'مصدره',
+  untraced: 'غير مرتبط بالتحقيق',
+  unknownFrom: 'يستشهد بسجلات خارج القائمة',
+  unlisted: 'يستشهد أيضًا بما ليس في قائمة الموجِّه الخاص به',
+  newObjectiveNewStudy: 'الهدف الجديد دراسة جديدة: أنشئها باستخدام sdk.createStudy.',
+  capabilityAimReminder: 'القدرة المستهدفة',
+  noCapabilityReminder: 'لم تُسمَّ: اقترح تغييرًا في المبدأ يجعل ممكنًا ما هو صعب اليوم، لا مجرد أسرع',
   none: 'لا شيء',
 };
 
@@ -2447,6 +2937,9 @@ const hi: StudyLabels = {
   refused: 'अस्वीकृत',
   notices: 'पढ़ने से पहले',
   noticeTexts: {
+    noDesign: 'डिज़ाइन चरण ने कोई आर्किटेक्चर नहीं रखा।',
+    minimumsNotMet: 'संरक्षक के निर्णय के बाद आवश्यकता से कम आइटम, इनमें: {detail}।',
+    untracedAssembly: 'डिज़ाइन के कुछ हिस्से जाँच के किसी रिकॉर्ड का हवाला नहीं देते, इनमें: {detail}।',
     analoguesNotDeconstructed: 'जिन सफलताओं को विघटित नहीं किया गया: {detail}।',
     noCapability: 'कोई आर्किटेक्चर नई क्षमता को लक्ष्य नहीं करता: डिज़ाइन केवल सुधार देता है।',
     noSources:
@@ -2644,7 +3137,47 @@ const hi: StudyLabels = {
   domain: 'क्षेत्र',
   arrow: '→',
   architectureKinds: { capability: 'नई क्षमता', improvement: 'सुधार: तेज़ या सस्ता' },
-  judgedImprovement: 'संरक्षक ने इसे केवल तेज़ या सस्ता माना',
+  judgedImprovement: 'संरक्षक ने इसे केवल तेज़ या सस्ता माना: {reason}',
+  reasons: {
+    judged: '{text}',
+    noSourceConfigured: 'स्थापित घोषित, पर अध्ययन के पास कोई स्रोत नहीं है: कुछ भी स्थापित नहीं हो सकता।',
+    citesUnlisted: 'स्थापित घोषित, पर यह {ids} का हवाला देता है, जो इसके प्रॉम्प्ट की सूची में नहीं हैं।',
+    citesNothing: 'स्थापित घोषित, पर यह अपने प्रॉम्प्ट की सूची के किसी परिणाम का हवाला नहीं देता।',
+    noveltyNotSearchedYet: 'जाँचने योग्य नवीनता: पूर्व कार्य अभी खोजा नहीं गया है।',
+    noveltyNoSource: 'जाँचने योग्य नवीनता: अध्ययन के पास पूर्व कार्य खोजने का कोई स्रोत नहीं है।',
+    noveltySearchBudget:
+      'जाँचने योग्य नवीनता: पूर्व कार्य की खोज से पहले खोज का बजट (maxSearches) समाप्त हो गया।',
+    noveltyNotSearched: 'जाँचने योग्य नवीनता: इसके लिए पूर्व कार्य की कोई खोज नहीं माँगी गई।',
+    noveltySearchFailed: 'जाँचने योग्य नवीनता: इसके पूर्व कार्य की खोजें विफल रहीं।',
+    noveltyNoResult: 'जाँचने योग्य नवीनता: इसके पूर्व कार्य की खोजों में कोई परिणाम नहीं मिला।',
+    noveltyNotAssessed: 'जाँचने योग्य नवीनता: इसके पूर्व कार्य की खोज हुई, पर परिणामों का आकलन नहीं हुआ।',
+    noveltyUnsupported: 'जाँचने योग्य नवीनता: पूर्व कार्य का आकलन इसके अपने किसी परिणाम का हवाला नहीं देता।',
+    priorArtExists: 'नवीनता नहीं: {closest}',
+    componentDocumented:
+      'नया बताया गया, पर घटक एक पूर्व तकनीक है, और इसके प्रॉम्प्ट की सूची का एक परिणाम इसे प्रलेखित करता है: नवीनता संयोजन में है।',
+    componentUndocumented:
+      'सूचीबद्ध स्रोत के बिना नया बताया गया: घटक एक पूर्व तकनीक है, और यह परिकल्पना ही रहता है।',
+    noServesObjective:
+      'कोई "servesObjective" नहीं: आइटम यह नहीं बताता कि वह उद्देश्य में किसकी सेवा करता है।',
+    invalidItem: 'अमान्य आइटम ({detail})।',
+    notAnObject: 'JSON ऑब्जेक्ट नहीं।',
+    notAUserLead: '"{lead}" उपयोगकर्ता का सुराग नहीं है (उनसे आगे मिला उपकरण एक स्वतंत्र सुराग है)।',
+    leadAlreadyJudged: 'सुराग "{lead}" पर पहले से निर्णय है।',
+    designWithoutCapability:
+      'डिज़ाइन कोई नई क्षमता नहीं देता, केवल सुधार (तेज़ या सस्ता): इसे आज कठिन या असंभव किसी चीज़ को लक्ष्य करना चाहिए।',
+    amendmentUnclassified: 'इसे वर्गीकृत नहीं किया जा सका ({error}), इसलिए यह अस्वीकृत है: उद्देश्य पहले है।',
+    amendmentCancelled: 'इसका वर्गीकरण रद्द हुआ, इसलिए यह अस्वीकृत है।',
+    amendmentTimedOut: 'इसके वर्गीकरण में बहुत समय लगा, इसलिए यह अस्वीकृत है।',
+    amendmentPolicy: 'एक बजट नीति ने इसके वर्गीकरण से इनकार किया ({reason}), इसलिए यह अस्वीकृत है।',
+  },
+  traceFrom: 'स्रोत',
+  untraced: 'जाँच से जुड़ा नहीं',
+  unknownFrom: 'सूची से बाहर के रिकॉर्ड का हवाला',
+  unlisted: 'अपने प्रॉम्प्ट की सूची से बाहर का भी हवाला',
+  newObjectiveNewStudy: 'नया उद्देश्य एक नया अध्ययन है: इसे sdk.createStudy से बनाएँ।',
+  capabilityAimReminder: 'लक्षित क्षमता',
+  noCapabilityReminder:
+    'कोई नाम नहीं: ऐसा सिद्धांत-परिवर्तन सुझाएँ जो आज कठिन चीज़ को संभव बनाए, केवल तेज़ नहीं',
   none: 'कोई नहीं',
 };
 
@@ -2661,6 +3194,20 @@ const LABELS: Record<StudyLabelLanguage, StudyLabels> = {
   ar,
   hi,
 };
+
+/** A reason in English, with its code and parameters (see `StudyReason`). */
+export function studyReason(code: StudyReasonCode, params?: Record<string, string>): StudyReason {
+  return {
+    code,
+    ...(params && Object.keys(params).length > 0 ? { params } : {}),
+    message: fillLabel(en.reasons[code], params),
+  };
+}
+
+/** A label with its `{name}` parameters replaced; a missing one leaves its braces. */
+export function fillLabel(template: string, params: Record<string, string> = {}): string {
+  return template.replace(/\{(\w+)\}/g, (whole, name: string) => params[name] ?? whole);
+}
 
 /** The labels' language of a language tag: `fr-CA` is `fr`; an unknown language is `en`. */
 export function labelLanguage(language: string): StudyLabelLanguage {
