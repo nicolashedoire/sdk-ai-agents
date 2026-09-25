@@ -25,6 +25,7 @@ export const text: LocaleText = {
     'guide/thinker-profiles': '像特定的人一样推理',
     'guide/governed-agents': '受治理智能体',
     'guide/studies': '研究',
+    'guide/tools': '工具',
     'guide/typed-decisions': '类型化决策（Jev）',
     'guide/web-research': 'Web 调研',
     'guide/mcp': 'MCP 通俗解释',

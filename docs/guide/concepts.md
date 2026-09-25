@@ -60,6 +60,8 @@ const calculatorTool = sdk.defineTool({
 })
 ```
 
+Ready-made tools (a folder, a database, a web API, the Web, another agent, an MCP server) and how every call is governed: see [Tools](./tools).
+
 ### 3. Capability
 
 A **Capability** is a logical group of tools that can be reused across multiple agents.
