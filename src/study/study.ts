@@ -510,13 +510,12 @@ export class Study {
   ): Promise<PassageReply> {
     const records = this.recordsFor(spec);
     const citedResults = this.citedResults(records);
-    // A reopened passage cannot reopen another: loops stay bounded by `maxLoops`.
-    const reopenable =
-      input.mode.reopened || run.loops >= run.limits.maxLoops
-        ? []
-        : PASSAGES.filter((earlier) => earlier.number < spec.number).map(
-            (earlier) => earlier.passage
-          );
+    const earlier = PASSAGES.filter((candidate) => candidate.number < spec.number).map(
+      (candidate) => candidate.passage
+    );
+    // Reopening is offered only while a loop is left (`runPassages` bounds the loops), and
+    // never to a passage that was itself reopened.
+    const reopenable = input.mode.reopened || run.loops >= run.limits.maxLoops ? [] : earlier;
     return this.model.ask(run, {
       purpose: 'passage',
       passage: spec.passage,
@@ -534,7 +533,7 @@ export class Study {
           ...(rejection ? { rejection } : {}),
         }),
       parse: (reply, final) =>
-        parsePassageReply(spec, reply, { leads: this.charter.leads, reopenable, final }),
+        parsePassageReply(spec, reply, { leads: this.charter.leads, reopenable: earlier, final }),
     });
   }
 
