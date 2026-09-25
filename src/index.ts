@@ -355,9 +355,19 @@ export type {
 } from './tools/postgres-read-only.js';
 export { assertSingleQuery } from './tools/sql-statement-guard.js';
 export type { SqlDialect } from './tools/sql-statement-guard.js';
-// Web research: search (DuckDuckGo by default, SearXNG, Brave, Tavily, Serper)
+// Web research: search (DuckDuckGo by default, SearXNG, Brave, Tavily, Serper), fetch, arXiv,
+// Wikipedia and GitHub
 export { DEFAULT_USER_AGENT, webTools } from './tools/web/web-tools.js';
-export type { WebSearchOutput, WebToolName, WebToolsOptions } from './tools/web/web-tools.js';
+export type {
+  SourceSearchOutput,
+  WebSearchOutput,
+  WebToolName,
+  WebToolsOptions,
+} from './tools/web/web-tools.js';
+export type { WebFetchOutput } from './tools/web/web-fetch.js';
+export type { ArxivOptions, ArxivResult } from './tools/web/sources/arxiv.js';
+export type { WikipediaOptions, WikipediaResult } from './tools/web/sources/wikipedia.js';
+export type { GithubOptions, GithubResult, GithubSearchKind } from './tools/web/sources/github.js';
 export { duckDuckGo } from './tools/web/providers/duckduckgo.js';
 export type { DuckDuckGoOptions } from './tools/web/providers/duckduckgo.js';
 export { searxng } from './tools/web/providers/searxng.js';
