@@ -502,11 +502,11 @@ Jede liefert fertige `ToolDefinition`s: Übergeben Sie sie an `sdk.defineTool`, 
 | `cognitiveAgentTool(agent, { name?, description?, metadata?, maxInputLength?, maxContextLength?, exposeErrors? })` | `ToolDefinition` | `ask_<agent>`: `{ problem, context? }` → `{ runId, status, decisionStatus?, answer?, rationale?, confidence?, missing?, nextActions?, error? }`; wird mit dem Aufrufer abgebrochen; `error` ist generisch, außer mit `exposeErrors` |
 | `governedAgentTool(agent, options)` | `ToolDefinition` | `{ message, context? }` → `{ runId, status, output?, error? }` |
 | `assertSingleQuery(sql, 'sqlite' \| 'postgres')` | `string` | Die Anweisungsprüfung der Datenbankadapter (nur SQLite- und PostgreSQL-Syntax) |
-| `webTools({ include?, prefix?, search?, circuitBreaker?, language?, userAgent?, timeoutMs?, maxResponseBytes?, maxRedirects?, hostIntervalMs?, robots?, allowPrivateNetwork?, lookup?, maxPdfBytes?, maxPdfPages?, cache?, retry?, arxiv?, wikipedia?, github? })` | `ToolDefinition[]` | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search`, schreibgeschützt (`web_fetch` mit mittlerem Risiko, die anderen mit niedrigem). Suchergebnisse `{ id, title, url, date?, excerpt, source }`; eine Seite `{ url, finalUrl, title?, date?, language?, contentType, content, truncated, untrusted: true, hint? }`. Keine Adresse außerhalb des öffentlichen Internets, außer mit `allowPrivateNetwork`; robots.txt wird beachtet. Siehe [Webrecherche](../guide/web-research) |
+| `webTools({ include?, prefix?, search?, circuitBreaker?, language?, userAgent?, timeoutMs?, callTimeoutMs?, maxResponseBytes?, maxRedirects?, hostIntervalMs?, robots?, allowPrivateNetwork?, lookup?, maxPdfBytes?, maxPdfPages?, cache?, retry?, arxiv?, wikipedia?, github? })` | `ToolDefinition[]` | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search`, schreibgeschützt (`web_fetch` mit mittlerem Risiko, die anderen mit niedrigem). Suchergebnisse `{ id, title, url, date?, excerpt, source }`; eine Seite `{ url, finalUrl, title?, date?, language?, contentType, content, truncated, untrusted: true, hint? }`. Keine Adresse außerhalb des öffentlichen Internets, außer mit `allowPrivateNetwork`; robots.txt wird beachtet; jeder Aufruf innerhalb von `callTimeoutMs` (60 s). Siehe [Webrecherche](../guide/web-research) |
 | `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | `SearchProvider` | Der Standardanbieter von `web_search`, ohne Schlüssel: die HTML-Seite von DuckDuckGo, 1,5 s zwischen zwei Suchen |
 | `searxng({ baseUrl, engines?, categories?, minIntervalMs? })` | `SearchProvider` | Die JSON-API einer SearXNG-Instanz; Ergebnisse als `searxng:<engine>` benannt, datiert nach `publishedDate` |
 | `brave({ apiKey, baseUrl?, minIntervalMs? })`, `tavily(…)`, `serper(…)` | `SearchProvider` | Die APIs von Brave Search, Tavily und Serper, mit ihrem Schlüssel |
-| `normalizeUrl(url)` | `string \| undefined` | Die URL, unter der ein Suchergebnis geführt wird: Tracking-Parameter, Fragment und abschließender Schrägstrich entfernt; `undefined` für alles außer http(s) |
+| `citableUrl(url)`, `normalizeUrl(url)` | `string \| undefined` | Die URL, unter der ein Suchergebnis angeführt wird (Tracking-Parameter und Fragment entfernt), und die, unter der es für seine id und Duplikate geführt wird (zusätzlich Host in Kleinbuchstaben, kein abschließender Schrägstrich); `undefined` für alles außer http(s) |
 | `isPublicAddress(address)` | `boolean` | Ob eine IP-Adresse im öffentlichen Internet liegt (die Prüfung hinter `allowPrivateNetwork`) |
 
 ```ts
@@ -525,11 +525,13 @@ interface ResourceProvider {
 }
 ```
 
-`web_search` fragt seine Anbieter der Reihe nach; ein Anbieter, der einen Fehler wirft, übergibt an den nächsten, und einer, der `SearchThrottledError` wirft (oder dreimal in Folge fehlschlägt), wird für `circuitBreaker.cooldownMs` (2 Minuten) übersprungen. Die Web-Tools werfen `WebRequestRefusedError` für das, was sie absichtlich ablehnen (`reason`: `private-address`, `scheme`, `downgrade`, `redirects`, `robots`, `content-type`, `too-large`, `pacing`), `WebHttpError` für eine Antwort außerhalb von 2xx (`status`) und `WebTimeoutError`; `retry` wiederholt nie eine Ablehnung.
+`web_search` fragt seine Anbieter der Reihe nach; ein Anbieter, der einen Fehler wirft, übergibt an den nächsten, und einer, der `SearchThrottledError` wirft (oder dreimal in Folge fehlschlägt), wird für `circuitBreaker.cooldownMs` (2 Minuten) übersprungen. Die Web-Tools werfen `WebRequestRefusedError` für das, was sie absichtlich ablehnen (`reason`: `private-address`, `scheme`, `downgrade`, `redirects`, `robots`, `content-type`, `too-large`, `pacing`), `WebHttpError` für eine Antwort außerhalb von 2xx (`status`), `WebTimeoutError` (eine Anfrage, die Frist des Aufrufs oder das Zeitbudget einer Extraktion), `WebConfigurationError` für eine fehlende Einrichtung (`unpdf`, ein GitHub-Token) und `SearchUnavailableError`, wenn kein Anbieter geantwortet hat (`failures`). `retry` wiederholt nie eine Ablehnung, eine fehlende Einrichtung oder eine Suche, auf die kein Anbieter geantwortet hat.
 
 ```ts
 interface SearchProvider {
   readonly name: string;
+  /** The origin of a baseUrl you gave it: its requests there may reach a private network. */
+  readonly configuredOrigin?: string;
   /** Send every request through `web`: timeouts, byte caps, pacing and address checks. */
   search(request: SearchRequest, web: WebClient): Promise<SearchHit[]>;
 }
@@ -552,8 +554,6 @@ interface WebClient {
     body?: string;
     minIntervalMs?: number;
     signal?: AbortSignal;
-    /** The origin comes from your code (a baseUrl): it may be on this machine or the local network. */
-    configuredEndpoint?: boolean;
     maxBytes?: number;
   }): Promise<{ status: number; url: string; headers: Record<string, string>; body: Buffer; truncated: boolean }>;
 }

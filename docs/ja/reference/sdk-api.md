@@ -502,11 +502,11 @@ interface ModelCostLine {
 | `cognitiveAgentTool(agent, { name?, description?, metadata?, maxInputLength?, maxContextLength?, exposeErrors? })` | `ToolDefinition` | `ask_<agent>`：`{ problem, context? }` → `{ runId, status, decisionStatus?, answer?, rationale?, confidence?, missing?, nextActions?, error? }`。呼び出し元がやめるとキャンセルされる。`exposeErrors` を指定しない限り、`error` は汎用的な内容になる |
 | `governedAgentTool(agent, options)` | `ToolDefinition` | `{ message, context? }` → `{ runId, status, output?, error? }` |
 | `assertSingleQuery(sql, 'sqlite' \| 'postgres')` | `string` | データベースアダプターが使うステートメントのチェック（SQLite と PostgreSQL の構文のみ） |
-| `webTools({ include?, prefix?, search?, circuitBreaker?, language?, userAgent?, timeoutMs?, maxResponseBytes?, maxRedirects?, hostIntervalMs?, robots?, allowPrivateNetwork?, lookup?, maxPdfBytes?, maxPdfPages?, cache?, retry?, arxiv?, wikipedia?, github? })` | `ToolDefinition[]` | `web_search`、`web_fetch`、`arxiv_search`、`wikipedia_search`、`github_search`。読み取り専用（`web_fetch` は中リスク、それ以外は低リスク）。検索結果は `{ id, title, url, date?, excerpt, source }`、ページは `{ url, finalUrl, title?, date?, language?, contentType, content, truncated, untrusted: true, hint? }`。`allowPrivateNetwork` を指定しない限り、公開インターネットの外のアドレスには接続しない。robots.txt を尊重する。[Web で調べる](../guide/web-research) を参照 |
+| `webTools({ include?, prefix?, search?, circuitBreaker?, language?, userAgent?, timeoutMs?, callTimeoutMs?, maxResponseBytes?, maxRedirects?, hostIntervalMs?, robots?, allowPrivateNetwork?, lookup?, maxPdfBytes?, maxPdfPages?, cache?, retry?, arxiv?, wikipedia?, github? })` | `ToolDefinition[]` | `web_search`、`web_fetch`、`arxiv_search`、`wikipedia_search`、`github_search`。読み取り専用（`web_fetch` は中リスク、それ以外は低リスク）。検索結果は `{ id, title, url, date?, excerpt, source }`、ページは `{ url, finalUrl, title?, date?, language?, contentType, content, truncated, untrusted: true, hint? }`。`allowPrivateNetwork` を指定しない限り、公開インターネットの外のアドレスには接続しない。robots.txt を尊重し、各呼び出しは `callTimeoutMs`（60 秒）以内に収まる。[Web で調べる](../guide/web-research) を参照 |
 | `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | `SearchProvider` | `web_search` のデフォルトのプロバイダーで、キーは不要：DuckDuckGo の HTML ページ。検索の間隔は 1.5 秒 |
 | `searxng({ baseUrl, engines?, categories?, minIntervalMs? })` | `SearchProvider` | SearXNG インスタンスの JSON API。結果は `searxng:<engine>` という名前を持ち、`publishedDate` で日付が付く |
 | `brave({ apiKey, baseUrl?, minIntervalMs? })`、`tavily(…)`、`serper(…)` | `SearchProvider` | Brave Search、Tavily、Serper の API。それぞれのキーを使う |
-| `normalizeUrl(url)` | `string \| undefined` | 検索結果を識別する URL：トラッキング用のパラメーター、フラグメント、末尾のスラッシュを取り除く。http(s) 以外には `undefined` |
+| `citableUrl(url)`、`normalizeUrl(url)` | `string \| undefined` | 検索結果が引用されるときの URL（トラッキング用のパラメーターとフラグメントを取り除く）と、その id と重複の判定に使われる URL（さらにホストを小文字にし、末尾のスラッシュを取り除く）。http(s) 以外には `undefined` |
 | `isPublicAddress(address)` | `boolean` | IP アドレスが公開インターネット上にあるかどうか（`allowPrivateNetwork` の背後にあるチェック） |
 
 ```ts
@@ -525,11 +525,13 @@ interface ResourceProvider {
 }
 ```
 
-`web_search` はプロバイダーに順番に問い合わせます。例外を投げたプロバイダーは次のプロバイダーに引き継ぎ、`SearchThrottledError` を投げた（または 3 回続けて失敗した）プロバイダーは、`circuitBreaker.cooldownMs`（2 分）のあいだ飛ばされます。Web ツールは、意図的に拒否したものには `WebRequestRefusedError`（`reason`：`private-address`、`scheme`、`downgrade`、`redirects`、`robots`、`content-type`、`too-large`、`pacing`）を、2xx 以外の応答には `WebHttpError`（`status`）を、タイムアウトには `WebTimeoutError` を投げます。`retry` は拒否を決してリトライしません。
+`web_search` はプロバイダーに順番に問い合わせます。例外を投げたプロバイダーは次のプロバイダーに引き継ぎ、`SearchThrottledError` を投げた（または 3 回続けて失敗した）プロバイダーは、`circuitBreaker.cooldownMs`（2 分）のあいだ飛ばされます。Web ツールは、意図的に拒否したものには `WebRequestRefusedError`（`reason`：`private-address`、`scheme`、`downgrade`、`redirects`、`robots`、`content-type`、`too-large`、`pacing`）を、2xx 以外の応答には `WebHttpError`（`status`）を、タイムアウトには `WebTimeoutError`（リクエスト、呼び出しの期限、または抽出の時間予算）を、準備の不足には `WebConfigurationError`（`unpdf`、GitHub のトークン）を、どのプロバイダーも答えなかったときには `SearchUnavailableError`（`failures`）を投げます。`retry` は、拒否、準備の不足、どのプロバイダーも答えなかった検索を決してリトライしません。
 
 ```ts
 interface SearchProvider {
   readonly name: string;
+  /** The origin of a baseUrl you gave it: its requests there may reach a private network. */
+  readonly configuredOrigin?: string;
   /** Send every request through `web`: timeouts, byte caps, pacing and address checks. */
   search(request: SearchRequest, web: WebClient): Promise<SearchHit[]>;
 }
@@ -552,8 +554,6 @@ interface WebClient {
     body?: string;
     minIntervalMs?: number;
     signal?: AbortSignal;
-    /** The origin comes from your code (a baseUrl): it may be on this machine or the local network. */
-    configuredEndpoint?: boolean;
     maxBytes?: number;
   }): Promise<{ status: number; url: string; headers: Record<string, string>; body: Buffer; truncated: boolean }>;
 }

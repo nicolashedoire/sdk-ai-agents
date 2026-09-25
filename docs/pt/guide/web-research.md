@@ -52,8 +52,8 @@ Todo resultado de pesquisa tem o mesmo formato, que um estudo lê como um result
 }
 ```
 
-- **`url`** é normalizada: parâmetros de rastreamento (`utm_*`, `fbclid`, `gclid`…), o fragmento e uma barra final são removidos. A mesma página encontrada duas vezes, por duas pesquisas ou por dois provedores, é mantida uma única vez.
-- **`id`** é estável: derivado da URL normalizada (`web:` e 16 dígitos hexadecimais do seu SHA-256), `arxiv:1706.03762`, `wikipedia:en:7266` ou `github:owner/repo`.
+- **`url`** é a URL tal como foi encontrada, sem os seus parâmetros de rastreamento (`utm_*`, `fbclid`, `gclid`…) e sem o seu fragmento; o seu caminho é mantido como está, para que o link funcione. A mesma página encontrada duas vezes em uma resposta é mantida uma única vez. Entre pesquisas, um estudo numera a mesma URL uma única vez.
+- **`id`** é estável: derivado da URL normalizada (a URL acima, com o host em minúsculas e sem barra final: `web:` e 16 dígitos hexadecimais do seu SHA-256), `arxiv:1706.03762`, `wikipedia:en:7266` ou `github:owner/repo`.
 - **`date`** é `YYYY-MM-DD` quando o provedor ou a fonte fornece uma: uma data de publicação, uma idade relativa (`3 days ago`), a data de submissão do arXiv, a última edição da Wikipedia, o último push de um repositório.
 - **`excerpt`** é uma linha de texto, com no máximo 600 caracteres; **`source`** diz quem o encontrou: `duckduckgo`, `searxng:bing`, `brave`, `tavily`, `serper`, `arxiv`, `wikipedia`, `github`.
 
@@ -61,10 +61,10 @@ Os resultados do arXiv também têm `authors`, `pdfUrl`, `updated` e `category`;
 
 ### O que `web_fetch` guarda {#what-web-fetch-keeps}
 
-- **HTML** vira Markdown (ou texto simples com `format: 'text'`), sem nenhuma dependência: o conteúdo principal (`<main>`, senão o `<article>` mais longo, senão `<body>`) com os seus títulos, parágrafos, listas, links tornados absolutos, tabelas, blocos de código e citações. Scripts, estilos, formulários, navegação, cabeçalhos e rodapés da página, elementos laterais (asides), diálogos e todo elemento oculto são descartados. O título vem de `og:title` ou de `<title>`, a data dos metadados da página, do seu JSON-LD ou de um `<time>`, o idioma de `<html lang>`. Os charsets indicados pela página são decodificados, e as respostas comprimidas também.
-- O texto de um **PDF** é lido com o pacote opcional [`unpdf`](https://github.com/unjs/unpdf) (Node.js 22 ou posterior): `npm install unpdf`. Sem ele, `web_fetch` diz isso. O título e a data vêm do documento.
+- **HTML** vira Markdown (ou texto simples com `format: 'text'`), sem nenhuma dependência: o conteúdo principal (`<main>`, senão o `<article>` mais longo, senão `<body>`) com os seus títulos, parágrafos, listas, links tornados absolutos, tabelas, blocos de código e citações. Scripts, estilos, controles de formulário, navegação, cabeçalhos e rodapés da página, elementos laterais (asides), diálogos, todo elemento oculto e o que os navegadores nunca mostram (`noframes`, `noembed`, os parênteses das anotações ruby) são descartados; o texto de um formulário, as seções marcadas com `hidden="until-found"` e o conteúdo de `<noscript>` (a página como um navegador sem JavaScript a mostra) são mantidos. O título vem de `og:title` ou de `<title>`, a data dos metadados da página, do seu JSON-LD ou de um `<time>`, o idioma de `<html lang>`. Os charsets indicados pela página são decodificados, e as respostas comprimidas também. O trabalho é limitado: no máximo 100.000 elementos, com até 128 níveis de profundidade, são lidos (`truncated: true` além disso), e a extração para após 5 s de trabalho, ou antes se a chamada tiver menos tempo restante.
+- O texto de um **PDF** é lido com o pacote opcional [`unpdf`](https://github.com/unjs/unpdf) (Node.js 22 ou posterior): `npm install unpdf`. Sem ele, `web_fetch` diz isso. O título e a data vêm do documento. O PDF é lido em uma worker thread, interrompida se o processo crescer mais de 256 MB, após 20 s, ou quando a chamada termina: um PDF pequeno que se expande para gigabytes não consegue bloquear nem esgotar o processo.
 - Respostas de **texto** (texto simples, Markdown, CSV, JSON, XML, feeds) são devolvidas como estão. Qualquer outro tipo (imagens, arquivos compactados, vídeos…) é recusado antes que o seu corpo seja lido.
-- **`truncated: true`** diz que o conteúdo foi cortado: por `maxChars`, porque a página era maior que `maxResponseBytes`, ou porque um PDF tinha mais de `maxPdfPages` páginas.
+- **`truncated: true`** diz que o conteúdo foi cortado: por `maxChars`, porque a página era maior que `maxResponseBytes` ou tinha mais de 100.000 elementos, ou porque um PDF tinha mais de `maxPdfPages` páginas.
 - **`hint: 'js-rendered'`** diz que a página parece construir o seu conteúdo com JavaScript, que `web_fetch` não executa: ela voltou quase vazia.
 
 ## Provedores de pesquisa {#search-providers}
@@ -97,17 +97,18 @@ Cada provedor transforma `site`, `freshness` e `language` nos seus próprios par
 
 ### O seu próprio provedor {#your-own-provider}
 
-Um provedor é um objeto com um nome e uma função `search`. Envie toda requisição pelo cliente `web` que ela recebe: ele aplica os timeouts, os limites de bytes, o espaçamento das requisições e as verificações de endereço.
+Um provedor é um objeto com um nome e uma função `search`. Envie toda requisição pelo cliente `web` que ela recebe: ele aplica os timeouts, os limites de bytes, o espaçamento das requisições e as verificações de endereço. Se o seu endpoint estiver nesta máquina ou na sua rede privada, declare a sua origem uma vez, como `configuredOrigin`: as requisições do provedor podem alcançar essa origem, e nenhum outro endereço privado. Uma requisição não pode suspender as verificações.
 
 ```ts
 import { SearchThrottledError, type SearchProvider } from '@sdk-ai-agents/core';
 
 const intranetSearch: SearchProvider = {
   name: 'intranet',
+  // Declared once: the host comes from your code, not from the model.
+  configuredOrigin: 'https://search.intranet.example',
   async search(request, web) {
     const url = `https://search.intranet.example/api?q=${encodeURIComponent(request.query)}`;
-    // configuredEndpoint: the host comes from your code, not from the model.
-    const response = await web.request(url, { configuredEndpoint: true, signal: request.signal });
+    const response = await web.request(url, { signal: request.signal });
     if (response.status === 429) throw new SearchThrottledError('intranet search is busy');
     const hits = JSON.parse(response.body.toString('utf8')) as Array<{ title: string; link: string; summary: string }>;
     return hits.map((hit) => ({ title: hit.title, url: hit.link, excerpt: hit.summary }));
@@ -124,8 +125,9 @@ const intranetSearch: SearchProvider = {
 | `search` | `[duckDuckGo()]` | Um provedor ou uma lista, tentados em ordem. |
 | `circuitBreaker` | `{ cooldownMs: 120000, failureThreshold: 3 }` | Quando um provedor que falha é pulado, e por quanto tempo. |
 | `language` | — | Idioma das pesquisas que não indicam nenhum; também a Wikipedia de `wikipedia_search`. |
-| `userAgent` | `sdk-ai-agents (+https://github.com/nicolashedoire/sdk-ai-agents)` | Enviado com cada requisição; a sua primeira palavra é o nome com o qual as regras do robots.txt são comparadas. |
-| `timeoutMs` | `15000` | Por requisição, cada salto de redirecionamento contado à parte. |
+| `userAgent` | `sdk-ai-agents (+https://github.com/nicolashedoire/sdk-ai-agents)` | Enviado com cada requisição. As regras do robots.txt são sempre comparadas para `sdk-ai-agents`, qualquer que seja o user agent. |
+| `timeoutMs` | `15000` | Por requisição: cada salto de redirecionamento, e cada leitura do robots.txt, contados à parte. Uma chamada faz várias requisições, então pode levar várias vezes esse tempo: `callTimeoutMs` limita a chamada inteira. |
+| `callTimeoutMs` | `60000` | A chamada inteira, o que quer que ela espere: robots.txt, espaçamento, cada redirecionamento, o corpo e a extração da página ou do PDF. Passado esse tempo, tudo é abortado e a chamada falha com um `WebTimeoutError`. |
 | `maxResponseBytes` | `2000000` | Maior corpo lido, depois da descompressão. |
 | `maxRedirects` | `5` | Redirecionamentos seguidos, cada um verificado de novo. |
 | `hostIntervalMs` | `1000` | Tempo mínimo entre duas requisições de `web_fetch` a um mesmo host. |
@@ -134,20 +136,20 @@ const intranetSearch: SearchProvider = {
 | `lookup` | o resolvedor do sistema | Resolve os nomes de host: `(hostname) => Promise<Array<{ address, family }>>`. |
 | `maxPdfBytes` | `10000000` | Maior PDF lido. Um maior é recusado. |
 | `maxPdfPages` | `30` | Páginas de um PDF lidas. |
-| `cache` | `{ ttlMs: 600000, maxEntries: 200 }` | Resultados guardados em memória por ferramenta e argumentos; `false` desativa isso. |
-| `retry` | — | Novas tentativas das chamadas que falharam (`{ maxRetries }`): limites de requisições, erros de servidor, timeouts e falhas de rede, nunca uma recusa. |
+| `cache` | `{ ttlMs: 600000, maxEntries: 200, maxBytes: 20000000 }` | Resultados guardados em memória por ferramenta e argumentos, no máximo `maxBytes` medidos como JSON; `false` desativa isso. |
+| `retry` | — | Novas tentativas das chamadas que falharam (`{ maxRetries }`): limites de requisições, erros de servidor, timeouts e falhas de rede; nunca uma recusa, uma configuração ausente (`WebConfigurationError`) ou uma pesquisa à qual nenhum provedor respondeu (`SearchUnavailableError`). |
 | `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | A API do arXiv pede 3 s entre requisições. |
-| `wikipedia` | `{ baseUrl: 'https://{language}.wikipedia.org', language: 'en' }` | `{language}` é substituído pelo idioma da pesquisa. |
+| `wikipedia` | `{ baseUrl: 'https://{language}.wikipedia.org', language: 'en' }` | `{language}` é substituído pelo idioma da pesquisa. Um `baseUrl` seu só fica isento da verificação de rede privada quando `{language}` não está no seu host. |
 | `github` | `{ baseUrl: 'https://api.github.com' }` | `token` aumenta o limite de requisições (10 pesquisas por minuto sem ele) e é necessário para pesquisar código. |
 
 ## Regras de segurança {#security-rules}
 
-1. **Nada fora da Internet pública.** Loopback (`127.0.0.1`, `::1`, `localhost`), redes privadas (`10.x`, `172.16.x`, `192.168.x`, `fc00::/7`), endereços link-local e o serviço de metadados da nuvem (`169.254.169.254`), NAT de operadora (carrier-grade NAT), multicast e faixas reservadas são recusados, assim como os endereços IPv6 que carregam um deles (`::ffff:127.0.0.1`, NAT64, 6to4). Um IP escrito na URL é verificado antes da conexão; um nome de host é verificado pela resolução que a própria conexão usa, então cada endereço para o qual ele resolve é verificado quando a conexão se abre: uma resposta DNS que muda entre uma verificação e a conexão não consegue passar. Cada redirecionamento é verificado de novo.
-2. **A exceção é explícita.** `allowPrivateNetwork: ['intranet.example']` deixa passar apenas os hosts listados, `true` todos eles. O `baseUrl` de um provedor ou de uma fonte vem do seu código, não do modelo: ele é acessível mesmo nesta máquina (um SearXNG em `localhost`), apenas na sua própria origem — `web_fetch` continua a recusá-lo.
+1. **Nada fora da Internet pública.** Loopback (`127.0.0.1`, `::1`, `localhost`), redes privadas (`10.x`, `172.16.x`, `192.168.x`, `fc00::/7`), endereços link-local e o serviço de metadados da nuvem (`169.254.169.254`), NAT de operadora (carrier-grade NAT), multicast e faixas reservadas são recusados, assim como os endereços IPv6 que carregam um deles (`::ffff:127.0.0.1`, `::ffff:0:127.0.0.1`, NAT64, 6to4). Um IP escrito na URL é verificado antes da conexão; um nome de host é verificado pela resolução que a própria conexão usa, então cada endereço para o qual ele resolve é verificado quando a conexão se abre: uma resposta DNS que muda entre uma verificação e a conexão não consegue passar. Cada redirecionamento é verificado de novo, pelo próprio cliente, seja o robots.txt lido ou não.
+2. **A exceção é explícita.** `allowPrivateNetwork: ['intranet.example']` deixa passar apenas os hosts listados, `true` todos eles. Um `baseUrl` que você dá a um provedor ou a uma fonte vem do seu código, não do modelo: ele é acessível mesmo nesta máquina (um SearXNG em `localhost`), apenas na sua própria origem, para as requisições desse provedor ou dessa fonte — um redirecionamento para outro lugar é verificado, e `web_fetch` continua a recusá-lo. A exceção é fixada quando `webTools()` é chamado (um provedor a declara como `configuredOrigin`), nunca por uma requisição. Os endpoints públicos padrão (DuckDuckGo, arXiv, Wikipedia, GitHub) nunca são isentos: você não controla o DNS deles.
 3. **Apenas http e https**, https nunca rebaixado para http por um redirecionamento, no máximo `maxRedirects` redirecionamentos, certificados TLS sempre verificados. Uma chave de API ou um token nunca é enviado a outra origem para a qual um redirecionamento aponta.
-4. **Limitado.** Um timeout por requisição; no máximo `maxResponseBytes` lidos, depois da descompressão, e o resto nunca é baixado; PDFs dentro de `maxPdfBytes` (um PDF que anuncia um tamanho maior é recusado antes de ser baixado) e de `maxPdfPages`; o conteúdo dentro de `maxChars`.
-5. **Educado.** `web_fetch` lê o robots.txt ([RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)) e nunca busca o que ele proíbe para o seu user agent, redirecionamentos incluídos: o grupo que nomeia o seu user agent, senão `*`; a regra mais longa vence, `Allow` vence em caso de empate; padrões `*` e `$`. Um robots.txt ausente (4xx) permite tudo; um que falha (5xx, 429) ou que não pode ser acessado proíbe tudo. `Crawl-delay` espaça as requisições ao seu site. As requisições a cada host são espaçadas (1 s para páginas, 1,5 s para o DuckDuckGo, 3 s para o arXiv), as respostas ficam em cache, e o user agent diz quem está pedindo. As APIs de pesquisa não são rastreadas: o robots.txt não se aplica a elas.
-6. **O conteúdo são dados.** Toda resposta diz `untrusted: true`, e as descrições das ferramentas dizem ao modelo que nunca siga instruções encontradas nela. Antes da extração, `web_fetch` descarta o que um leitor não consegue ver e um modelo veria: elementos `hidden`, `aria-hidden="true"`, `display:none`, `visibility:hidden`, de tamanho de fonte zero ou de opacidade zero, comentários HTML, e caracteres de largura zero e de controle bidirecional. Um estudo mostra os resultados ao seu modelo entre marcadores de dados não confiáveis.
+4. **Limitado.** Um prazo para a chamada inteira (`callTimeoutMs`) e um timeout por requisição; no máximo `maxResponseBytes` lidos, depois da descompressão, e o resto nunca é baixado; PDFs dentro de `maxPdfBytes` (um PDF que anuncia um tamanho maior é recusado antes de ser baixado) e de `maxPdfPages`, lidos em um worker interrompido além de 256 MB ou de 20 s; a extração de uma página dentro de 100.000 elementos e 5 s de trabalho; o conteúdo dentro de `maxChars`. Nenhum trabalho depois do download pode bloquear o processo: o comparador do robots.txt roda em tempo linear, e o caminho do HTML não tem nenhuma etapa quadrática.
+5. **Educado.** `web_fetch` lê o robots.txt ([RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)) e nunca busca o que ele proíbe para `sdk-ai-agents`, redirecionamentos incluídos: o grupo que nomeia `sdk-ai-agents`, senão `*`; a regra mais longa vence, `Allow` vence em caso de empate; padrões `*` e `$`; os escapes de caracteres não reservados são decodificados antes da comparação (`%7E` é `~`). Um robots.txt ausente (4xx) permite tudo; um que falha (5xx, 429) ou que não pode ser acessado proíbe tudo. Ler o robots.txt não atrasa a primeira página; `Crawl-delay` espaça as requisições seguintes, e um intervalo maior que 30 s recusa a próxima página até lá. As requisições a cada host são espaçadas (1 s para páginas, 1,5 s para o DuckDuckGo, 3 s para o arXiv), as respostas ficam em cache, e o user agent diz quem está pedindo. As APIs de pesquisa não são rastreadas: o robots.txt não se aplica a elas.
+6. **O conteúdo são dados.** Toda resposta diz `untrusted: true`, e as descrições das ferramentas dizem ao modelo que nunca siga instruções encontradas nela. Antes da extração, `web_fetch` descarta o que um leitor não consegue ver e um modelo veria: elementos `hidden`, `aria-hidden="true"`, `display:none`, `visibility:hidden`, de tamanho de fonte zero ou de opacidade zero, comentários HTML, e caracteres invisíveis: controles de largura zero e bidirecionais, o bloco Tags (que escreve texto de forma invisível) e os seletores de variação. Os resultados de pesquisa e as mensagens de erro são limpos da mesma forma; um erro cita no máximo uma linha da resposta de um servidor, marcada como não confiável. Um estudo mostra os resultados ao seu modelo entre marcadores de dados não confiáveis.
 7. **Governado.** `web_fetch` tem um risco médio, não baixo: o modelo escolhe a URL, e uma URL pode levar dados para fora (`https://attacker.example/?q=<secret>`). Mantenha-a longe de agentes que guardam segredos, ou faça um humano aprovar cada chamada:
 
 ```ts
@@ -187,4 +189,4 @@ Cada resultado se torna uma fonte numerada (`S1`, `S2`…) com o seu título, a 
 - **Uma regra simples para o conteúdo principal.** `<main>`, o `<article>` mais longo, senão `<body>`: o conteúdo repetitivo que está dentro do conteúdo principal permanece.
 - **Sem OCR.** Um PDF digitalizado não tem texto para ler.
 - **A página HTML do DuckDuckGo não é uma API.** O seu formato pode mudar e ela limita o uso intenso: configure outro provedor para volume.
-- **Os caches vivem em memória**, por chamada de `webTools()`, e se perdem quando o processo termina.
+- **Os caches e o espaçamento vivem em memória**, por chamada de `webTools()`, e se perdem quando o processo termina.
