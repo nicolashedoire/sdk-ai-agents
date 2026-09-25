@@ -159,6 +159,8 @@ await study.recordResult('M1', {
 
 如果一条论断的现有技术无法被搜索或评估，它就仍然有待核查（`toVerify`），并说明原因：对于创新点，原因写在它的 `statusReason` 中；对于其他状态的能力，原因写在它的 `priorArtReason` 中。这些原因是：它的搜索还没有运行（`priorArtNotSearchedYet`）、没有来源（`priorArtNoSource`）、没有为它请求搜索（`priorArtNotSearched`）、它的搜索失败了（`priorArtSearchFailed`）或什么也没找到（`priorArtNoResult`）、搜索预算用完了（`priorArtSearchBudget`）、它的结果没有被评估（`priorArtNotAssessed`），或者核查没有引用它自己的任何结果（`priorArtUnsupported`）。在设计之后才提出的创新点也仍然有待核查。报告会统计这些论断（提示 `noveltiesToVerify` 和 `capabilitiesToVerify`）。
 
+因为服务限流而失败的现有技术搜索（它的工具的错误会说明 `throttled`，SDK 的 Web 工具就是这样做的）不会因此作废：它会再尝试一次，时间在其他现有技术搜索之后，并且在服务要求的等待时间（至少 5 秒，最多 150 秒）之后，前提是这次运行还剩下一分钟和可用的搜索次数。第二次尝试会被记录为一次单独的搜索（`retry: true`）。因其他原因失败的搜索不会再尝试；第二次尝试也失败的论断仍然有待核查，如上所述。
+
 ## 通过你的来源开展研究 {#research-through-your-sources}
 
 研究使用**你交给它的工具**作为 `sources` 来搜索：也就是 SDK 工具的名称。SDK 的 [Web 工具](./web-research)无需任何配置即可使用——`web_search`（在你配置另一个提供商之前使用 DuckDuckGo）、`arxiv_search`、`wikipedia_search` 和 `github_search`——它们的结果附带一个 URL，如果已知，还附带一个日期：
