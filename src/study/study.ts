@@ -1,5 +1,5 @@
 import type { PolicyEngine } from '../engines/policy-engine.js';
-import { ValidationError } from '../errors/index.js';
+import { SDKError, ValidationError } from '../errors/index.js';
 import type { LLMProvider } from '../providers/llm-provider.js';
 import type { IEventStore } from '../stores/event-store.js';
 import { finishWatch, type LiveSubscription, watchRun } from '../stores/observed-event-store.js';
@@ -723,11 +723,7 @@ export class Study {
       } catch (error) {
         const stop = run.stopFor(error);
         if (stop instanceof StudyStop) throw stop;
-        entry = {
-          ...base,
-          resultIds: [],
-          error: truncate(error instanceof Error ? error.message : String(error)),
-        };
+        entry = { ...base, resultIds: [], error: truncate(searchError(error)) };
       }
     }
     this.searches.push(entry);
@@ -901,6 +897,16 @@ function outcomeOf(stopped: unknown): {
     status: 'failed',
     error: stopped instanceof Error ? stopped : new Error(String(stopped)),
   };
+}
+
+/** Why a search failed: the tool's own error, not only the governed pipeline's wrapper. */
+function searchError(error: unknown): string {
+  let cause = error;
+  while (cause instanceof SDKError && cause.originalError && cause.originalError !== cause) {
+    cause = cause.originalError;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return cause !== error && cause instanceof Error ? `${message}: ${cause.message}` : message;
 }
 
 function stageKey(stage: string): string {
