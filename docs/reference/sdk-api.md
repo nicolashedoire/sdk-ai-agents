@@ -179,7 +179,7 @@ Per run. `DEFAULT_STUDY_LIMITS` holds the defaults; a value out of range throws 
 | `name`, `language`, `charter`, `charterHash` | The name, the language, the frozen `StudyCharter`, and its SHA-256 (hexadecimal), recorded in `study.started` and with each amendment |
 | `amendments` | `StudyAmendment[]`: accepted and refused, in order |
 | `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`. Resumes where the last run stopped: the guardian first judges what that run left unjudged, a passage judged but not finished only finishes, then the passages not complete run. `restart` starts the study over: passages, results, searches, drift log, numbering and runs are cleared; the charter and the amendments stay. A limit, a policy, a cancellation or an error ends the run with its status and the report of what was done; it throws only for a run already in progress, an `onEvent` that cannot be served, or an event store that fails. `onEvent` works as with `agent.run` |
-| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`. Classified against the charter alone, never against earlier amendments, in a run of its own (`mode: 'study-amendment'`) where the budget policies are checked first; only `refines` is accepted, and shows in every later prompt. `timeoutMs` (default 60 000) and `signal` bound the classification: past them, or when a policy refuses it, the amendment is refused as `unclassified`. Throws a `ValidationError` for an empty text, a text longer than `MAX_AMENDMENT_LENGTH` (500 characters), or once `MAX_AMENDMENTS` (10) amendments were accepted |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`. Classified against the charter alone, never against earlier amendments (two that contradict each other can both be accepted), one at a time in the order asked, in a run of its own (`mode: 'study-amendment'`) where the budget policies are checked first; only `refines` is accepted, and shows in every later prompt. `timeoutMs` (default 60 000, counted from its turn) and `signal` bound the classification: past them, or when a policy refuses it, the amendment is refused as `unclassified`. Throws a `ValidationError` for an empty text, a text longer than `MAX_AMENDMENT_LENGTH` (500 characters), or when its turn comes once `MAX_AMENDMENTS` (10) amendments were accepted |
 | `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`. Fills fields 10 and 11 of a card and records `study.result_recorded` in the run that wrote it; a `ValidationError` for an unknown card or an empty `result` |
 | `report()` | `StudyReport`: the report as it stands, results recorded since the last run included |
 
@@ -220,7 +220,7 @@ interface StudyReport {
   revisableDecisions: StudyRevisableDecision[]; // D1…
   combinations: StudyCombination[];             // X1…
   capabilities: StudyCapability[];              // Y1…
-  architectures: StudyArchitecture[];           // A1…, capabilities first
+  architectures: StudyArchitecture[];           // A1…: new capabilities, existing ones, improvements
   noveltyClaims: StudyNoveltyClaim[];           // N1…
   experiments: StudyExperiment[];               // E1…
   cards: MechanismCard[];                       // M1…
@@ -241,7 +241,8 @@ interface StudyClaim {
   sources: string[];                                // results listed in the prompt that wrote it
   unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
   servesObjective: string;
-  toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
+  toVerify?: boolean;                               // prior art not assessed: a novelty, or a capability's assembly
+  priorArtReason?: StudyReason;                     // a capability that is not a novelty: why not checked, or assemblyExists
   priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
   unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
   runId: string;
@@ -260,15 +261,17 @@ interface StudyTrace {
 }
 ```
 
-Every reason of the report is a `StudyReason`: the `statusReason` of claims and components, the `reason` of drift entries and amendments, and the `kindReason` of a demoted architecture. The dossier renders its `code` in the study's language (`studyLabels(language).reasons`); a text the guardian or the model wrote has the code `judged`, in `params.text`. The codes (`StudyReasonCode`):
+Every reason of the report is a `StudyReason`: the `statusReason` of claims and components, the `priorArtReason` of a capability that is not a novelty, the `reason` of drift entries and amendments, and the `kindReason` of a demoted architecture. The dossier renders its `code` in the study's language (`studyLabels(language).reasons`); a text the guardian or the model wrote has the code `judged`, in `params.text`. The codes (`StudyReasonCode`):
 
 | Codes | Why |
 | --- | --- |
 | `noSourceConfigured`, `citesUnlisted`, `citesNothing` | An `established` claim or component lowered to `hypothesis`: no source, or no id listed in its prompt |
-| `noveltyNotSearchedYet`, `noveltyNoSource`, `noveltySearchBudget`, `noveltyNotSearched`, `noveltySearchFailed`, `noveltyNoResult`, `noveltyNotAssessed`, `noveltyUnsupported` | Why a novelty is still to verify |
+| `priorArtNotSearchedYet`, `priorArtNoSource`, `priorArtSearchBudget`, `priorArtNotSearched`, `priorArtSearchFailed`, `priorArtNoResult`, `priorArtNotAssessed`, `priorArtUnsupported` | Why the prior art of a novelty, or of a capability's assembly, is still to verify (their English text starts "To verify against prior art:") |
 | `priorArtExists` | A novelty lowered to `hypothesis`: the closest work already does it |
+| `assemblyExists` | A capability that is not a novelty, whose assembly already exists (in its `priorArtReason`) |
 | `componentDocumented`, `componentUndocumented` | A component presented as new |
-| `noServesObjective`, `invalidItem`, `notAnObject`, `notAUserLead`, `leadAlreadyJudged` | An item refused by the schema |
+| `noServesObjective`, `invalidItem`, `notAnObject`, `notAUserLead` | An item refused by the schema |
+| `leadAlreadyJudged` | A verdict given again on a lead already judged: dropped, not drift (`duplicates` of `study.passage_completed`) |
 | `designWithoutCapability` | A design without any new capability |
 | `amendmentUnclassified`, `amendmentCancelled`, `amendmentTimedOut`, `amendmentPolicy` | An amendment that could not be classified |
 | `judged` | The guardian's or the model's own words |
@@ -304,8 +307,8 @@ The other entries of the report are not claims:
 | `StudyDriftEntry` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason` (`StudyReason`), `by` (`guardian`: off the objective; `schema`: refused before, for example without `servesObjective`), `attempt` (2 in a redo), `runId` |
 | `StudySearchResult` | `id` (`S1`…, kept when the same result is found again, until a restart), `title`, `locator` (a URL or another locator), `date?`, `excerpt`, `tool`, `query`, `runId` |
 | `StudySearch` | `passage`, `purpose` (`research` or `priorArt`), `tool`, `query`, `servesObjective`, `claims?`, `resultIds`, `error?`, `skipped?` (`maxSearches`), `runId` |
-| `StudyPassageState` | `passage`, `state` (`complete`; `partial`: judged but not finished, waiting for its loop or with its prior-art search cut short; `unchecked`: items the guardian has not judged; `notRun`), `attempts` (2 after a redo), `reopenedBy`, `runId?` |
-| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noDesign`, `noCapability`, `minimumsNotMet`, `untracedAssembly`, `noveltiesToVerify`), `params?` (`limit`, `error`, `count`), `details?` (the passages, `passage.collection` pairs, leads, breakthroughs or architectures concerned), `message` (in English; the dossier renders the code in its language) |
+| `StudyPassageState` | `passage`, `state` (`complete`; `partial`: judged but not finished, waiting for its loop or with its prior-art search cut short; `unchecked`: items the guardian has not judged; `notRun`), `attempts` (2 after a redo), `keptAttempt?` and `discarded?` (`attempt`, `items`: a redo discarded for a better first attempt), `reopenedBy`, `runId?` |
+| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noDesign`, `noCapability`, `minimumsNotMet`, `untracedAssembly`, `passagesOutdated`, `capabilitiesToVerify`, `capabilitiesExist`, `noveltiesToVerify`), `params?` (`limit`, `error`, `count`), `details?` (the passages, `passage.collection` pairs, leads, breakthroughs or architectures concerned), `message` (in English; the dossier renders the code in its language) |
 | `StudyStats` | Since the last restart: `runs` and `modelCalls` (runs of `run()`, and the calls the vendor answered in them), `searches`, `searchesSkipped`, `results`, `items`, `rejected`, `byStatus` (per status), `downgraded` (claims whose status the study lowered), `noveltiesToVerify`, `redos`, `loops`. And `amendments` (`count`, `modelCalls`): every amendment of the study, counted apart |
 
 ### `renderStudyMarkdown(report)`
