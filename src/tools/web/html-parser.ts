@@ -1,4 +1,5 @@
 import { decodeEntities } from './html-entities.js';
+import { WebTimeoutError } from './web-errors.js';
 
 /** An element of a parsed page. Tag and attribute names are in lower case. */
 export interface HtmlElement {
@@ -15,6 +16,40 @@ export interface HtmlText {
 }
 
 export type HtmlNode = HtmlElement | HtmlText;
+
+/** A parsed page: its root, and whether the parser stopped before the end. */
+export interface HtmlDocument extends HtmlElement {
+  /** More than `maxElements` elements: the rest of the page was left out. */
+  truncated: boolean;
+}
+
+/**
+ * A time budget for synchronous work: nothing else runs while it goes on, so it checks the
+ * clock itself, every few hundred steps, and throws a `WebTimeoutError` once past its end.
+ */
+export class CpuBudget {
+  private steps = 0;
+
+  constructor(
+    private readonly deadline: number,
+    private readonly what: string
+  ) {}
+
+  static of(ms: number, what: string): CpuBudget {
+    return new CpuBudget(Date.now() + ms, what);
+  }
+
+  /** Counts a step; every 256 steps, throws if the budget is spent. */
+  step(): void {
+    if ((++this.steps & 255) === 0) this.check();
+  }
+
+  check(): void {
+    if (Date.now() > this.deadline) {
+      throw new WebTimeoutError(`${this.what} took too long: the page is too large or too complex`);
+    }
+  }
+}
 
 const VOID = new Set([
   'area',
@@ -33,7 +68,11 @@ const VOID = new Set([
   'wbr',
 ]);
 
-/** Elements whose content is text up to their end tag, never markup. */
+/**
+ * Elements whose content is text up to their end tag, never markup, as a browser that runs
+ * scripts reads them. `<noscript>` is not among them: `web_fetch` runs no script, so its
+ * content is markup, the page as a browser without JavaScript shows it.
+ */
 const RAW_TEXT = new Set([
   'script',
   'style',
@@ -41,7 +80,6 @@ const RAW_TEXT = new Set([
   'iframe',
   'noembed',
   'noframes',
-  'noscript',
   'textarea',
   'title',
   'plaintext',
@@ -95,26 +133,39 @@ const IMPLIED_ENDS: Record<string, { closes: string[]; boundary: string[] }> = {
   option: { closes: ['option'], boundary: ['select', 'datalist', 'optgroup'] },
 };
 
-/** Deeper elements are kept as siblings: the tree (and the recursion over it) stays bounded. */
-const MAX_DEPTH = 256;
+/** Deeper elements are kept as siblings: the tree, and every walk over it, stays shallow. */
+export const MAX_HTML_DEPTH = 128;
+/** Elements past this many are left out (`truncated`): a page of 2 MB rarely holds 50,000. */
+export const MAX_HTML_ELEMENTS = 100_000;
+/** Steps back up the open elements when an end tag looks for its start. */
+const MAX_CLOSE_SEARCH = MAX_HTML_DEPTH;
 
-const ATTRIBUTE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+const ATTRIBUTE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
 
 /**
  * Parses HTML the tolerant way: unclosed and misnested tags are closed as a browser would
  * close the common cases (`<p>`, `<li>`, table cells…), comments and doctypes are dropped,
- * and the content of `<script>`, `<style>` and other raw-text elements is kept as text.
- * Returns a root element holding the whole page.
+ * and the content of `<script>`, `<style>` and other raw-text elements is kept as text. In
+ * a tag, a quote opens a value only right after `=`, as in a browser's tokenizer. Returns a
+ * root element holding the whole page, at most `MAX_HTML_DEPTH` deep and `MAX_HTML_ELEMENTS`
+ * elements; `budget` bounds the time it takes.
  */
-export function parseHtml(html: string): HtmlElement {
-  const root: HtmlElement = { type: 'element', tag: '#root', attributes: {}, children: [] };
+export function parseHtml(html: string, budget?: CpuBudget): HtmlDocument {
+  const root: HtmlDocument = {
+    type: 'element',
+    tag: '#root',
+    attributes: {},
+    children: [],
+    truncated: false,
+  };
   const stack: HtmlElement[] = [root];
   const current = () => stack[stack.length - 1] as HtmlElement;
   const addText = (text: string) => {
     if (text) current().children.push({ type: 'text', text: decodeEntities(text) });
   };
   const closeUpTo = (tags: string[], boundary: string[]) => {
-    for (let index = stack.length - 1; index > 0; index--) {
+    const lowest = Math.max(1, stack.length - MAX_CLOSE_SEARCH);
+    for (let index = stack.length - 1; index >= lowest; index--) {
       const tag = (stack[index] as HtmlElement).tag;
       if (boundary.includes(tag)) return;
       if (tags.includes(tag)) {
@@ -124,8 +175,10 @@ export function parseHtml(html: string): HtmlElement {
     }
   };
 
+  let elements = 0;
   let position = 0;
   while (position < html.length) {
+    budget?.step();
     const open = html.indexOf('<', position);
     if (open === -1) {
       addText(html.slice(position));
@@ -144,23 +197,27 @@ export function parseHtml(html: string): HtmlElement {
       continue;
     }
     if (next === '/') {
-      const match = /^<\/([a-zA-Z][\w:-]*)[^>]*>/.exec(html.slice(open, open + 200));
+      const match = /^<\/([a-zA-Z][\w:-]{0,63})[^>]{0,256}>/.exec(html.slice(open, open + 330));
       if (!match) {
         addText('<');
         position = open + 1;
         continue;
       }
-      const tag = (match[1] ?? '').toLowerCase();
-      closeUpTo([tag], []);
+      closeUpTo([(match[1] ?? '').toLowerCase()], []);
       position = open + match[0].length;
       continue;
     }
-    const tagMatch = /^<([a-zA-Z][\w:-]*)/.exec(html.slice(open, open + 100));
+    const tagMatch = /^<([a-zA-Z][\w:-]{0,63})/.exec(html.slice(open, open + 66));
     if (!tagMatch) {
       addText('<');
       position = open + 1;
       continue;
     }
+    if (elements >= MAX_HTML_ELEMENTS) {
+      root.truncated = true;
+      break;
+    }
+    elements++;
     const end = findTagEnd(html, open + tagMatch[0].length);
     const tag = (tagMatch[1] ?? '').toLowerCase();
     const inside = html.slice(open + tagMatch[0].length, end);
@@ -179,33 +236,58 @@ export function parseHtml(html: string): HtmlElement {
     current().children.push(element);
 
     if (RAW_TEXT.has(tag) && !selfClosing) {
-      const close = new RegExp(`</${tag}\\s*>`, 'i');
-      const rest = html.slice(position);
-      const found = close.exec(rest);
-      const raw = found ? rest.slice(0, found.index) : rest;
+      const close = rawTextEnd(html, tag, position);
+      const raw = html.slice(position, close.start);
       // Title and textarea hold text with entities; scripts and styles hold code.
       const text = tag === 'title' || tag === 'textarea' ? decodeEntities(raw) : raw;
       if (text) element.children.push({ type: 'text', text });
-      position += found ? found.index + found[0].length : rest.length;
+      position = close.end;
       continue;
     }
-    if (!VOID.has(tag) && !selfClosing && stack.length < MAX_DEPTH) stack.push(element);
+    if (!VOID.has(tag) && !selfClosing && stack.length < MAX_HTML_DEPTH) stack.push(element);
   }
   return root;
 }
 
-/** The index of the `>` that ends a start tag, skipping quoted attribute values. */
-function findTagEnd(html: string, from: number): number {
-  let quote = '';
-  for (let index = from; index < html.length; index++) {
-    const char = html.charAt(index);
-    if (quote) {
-      if (char === quote) quote = '';
-    } else if (char === '"' || char === "'") {
-      quote = char;
-    } else if (char === '>') {
-      return index;
+/** Where a raw-text element ends: its end tag, found case-insensitively, else the page's end. */
+function rawTextEnd(html: string, tag: string, from: number): { start: number; end: number } {
+  const lower = `</${tag}`;
+  let index = from;
+  for (;;) {
+    const found = html.indexOf('</', index);
+    if (found === -1) return { start: html.length, end: html.length };
+    if (html.slice(found, found + lower.length).toLowerCase() === lower) {
+      const after = html.charAt(found + lower.length);
+      if (after === '>' || after === '' || /\s|\//.test(after)) {
+        const close = html.indexOf('>', found);
+        return { start: found, end: close === -1 ? html.length : close + 1 };
+      }
     }
+    index = found + 2;
+  }
+}
+
+/**
+ * The index of the `>` that ends a start tag. A quote opens a value only right after `=`
+ * (spaces allowed between), as in a browser's tokenizer: `<div class=a"b>` ends at its `>`.
+ */
+function findTagEnd(html: string, from: number): number {
+  let index = from;
+  while (index < html.length) {
+    const char = html.charAt(index);
+    if (char === '>') return index;
+    if (char === '=') {
+      index++;
+      while (index < html.length && /\s/.test(html.charAt(index))) index++;
+      const quote = html.charAt(index);
+      if (quote === '"' || quote === "'") {
+        const close = html.indexOf(quote, index + 1);
+        if (close === -1) return html.length;
+        index = close + 1;
+      }
+      continue;
+    }
+    index++;
   }
   return html.length;
 }
@@ -220,17 +302,36 @@ function parseAttributes(text: string): Record<string, string> {
   return attributes;
 }
 
-/** Every element under `node` (depth first), `node` excluded. */
-export function* descendants(node: HtmlElement): Generator<HtmlElement> {
-  for (const child of node.children) {
-    if (child.type !== 'element') continue;
-    yield child;
-    yield* descendants(child);
+/** Every element under `node`, depth first, `node` excluded. Iterative: no deep recursion. */
+export function descendants(node: HtmlElement, budget?: CpuBudget): HtmlElement[] {
+  const found: HtmlElement[] = [];
+  const pending: HtmlNode[] = [...node.children].reverse();
+  while (pending.length > 0) {
+    budget?.step();
+    const next = pending.pop() as HtmlNode;
+    if (next.type !== 'element') continue;
+    found.push(next);
+    for (let index = next.children.length - 1; index >= 0; index--) {
+      pending.push(next.children[index] as HtmlNode);
+    }
   }
+  return found;
 }
 
-/** The text under a node, whitespace as written. */
+/** The text under a node, whitespace as written. Iterative. */
 export function textOf(node: HtmlNode): string {
   if (node.type === 'text') return node.text;
-  return node.children.map(textOf).join('');
+  const parts: string[] = [];
+  const pending: HtmlNode[] = [node];
+  while (pending.length > 0) {
+    const next = pending.pop() as HtmlNode;
+    if (next.type === 'text') {
+      parts.push(next.text);
+      continue;
+    }
+    for (let index = next.children.length - 1; index >= 0; index--) {
+      pending.push(next.children[index] as HtmlNode);
+    }
+  }
+  return parts.join('');
 }

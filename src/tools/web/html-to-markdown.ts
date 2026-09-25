@@ -1,5 +1,12 @@
 import { stripInvisible } from './html-entities.js';
-import { descendants, type HtmlElement, type HtmlNode, parseHtml, textOf } from './html-parser.js';
+import {
+  CpuBudget,
+  descendants,
+  type HtmlElement,
+  type HtmlNode,
+  parseHtml,
+  textOf,
+} from './html-parser.js';
 import { isoDate, oneLine } from './results.js';
 
 /** What `web_fetch` keeps of an HTML page. */
@@ -13,7 +20,12 @@ export interface PageExtract {
   content: string;
   /** The page seems to build its content with JavaScript, which `web_fetch` does not run. */
   hint?: 'js-rendered';
+  /** The page had more elements than are read: its end was left out. */
+  truncated?: boolean;
 }
+
+/** Longest time the extraction of one page may take, unless the call has less left. */
+export const EXTRACT_BUDGET_MS = 5_000;
 
 export type PageFormat = 'markdown' | 'text';
 
@@ -22,8 +34,10 @@ const DROPPED = new Set([
   'head',
   'script',
   'style',
-  'noscript',
   'template',
+  'noframes',
+  'noembed',
+  'rp',
   'iframe',
   'frame',
   'frameset',
@@ -33,7 +47,6 @@ const DROPPED = new Set([
   'svg',
   'math',
   'canvas',
-  'form',
   'input',
   'button',
   'select',
@@ -96,27 +109,35 @@ const MODIFIED_META = ['article:modified_time', 'og:updated_time', 'datemodified
 /**
  * Extracts what a reader (or a model) needs from an HTML page, with no dependency: its title,
  * date and language, and its main content as Markdown or plain text — headings, paragraphs,
- * lists, links, tables and code kept; scripts, styles, navigation, footers, forms and hidden
- * elements (`hidden`, `aria-hidden`, `display:none`, `visibility:hidden`, zero font size or
- * opacity) dropped, invisible characters removed.
+ * lists, links, tables and code kept; scripts, styles, navigation, footers, form controls and
+ * hidden elements (`hidden`, `aria-hidden`, `display:none`, `visibility:hidden`, zero font
+ * size or opacity) dropped, invisible characters removed.
+ *
+ * The work is bounded: the tree is at most 128 elements deep and 100,000 elements large,
+ * every walk over it is iterative or depth-limited, and the whole extraction stops with a
+ * `WebTimeoutError` past `budgetMs` (5 s by default).
  */
 export function extractPage(
   html: string,
-  options: { url: string; format: PageFormat }
+  options: { url: string; format: PageFormat; budgetMs?: number }
 ): PageExtract {
-  const root = parseHtml(html);
-  const metadata = readMetadata(root);
-  const base = baseUrl(root, options.url);
-  prune(root, false);
-  const main = mainContent(root);
-  const content = render(main, { markdown: options.format === 'markdown', base, blocks: [] });
-  const title = metadata.title ?? firstHeading(main);
-  const date = metadata.published ?? timeDate(main) ?? metadata.modified;
+  const budget = CpuBudget.of(options.budgetMs ?? EXTRACT_BUDGET_MS, 'Extracting the page');
+  const root = parseHtml(html, budget);
+  const metadata = readMetadata(root, budget);
+  const base = baseUrl(root, options.url, budget);
+  prune(root, false, budget);
+  const main = mainContent(root, budget);
+  const content = render(main, {
+    markdown: options.format === 'markdown',
+    base,
+    blocks: [],
+    budget,
+  });
+  budget.check();
+  const title = metadata.title ?? firstHeading(main, budget);
+  const date = metadata.published ?? timeDate(main, budget) ?? metadata.modified;
   const hint =
-    content.replace(/\s+/g, '').length < 200 &&
-    /id=["'](?:__next|root|app|__nuxt)["']|data-reactroot|ng-app|__NUXT__|<noscript[^>]*>[^<]*(?:enable|activate|turn on)\s+javascript/i.test(
-      html
-    )
+    content.replace(/\s+/g, '').length < 200 && JS_RENDERED.test(html.slice(0, 65_536))
       ? ('js-rendered' as const)
       : undefined;
   return {
@@ -125,8 +146,13 @@ export function extractPage(
     ...(metadata.language ? { language: metadata.language } : {}),
     content,
     ...(hint ? { hint } : {}),
+    ...(root.truncated ? { truncated: true } : {}),
   };
 }
+
+/** Marks of a page built by JavaScript. Bounded repetitions: no quadratic backtracking. */
+const JS_RENDERED =
+  /id=["'](?:__next|root|app|__nuxt)["']|data-reactroot|ng-app|__NUXT__|<noscript[^>]{0,200}>[^<]{0,500}?(?:enable|activate|turn on)\s{1,5}javascript/i;
 
 interface Metadata {
   title?: string;
@@ -136,13 +162,13 @@ interface Metadata {
 }
 
 /** Title, dates and language from `<meta>`, `<title>`, `<html lang>` and JSON-LD. */
-function readMetadata(root: HtmlElement): Metadata {
+function readMetadata(root: HtmlElement, budget: CpuBudget): Metadata {
   const metas = new Map<string, string>();
   const jsonLd: unknown[] = [];
   let title: string | undefined;
   let htmlLang: string | undefined;
   let itemDate: string | undefined;
-  for (const element of descendants(root)) {
+  for (const element of descendants(root, budget)) {
     const { tag, attributes } = element;
     if (tag === 'meta') {
       const key = (
@@ -223,14 +249,14 @@ function stringOf(value: unknown): string | undefined {
 }
 
 /** Links resolve against `<base href>` when the page sets one, else against its URL. */
-function baseUrl(root: HtmlElement, url: string): URL | undefined {
+function baseUrl(root: HtmlElement, url: string, budget: CpuBudget): URL | undefined {
   let base: URL | undefined;
   try {
     base = new URL(url);
   } catch {
     base = undefined;
   }
-  for (const element of descendants(root)) {
+  for (const element of descendants(root, budget)) {
     if (element.tag === 'base' && element.attributes.href) {
       try {
         return new URL(element.attributes.href, base);
@@ -243,15 +269,20 @@ function baseUrl(root: HtmlElement, url: string): URL | undefined {
 }
 
 /** Drops what is not content, and every element a reader cannot see. */
-function prune(node: HtmlElement, inContent: boolean): void {
+function prune(node: HtmlElement, inContent: boolean, budget: CpuBudget): void {
   node.children = node.children.filter((child) => {
+    budget.step();
     if (child.type === 'text') return true;
     if (DROPPED.has(child.tag) || isHidden(child)) return false;
     const role = child.attributes.role?.trim().toLowerCase();
     if (role && DROPPED_ROLES.has(role)) return false;
     // A page's header is furniture; an article's header holds its title and byline.
     if ((child.tag === 'header' || role === 'banner') && !inContent) return false;
-    prune(child, inContent || child.tag === 'article' || child.tag === 'main' || role === 'main');
+    prune(
+      child,
+      inContent || child.tag === 'article' || child.tag === 'main' || role === 'main',
+      budget
+    );
     return true;
   });
 }
@@ -259,7 +290,10 @@ function prune(node: HtmlElement, inContent: boolean): void {
 /** Hidden by an attribute or an inline style: text a reader never sees can carry instructions. */
 export function isHidden(element: HtmlElement): boolean {
   const { attributes } = element;
-  if ('hidden' in attributes) return true;
+  // `hidden="until-found"` is found by the browser's search: it is content.
+  if ('hidden' in attributes && attributes.hidden?.trim().toLowerCase() !== 'until-found') {
+    return true;
+  }
   if (attributes['aria-hidden']?.trim().toLowerCase() === 'true') return true;
   if (element.tag === 'input' && attributes.type?.toLowerCase() === 'hidden') return true;
   const style = (attributes.style ?? '').toLowerCase().replace(/\s+/g, '');
@@ -275,27 +309,50 @@ export function isHidden(element: HtmlElement): boolean {
 }
 
 /** `<main>`, else the longest `<article>`, else `<body>` — when it holds real text. */
-function mainContent(root: HtmlElement): HtmlElement {
-  const elements = [...descendants(root)];
+function mainContent(root: HtmlElement, budget: CpuBudget): HtmlElement {
+  const elements = descendants(root, budget);
+  const lengths = textLengths(elements, budget);
+  const length = (element: HtmlElement) => lengths.get(element) ?? 0;
   const main = elements.find(
     (element) => element.tag === 'main' || element.attributes.role?.toLowerCase() === 'main'
   );
-  if (main && textLength(main) >= 100) return main;
-  const articles = elements
-    .filter((element) => element.tag === 'article')
-    .map((article) => ({ article, length: textLength(article) }))
-    .sort((a, b) => b.length - a.length);
-  const article = articles[0];
-  if (article && article.length >= 100) return article.article;
+  if (main && length(main) >= 100) return main;
+  let article: HtmlElement | undefined;
+  for (const element of elements) {
+    if (element.tag === 'article' && (!article || length(element) > length(article))) {
+      article = element;
+    }
+  }
+  if (article && length(article) >= 100) return article;
   return elements.find((element) => element.tag === 'body') ?? root;
+}
+
+/**
+ * The length of the text (spaces left out) under every element, in one pass from the leaves
+ * up: measuring each element on its own would read nested text once per level.
+ */
+function textLengths(elements: HtmlElement[], budget: CpuBudget): Map<HtmlElement, number> {
+  const lengths = new Map<HtmlElement, number>();
+  // In depth-first order a parent comes before its descendants: backwards, after them.
+  for (let index = elements.length - 1; index >= 0; index--) {
+    budget.step();
+    const element = elements[index] as HtmlElement;
+    let total = 0;
+    for (const child of element.children) {
+      total +=
+        child.type === 'text' ? child.text.replace(/\s+/g, '').length : (lengths.get(child) ?? 0);
+    }
+    lengths.set(element, total);
+  }
+  return lengths;
 }
 
 function textLength(node: HtmlNode): number {
   return textOf(node).replace(/\s+/g, '').length;
 }
 
-function firstHeading(node: HtmlElement): string | undefined {
-  for (const element of descendants(node)) {
+function firstHeading(node: HtmlElement, budget: CpuBudget): string | undefined {
+  for (const element of descendants(node, budget)) {
     if (element.tag === 'h1') {
       const text = oneLine(stripInvisible(textOf(element)), 300);
       if (text) return text;
@@ -305,8 +362,8 @@ function firstHeading(node: HtmlElement): string | undefined {
 }
 
 /** The date of a `<time datetime>` in the content, a publication one first. */
-function timeDate(node: HtmlElement): string | undefined {
-  const times = [...descendants(node)].filter(
+function timeDate(node: HtmlElement, budget: CpuBudget): string | undefined {
+  const times = descendants(node, budget).filter(
     (element) => element.tag === 'time' && element.attributes.datetime
   );
   const published = times.find(
@@ -326,7 +383,16 @@ interface RenderContext {
   base: URL | undefined;
   /** Preformatted blocks, kept apart so whitespace clean-up never touches them. */
   blocks: string[];
+  budget: CpuBudget;
+  /** How deep the element being rendered is: past `FLAT_DEPTH`, its text only. */
+  depth?: number;
 }
+
+/**
+ * Past this depth, an element is rendered as its plain text: each level of formatting (a quote
+ * mark, a list indent) costs a copy of what it holds, so depth multiplies the work.
+ */
+const FLAT_DEPTH = 40;
 
 /** Indentation of nested list lines, kept apart from the spaces the clean-up trims. */
 const INDENT = '\ue000';
@@ -353,6 +419,8 @@ const BLOCKS = new Set([
   'caption',
   'dd',
   'search',
+  'form',
+  'noscript',
 ]);
 
 function render(node: HtmlElement, context: RenderContext): string {
@@ -381,8 +449,18 @@ function block(content: string): string {
 }
 
 function renderChildren(node: HtmlElement, context: RenderContext): string {
+  const depth = (context.depth ?? 0) + 1;
+  if (depth > FLAT_DEPTH) {
+    return stripInvisible(textOf(node))
+      .replace(/[\ue000-\uf8ff]/g, '')
+      .replace(/[\s\u00a0]+/g, ' ');
+  }
+  const inner = { ...context, depth };
   let out = '';
-  for (const child of node.children) out += renderNode(child, context);
+  for (const child of node.children) {
+    context.budget.step();
+    out += renderNode(child, inner);
+  }
   return out;
 }
 
@@ -561,8 +639,8 @@ function cellsOf(row: HtmlElement): HtmlElement[] {
 }
 
 /** A table used to lay a page out, not to hold data: its cells hold blocks. */
-function isLayoutTable(table: HtmlElement, rows: HtmlElement[]): boolean {
-  for (const element of descendants(table)) {
+function isLayoutTable(table: HtmlElement, rows: HtmlElement[], budget: CpuBudget): boolean {
+  for (const element of descendants(table, budget)) {
     if (
       ['table', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'pre', 'blockquote'].includes(
         element.tag
@@ -576,7 +654,7 @@ function isLayoutTable(table: HtmlElement, rows: HtmlElement[]): boolean {
 
 function renderTable(table: HtmlElement, context: RenderContext): string {
   const rows = tableRows(table);
-  if (isLayoutTable(table, rows)) {
+  if (isLayoutTable(table, rows, context.budget)) {
     return rows
       .flatMap((row) => cellsOf(row).map((cell) => block(renderChildren(cell, context))))
       .join('');

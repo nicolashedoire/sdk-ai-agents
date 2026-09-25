@@ -44,7 +44,9 @@ function layout(node) {
 > Immutability makes caching safe.
 
 Call \`layout()\` once.
-Then paint.`;
+Then paint.
+
+Email`;
 
 describe('web_fetch', () => {
   let server: WebServer;
