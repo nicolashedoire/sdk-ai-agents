@@ -90,6 +90,23 @@ Every term used in this documentation, explained without jargon, with a link to 
 | **Calibration example** | A run the person validated, shown to the model as a model answer. |
 | **Correction** | A lesson from a run the person disagreed with, shown to the model as its highest priority. |
 
+## Studies
+
+| Term | In plain words |
+| --- | --- |
+| **Study** | An AI researcher (`sdk.createStudy`): it understands an object, then proposes how to redesign it with the knowledge and techniques of today, and designs the experiments that would decide. It builds and measures nothing. See [Studies](./studies). |
+| **Passage** | One of the seven stages of a study: observe, decompose, understand the choices of their time, examine what changed, cross past and present, design, confront. A passage can reopen an earlier one. |
+| **Charter** | The frame of a study: the object, the guiding question, the objective, the needs, your leads, what is out of scope. It is frozen when the study is created, and every prompt starts with it. |
+| **Lead** | An idea you give the study to look into. It is an example to verify, not a truth: the study says whether it is relevant, with reasons, and looks beyond it. |
+| **Claim status** | What a statement of a study is worth: **established** (backed by a source the study actually found), **hypothesis** (plausible, not documented) or **novelty** (a new idea, to check against existing work). The code checks it, not the model. See [Established, hypothesis, novelty](./studies#established-hypothesis-novelty). |
+| **Prior art** | The existing work closest to an idea presented as new. A novelty stays "to verify" until the study has searched for it. |
+| **Guardian** | A separate check after each passage of a study: it sees only the charter and what the passage produced, and removes what wanders off the objective. See [The guardian](./studies#the-guardian). |
+| **Drift, drift log** | Drift is a model slowly leaving its subject. The drift log lists everything a study removed for that reason, and why. |
+| **Amendment** | An instruction added to a study after it was created. It is accepted only when it refines the objective; one that contradicts the charter or changes the objective is refused. |
+| **New capability** | Something that becomes possible, difficult or impossible today, through a change of principle — as opposed to an **improvement**, which only makes something faster or cheaper. |
+| **Breakthrough by assembly** | A breakthrough made of techniques that already existed, joined in a new way. Bitcoin is one: signatures, hash chains, proof of work and a peer-to-peer network were all known before. |
+| **Mechanism card** | Eleven questions about one mechanism, from what was observed to what was concluded. A study answers the first nine; you answer the last two once you have run the experiment. |
+
 ## Typed decisions and connectors
 
 | Term | In plain words |

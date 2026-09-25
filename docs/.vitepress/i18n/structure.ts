@@ -31,6 +31,7 @@ export const SIDEBAR = [
       'guide/memory',
       'guide/thinker-profiles',
       'guide/governed-agents',
+      'guide/studies',
     ],
   },
   {

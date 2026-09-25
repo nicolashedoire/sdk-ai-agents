@@ -25,7 +25,7 @@ Version 0.2 adds a reasoning layer on top of the governed runtime described belo
 | Assessors | `src/cognition/hypothesis-assessor.ts` | `compare` with typed decisions: evidence asked without the thinker, fit asked for proposals only |
 | Recorder & factory | `src/cognition/cognitive-run-recorder.ts`, `create-cognitive-agent.ts` | Event shapes of a cognitive run; assembly of an agent from its configuration and the SDK services |
 
-Around it: `src/decisions` (typed decisions, Jev client, decision service), `src/costs` (pricing and run costs), `src/resilience` (retry policy and retrying provider), `src/incidents` (rules, notifiers, monitored event store) and `src/mcp` (server and client, published as `@sdk-ai-agents/core/mcp`).
+Around it: `src/decisions` (typed decisions, Jev client, decision service), `src/costs` (pricing and run costs), `src/resilience` (retry policy and retrying provider), `src/incidents` (rules, notifiers, monitored event store), `src/mcp` (server and client, published as `@sdk-ai-agents/core/mcp`) and `src/study` (studies, which reuse the providers, the event store, governed tool execution and costs, but not the cognitive engine).
 
 The rest of this page documents the governed runtime (v0.1).
 
@@ -282,7 +282,18 @@ type EventType =
   | 'cognition.evaluated'
   | 'cognition.feedback'
   | 'cognition.knowledge_recorded'
-  | 'decision.evaluated';
+  | 'decision.evaluated'
+  | 'study.started'
+  | 'study.passage_started'
+  | 'study.passage_completed'
+  | 'study.search'
+  | 'study.model_called'
+  | 'study.drift_rejected'
+  | 'study.amendment_accepted'
+  | 'study.amendment_refused'
+  | 'study.result_recorded'
+  | 'study.completed'
+  | 'study.failed';
 ```
 
 ### Event Structure

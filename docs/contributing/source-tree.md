@@ -15,6 +15,7 @@ sdk-ai-agents/
 │   ├── mcp.ts                  # Entry point of @sdk-ai-agents/core/mcp
 │   ├── cognition/              # Cognitive agents: mental state, operations, controllers, profiles
 │   ├── decisions/              # Typed decisions (Jev client, DecisionService)
+│   ├── study/                  # Studies: charter, passages, guardian, claim statuses, dossier
 │   ├── engines/                # Reasoning, action, policy and replay engines
 │   ├── stores/                 # Event stores (file, SQLite, PostgreSQL)
 │   ├── providers/              # LLM providers (OpenAI, Anthropic, fallback)
@@ -145,6 +146,12 @@ sdk-ai-agents/
 **Purpose:** Cognitive agents — explicit mental state, cognitive operations, controllers, thinker profiles.
 
 **Contains:** `cognitive-agent.ts` (run loop), `operation-selector.ts`, `operation-performer.ts`, `cognitive-controller.ts` (heuristic), `typed-decision-controller.ts` (Jev), `hypothesis-assessor.ts`, `information-seeker.ts`, `llm-thought-generator.ts` and `thought-prompts.ts`, `mental-state.ts` (schemas and types), `mental-state-reducer.ts` and `hypothesis-transitions.ts`, `mental-state-replay.ts`, `thinker-profile.ts`, `profile-distiller.ts`, `create-cognitive-agent.ts`.
+
+### `src/study/`
+
+**Purpose:** Studies (`sdk.createStudy`) — a researcher that understands an object, then proposes how to redesign it, separate from the cognitive engine.
+
+**Contains:** `study.ts` (the `Study` class: runs, guardian, amendments, prior-art search), `passages.ts` (the seven passages, their collections and schemas), `study-config.ts` (configuration, frozen charter and its hash), `study-prompts.ts` and `study-replies.ts` (prompts rebuilt at each call, replies read against their schemas), `study-claims.ts` (claim statuses checked in code), `study-sources.ts` (sources, query parameters, results), `study-model.ts` and `study-run.ts` (model calls, limits, events), `study-report.ts`, `study-markdown.ts` and `study-labels.ts` (the report, and the dossier in eleven languages), `study-types.ts`.
 
 ### `src/decisions/` (v0.2)
 

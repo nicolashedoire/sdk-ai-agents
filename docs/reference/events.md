@@ -17,7 +17,7 @@ interface Event {
 
 | Type | Data |
 | --- | --- |
-| `run.started` | `input`, `mode` (`cognitive`, `tool` for a call outside an agent such as an MCP call, `resource` for an MCP resource read, or absent for governed runs), `replayOf?` |
+| `run.started` | `input`, `mode` (`cognitive`, `study` for a study's run, `study-amendment` for the run that classifies an amendment, `tool` for a call outside an agent such as an MCP call, `resource` for an MCP resource read, or absent for governed runs), `replayOf?` |
 | `run.completed` | `output`, `decision?` (cognitive) |
 | `run.failed` | `error`, `steps?`, `uri?` (failed resource read) |
 | `run.cancelled` / `run.stopped` | `reason` |
@@ -28,7 +28,7 @@ interface Event {
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` — or `intention` for a cognitive final answer |
 | `policy.checked` | `intention`, `validation`: the action engine's verdict on a tool call. The policy engine also records one event per policy it checks — `policyId`, `policyType`, `intention`, `conditionEvaluated?`, `validationResult`, `applied` (`true` when the policy applied and refused) and `reason` — before a tool call, and before each step of a cognitive run for the budget and timeout policies that can apply to a step (`intention` is then `{ type: 'continue' }`) |
-| `policy.violated` | `intention`, `reason`, `violatedPolicies` (`allowed-tools` when a caller used a tool it was not given; the budget policy's id when its call budget is spent), and `step` when a budget or timeout policy refused a step of a cognitive run (its `intention` is then `{ type: 'continue' }`) |
+| `policy.violated` | `intention`, `reason`, `violatedPolicies` (`allowed-tools` when a caller used a tool it was not given; the budget policy's id when its call budget is spent), and `step` when a budget or timeout policy refused a step of a cognitive run, or `passage` a passage of a study (its `intention` is then `{ type: 'continue' }`) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval` when the tool's own `metadata.requiresApproval` asked for it), `reason?` (`cancelled before a decision` when the caller gave up or the run stopped, `no decision within N ms` after `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` — `action.failed` also records a call refused for invalid arguments (before any policy) or because its caller left after an approval |
 | `tool.called` | `toolName`, `parameters` |
@@ -53,6 +53,25 @@ interface Event {
 | `cognition.knowledge_recorded` | `scope`, `findings` (statement, kind, scope, `revises?`, `difference?`, `evidence`: each test with `runId`, `predictionId`, `verdict`, `expected`, `observed`, evaluator), `error?` when the store failed. Appended after `run.completed`, `run.failed` or `run.cancelled`, and only when the run tested something |
 | `cognition.feedback` | `feedback` (`verdict`, `agreement?`, `wrongAbout?`, …), `profileId`, `profileVersionBefore`, `profileVersionAfter` |
 | `decision.evaluated` | `client`, `purpose` (`operation_selection`, `hypothesis_assessment`, `direct`), `model`, `state`, `questions`, `answers` (empty when rejected), `usage?` (absent when the backend reported no token counts), `error?` (why a billed answer was rejected), `step?` |
+
+## Studies
+
+A study's runs (`mode: 'study'`) and the runs that classify its amendments (`mode: 'study-amendment'`) record these events. Each carries the study's `id` as `metadata.agentId` and its name as `metadata.studyName`. The searches also record the events of their governed tool calls (`action.executing`, `policy.checked`, `tool.called`, `action.executed`) in the study's run. See [Studies](../guide/studies).
+
+| Type | Data |
+| --- | --- |
+| `study.started` | `name`, `charter` (`object`, `question`, `objective`, `needs`, `leads`, `scope`, `capability?`, `analogues`), `charterHash` (SHA-256), `language`, `model?`, `sources` (tool names), `limits`, `driftThreshold`, `amendments` (the accepted ones: `number`, `text`), `resumeAt?` (the passage a resumed run starts at) |
+| `study.passage_started` | `passage`, `number` (1 to 7), `amendments` (numbers of the accepted amendments in force), and `reopenedBy?`, `focus?`, `reason?` when a later passage reopened it |
+| `study.passage_completed` | `passage`, `attempts` (2 when the guardian had it redone), `items` (each with its `collection`, `id`, `statement`, `status`, `sources`, `servesObjective`, the other fields of a claim and its own fields), `reopenedBy?`, `reopen?` (`passage`, `focus`, `reason`: the earlier passage it asks to reopen) |
+| `study.search` | `passage`, `purpose` (`research`, or `priorArt` for the prior art of novelties), `tool`, `query`, `servesObjective`, `claims?` (the novelties it looks for), `resultIds`, `results` (`id`, `title`, `locator`, `date?`), `error?` (the search failed), `skipped?` (`maxSearches`: not run) |
+| `study.model_called` | `purpose` (`passage`, `queries`, `check`, `priorArtQueries`, `priorArtCheck`, `amendment`), `passage?`, `model?`, `requestedModel?`, `usage` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?`, `unmeteredTokens?`: one event for a call and its repair), `failed?` (why the reply could not be used) — counted in costs and in budgets per period |
+| `study.drift_rejected` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason`, `by` (`guardian`: judged off the objective; `schema`: refused before, for example without `servesObjective`), `attempt` (2 in a redo) |
+| `study.amendment_accepted` / `study.amendment_refused` | `number?` (accepted only), `text`, `verdict` (`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason`, `charterHash` — in the amendment's own run |
+| `study.result_recorded` | `card`, `resultAndError` (`result`, `error?`), `conclusionAndMemory?` — appended to the run that wrote the card, after its end |
+| `study.completed` | `status`, `passages` (`passage`, `state`), `stats` |
+| `study.failed` | `status` (`stopped`, `failed` or `cancelled`), `stoppedBy?`, `error`, `passages`, `stats`, `partial: true` — then `run.failed`, or `run.cancelled` |
+
+`study.model_called` is what `getRunCost` and budgets read for a study. When two runs are compared, study events are paired by passage (`study.model_called` by purpose and passage), and the `usage` of `study.model_called` is not compared.
 
 ## Operations
 
