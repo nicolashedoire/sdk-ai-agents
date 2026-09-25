@@ -2,6 +2,7 @@ import { bodyText, ensureOk, type WebClient } from '../guarded-http.js';
 import { decodeEntities, stripInvisible } from '../html-entities.js';
 import { isoDate, oneLine } from '../results.js';
 import { trimBase } from '../search-provider.js';
+import { WebHttpError } from '../web-errors.js';
 
 export interface ArxivOptions {
   /** Default `https://export.arxiv.org`. */
@@ -29,9 +30,9 @@ export interface ArxivResult {
   source: 'arxiv';
 }
 
-/** Words too common to narrow an arXiv search. */
+/** Words too common to narrow an arXiv search, and the operators of its syntax. */
 const STOP_WORDS = new Set(
-  'a an and are as at be by for from how in into is it of on or that the this to with without what which why'.split(
+  'a an and andnot are as at be by for from how in into is it not of on or that the this to with without what which why'.split(
     ' '
   )
 );
@@ -39,9 +40,10 @@ const STOP_WORDS = new Set(
 const ARXIV_SYNTAX = /\b(?:ti|au|abs|co|jr|cat|rn|id|all):/;
 
 /**
- * Searches arXiv's API (Atom): title, authors, dates, abstract and links of each paper. Plain
- * words are all required (`all:w1 AND all:w2`, stop words dropped); a query written in
- * arXiv's syntax (`ti:`, `au:`, `cat:`…) is sent as it is.
+ * Searches arXiv's API (Atom): title, authors, dates, abstract and links of each paper,
+ * best matches first. Plain words are searched as a phrase and one by one (stop words
+ * dropped), so a paper matching the phrase or more of the words ranks higher; a query written
+ * in arXiv's syntax (`ti:`, `au:`, `cat:`…) is sent as it is.
  */
 export async function searchArxiv(
   web: WebClient,
@@ -60,18 +62,32 @@ export async function searchArxiv(
     configuredEndpoint: true,
     ...(request.signal ? { signal: request.signal } : {}),
   });
+  if ([403, 406, 429, 503].includes(response.status)) {
+    // arXiv's API refuses clients that go faster than one request every 3 s, sometimes with a
+    // 406 from its CDN.
+    throw new WebHttpError(
+      `arXiv refused the request (HTTP ${response.status}): it allows one request every 3 s; try again later`,
+      response.status
+    );
+  }
   ensureOk(response, 'arXiv');
   return parseArxivFeed(bodyText(response));
 }
 
-/** The `search_query` of a query: plain words become required terms. */
+/**
+ * The `search_query` of a query: its words as a phrase, or any of its significant words
+ * (`all:"a b c" OR all:a OR all:c`). Requiring every word finds nothing too often.
+ */
 export function arxivQuery(query: string): string {
   if (ARXIV_SYNTAX.test(query)) return query;
-  const words = (query.match(/[\p{L}\p{N}][\p{L}\p{N}.+-]*/gu) ?? []).filter(
-    (word) => !STOP_WORDS.has(word.toLowerCase())
-  );
-  const terms = [...new Set(words)].slice(0, 6);
-  return terms.length > 0 ? terms.map((word) => `all:${word}`).join(' AND ') : `all:${query}`;
+  const words = query.match(/[\p{L}\p{N}][\p{L}\p{N}.+-]*/gu) ?? [];
+  const significant = [
+    ...new Set(words.filter((word) => !STOP_WORDS.has(word.toLowerCase()))),
+  ].slice(0, 6);
+  if (significant.length === 0) return `all:"${words.join(' ')}"`;
+  const terms = significant.map((word) => `all:${word}`);
+  const phrase = words.slice(0, 12).join(' ');
+  return words.length > 1 ? [`all:"${phrase}"`, ...terms].join(' OR ') : (terms[0] as string);
 }
 
 /** Reads the entries of an arXiv Atom feed; an error feed throws its message. */

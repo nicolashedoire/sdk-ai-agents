@@ -73,7 +73,7 @@ describe('arxiv_search, wikipedia_search, github_search', () => {
       });
       const query = server.hits('/api/query')[0]?.query;
       expect(Object.fromEntries(query ?? [])).toEqual({
-        search_query: 'all:attention AND all:transformer',
+        search_query: 'all:"attention in the transformer" OR all:attention OR all:transformer',
         start: '0',
         max_results: '2',
         sortBy: 'relevance',
@@ -81,9 +81,12 @@ describe('arxiv_search, wikipedia_search, github_search', () => {
       });
     });
 
-    it("passes arXiv's own syntax as it is", () => {
+    it("searches the words as a phrase or one by one, and passes arXiv's own syntax as it is", () => {
       expect(arxivQuery('ti:transformer AND cat:cs.LG')).toBe('ti:transformer AND cat:cs.LG');
-      expect(arxivQuery('the of')).toBe('all:the of');
+      expect(arxivQuery('transformers')).toBe('all:transformers');
+      // Operators are never terms: `all:AND` is a syntax error for arXiv.
+      expect(arxivQuery('layout AND not paint')).toBe('all:"layout AND not paint" OR all:layout OR all:paint');
+      expect(arxivQuery('the of')).toBe('all:"the of"');
     });
 
     it('throws the message of an error feed', async () => {
@@ -91,6 +94,14 @@ describe('arxiv_search, wikipedia_search, github_search', () => {
 
       await expect(call('arxiv_search', { query: 'x' }, arxiv())).rejects.toThrow(
         'arXiv refused the query: max_results must be non-negative'
+      );
+    });
+
+    it('explains a refusal of its rate limit (arXiv answers 406 or 503)', async () => {
+      server.on('/api/query', reply('Not Acceptable', { status: 406, type: 'text/plain' }));
+
+      await expect(call('arxiv_search', { query: 'x' }, arxiv())).rejects.toThrow(
+        'arXiv refused the request (HTTP 406): it allows one request every 3 s; try again later'
       );
     });
 
