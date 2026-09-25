@@ -90,6 +90,23 @@ Jeder Begriff, der in dieser Dokumentation verwendet wird, ohne Fachjargon erkl�
 | **Kalibrierungsbeispiel** (Calibration Example) | Ein Lauf, den die Person bestätigt hat, dem Modell als Musterantwort gezeigt. |
 | **Korrektur** (Correction) | Eine Lektion aus einem Lauf, mit dem die Person nicht einverstanden war, dem Modell mit höchster Priorität gezeigt. |
 
+## Studien {#studies}
+
+| Begriff | Einfach erklärt |
+| --- | --- |
+| **Studie** (Study) | Ein KI-Forscher (`sdk.createStudy`), der ein Objekt versteht, dann vorschlägt, wie es mit dem Wissen und den Techniken von heute neu zu entwerfen ist, und die Experimente entwirft, die entscheiden würden. Er baut nichts und misst nichts. Siehe [Studien](./studies). |
+| **Phase** (Passage) | Eine der sieben Etappen einer Studie: beobachten, zerlegen, die Entscheidungen ihrer Zeit verstehen, untersuchen, was sich geändert hat, Vergangenheit und Gegenwart kreuzen, entwerfen, konfrontieren. Eine Phase kann eine frühere wieder öffnen. |
+| **Charta** (Charter) | Die Grundlage einer Studie: das Objekt, die Leitfrage, das Ziel, die Bedürfnisse, Ihre Spuren, was außerhalb des Rahmens liegt. Sie wird beim Erstellen der Studie eingefroren, und jeder Prompt beginnt mit ihr. |
+| **Spur** (Lead) | Eine Idee, die Sie der Studie zur Untersuchung geben. Sie ist ein zu prüfendes Beispiel, keine Wahrheit: Die Studie sagt mit Gründen, ob sie relevant ist, und schaut über sie hinaus. |
+| **Status einer Behauptung** (Claim Status) | Was eine Aussage einer Studie wert ist: **belegt** (gestützt auf eine Quelle, die die Studie tatsächlich gefunden hat), **Hypothese** (plausibel, nicht dokumentiert) oder **Neuheit** (eine neue Idee, die mit bestehenden Arbeiten abzugleichen ist). Der Code prüft ihn, nicht das Modell. Siehe [Belegt, Hypothese, Neuheit](./studies#established-hypothesis-novelty). |
+| **Stand der Technik** (Prior Art) | Die bestehende Arbeit, die einer als neu dargestellten Idee am nächsten kommt. Eine Neuheit bleibt „zu prüfen“, bis die Studie danach gesucht hat. |
+| **Wächter** (Guardian) | Eine separate Prüfung nach jeder Phase einer Studie: Er sieht nur die Charta und das, was die Phase erzeugt hat, und entfernt, was vom Ziel abschweift. Siehe [Der Wächter](./studies#the-guardian). |
+| **Drift, Drift-Protokoll** (Drift, Drift Log) | Drift bedeutet, dass ein Modell langsam von seinem Thema abkommt. Das Drift-Protokoll listet alles auf, was eine Studie aus diesem Grund entfernt hat, und warum. |
+| **Nachtrag** (Amendment) | Eine Anweisung, die einer Studie nach ihrer Erstellung hinzugefügt wird. Er wird nur angenommen, wenn er das Ziel verfeinert; ein Nachtrag, der der Charta widerspricht oder das Ziel ändert, wird abgelehnt. |
+| **Neue Fähigkeit** (New Capability) | Etwas, das heute schwierig oder unmöglich ist und durch einen Wechsel des Prinzips möglich wird – im Gegensatz zu einer **Verbesserung**, die etwas nur schneller oder günstiger macht. |
+| **Durchbruch durch Zusammensetzung** (Breakthrough by Assembly) | Ein Durchbruch aus Techniken, die es schon gab, auf neue Weise verbunden. Bitcoin ist einer: Signaturen, Hash-Ketten, Proof of Work und ein Peer-to-Peer-Netz waren alle schon vorher bekannt. |
+| **Mechanismuskarte** (Mechanism Card) | Elf Fragen zu einem Mechanismus, von dem, was beobachtet wurde, bis zu dem, was daraus geschlossen wurde. Eine Studie beantwortet die ersten neun; die letzten beiden beantworten Sie, sobald Sie das Experiment ausgeführt haben. |
+
 ## Typisierte Entscheidungen und Konnektoren {#typed-decisions-and-connectors}
 
 | Begriff | Einfach erklärt |

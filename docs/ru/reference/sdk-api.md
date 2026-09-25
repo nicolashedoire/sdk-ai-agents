@@ -132,6 +132,189 @@ interface OutcomeEvaluator {
 | `distillThinkerProfile({ id, name, samples, model })` | `Promise<ThinkerProfile>` |
 | `exportControllerDataset(runIds?)` | `Promise<string>` — JSON Lines |
 
+## Исследования {#studies}
+
+Исследование работает как исследователь: оно понимает объект, затем предлагает, как перепроектировать его с помощью знаний и техник сегодняшнего дня, и проектирует эксперименты, которые позволили бы сделать выбор. См. [Исследования](../guide/studies).
+
+| Метод | Возвращает | |
+| --- | --- | --- |
+| `createStudy(config)` | `Study` | Проверяет конфигурацию, сопоставляет источники с инструментами и замораживает устав. Выбрасывает `ValidationError` при неверной конфигурации или для источника, который не является определённым инструментом или не принимает текстовый запрос |
+
+### `StudyConfig` {#studyconfig}
+
+| Параметр | По умолчанию | |
+| --- | --- | --- |
+| `name`, `object`, `objective` | — | Обязательные, непустые. `name` записывается вместе с событиями исследования (`metadata.studyName`); цель никогда не меняется: новая цель — это новое исследование |
+| `question` | Направляющий вопрос метода и ориентир на новую возможность, на языке `language` | Направляющий вопрос |
+| `needs`, `leads`, `analogues` | `[]` | Потребности и критерии сегодняшнего дня; ваши направления — примеры для проверки, каждое из которых получает вердикт; прорывы за счёт сборки, которые нужно разобрать (`['Bitcoin']`) |
+| `scope` | `{ exclude: [] }` | Что лежит вне рамок |
+| `capability` | — | Новая возможность, на которую нацелено исследование; без неё исследование предлагает кандидатов |
+| `sources` | `[]` | Имена инструментов SDK, с помощью которых ищет исследование, определённых до создания исследования (например, инструменты `connectMcpServer`); без источников ничего нельзя установить |
+| `model` | Модель провайдера по умолчанию | Модель каждого вызова |
+| `llmProvider` | Провайдер SDK | Провайдер для этого исследования |
+| `language` | `'en'` | Язык текстов и досье в виде языкового тега (`fr`, `pt-BR`…) |
+| `limits` | См. [`StudyLimits`](#studylimits) | Опущенный лимит сохраняет значение по умолчанию |
+| `driftThreshold` | `1/3` (`DEFAULT_DRIFT_THRESHOLD`) | Доля элементов этапа, от 0 до 1, которую можно отклонить, прежде чем этап будет переделан один раз |
+| `temperature`, `maxTokens` | `0.4`, — | Для этапов и запросов на поиск; страж, дополнения и проверка предшествующих работ работают при 0 |
+
+Устав (`StudyCharter`) содержит `object`, `question`, `objective`, `needs`, `leads`, `scope`, `capability` и `analogues`; повторяющиеся элементы списков (без учёта регистра) удаляются. Он заморожен и хеширован; `name` в него не входит.
+
+### `StudyLimits` {#studylimits}
+
+На один запуск. `DEFAULT_STUDY_LIMITS` содержит значения по умолчанию; значение вне допустимого диапазона выбрасывает `ValidationError`.
+
+| Лимит | По умолчанию | Диапазон | |
+| --- | --- | --- | --- |
+| `maxModelCalls` | 60 | от 1 до 10 000 | Вызовы модели, включая исправления и проверки; при достижении лимита запуск останавливается (`stoppedBy: 'maxModelCalls'`) |
+| `maxSearches` | 20 | от 0 до 10 000 | Поиски; когда лимит исчерпан, запуск продолжается без поиска (предупреждение `searchesSkipped`) |
+| `maxLoops` | 1 | от 0 до 10 | Сколько более ранних этапов запуск может вновь открыть |
+| `timeoutMs` | 1 200 000 (20 минут) | от 1 до 2 147 483 647 | Длительность запуска; при достижении лимита запуск прерывается (`stoppedBy: 'timeoutMs'`) |
+| `maxResultsPerSearch` | 5 | от 1 до 50 | Сколько результатов сохраняется из одного поиска |
+
+### `Study` {#study}
+
+| Член | |
+| --- | --- |
+| `id` | `study_…`, новый для каждого исследования: `metadata.agentId` его событий и id агента для его бюджетов, политик и вызовов инструментов |
+| `name`, `language`, `charter`, `charterHash` | Имя, язык, замороженный `StudyCharter` и его SHA-256 (в шестнадцатеричном виде), который записывается в `study.started` и с каждым дополнением |
+| `amendments` | `StudyAmendment[]`: принятые и отклонённые, по порядку |
+| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`. Продолжает с того места, где остановился последний запуск: сначала страж оценивает то, что этот запуск оставил неоценённым; этап, который оценён, но не закончен, только заканчивается; затем выполняются незавершённые этапы. `restart` начинает исследование заново: этапы, результаты, поиски, журнал дрейфа, нумерация и запуски очищаются; устав и дополнения остаются. Лимит, политика, отмена или ошибка завершают запуск с соответствующим статусом и отчётом о том, что было сделано; исключение выбрасывается только для уже идущего запуска, для `onEvent`, который нельзя обслужить, или при сбое хранилища событий. `onEvent` работает так же, как с `agent.run` |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`. Классифицируется только относительно устава, никогда относительно более ранних дополнений (два противоречащих друг другу дополнения могут быть приняты оба), по одному в порядке запроса, в отдельном запуске (`mode: 'study-amendment'`), где сначала проверяются политики бюджета; принимается только `refines`, и тогда оно показывается в каждом последующем промпте. `timeoutMs` (по умолчанию 60 000, отсчитывается с момента, когда подходит его очередь) и `signal` ограничивают классификацию: если они срабатывают или политика её отклоняет, дополнение отклоняется как `unclassified`. Выбрасывает `ValidationError` для пустого текста, текста длиннее `MAX_AMENDMENT_LENGTH` (500 символов) или если, когда подходит его очередь, уже было принято `MAX_AMENDMENTS` (10) дополнений |
+| `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`. Заполняет поля 10 и 11 карточки и записывает `study.result_recorded` в запуск, который её написал; `ValidationError` для неизвестной карточки или пустого `result` |
+| `report()` | `StudyReport`: отчёт в текущем виде, включая результаты, записанные после последнего запуска |
+
+Исследование создаётся через `sdk.createStudy`: класс `Study` экспортируется ради своего типа, а то, из чего оно собирается, остаётся внутренним. `MAX_AMENDMENTS` и `MAX_AMENDMENT_LENGTH` экспортируются, как и `StudyAmendOptions` — тип параметров `amend`.
+
+### `StudyResult` {#studyresult}
+
+`{ runId, status, stoppedBy?, error?, report, markdown }` — `status` равен `completed`; `stopped`, когда запуск завершил лимит или политика бюджета или тайм-аута, со `stoppedBy` (`maxModelCalls`, `timeoutMs` или `policy`); `failed`, когда его завершила ошибка; или `cancelled`. `error` — это `Error`, завершивший запуск, `report` — `StudyReport` на момент окончания, а `markdown` — то же самое в виде досье.
+
+### `StudyReport` {#studyreport}
+
+```ts
+interface StudyReport {
+  studyId: string;
+  name: string;
+  language: string;
+  charter: StudyCharter;
+  charterHash: string;
+  amendments: StudyAmendment[];
+  status: StudyStatus | 'notRun';
+  stoppedBy?: StudyStopReason;
+  error?: string;
+  notices: StudyNotice[];                       // { code, message, details? }
+  passages: StudyPassageState[];                // { passage, state, attempts, reopenedBy, runId? }
+  observations: StudyObservation[];             // O1…
+  pieces: StudyPiece[];                         // P1…
+  chain: StudyChainStage[];                     // C1…
+  threeStates: StudyPieceStates[];              // { piece, atItsTime, currentBest, proposal }
+  historicalChoices: StudyHistoricalChoice[];   // H1…
+  advances: StudyAdvance[];                     // V1…
+  leadVerdicts: StudyLeadVerdict[];             // L1…
+  unverifiedLeads: string[];
+  independentLeads: StudyIndependentLead[];     // I1…
+  references: StudyReference[];                 // R1…
+  analogues: StudyAnalogue[];                   // B1…
+  undeconstructedAnalogues: string[];
+  constraints: StudyConstraint[];               // K1…
+  revisableDecisions: StudyRevisableDecision[]; // D1…
+  combinations: StudyCombination[];             // X1…
+  capabilities: StudyCapability[];              // Y1…
+  architectures: StudyArchitecture[];           // A1…: new capabilities, existing ones, improvements
+  noveltyClaims: StudyNoveltyClaim[];           // N1…
+  experiments: StudyExperiment[];               // E1…
+  cards: MechanismCard[];                       // M1…
+  results: StudySearchResult[];                 // S1…
+  searches: StudySearch[];
+  driftLog: StudyDriftEntry[];
+  stats: StudyStats;
+  runIds: string[];                             // runs of run() since the last restart, oldest first
+}
+
+interface StudyClaim {
+  id: string;
+  passage: StudyPassage;
+  statement: string;
+  status: 'established' | 'hypothesis' | 'novelty'; // after the study's checks
+  declaredStatus?: StudyClaimStatus;                // the model's, when the study changed it
+  statusReason?: StudyReason;
+  sources: string[];                                // results listed in the prompt that wrote it
+  unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
+  servesObjective: string;
+  toVerify?: boolean;                               // prior art not assessed: a novelty, or a capability's assembly
+  priorArtReason?: StudyReason;                     // a capability that is not a novelty: why not checked, or assemblyExists
+  priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
+  unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
+  runId: string;
+}
+
+interface StudyReason {
+  code: StudyReasonCode;
+  params?: Record<string, string>;
+  message: string;                                  // the same reason, in English
+}
+
+interface StudyTrace {
+  from: string[];                                   // records of the investigation it comes from
+  unknownFrom?: string[];                           // cited, not listed in the design's prompt
+  untraced?: boolean;                               // it cites none of the listed records
+}
+```
+
+Каждая причина в отчёте — это `StudyReason`: `statusReason` утверждений и компонентов, `priorArtReason` возможности, которая не является новшеством, `reason` записей журнала дрейфа и дополнений, а также `kindReason` пониженной архитектуры. Досье выводит её `code` на языке исследования (`studyLabels(language).reasons`); у текста, который написал страж или модель, код `judged`, а сам текст — в `params.text`. Коды (`StudyReasonCode`):
+
+| Коды | Почему |
+| --- | --- |
+| `noSourceConfigured`, `citesUnlisted`, `citesNothing` | Утверждение или компонент `established` понижены до `hypothesis`: нет источника или нет ни одного идентификатора, перечисленного в его промпте |
+| `priorArtNotSearchedYet`, `priorArtNoSource`, `priorArtSearchBudget`, `priorArtNotSearched`, `priorArtSearchFailed`, `priorArtNoResult`, `priorArtNotAssessed`, `priorArtUnsupported` | Почему предшествующие работы для новшества или для сборки возможности всё ещё требуют проверки (их английский текст начинается с «To verify against prior art:») |
+| `priorArtExists` | Новшество понижено до `hypothesis`: наиболее близкая работа уже это делает |
+| `assemblyExists` | Возможность, которая не является новшеством и сборка которой уже существует (в её `priorArtReason`) |
+| `componentDocumented`, `componentUndocumented` | Компонент, представленный как новый |
+| `noServesObjective`, `invalidItem`, `notAnObject`, `notAUserLead` | Элемент, отклонённый схемой |
+| `leadAlreadyJudged` | Повторный вердикт по уже оценённому направлению: отбрасывается, это не дрейф (`duplicates` в `study.passage_completed`) |
+| `designWithoutCapability` | Проектирование без единой новой возможности |
+| `amendmentUnclassified`, `amendmentCancelled`, `amendmentTimedOut`, `amendmentPolicy` | Дополнение, которое не удалось классифицировать |
+| `judged` | Собственные слова стража или модели |
+
+Каждый элемент — это `StudyClaim` с собственными полями:
+
+| Тип | Собственные поля |
+| --- | --- |
+| `StudyObservation` | `kind` (`behaviour`, `use`, `variation`, `failure`), `conditions`, `era?` |
+| `StudyPiece` | `name`, `function`, `inputs`, `outputs`, `relations`, `unknowns`, `parent?` (часть, которую она детализирует) |
+| `StudyChainStage` | `stage`, `pieces` |
+| `StudyHistoricalChoice` | `choice`, `piece?`, `factors` (`hardware`, `tools`, `uses`, `knowledge`, `costs`, `compatibility`, `other`), `era?` |
+| `StudyAdvance` | `mechanism`, `date?`, `domain` (`object` или `other`), `field?`, `evidence`, `conditions`, `availability`, `piece?` |
+| `StudyLeadVerdict` | `lead` (в том виде, в каком его записывает устав), `verdict` (`relevant`, `partlyRelevant`, `notRelevant`), `reasons` |
+| `StudyIndependentLead` | `tool`, `kind` (`mathematical`, `technical`, `other`), `piece?` |
+| `StudyReference` | `name`, `piece?`, `date?` |
+| `StudyAnalogue` | `breakthrough`, `named?` (номер прорыва из устава, который он разбирает), `domain?`, `date?`, `components` (два или больше `{ name, date? }`), `liftedConstraint`, `capability`, `pattern` |
+| `StudyConstraint` | `constraint`, `state` (`remains`, `weakened`, `newRequirement`), `piece?` |
+| `StudyRevisableDecision` | `decision`, `because` (условие, которое изменилось), `opens` |
+| `StudyCombination` | `a`, `b`, `enables` (что A позволяет делать B), `exchange`, `cost`, `changes` (`representation`, `distribution`, `responsibilities`) |
+| `StudyCapability` | `capability`, `forWhom`, `hardToday`, `principle?` |
+| `StudyArchitecture` | `name`, `kind` (`capability` или `improvement`), `declaredKind?` и `kindReason?` (возможность, которую страж признал лишь более быстрой или более дешёвой), `capability` (`what`, `forWhom`, `liftedConstraint`), `principleChange?` (`principle`: `representation`, `distribution`, `responsibility`, `trust`, `verification` или `other`; `change`), `mechanism`, `components` (`StudyComponent[]`: `name`, `statement`, `date?`, `status`, `declaredStatus?`, `statusReason?`, `sources`, `unlistedSources?`, а также `StudyTrace`), `assembly` (`component`, `gives`, `exchanges`, `cost`, а также `StudyTrace`), `conditions`, `benefit`, `addedCost`, `counterexample`, `chain` (`stage`, `how`), `uncoveredStages` (звенья всей цепочки, которые она не охватывает, по проверке исследования), `predictions` |
+| `StudyThreeState` | `piece`, `state` (`atItsTime`, `currentBest`, `proposal`), `architecture?` |
+| `StudyNoveltyClaim` | `architecture?` |
+| `StudyExperiment` | `name`, `architectures`, `protocol`, `measures`, `criteria`, `expected` (`architecture`, `result`), `wholeChain` |
+| `MechanismCard` | Поля с 1 по 9: `observation`, `mechanism`, `unknown`, `historicalChoice`, `evolution`, `newPossibility`, `proposedCombination`, `prediction`, `experiment`; поля 10 и 11 — после того как вы их записали: `resultAndError?` (`result`, `error?`), `conclusionAndMemory?`, а также `resultRecordedAt?` |
+
+Остальные записи отчёта утверждениями не являются:
+
+| Тип | Поля |
+| --- | --- |
+| `StudyAmendment` | `number?` (только у принятых, начиная с 1), `text`, `verdict` (`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason` (`StudyReason`), `runId` |
+| `StudyDriftEntry` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason` (`StudyReason`), `by` (`guardian`: вне цели; `schema`: отклонён раньше, например без `servesObjective`), `attempt` (2 при переделке), `runId` |
+| `StudySearchResult` | `id` (`S1`…, сохраняется, когда тот же результат найден снова, до перезапуска), `title`, `locator` (URL или другой указатель), `date?`, `excerpt`, `tool`, `query`, `runId` |
+| `StudySearch` | `passage`, `purpose` (`research` или `priorArt`), `tool`, `query`, `servesObjective`, `claims?`, `resultIds`, `error?`, `skipped?` (`maxSearches`), `runId` |
+| `StudyPassageState` | `passage`, `state` (`complete`; `partial`: оценён, но не закончен — ждёт завершения своего цикла или его поиск предшествующих работ был прерван; `unchecked`: элементы, которые страж не оценил; `notRun`), `attempts` (2 после переделки), `keptAttempt?` и `discarded?` (`attempt`, `items`: переделка, отброшенная ради лучшей первой попытки), `reopenedBy`, `runId?` |
+| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noDesign`, `noCapability`, `minimumsNotMet`, `untracedAssembly`, `passagesOutdated`, `capabilitiesToVerify`, `capabilitiesExist`, `noveltiesToVerify`), `params?` (`limit`, `error`, `count`), `details?` (затронутые этапы, пары `passage.collection`, направления, прорывы или архитектуры), `message` (по-английски; досье выводит код на своём языке) |
+| `StudyStats` | С последнего перезапуска: `runs` и `modelCalls` (запуски `run()` и вызовы в них, на которые ответил поставщик), `searches`, `searchesSkipped`, `results`, `items`, `rejected`, `byStatus` (по статусам), `downgraded` (утверждения, статус которых исследование понизило), `noveltiesToVerify`, `redos`, `loops`. А также `amendments` (`count`, `modelCalls`): все дополнения исследования, учтённые отдельно |
+
+### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}
+
+Возвращает отчёт в виде читаемого досье в формате Markdown на языке отчёта: это `markdown` из `StudyResult`. Вызовите его для `study.report()`, чтобы включить результаты, записанные с тех пор. Его слова берутся из `studyLabels(language)` (`StudyLabels`), которые существуют на одиннадцати языках этой документации (`StudyLabelLanguage`); другой или неизвестный язык получает английские слова, а `fr-CA` — французские.
+
 ## Типизированные решения — `sdk.decisions` {#typed-decisions-—-sdk-decisions}
 
 Выбрасывает `ValidationError`, если бэкенд не настроен.
@@ -211,7 +394,7 @@ interface ModelCostLine {
 | `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | Те же различия в виде регрессий, у каждой — серьёзность и влияние: `no_regression` или `regressions_detected` |
 | `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | Воспроизводит запуск, затем проверяет воспроизведение. Воспроизведение не вызывает модель: сравнивайте его с `validateAspects: ['tools', 'policies']` |
 
-Запуски сравниваются **по смыслу их событий**, а не по id событий (у каждого запуска они новые). События сопоставляются по порядку: сначала одинаковые события, затем события того же типа и предмета (инструмент, операция, ответ), у которых изменились данные, затем события, у которых для того же предмета сменился тип. Никогда не сравниваются: id событий, время, метаданные, события `incident.reported` (они записывают отправку уведомлений и их ограничение; событие, вызвавшее инцидент, сравнивается) и значения, которые записывает SDK и которые меняются от запуска к запуску: длительность вызова инструмента, расход токенов, паузы перед повторами, id одобрений, исходный запуск воспроизведения, время и исходное событие наблюдения. Текст, который модель пишет рядом с вызовом инструмента, сравнивается только в `intention.generated`. Параметры, результат и вход инструмента сравниваются всегда, как бы ни назывались их ключи: аргумент `duration`, изменившийся с 30 на 60, — это изменение. Запуск, который снова делает то же самое, проходит; инструмент, вызванный с другими аргументами, отмечается там, где произошёл вызов (`parameters.metric: "churn" → "revenue"`); вызов, вставленный перед таким же, — это один добавленный вызов; `action.executed`, ставший `action.failed`, — это одно изменение, а не пропажа плюс добавление.
+Запуски сравниваются **по смыслу их событий**, а не по id событий (у каждого запуска они новые). События сопоставляются по порядку: сначала одинаковые события, затем события того же типа и предмета (инструмент, операция, этап исследования, ответ), у которых изменились данные, затем события, у которых для того же предмета сменился тип. Никогда не сравниваются: id событий, время, метаданные, события `incident.reported` (они записывают отправку уведомлений и их ограничение; событие, вызвавшее инцидент, сравнивается) и значения, которые записывает SDK и которые меняются от запуска к запуску: длительность вызова инструмента, расход токенов, паузы перед повторами, id одобрений, исходный запуск воспроизведения, время и исходное событие наблюдения. Текст, который модель пишет рядом с вызовом инструмента, сравнивается только в `intention.generated`. Параметры, результат и вход инструмента сравниваются всегда, как бы ни назывались их ключи: аргумент `duration`, изменившийся с 30 на 60, — это изменение. Запуск, который снова делает то же самое, проходит; инструмент, вызванный с другими аргументами, отмечается там, где произошёл вызов (`parameters.metric: "churn" → "revenue"`); вызов, вставленный перед таким же, — это один добавленный вызов; `action.executed`, ставший `action.failed`, — это одно изменение, а не пропажа плюс добавление.
 
 | Параметр | Для | |
 | --- | --- | --- |
@@ -286,6 +469,7 @@ Id агентов новые в каждом процессе, поэтому н
 | --- | --- |
 | `RunInput.onEvent`: `agent.run({ message, onEvent })` | Каждое событие запуска; `run()` завершается, когда слушатель закончил обработку каждого из них, или раньше, если запуск был остановлен или отменён или прерывается `signal` (тогда подписка слушателя отменяется). Слушатель не записывается |
 | `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | То же самое для когнитивного запуска, у которого ожидание прекращает и `limits.timeoutMs` |
+| `StudyRunOptions.onEvent`: `study.run({ onEvent })` | То же самое для запуска исследования, у которого ожидание прекращает и `limits.timeoutMs` |
 | `replay(runId, modifications?, { onEvent })` | То же самое для воспроизведения, которое нельзя отменить: оно всегда ждёт |
 | `executeTool(name, params, { onEvent })` | События вызова, а также запусков, которые начинает его инструмент, только на один уровень: обработчик получает слушателя как `context.onEvent`, и `governedAgentTool` и `cognitiveAgentTool` передают его своему агенту (агент, собранный вручную на хранилище без событий в реальном времени, работает без него). `signal` прекращает ожидание |
 | `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: каждое событие каждого запуска, подходящего под фильтр (`agentId` — это `metadata.agentId`), пока вы не вызовете возвращённую функцию, которая отбрасывает ещё не доставленные события. Запуски наборов регрессионных тестов и воспроизведения — настоящие запуски: слушатель получает и их события (набор не сохраняет `onEvent` и `onText` своего входа) |

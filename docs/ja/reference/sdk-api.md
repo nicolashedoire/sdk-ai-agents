@@ -132,6 +132,189 @@ interface OutcomeEvaluator {
 | `distillThinkerProfile({ id, name, samples, model })` | `Promise<ThinkerProfile>` |
 | `exportControllerDataset(runIds?)` | `Promise<string>` — JSON Lines 形式 |
 
+## 研究 {#studies}
+
+研究は研究者です。対象を理解し、今日の知識と技術でそれをどう設計し直すかを提案し、どれを選ぶかを決める実験を設計します。[研究](../guide/studies) を参照してください。
+
+| メソッド | 戻り値 | |
+| --- | --- | --- |
+| `createStudy(config)` | `Study` | 設定をチェックし、情報源を解決し、憲章を凍結する。設定が不正な場合や、情報源が定義済みのツールでない、またはテキストのクエリを受け取らない場合は `ValidationError` を投げる |
+
+### `StudyConfig` {#studyconfig}
+
+| オプション | デフォルト | |
+| --- | --- | --- |
+| `name`、`object`、`objective` | — | 必須で、空であってはならない。`name` は研究のイベントとともに記録される（`metadata.studyName`）。目的は決して変わらない：新しい目的は新しい研究である |
+| `question` | 手法の指針となる問いと能力の狙い（`language` で書かれる） | 指針となる問い |
+| `needs`、`leads`、`analogues` | `[]` | 今日のニーズと基準。あなたの手がかり（検証すべき例で、それぞれに判定が下される）。分解すべき組み立てによるブレークスルー（`['Bitcoin']`） |
+| `scope` | `{ exclude: [] }` | 範囲外のもの |
+| `capability` | — | 目指す新しい能力。指定しなければ、研究が候補を提案する |
+| `sources` | `[]` | 研究が検索に使う SDK のツールの名前。研究より前に定義しておく（たとえば `connectMcpServer` のツール）。情報源がなければ、何も確立できない |
+| `model` | プロバイダーのデフォルト | すべての呼び出しのモデル |
+| `llmProvider` | SDK のプロバイダー | この研究のためのプロバイダー |
+| `language` | `'en'` | テキストと調査書の言語。言語タグで指定する（`fr`、`pt-BR`…） |
+| `limits` | [`StudyLimits`](#studylimits) を参照 | 省略した制限はデフォルトのまま |
+| `driftThreshold` | `1/3`（`DEFAULT_DRIFT_THRESHOLD`） | 工程の項目のうち、その工程が一度やり直される前に拒否されてよい割合（0 から 1） |
+| `temperature`、`maxTokens` | `0.4`、— | 工程と検索の依頼の設定。監視役、追加指示、先行技術のチェックは 0 で動く |
+
+憲章（`StudyCharter`）は `object`、`question`、`objective`、`needs`、`leads`、`scope`、`capability`、`analogues` を保持し、リストの中で重複する項目（大文字・小文字の違いは無視）は取り除かれます。憲章は凍結され、ハッシュ化されます。`name` は憲章に含まれません。
+
+### `StudyLimits` {#studylimits}
+
+実行ごとの制限です。`DEFAULT_STUDY_LIMITS` がデフォルト値を保持し、範囲外の値は `ValidationError` を投げます。
+
+| 制限 | デフォルト | 範囲 | |
+| --- | --- | --- | --- |
+| `maxModelCalls` | 60 | 1 から 10 000 | モデル呼び出し（修復とチェックを含む）。達すると実行が止まる（`stoppedBy: 'maxModelCalls'`） |
+| `maxSearches` | 20 | 0 から 10 000 | 検索。使い切ると、実行は検索せずに続く（注意事項 `searchesSkipped`） |
+| `maxLoops` | 1 | 0 から 10 | 実行が差し戻せる、前の工程の数 |
+| `timeoutMs` | 1 200 000（20 分） | 1 から 2 147 483 647 | 実行の長さ。達すると実行は中断される（`stoppedBy: 'timeoutMs'`） |
+| `maxResultsPerSearch` | 5 | 1 から 50 | 1 回の検索から保持する結果の数 |
+
+### `Study` {#study}
+
+| メンバー | |
+| --- | --- |
+| `id` | `study_…`。研究ごとに新しくなる。そのイベントの `metadata.agentId` であり、その予算、ポリシー、ツール呼び出しのエージェント ID |
+| `name`、`language`、`charter`、`charterHash` | 名前、言語、凍結された `StudyCharter`、その SHA-256（16 進数）。ハッシュは `study.started` と各追加指示に記録される |
+| `amendments` | `StudyAmendment[]`：受け入れられたものと拒否されたもの、順番どおり |
+| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`。最後の実行が止まったところから再開する：まず監視役がその実行が判定しないまま残したものを判定し、判定済みだが終わっていない工程は仕上げだけを行い、その後、完了していない工程が実行される。`restart` は研究を最初から始め直す：工程、結果、検索、逸脱ログ、番号付け、実行が消去され、憲章と追加指示は残る。制限、ポリシー、キャンセル、エラーは、その状態と行われたことのレポートとともに実行を終わらせる。例外を投げるのは、すでに実行が進行中の場合、処理できない `onEvent` の場合、イベントストアが失敗した場合だけ。`onEvent` は `agent.run` と同じように働く |
+| `amend(text, { signal?, timeoutMs? })` | `Promise<StudyAmendment>`。それ以前の追加指示には決して照らさず（互いに矛盾する 2 つの追加指示がどちらも受け入れられることがある）、憲章だけに照らして、求められた順に 1 つずつ、予算のポリシーがまず確認される専用の実行（`mode: 'study-amendment'`）の中で分類される。受け入れられるのは `refines` だけで、それ以降のすべてのプロンプトに示される。`timeoutMs`（デフォルトは 60 000。その追加指示の順番が来たときから数える）と `signal` が分類に上限を設ける：それらを過ぎたとき、またはポリシーが分類を拒否したとき、追加指示は `unclassified` として拒否される。空のテキスト、`MAX_AMENDMENT_LENGTH`（500 文字）より長いテキスト、または順番が来たときにすでに `MAX_AMENDMENTS`（10）の追加指示が受け入れられている場合は `ValidationError` を投げる |
+| `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`。カードのフィールド 10 と 11 を埋め、そのカードを書いた実行に `study.result_recorded` を記録する。未知のカードや空の `result` には `ValidationError` |
+| `report()` | `StudyReport`：現時点のレポート。最後の実行以降に記録された結果も含む |
+
+研究は `sdk.createStudy` で作成します。`Study` クラスはその型のためにエクスポートされており、研究を組み立てる材料は内部のものです。`MAX_AMENDMENTS` と `MAX_AMENDMENT_LENGTH` もエクスポートされており、`amend` のオプションの型である `StudyAmendOptions` も同様です。
+
+### `StudyResult` {#studyresult}
+
+`{ runId, status, stoppedBy?, error?, report, markdown }` — `status` は `completed`、制限または予算やタイムアウトのポリシーが実行を終わらせた場合は `stopped`（`stoppedBy` は `maxModelCalls`、`timeoutMs`、`policy` のいずれか）、エラーが終わらせた場合は `failed`、あるいは `cancelled` です。`error` は実行を終わらせた `Error`、`report` は終了時の `StudyReport`、`markdown` はそれを調査書にしたものです。
+
+### `StudyReport` {#studyreport}
+
+```ts
+interface StudyReport {
+  studyId: string;
+  name: string;
+  language: string;
+  charter: StudyCharter;
+  charterHash: string;
+  amendments: StudyAmendment[];
+  status: StudyStatus | 'notRun';
+  stoppedBy?: StudyStopReason;
+  error?: string;
+  notices: StudyNotice[];                       // { code, message, details? }
+  passages: StudyPassageState[];                // { passage, state, attempts, reopenedBy, runId? }
+  observations: StudyObservation[];             // O1…
+  pieces: StudyPiece[];                         // P1…
+  chain: StudyChainStage[];                     // C1…
+  threeStates: StudyPieceStates[];              // { piece, atItsTime, currentBest, proposal }
+  historicalChoices: StudyHistoricalChoice[];   // H1…
+  advances: StudyAdvance[];                     // V1…
+  leadVerdicts: StudyLeadVerdict[];             // L1…
+  unverifiedLeads: string[];
+  independentLeads: StudyIndependentLead[];     // I1…
+  references: StudyReference[];                 // R1…
+  analogues: StudyAnalogue[];                   // B1…
+  undeconstructedAnalogues: string[];
+  constraints: StudyConstraint[];               // K1…
+  revisableDecisions: StudyRevisableDecision[]; // D1…
+  combinations: StudyCombination[];             // X1…
+  capabilities: StudyCapability[];              // Y1…
+  architectures: StudyArchitecture[];           // A1…: new capabilities, existing ones, improvements
+  noveltyClaims: StudyNoveltyClaim[];           // N1…
+  experiments: StudyExperiment[];               // E1…
+  cards: MechanismCard[];                       // M1…
+  results: StudySearchResult[];                 // S1…
+  searches: StudySearch[];
+  driftLog: StudyDriftEntry[];
+  stats: StudyStats;
+  runIds: string[];                             // runs of run() since the last restart, oldest first
+}
+
+interface StudyClaim {
+  id: string;
+  passage: StudyPassage;
+  statement: string;
+  status: 'established' | 'hypothesis' | 'novelty'; // after the study's checks
+  declaredStatus?: StudyClaimStatus;                // the model's, when the study changed it
+  statusReason?: StudyReason;
+  sources: string[];                                // results listed in the prompt that wrote it
+  unlistedSources?: string[];                       // cited, not listed in that prompt: they support nothing
+  servesObjective: string;
+  toVerify?: boolean;                               // prior art not assessed: a novelty, or a capability's assembly
+  priorArtReason?: StudyReason;                     // a capability that is not a novelty: why not checked, or assemblyExists
+  priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
+  unchecked?: boolean;                              // not judged by the guardian: kept out of later prompts
+  runId: string;
+}
+
+interface StudyReason {
+  code: StudyReasonCode;
+  params?: Record<string, string>;
+  message: string;                                  // the same reason, in English
+}
+
+interface StudyTrace {
+  from: string[];                                   // records of the investigation it comes from
+  unknownFrom?: string[];                           // cited, not listed in the design's prompt
+  untraced?: boolean;                               // it cites none of the listed records
+}
+```
+
+レポートのすべての理由は `StudyReason` です。主張と構成要素の `statusReason`、新規性ではない能力の `priorArtReason`、逸脱のエントリーと追加指示の `reason`、格下げされたアーキテクチャの `kindReason` がそうです。調査書はその `code` を研究の言語で表示します（`studyLabels(language).reasons`）。監視役やモデルが書いたテキストはコード `judged` を持ち、`params.text` に入ります。コード（`StudyReasonCode`）は次のとおりです。
+
+| コード | 理由 |
+| --- | --- |
+| `noSourceConfigured`、`citesUnlisted`、`citesNothing` | `hypothesis` に引き下げられた `established` の主張または構成要素：情報源がない、またはそのプロンプトに一覧された ID を引用していない |
+| `priorArtNotSearchedYet`、`priorArtNoSource`、`priorArtSearchBudget`、`priorArtNotSearched`、`priorArtSearchFailed`、`priorArtNoResult`、`priorArtNotAssessed`、`priorArtUnsupported` | 新規性の先行技術、または能力の組み立ての先行技術が、まだ確認すべきものである理由（その英語のテキストは「To verify against prior art:」で始まる） |
+| `priorArtExists` | `hypothesis` に引き下げられた新規性：最も近い成果がすでにそれを実現している |
+| `assemblyExists` | 新規性ではなく、組み立てがすでに存在する能力（その `priorArtReason` に入る） |
+| `componentDocumented`、`componentUndocumented` | 新しいものとして示された構成要素 |
+| `noServesObjective`、`invalidItem`、`notAnObject`、`notAUserLead` | スキーマに拒否された項目 |
+| `leadAlreadyJudged` | すでに判定された手がかりにもう一度下された判定：捨てられるが、逸脱ではない（`study.passage_completed` の `duplicates`） |
+| `designWithoutCapability` | 新しい能力を 1 つも含まない設計 |
+| `amendmentUnclassified`、`amendmentCancelled`、`amendmentTimedOut`、`amendmentPolicy` | 分類できなかった追加指示 |
+| `judged` | 監視役またはモデル自身の言葉 |
+
+すべての項目は、それぞれ独自のフィールドを持つ `StudyClaim` です。
+
+| 型 | 独自のフィールド |
+| --- | --- |
+| `StudyObservation` | `kind`（`behaviour`、`use`、`variation`、`failure`）、`conditions`、`era?` |
+| `StudyPiece` | `name`、`function`、`inputs`、`outputs`、`relations`、`unknowns`、`parent?`（その部品が詳しく述べる部品） |
+| `StudyChainStage` | `stage`、`pieces` |
+| `StudyHistoricalChoice` | `choice`、`piece?`、`factors`（`hardware`、`tools`、`uses`、`knowledge`、`costs`、`compatibility`、`other`）、`era?` |
+| `StudyAdvance` | `mechanism`、`date?`、`domain`（`object` または `other`）、`field?`、`evidence`、`conditions`、`availability`、`piece?` |
+| `StudyLeadVerdict` | `lead`（憲章に書かれたとおり）、`verdict`（`relevant`、`partlyRelevant`、`notRelevant`）、`reasons` |
+| `StudyIndependentLead` | `tool`、`kind`（`mathematical`、`technical`、`other`）、`piece?` |
+| `StudyReference` | `name`、`piece?`、`date?` |
+| `StudyAnalogue` | `breakthrough`、`named?`（それが分解する、憲章のブレークスルーの番号）、`domain?`、`date?`、`components`（2 つ以上の `{ name, date? }`）、`liftedConstraint`、`capability`、`pattern` |
+| `StudyConstraint` | `constraint`、`state`（`remains`、`weakened`、`newRequirement`）、`piece?` |
+| `StudyRevisableDecision` | `decision`、`because`（変わった条件）、`opens` |
+| `StudyCombination` | `a`、`b`、`enables`（A によって B が何をできるようになるか）、`exchange`、`cost`、`changes`（`representation`、`distribution`、`responsibilities`） |
+| `StudyCapability` | `capability`、`forWhom`、`hardToday`、`principle?` |
+| `StudyArchitecture` | `name`、`kind`（`capability` または `improvement`）、`declaredKind?` と `kindReason?`（より速い、あるいは安いだけだと監視役が判断した能力）、`capability`（`what`、`forWhom`、`liftedConstraint`）、`principleChange?`（`principle`：`representation`、`distribution`、`responsibility`、`trust`、`verification`、`other` のいずれか。`change`）、`mechanism`、`components`（`StudyComponent[]`：`name`、`statement`、`date?`、`status`、`declaredStatus?`、`statusReason?`、`sources`、`unlistedSources?`、そして `StudyTrace`）、`assembly`（`component`、`gives`、`exchanges`、`cost`、そして `StudyTrace`）、`conditions`、`benefit`、`addedCost`、`counterexample`、`chain`（`stage`、`how`）、`uncoveredStages`（連鎖全体のうち、そのアーキテクチャが扱わない段階。研究がチェックしたもの）、`predictions` |
+| `StudyThreeState` | `piece`、`state`（`atItsTime`、`currentBest`、`proposal`）、`architecture?` |
+| `StudyNoveltyClaim` | `architecture?` |
+| `StudyExperiment` | `name`、`architectures`、`protocol`、`measures`、`criteria`、`expected`（`architecture`、`result`）、`wholeChain` |
+| `MechanismCard` | フィールド 1 から 9：`observation`、`mechanism`、`unknown`、`historicalChoice`、`evolution`、`newPossibility`、`proposedCombination`、`prediction`、`experiment`。あなたが記録した後のフィールド 10 と 11：`resultAndError?`（`result`、`error?`）、`conclusionAndMemory?`、そして `resultRecordedAt?` |
+
+レポートのそのほかの項目は主張ではありません。
+
+| 型 | フィールド |
+| --- | --- |
+| `StudyAmendment` | `number?`（受け入れられたものだけ。1 から）、`text`、`verdict`（`refines`、`conflicts`、`changesObjective`、`unclassified`）、`accepted`、`reason`（`StudyReason`）、`runId` |
+| `StudyDriftEntry` | `passage`、`collection`、`item`（`id?`、`statement?`、`servesObjective?`）、`reason`（`StudyReason`）、`by`（`guardian`：目的から外れている。`schema`：その前に拒否された。たとえば `servesObjective` がない）、`attempt`（やり直しでは 2）、`runId` |
+| `StudySearchResult` | `id`（`S1`…。同じ結果が再び見つかっても、リスタートまでは保たれる）、`title`、`locator`（URL またはその他の所在情報）、`date?`、`excerpt`、`tool`、`query`、`runId` |
+| `StudySearch` | `passage`、`purpose`（`research` または `priorArt`）、`tool`、`query`、`servesObjective`、`claims?`、`resultIds`、`error?`、`skipped?`（`maxSearches`）、`runId` |
+| `StudyPassageState` | `passage`、`state`（`complete`。`partial`：判定済みだが終わっていない。ループを待っているか、先行技術の検索が途中で打ち切られた。`unchecked`：監視役が判定していない項目がある。`notRun`）、`attempts`（やり直しの後は 2）、`keptAttempt?` と `discarded?`（`attempt`、`items`：より良い最初の試行のために破棄されたやり直し）、`reopenedBy`、`runId?` |
+| `StudyNotice` | `code`（`noSources`、`stopped`、`failed`、`cancelled`、`passagesNotRun`、`uncheckedItems`、`searchesSkipped`、`leadsNotVerified`、`analoguesNotDeconstructed`、`noDesign`、`noCapability`、`minimumsNotMet`、`untracedAssembly`、`passagesOutdated`、`capabilitiesToVerify`、`capabilitiesExist`、`noveltiesToVerify`）、`params?`（`limit`、`error`、`count`）、`details?`（対象となる工程、`passage.collection` の組、手がかり、ブレークスルー、またはアーキテクチャ）、`message`（英語。調査書はコードを自分の言語で表示する） |
+| `StudyStats` | 最後のリスタート以降：`runs` と `modelCalls`（`run()` の実行と、その中でベンダーが応答した呼び出し）、`searches`、`searchesSkipped`、`results`、`items`、`rejected`、`byStatus`（状態ごと）、`downgraded`（研究が状態を引き下げた主張）、`noveltiesToVerify`、`redos`、`loops`。そして `amendments`（`count`、`modelCalls`）：研究のすべての追加指示で、別に数えられる |
+
+### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}
+
+レポートを、レポートの言語で書かれた読みやすい Markdown の調査書として返します。これは `StudyResult` の `markdown` と同じものです。それ以降に記録された結果を含めるには、`study.report()` に対して呼び出してください。その文言は `studyLabels(language)`（`StudyLabels`）から取られ、このドキュメントの 11 の言語で用意されています（`StudyLabelLanguage`）。それ以外の言語や未知の言語では英語の文言になり、`fr-CA` ではフランス語の文言になります。
+
 ## 型付き決定 — `sdk.decisions` {#typed-decisions-—-sdk-decisions}
 
 バックエンドが設定されていない場合は、`ValidationError` を投げます。
@@ -211,7 +394,7 @@ interface ModelCostLine {
 | `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | 同じ差分をリグレッションとして、重大度と影響付きで返す。結果は `no_regression` または `regressions_detected` |
 | `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | 実行をリプレイしてから、そのリプレイを検証する。リプレイはモデルを呼ばないため、`validateAspects: ['tools', 'policies']` で比較する |
 
-実行は **イベントの意味で** 比較され、イベントの id では決して比較されません（id は実行ごとに新しくなります）。イベントは順番に対応づけられます。まず同一のイベント、次に種類と対象（ツール、操作、回答）が同じでデータが変わったイベント、最後に同じ対象で種類が変わったイベントです。比較しないもの：イベントの id、時刻、メタデータ、`incident.reported` イベント（通知の送信と抑制を記録するものです。インシデントを起こしたイベントは比較されます）、そして SDK が書き込み、実行ごとに変わる値（ツール呼び出しの所要時間、トークン使用量、リトライ前の待ち時間、承認の id、リプレイ元の実行、観察の時刻と元のイベント）。モデルがツール呼び出しの横に書くテキストは `intention.generated` の中でだけ比較されます。ツールのパラメーター、結果、入力は、キーの名前にかかわらず常に比較されます。30 から 60 に変わった `duration` 引数は変更です。同じことをもう一度行う実行は合格します。別の引数で呼ばれたツールは、呼び出しが起きた位置で報告されます（`parameters.metric: "churn" → "revenue"`）。同一の呼び出しの前に挿入された呼び出しは、追加された 1 つの呼び出しです。`action.executed` が `action.failed` になった場合は、消失と追加ではなく 1 つの変更です。
+実行は **イベントの意味で** 比較され、イベントの id では決して比較されません（id は実行ごとに新しくなります）。イベントは順番に対応づけられます。まず同一のイベント、次に種類と対象（ツール、操作、研究の工程、回答）が同じでデータが変わったイベント、最後に同じ対象で種類が変わったイベントです。比較しないもの：イベントの id、時刻、メタデータ、`incident.reported` イベント（通知の送信と抑制を記録するものです。インシデントを起こしたイベントは比較されます）、そして SDK が書き込み、実行ごとに変わる値（ツール呼び出しの所要時間、トークン使用量、リトライ前の待ち時間、承認の id、リプレイ元の実行、観察の時刻と元のイベント）。モデルがツール呼び出しの横に書くテキストは `intention.generated` の中でだけ比較されます。ツールのパラメーター、結果、入力は、キーの名前にかかわらず常に比較されます。30 から 60 に変わった `duration` 引数は変更です。同じことをもう一度行う実行は合格します。別の引数で呼ばれたツールは、呼び出しが起きた位置で報告されます（`parameters.metric: "churn" → "revenue"`）。同一の呼び出しの前に挿入された呼び出しは、追加された 1 つの呼び出しです。`action.executed` が `action.failed` になった場合は、消失と追加ではなく 1 つの変更です。
 
 | オプション | 対象 | |
 | --- | --- | --- |
@@ -286,6 +469,7 @@ interface ModelCostLine {
 | --- | --- |
 | `RunInput.onEvent`：`agent.run({ message, onEvent })` | 実行のすべてのイベント。`run()` は、リスナーがそのそれぞれの処理を終えた後に解決される。ただし、実行が停止またはキャンセルされたとき、または `signal` が中断されたときは、それより早く解決される（そのときリスナーの購読は解除される）。リスナーは記録されない |
 | `ThinkInput.onEvent`：`agent.think({ problem, onEvent })` | 認知エージェントの実行について同じ。その `limits.timeoutMs` でも待機が終わる |
+| `StudyRunOptions.onEvent`：`study.run({ onEvent })` | 研究の実行について同じ。その `limits.timeoutMs` でも待機が終わる |
 | `replay(runId, modifications?, { onEvent })` | リプレイについて同じ。リプレイはキャンセルできないので、必ず待つ |
 | `executeTool(name, params, { onEvent })` | 呼び出しのイベントと、そのツールが開始する実行のイベント（1 階層分まで）。ハンドラーはリスナーを `context.onEvent` として受け取り、`governedAgentTool` と `cognitiveAgentTool` はそれを自分のエージェントに渡す（リアルタイムのイベントに対応していないストアの上に手作業で組み立てたエージェントは、リスナーなしで動く）。`signal` で待機が終わる |
 | `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`：フィルターに一致するすべての実行のすべてのイベント（`agentId` は `metadata.agentId`）。返された関数を呼び出すまで続き、その関数を呼び出すと、まだ配信されていないイベントは破棄される。リグレッションスイートの実行とリプレイも実際の実行なので、そのイベントもリスナーに届く（スイートは入力の `onEvent` と `onText` を保存しない） |

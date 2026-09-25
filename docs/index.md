@@ -35,6 +35,11 @@ features:
     details: Yes, it can imitate how someone reasons. Explain a few topics in your own words, and it distills your order of attention, priorities and reflexes into a profile written into the instructions of each reasoning step. Each correction is added to it, and your agreement shows how close it gets.
     link: /guide/thinker-profiles
     linkText: Reason like a given person
+  - icon: 🧭
+    title: A researcher that stays on course
+    details: Give it an object to understand and redesign with today's means. It searches your sources, tells established facts from hypotheses and novelties, and proposes the experiments that would decide — with a frozen charter and a guardian that keep it on its objective.
+    link: /guide/studies
+    linkText: Studies
   - icon: 🎯
     title: Typed decisions with Jev
     details: Inject any context, ask yes/no, single or multiple choice and rating questions, and get calibrated probabilities your code can act on.
@@ -104,6 +109,7 @@ console.log(await sdk.getRunCost(runId));     // what it cost, per model
 | --- | --- | --- |
 | Reason before answering | One-shot generation | Hypotheses, simulation and critique on an explicit state |
 | Reason like a given person | A long system prompt | A versioned thinker profile, refined by feedback |
+| Research that stays on its objective | A chat that drifts as instructions pile up | A study: frozen charter, prompts rebuilt at each call, a guardian, claims checked against sources |
 | Fast, calibrated decisions | Parse free text | Typed answers with probabilities and confidence (Jev) |
 | Connect company tools | Custom glue per tool | MCP server and client, governed by policies |
 | Know what happened | Logs, if any | Event log, replay, mental state rebuild |

@@ -94,7 +94,7 @@ export interface UsageRecord {
 /**
  * Reads the model calls recorded in a run, with their token usage: LLM calls (native
  * reasoning and tool selection, answers discarded after the vendor billed them, cognitive
- * thoughts and operations interrupted after billed attempts) and typed decisions, rejected
+ * thoughts and operations interrupted after billed attempts, a study's calls) and typed decisions, rejected
  * answers included. A call recorded without both input and output token counts is counted
  * as unmetered: its cost is unknown, never taken as zero (see `tokensOfCall`).
  */
@@ -123,6 +123,9 @@ export function modelCallsOf(event: Pick<Event, 'type' | 'data'>): UsageRecord |
     case 'cognition.operation_failed':
       // A thought made by the engine alone (a tool result, a test) called no model.
       return data.model !== undefined || data.usage !== undefined ? llmRecord(data) : undefined;
+    case 'study.model_called':
+      // A study's call and its repair, as a thought and its repairs are.
+      return llmRecord(data);
     case 'decision.evaluated':
       return decisionRecord(data);
     default:

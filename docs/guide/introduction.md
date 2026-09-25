@@ -61,6 +61,7 @@ What it imitates is a **way of reasoning**: it does not know what you never wrot
 - **Reasoning like a given person**: distill a thinker profile from topics explained in your own words, then correct the agent with `match`, `partial` or `mismatch` verdicts and a percentage of agreement.
 - **Typed decisions** — [TypeSafe Jev](https://docs.typesafe.ai) or any compatible backend answers Noul, Choice and Score questions with calibrated probabilities.
 - **MCP connectors** — expose your tools as an MCP server, import any MCP server as governed tools.
+- **Studies** — a researcher that understands an object, then proposes how to redesign it with today's means: seven passages, claims checked against the sources it actually searched, and a frozen charter with a guardian that keeps it on its objective. See [Studies](./studies).
 - **Operations built in** — per-run API costs, retry policies that do not stack, incident alerts by email or webhook.
 - **Native event sourcing** — replay without the LLM, golden traces, regression detection, reasoning graphs.
 

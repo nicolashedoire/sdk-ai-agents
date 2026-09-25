@@ -90,6 +90,23 @@ Tous les termes employés dans cette documentation, expliqués sans jargon, avec
 | **Exemple de calibrage** (*calibration example*) | Une exécution que la personne a validée, montrée au modèle comme une réponse modèle. |
 | **Correction** | Une leçon tirée d'une exécution avec laquelle la personne était en désaccord, montrée au modèle comme sa priorité la plus haute. |
 
+## Études {#studies}
+
+| Terme | En termes simples |
+| --- | --- |
+| **Étude** (*study*) | Un chercheur IA (`sdk.createStudy`) : il comprend un objet, puis propose de le repenser avec les connaissances et les techniques d'aujourd'hui, et conçoit les expériences qui permettraient de trancher. Il ne construit et ne mesure rien. Voir [Études](./studies). |
+| **Passage** | L'une des sept étapes d'une étude : observer, décomposer, comprendre les choix de leur époque, examiner ce qui a changé, croiser passé et présent, concevoir, confronter. Un passage peut en rouvrir un précédent. |
+| **Charte** (*charter*) | Le cadre d'une étude : l'objet, la question directrice, l'objectif, les besoins, vos pistes, ce qui est hors du périmètre. Elle est figée à la création de l'étude, et chaque prompt commence par elle. |
+| **Piste** (*lead*) | Une idée que vous donnez à l'étude pour qu'elle l'examine. C'est un exemple à vérifier, pas une vérité : l'étude dit si elle est pertinente, avec des raisons, et cherche au-delà. |
+| **Statut d'une affirmation** (*claim status*) | Ce que vaut un énoncé d'une étude : **établie** (appuyée par une source que l'étude a réellement trouvée), **hypothèse** (plausible, non documentée) ou **nouveauté** (une idée nouvelle, à confronter à l'existant). C'est le code qui le vérifie, pas le modèle. Voir [Établie, hypothèse, nouveauté](./studies#established-hypothesis-novelty). |
+| **Existant** (*prior art*) | Les travaux existants les plus proches d'une idée présentée comme nouvelle. Une nouveauté reste « à vérifier » tant que l'étude ne les a pas cherchés. |
+| **Gardien** (*guardian*) | Un contrôle distinct après chaque passage d'une étude : il ne voit que la charte et ce que le passage a produit, et retire ce qui s'écarte de l'objectif. Voir [Le gardien](./studies#the-guardian). |
+| **Dérive, journal de dérive** (*drift, drift log*) | La dérive, c'est un modèle qui quitte peu à peu son sujet. Le journal de dérive liste tout ce qu'une étude a retiré pour cette raison, et pourquoi. |
+| **Amendement** (*amendment*) | Une instruction ajoutée à une étude après sa création. Il n'est accepté que s'il précise l'objectif ; un amendement qui contredit la charte ou change l'objectif est refusé. |
+| **Capacité nouvelle** (*new capability*) | Quelque chose qui devient possible alors que c'est difficile, voire impossible, aujourd'hui, grâce à un changement de principe — par opposition à une **amélioration** (*improvement*), qui ne fait que rendre quelque chose plus rapide ou moins cher. |
+| **Rupture par assemblage** (*breakthrough by assembly*) | Une rupture faite de techniques qui existaient déjà, réunies d'une façon nouvelle. Bitcoin en est une : les signatures, les chaînes de hachage, la preuve de travail et un réseau pair à pair étaient tous connus auparavant. |
+| **Fiche de mécanisme** (*mechanism card*) | Onze questions sur un mécanisme, de ce qui a été observé à ce qui a été conclu. Une étude répond aux neuf premières ; vous répondez aux deux dernières une fois l'expérience menée. |
+
 ## Décisions typées et connecteurs {#typed-decisions-and-connectors}
 
 | Terme | En termes simples |

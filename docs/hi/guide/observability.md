@@ -88,7 +88,7 @@ unsubscribe();
 
 | कहाँ | listener को क्या मिलता है |
 | --- | --- |
-| `run({ onEvent })`, `think({ onEvent })` | उस run का हर इवेंट |
+| `run({ onEvent })`, `think({ onEvent })`, `study.run({ onEvent })` | उस run का हर इवेंट |
 | `replay(runId, modifications, { onEvent })` | रीप्ले का हर इवेंट |
 | `executeTool(name, params, { onEvent })` | कॉल के इवेंट, और उसके टूल द्वारा शुरू किए गए एजेंट run के इवेंट (`governedAgentTool`, `cognitiveAgentTool`), सिर्फ़ एक स्तर तक: वह एजेंट आगे जो runs शुरू करता है, उनके नहीं |
 | `sdk.subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | फ़िल्टर से मेल खाने वाले हर run का हर इवेंट, जब तक आप उसके द्वारा लौटाया गया फ़ंक्शन कॉल नहीं करते |

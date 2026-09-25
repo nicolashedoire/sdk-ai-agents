@@ -15,6 +15,7 @@ sdk-ai-agents/
 │   ├── mcp.ts                  # Entry point of @sdk-ai-agents/core/mcp
 │   ├── cognition/              # Cognitive agents: mental state, operations, controllers, profiles
 │   ├── decisions/              # Typed decisions (Jev client, DecisionService)
+│   ├── study/                  # Studies: charter, passages, guardian, claim statuses, dossier
 │   ├── engines/                # Reasoning, action, policy and replay engines
 │   ├── stores/                 # Event stores (file, SQLite, PostgreSQL)
 │   ├── providers/              # LLM providers (OpenAI, Anthropic, fallback)
@@ -145,6 +146,12 @@ sdk-ai-agents/
 **Назначение:** когнитивные агенты — явное ментальное состояние, когнитивные операции, контроллеры, профили мыслителя.
 
 **Содержит:** `cognitive-agent.ts` (цикл запуска), `operation-selector.ts`, `operation-performer.ts`, `cognitive-controller.ts` (эвристический), `typed-decision-controller.ts` (Jev), `hypothesis-assessor.ts`, `information-seeker.ts`, `llm-thought-generator.ts` и `thought-prompts.ts`, `mental-state.ts` (схемы и типы), `mental-state-reducer.ts` и `hypothesis-transitions.ts`, `mental-state-replay.ts`, `thinker-profile.ts`, `profile-distiller.ts`, `create-cognitive-agent.ts`.
+
+### `src/study/` {#src-study}
+
+**Назначение:** исследования (`sdk.createStudy`) — исследователь, который понимает объект, затем предлагает, как его перепроектировать, отдельно от когнитивного движка.
+
+**Содержит:** `study.ts` (класс `Study`: запуски, страж, дополнения, поиск предшествующих работ), `passages.ts` (семь этапов, их коллекции и схемы), `study-config.ts` (конфигурация, замороженный устав и его хеш), `study-prompts.ts` и `study-replies.ts` (промпты, собираемые заново при каждом вызове, ответы, читаемые по их схемам), `study-claims.ts` (статусы утверждений, проверяемые в коде), `study-sources.ts` (источники, параметры запроса, результаты), `study-model.ts` и `study-run.ts` (вызовы модели, лимиты, события), `study-report.ts`, `study-markdown.ts` и `study-labels.ts` (отчёт и досье на одиннадцати языках), `study-types.ts`.
 
 ### `src/decisions/` (v0.2) {#src-decisions-v0-2}
 

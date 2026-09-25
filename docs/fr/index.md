@@ -35,6 +35,11 @@ features:
     details: "Oui, il peut imiter la façon dont quelqu'un raisonne. Expliquez quelques sujets avec vos propres mots : il en distille votre ordre d'attention, vos priorités et vos réflexes dans un profil inscrit dans les instructions de chaque étape de raisonnement. Chaque correction y est ajoutée, et votre degré d'accord montre à quel point il s'en approche."
     link: /fr/guide/thinker-profiles
     linkText: Raisonner comme une personne donnée
+  - icon: 🧭
+    title: Un chercheur qui garde le cap
+    details: Donnez-lui un objet à comprendre et à repenser avec les moyens d'aujourd'hui. Il cherche dans vos sources, distingue les faits établis des hypothèses et des nouveautés, et propose les expériences qui permettraient de trancher — avec une charte figée et un gardien qui le maintiennent sur son objectif.
+    link: /fr/guide/studies
+    linkText: Études
   - icon: 🎯
     title: Des décisions typées avec Jev
     details: Injectez n'importe quel contexte, posez des questions oui/non, à choix unique, à choix multiple ou de notation, et obtenez des probabilités calibrées sur lesquelles votre code peut agir.
@@ -104,6 +109,7 @@ console.log(await sdk.getRunCost(runId));     // what it cost, per model
 | --- | --- | --- |
 | Raisonner avant de répondre | Une génération en un seul passage | Hypothèses, simulation et critique sur un état explicite |
 | Raisonner comme une personne donnée | Un long prompt système | Un profil de penseur versionné, affiné par les retours |
+| Une recherche qui reste sur son objectif | Une conversation qui dérive à mesure que les instructions s'empilent | Une étude : charte figée, prompts reconstruits à chaque appel, un gardien, des affirmations vérifiées par rapport aux sources |
 | Des décisions rapides et calibrées | Analyser du texte libre | Des réponses typées, avec probabilités et confiance (Jev) |
 | Connecter les outils de l'entreprise | Du code d'intégration sur mesure pour chaque outil | Serveur et client MCP, gouvernés par des politiques |
 | Savoir ce qui s'est passé | Des journaux, s'il y en a | Journal d'événements, rejeu, reconstruction de l'état mental |

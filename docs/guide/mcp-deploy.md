@@ -220,7 +220,7 @@ agent completed
 call completed
 ```
 
-Messages name the steps, the tools and the cognitive operations: the tool the model chose, and every tool the agent calls, including tools of the agent that the server does not expose. They never carry arguments, results or error texts. There is no `total`: nobody knows in advance how many steps a run takes. Every notification is sent before the result, never after it. Over Streamable HTTP they travel on the stream of the response (SSE); a transport created with `enableJsonResponse: true` answers in plain JSON and drops them. A client that sends no `progressToken` gets none.
+Messages name the steps, the tools and the cognitive operations: the tool the model chose, and every tool the agent calls, including tools of the agent that the server does not expose. A tool that runs a [study](./studies) with the `onEvent` of its context is described by passage (`study started`, `passage changes started`, `search in changes`, `report ready`), never by query. They never carry arguments, results or error texts. There is no `total`: nobody knows in advance how many steps a run takes. Every notification is sent before the result, never after it. Over Streamable HTTP they travel on the stream of the response (SSE); a transport created with `enableJsonResponse: true` answers in plain JSON and drops them. A client that sends no `progressToken` gets none.
 
 Only the agent run a tool starts is followed, one level deep: the runs that agent starts through its own agent tools are not, and an agent built by hand on a store without live events is not either. Nothing is coalesced: every event is a notification, and a long cognitive run can send hundreds of them.
 

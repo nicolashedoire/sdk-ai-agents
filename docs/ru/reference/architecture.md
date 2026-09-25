@@ -25,7 +25,7 @@
 | Оценщики гипотез | `src/cognition/hypothesis-assessor.ts` | `compare` с типизированными решениями: доказательства запрашиваются без мыслителя, соответствие — только для предложений |
 | Регистратор и фабрика | `src/cognition/cognitive-run-recorder.ts`, `create-cognitive-agent.ts` | Структура событий когнитивного запуска; сборка агента из его конфигурации и сервисов SDK |
 
-Вокруг него: `src/decisions` (типизированные решения, клиент Jev, сервис решений), `src/costs` (цены и затраты запусков), `src/resilience` (политика повторных попыток и провайдер с повторными попытками), `src/incidents` (правила, уведомители, хранилище событий с мониторингом) и `src/mcp` (сервер и клиент, публикуются как `@sdk-ai-agents/core/mcp`).
+Вокруг него: `src/decisions` (типизированные решения, клиент Jev, сервис решений), `src/costs` (цены и затраты запусков), `src/resilience` (политика повторных попыток и провайдер с повторными попытками), `src/incidents` (правила, уведомители, хранилище событий с мониторингом), `src/mcp` (сервер и клиент, публикуются как `@sdk-ai-agents/core/mcp`) и `src/study` (исследования, которые повторно используют провайдеры, хранилище событий, управляемое выполнение инструментов и затраты, но не когнитивный движок).
 
 Остальная часть этой страницы описывает управляемую среду выполнения (v0.1).
 
@@ -282,7 +282,19 @@ type EventType =
   | 'cognition.evaluated'
   | 'cognition.feedback'
   | 'cognition.knowledge_recorded'
-  | 'decision.evaluated';
+  | 'decision.evaluated'
+  | 'study.started'
+  | 'study.passage_started'
+  | 'study.passage_completed'
+  | 'study.search'
+  | 'study.model_called'
+  | 'study.drift_rejected'
+  | 'study.capability_demoted'
+  | 'study.amendment_accepted'
+  | 'study.amendment_refused'
+  | 'study.result_recorded'
+  | 'study.completed'
+  | 'study.failed';
 ```
 
 ### Структура события {#event-structure}

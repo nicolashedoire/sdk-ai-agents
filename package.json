@@ -44,6 +44,7 @@
     "test:api": "tsx examples/test-api.ts",
     "example:cognitive": "tsx examples/cognitive-agent.ts",
     "example:rules": "tsx examples/rule-discovery.ts",
+    "example:study": "tsx examples/study.ts",
     "example:mcp": "tsx examples/mcp-server.ts",
     "example:mcp-openapi": "tsx examples/mcp-openapi.ts",
     "example:mcp-folder": "tsx examples/mcp-folder.ts",

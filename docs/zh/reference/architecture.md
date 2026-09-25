@@ -25,7 +25,7 @@
 | 评分器 | `src/cognition/hypothesis-assessor.ts` | 用类型化决策执行 `compare`：询问证据时不带思考者画像，只针对提议询问契合度 |
 | 记录器与工厂 | `src/cognition/cognitive-run-recorder.ts`、`create-cognitive-agent.ts` | 认知运行的事件结构；根据配置和 SDK 服务组装一个智能体 |
 
-在它周围：`src/decisions`（类型化决策、Jev 客户端、决策服务）、`src/costs`（定价和运行成本）、`src/resilience`（重试策略和带重试的提供商）、`src/incidents`（规则、通知器、受监控的事件存储）以及 `src/mcp`（服务器和客户端，以 `@sdk-ai-agents/core/mcp` 的形式发布）。
+在它周围：`src/decisions`（类型化决策、Jev 客户端、决策服务）、`src/costs`（定价和运行成本）、`src/resilience`（重试策略和带重试的提供商）、`src/incidents`（规则、通知器、受监控的事件存储）、`src/mcp`（服务器和客户端，以 `@sdk-ai-agents/core/mcp` 的形式发布）以及 `src/study`（研究，它复用提供商、事件存储、受治理的工具执行和成本，但不复用认知引擎）。
 
 本页其余部分介绍受治理的运行时（v0.1）。
 
@@ -282,7 +282,19 @@ type EventType =
   | 'cognition.evaluated'
   | 'cognition.feedback'
   | 'cognition.knowledge_recorded'
-  | 'decision.evaluated';
+  | 'decision.evaluated'
+  | 'study.started'
+  | 'study.passage_started'
+  | 'study.passage_completed'
+  | 'study.search'
+  | 'study.model_called'
+  | 'study.drift_rejected'
+  | 'study.capability_demoted'
+  | 'study.amendment_accepted'
+  | 'study.amendment_refused'
+  | 'study.result_recorded'
+  | 'study.completed'
+  | 'study.failed';
 ```
 
 ### 事件结构 {#event-structure}

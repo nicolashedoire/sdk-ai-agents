@@ -1,6 +1,6 @@
 # API 成本
 
-SDK 会把每一次模型调用的 token 用量记录**在发起它的那次运行中**——工具选择、认知思维和类型化决策——并按模型计价。只要厂商已经应答，这次调用就会被计数，即使 SDK 随后因为这个应答让该步骤失败也一样（参见[失败的调用](#failed-calls)）。
+SDK 会把每一次模型调用的 token 用量记录**在发起它的那次运行中**——工具选择、认知思维、类型化决策以及研究的调用——并按模型计价。只要厂商已经应答，这次调用就会被计数，即使 SDK 随后因为这个应答让该步骤失败也一样（参见[失败的调用](#failed-calls)）。
 
 ```ts
 const cost = await sdk.getRunCost(runId);
@@ -57,6 +57,7 @@ SDK 从不编造价格，也不编造 token 数。调用的成本在两种情况
 
 - 受治理智能体的工具调用，其参数不是有效的 JSON：`intention.generated` 会在读取应答之前被记录；
 - 应答未通过校验的认知思维（包括修复），以及在已计费的尝试之后被 `stop()` 或运行超时打断的操作（`cognition.operation_failed` 带有它们的 `usage`，已经得到应答的类型化决策请求记录为 `decision.evaluated`）；
+- 回复即使经过修复仍无法使用的研究调用，或者在已计费的尝试之后被停止或超时打断的研究调用：带有 `failed` 以及已得到应答的尝试的 `usage` 的 `study.model_called`；
 - 答案与问题不符的类型化决策（选择不在选项之中，答案缺失或类型不对）：先记录带有 `error` 和空 `answers` 的 `decision.evaluated`，然后 `sdk.decisions` 抛出该错误，认知智能体则像以前一样回退；
 - 提供商丢弃的应答：不含任何选项的 OpenAI 应答，它会让调用失败，或让回退提供商接手（`provider.answer_discarded`；在受治理的运行和认知思维中都一样，按给出该应答的模型计价）。
 
@@ -71,6 +72,7 @@ SDK 从不编造价格，也不编造 token 数。调用的成本在两种情况
 | `cognition.thought` | 认知操作，包括修复和失败的尝试（通过后备提供商由不同于最后一次尝试的模型回答的较早尝试，如果报告了用量，记录为 `provider.answer_discarded`） | `model`、`requestedModel`、`usage.calls`、`usage.unmeteredCalls`、`usage.unmeteredTokens` |
 | `cognition.operation_failed` | 在已计费的尝试之后被停止或超时打断的操作 | `model`、`requestedModel`、`usage` |
 | `decision.evaluated` | Jev 以及其他类型化决策后端，包括被拒绝的答案 | `model`、`usage.inputTokens`、`usage.outputTokens` |
+| `study.model_called` | 研究的调用：环节、搜索请求、守护者检查、现有技术检查和修正案，包括修复（一次调用及其修复记为一个事件；提供商丢弃的应答记录为 `provider.answer_discarded`） | `model`、`requestedModel`、`usage.calls`、`usage.unmeteredCalls`、`usage.unmeteredTokens` |
 
 认知运行的最终答案也会被记录为一个 `intention.generated` 事件（`source: 'cognition'`）：它不是模型调用，不会被计数。
 
@@ -78,6 +80,6 @@ SDK 从不编造价格，也不编造 token 数。调用的成本在两种情况
 
 ## 预算 {#budgets}
 
-成本只是一个方面；策略还可以按智能体、工具和时间段为**步数、token 数和工具调用次数**设置上限——参见[受治理智能体](./governed-agents)。带 `maxCost` 的 `budgetLimit` 会在某个智能体该时间段内模型调用的花费（按上面的价格计算）超过上限后，拒绝它的工具调用，对认知智能体还会拒绝它的下一步（参见[限制与策略](./cognitive-agents#limits-and-policies)）：已经开始的模型调用从不被中断，带 `toolName` 时只拒绝该工具。如果某个模型没有价格，或某次调用没有报告 token 数，就无法检查该上限，这些工具调用和步骤会被拒绝。如果 `maxCost` 不是有限且 ≥ 0 的数字（例如从配置文件读取的字符串 `'0.5'`、`NaN`、负数金额、`Infinity`、`null`），策略在应用时就会以 `ValidationError` 被拒绝。
+成本只是一个方面；策略还可以按智能体、工具和时间段为**步数、token 数和工具调用次数**设置上限——参见[受治理智能体](./governed-agents)。带 `maxCost` 的 `budgetLimit` 会在某个智能体该时间段内模型调用的花费（按上面的价格计算）超过上限后，拒绝它的工具调用，对认知智能体还会拒绝它的下一步，对研究则会拒绝它的下一个步骤（参见[限制与策略](./cognitive-agents#limits-and-policies)）：已经开始的模型调用从不被中断，带 `toolName` 时只拒绝该工具。如果某个模型没有价格，或某次调用没有报告 token 数，就无法检查该上限，这些工具调用和步骤会被拒绝。如果 `maxCost` 不是有限且 ≥ 0 的数字（例如从配置文件读取的字符串 `'0.5'`、`NaN`、负数金额、`Infinity`、`null`），策略在应用时就会以 `ValidationError` 被拒绝。
 
-预算统计 `getRunCost` 读取的模型调用，读取方式与它相同——包括[失败的调用](#failed-calls)，没有同时报告输入和输出 token 数的调用则算作成本未知的调用：受治理智能体的推理步骤；认知智能体的思维（包括修复和失败的尝试）、工具选择、类型化决策，以及在已计费的尝试之后被打断的操作；两者中提供商无法使用的应答；以及用 `sdk.decisions` 做出的类型化决策，包括被拒绝的答案。带 `agentId` 的上限统计该智能体的模型调用——以及用 `agentId` 指明它的 `sdk.decisions` 调用；不带 `agentId` 的上限统计全部调用，包括不指明智能体做出的类型化决策。预算从不拒绝 `sdk.decisions` 的调用：它拒绝的是工具调用和认知智能体的步骤。
+预算统计 `getRunCost` 读取的模型调用，读取方式与它相同——包括[失败的调用](#failed-calls)，没有同时报告输入和输出 token 数的调用则算作成本未知的调用：受治理智能体的推理步骤；认知智能体的思维（包括修复和失败的尝试）、工具选择、类型化决策，以及在已计费的尝试之后被打断的操作；两者中提供商无法使用的应答；研究的调用（参见[研究](./studies#costs-and-budgets)）；以及用 `sdk.decisions` 做出的类型化决策，包括被拒绝的答案。带 `agentId` 的上限统计该智能体的模型调用（对研究而言，是研究的 `id`）——以及用 `agentId` 指明它的 `sdk.decisions` 调用；不带 `agentId` 的上限统计全部调用，包括不指明智能体做出的类型化决策。预算从不拒绝 `sdk.decisions` 的调用：它拒绝的是工具调用、认知智能体和研究的步骤，以及对研究修正案的分类。

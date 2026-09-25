@@ -24,6 +24,7 @@ export const text: LocaleText = {
     'guide/memory': '跨运行记忆',
     'guide/thinker-profiles': '像特定的人一样推理',
     'guide/governed-agents': '受治理智能体',
+    'guide/studies': '研究',
     'guide/typed-decisions': '类型化决策（Jev）',
     'guide/mcp': 'MCP 通俗解释',
     'guide/mcp-first-server': '你的第一个 MCP 服务器',

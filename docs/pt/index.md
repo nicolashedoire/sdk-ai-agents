@@ -35,6 +35,11 @@ features:
     details: Sim, ele consegue imitar o modo como alguém raciocina. Explique alguns temas com suas próprias palavras e ele destila sua ordem de atenção, suas prioridades e seus reflexos em um perfil escrito nas instruções de cada etapa do raciocínio. Cada correção é acrescentada ao perfil, e a sua concordância mostra o quanto ele chega perto.
     link: /pt/guide/thinker-profiles
     linkText: Raciocinar como uma pessoa específica
+  - icon: 🧭
+    title: Um pesquisador que não sai do rumo
+    details: Dê a ele um objeto para entender e redesenhar com os meios de hoje. Ele pesquisa nas suas fontes, distingue os fatos estabelecidos das hipóteses e das novidades, e propõe os experimentos que permitiriam decidir — com uma carta congelada e um guardião que o mantêm no seu objetivo.
+    link: /pt/guide/studies
+    linkText: Estudos
   - icon: 🎯
     title: Decisões tipadas com Jev
     details: Injete qualquer contexto, faça perguntas de sim/não, de escolha única ou múltipla e de avaliação em escala, e receba probabilidades calibradas com as quais o seu código pode agir.
@@ -104,6 +109,7 @@ console.log(await sdk.getRunCost(runId));     // what it cost, per model
 | --- | --- | --- |
 | Raciocinar antes de responder | Geração em uma única passada | Hipóteses, simulação e crítica sobre um estado explícito |
 | Raciocinar como uma pessoa específica | Um longo prompt de sistema | Um perfil de pensador versionado, refinado por feedback |
+| Uma pesquisa que se mantém no objetivo | Um chat que fica à deriva à medida que as instruções se acumulam | Um estudo: carta congelada, prompts reconstruídos a cada chamada, um guardião, afirmações verificadas em relação às fontes |
 | Decisões rápidas e calibradas | Interpretar texto livre | Respostas tipadas com probabilidades e confiança (Jev) |
 | Conectar as ferramentas da empresa | Código de integração sob medida para cada ferramenta | Servidor e cliente MCP, governados por políticas |
 | Saber o que aconteceu | Logs, se houver | Log de eventos, replay, reconstrução do estado mental |

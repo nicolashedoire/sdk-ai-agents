@@ -90,6 +90,23 @@ Todos os termos usados nesta documentação, explicados sem jargão, com um link
 | **Exemplo de calibração** (calibration example) | Uma execução que a pessoa validou, mostrada ao modelo como uma resposta modelo. |
 | **Correção** (correction) | Uma lição de uma execução com a qual a pessoa não concordou, mostrada ao modelo como sua prioridade máxima. |
 
+## Estudos {#studies}
+
+| Termo | Em palavras simples |
+| --- | --- |
+| **Estudo** (study) | Um pesquisador de IA (`sdk.createStudy`): ele entende um objeto, depois propõe como redesenhá-lo com os conhecimentos e as técnicas de hoje, e concebe os experimentos que permitiriam decidir. Ele não constrói nem mede nada. Veja [Estudos](./studies). |
+| **Passagem** (passage) | Uma das sete fases de um estudo: observar, decompor, entender as escolhas da sua época, examinar o que mudou, cruzar passado e presente, conceber, confrontar. Uma passagem pode reabrir uma anterior. |
+| **Carta** (charter) | O quadro de um estudo: o objeto, a pergunta norteadora, o objetivo, as necessidades, as suas pistas, o que está fora do escopo. Ela é congelada quando o estudo é criado, e todo prompt começa com ela. |
+| **Pista** (lead) | Uma ideia que você dá ao estudo para ele examinar. É um exemplo a verificar, não uma verdade: o estudo diz se ela é pertinente, com os motivos, e procura além dela. |
+| **Status de uma afirmação** (claim status) | O que vale um enunciado de um estudo: **estabelecida** (sustentada por uma fonte que o estudo realmente encontrou), **hipótese** (plausível, não documentada) ou **novidade** (uma ideia nova, a verificar em relação aos trabalhos existentes). Quem o verifica é o código, não o modelo. Veja [Estabelecida, hipótese, novidade](./studies#established-hypothesis-novelty). |
+| **Estado da técnica** (prior art) | Os trabalhos existentes mais próximos de uma ideia apresentada como nova. Uma novidade continua "a verificar" até que o estudo o tenha pesquisado. |
+| **Guardião** (guardian) | Uma verificação separada depois de cada passagem de um estudo: ela vê apenas a carta e o que a passagem produziu, e remove o que se desvia do objetivo. Veja [O guardião](./studies#the-guardian). |
+| **Deriva, registro de deriva** (drift, drift log) | A deriva é um modelo que se afasta aos poucos do seu assunto. O registro de deriva lista tudo o que um estudo removeu por esse motivo, e por quê. |
+| **Emenda** (amendment) | Uma instrução acrescentada a um estudo depois que ele foi criado. Ela só é aceita quando refina o objetivo; uma emenda que contradiz a carta ou muda o objetivo é recusada. |
+| **Nova capacidade** (new capability) | Algo difícil ou impossível hoje que se torna possível graças a uma mudança de princípio — em oposição a uma **melhoria** (improvement), que apenas torna algo mais rápido ou mais barato. |
+| **Ruptura por montagem** (breakthrough by assembly) | Uma ruptura feita de técnicas que já existiam, juntadas de um modo novo. O Bitcoin é uma delas: assinaturas, cadeias de hashes, prova de trabalho e uma rede peer-to-peer já eram conhecidas antes. |
+| **Ficha de mecanismo** (mechanism card) | Onze perguntas sobre um mecanismo, do que foi observado ao que foi concluído. Um estudo responde às nove primeiras; você responde às duas últimas depois de executar o experimento. |
+
 ## Decisões tipadas e conectores {#typed-decisions-and-connectors}
 
 | Termo | Em palavras simples |

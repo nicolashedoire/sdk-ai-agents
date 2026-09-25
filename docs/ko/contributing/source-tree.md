@@ -15,6 +15,7 @@ sdk-ai-agents/
 │   ├── mcp.ts                  # Entry point of @sdk-ai-agents/core/mcp
 │   ├── cognition/              # Cognitive agents: mental state, operations, controllers, profiles
 │   ├── decisions/              # Typed decisions (Jev client, DecisionService)
+│   ├── study/                  # Studies: charter, passages, guardian, claim statuses, dossier
 │   ├── engines/                # Reasoning, action, policy and replay engines
 │   ├── stores/                 # Event stores (file, SQLite, PostgreSQL)
 │   ├── providers/              # LLM providers (OpenAI, Anthropic, fallback)
@@ -145,6 +146,12 @@ sdk-ai-agents/
 **목적:** 인지 에이전트 — 명시적인 심적 상태, 인지 연산, 컨트롤러, 사고자 프로필.
 
 **내용:** `cognitive-agent.ts`(실행 루프), `operation-selector.ts`, `operation-performer.ts`, `cognitive-controller.ts`(휴리스틱), `typed-decision-controller.ts`(Jev), `hypothesis-assessor.ts`, `information-seeker.ts`, `llm-thought-generator.ts`와 `thought-prompts.ts`, `mental-state.ts`(스키마와 타입), `mental-state-reducer.ts`와 `hypothesis-transitions.ts`, `mental-state-replay.ts`, `thinker-profile.ts`, `profile-distiller.ts`, `create-cognitive-agent.ts`.
+
+### `src/study/` {#src-study}
+
+**목적:** 연구(`sdk.createStudy`) — 대상을 이해한 다음 그것을 어떻게 다시 설계할지 제안하는 연구자로, 인지 엔진과는 분리되어 있습니다.
+
+**내용:** `study.ts`(`Study` 클래스: 실행, 감시자, 개정안, 선행 기술 검색), `passages.ts`(일곱 과정과 그 컬렉션, 스키마), `study-config.ts`(설정, 고정된 헌장과 그 해시), `study-prompts.ts`와 `study-replies.ts`(호출마다 다시 만드는 프롬프트, 스키마에 대조해 읽는 응답), `study-claims.ts`(코드로 검사되는 주장 상태), `study-sources.ts`(소스, 쿼리 매개변수, 결과), `study-model.ts`와 `study-run.ts`(모델 호출, 한도, 이벤트), `study-report.ts`, `study-markdown.ts`와 `study-labels.ts`(보고서, 그리고 열한 개 언어로 된 자료집), `study-types.ts`.
 
 ### `src/decisions/` (v0.2) {#src-decisions-v0-2}
 

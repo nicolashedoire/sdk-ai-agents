@@ -22,6 +22,7 @@ OPENAI_API_KEY=your-key npx tsx examples/quick-start.ts
 | `npm run test:api` | A minimal run against the real API, to check that a key works (`OPENAI_API_KEY`) |
 | `npm run example:cognitive` | A cognitive agent with a governed tool, costs and incident alerts; typed decisions with `TYPESAFE_API_KEY`, or Jev through Vercel AI Gateway with `AI_GATEWAY_API_KEY` |
 | `npm run example:rules` | The evidence loop: a rule induced from measurements, predictions tested on a simulated bench, a refuted rule revised (`MODEL=gpt-4o` to try a stronger model) |
+| `npm run example:study` | A study of the Web browser from 1990 to 2026, in French: three leads to verify (vectorisation, poids, ReLU), Bitcoin deconstructed as a breakthrough by assembly, architectures aiming at a new capability and the experiments that would decide, written to `examples/study-navigateur.md` (`OPENAI_API_KEY`; `SEARCH_MCP`, the command of an MCP search server — without it nothing can be established; `SEARCH_ENV`, the names of the variables the server needs, such as `BRAVE_API_KEY`: it gets only those and a minimal environment, never your model key; `SEARCH_TOOLS`, `MODEL`). Exits with the code 1, saying why, when the run did not complete |
 | `npm run example:mcp` | A function exposed as an MCP server over stdio (no model key needed) |
 | `npm run example:mcp-openapi` | Any web API as an MCP server, from its OpenAPI description (`OPENAPI_SPEC`, `API_BASE_URL`, `API_TOKEN`) |
 | `npm run example:mcp-folder -- /path/to/folder` | A folder of documents: list, read, search, and MCP resources |

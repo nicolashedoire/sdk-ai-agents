@@ -61,6 +61,7 @@ Lo que imita es una **forma de razonar**: no sabe lo que nunca pusiste por escri
 - **Razonar como una persona concreta**: destila un perfil de pensador a partir de temas explicados con tus propias palabras, y después corrige al agente con veredictos `match`, `partial` o `mismatch` y un porcentaje de acuerdo.
 - **Decisiones tipadas** — [TypeSafe Jev](https://docs.typesafe.ai) o cualquier backend compatible responde a preguntas Noul, Choice y Score con probabilidades calibradas.
 - **Conectores MCP** — expón tus herramientas como un servidor MCP, importa cualquier servidor MCP como herramientas gobernadas.
+- **Estudios** — un investigador que comprende un objeto y después propone cómo rediseñarlo con los medios de hoy: siete pasajes, afirmaciones comprobadas frente a las fuentes en las que realmente buscó, y una carta congelada con un guardián que lo mantiene en su objetivo. Consulta [Estudios](./studies).
 - **Operación integrada** — costes de API por ejecución, políticas de reintento que no se acumulan, alertas de incidentes por correo electrónico o webhook.
 - **Event sourcing nativo** — repetición sin el LLM, trazas de referencia, detección de regresiones, grafos de razonamiento.
 

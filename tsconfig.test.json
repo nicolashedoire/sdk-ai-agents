@@ -78,6 +78,11 @@
     "src/__tests__/junit-report.test.ts",
     "src/__tests__/postgresql-live.test.ts",
     "src/__tests__/stable-json.test.ts",
+    "src/__tests__/study.test.ts",
+    "src/__tests__/study-runs.test.ts",
+    "src/__tests__/study-capabilities.test.ts",
+    "src/__tests__/study-review.test.ts",
+    "src/__tests__/study-review-2.test.ts",
     "examples/cognitive-agent.ts",
     "examples/mcp-server.ts",
     "examples/mcp-openapi.ts",
@@ -86,7 +91,8 @@
     "examples/mcp-agent.ts",
     "examples/mcp-http.ts",
     "examples/mcp-approvals.ts",
-    "examples/rule-discovery.ts"
+    "examples/rule-discovery.ts",
+    "examples/study.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

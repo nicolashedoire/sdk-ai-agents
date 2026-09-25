@@ -88,7 +88,7 @@ unsubscribe();
 
 | 場所 | リスナーが受け取るもの |
 | --- | --- |
-| `run({ onEvent })`、`think({ onEvent })` | その実行のすべてのイベント |
+| `run({ onEvent })`、`think({ onEvent })`、`study.run({ onEvent })` | その実行のすべてのイベント |
 | `replay(runId, modifications, { onEvent })` | リプレイのすべてのイベント |
 | `executeTool(name, params, { onEvent })` | 呼び出しのイベントと、そのツールが開始するエージェントの実行（`governedAgentTool`、`cognitiveAgentTool`）のイベント。1 階層分までで、そのエージェントがさらに開始する実行のイベントは含まれない |
 | `sdk.subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | フィルターに一致するすべての実行のすべてのイベント。返された関数を呼び出すまで続く |

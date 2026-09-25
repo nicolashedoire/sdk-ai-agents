@@ -88,7 +88,7 @@ unsubscribe();
 
 | Où | Ce que reçoit l'écouteur |
 | --- | --- |
-| `run({ onEvent })`, `think({ onEvent })` | Tous les événements de cette exécution |
+| `run({ onEvent })`, `think({ onEvent })`, `study.run({ onEvent })` | Tous les événements de cette exécution |
 | `replay(runId, modifications, { onEvent })` | Tous les événements du rejeu |
 | `executeTool(name, params, { onEvent })` | Les événements de l'appel, et ceux de l'exécution d'agent que lance son outil (`governedAgentTool`, `cognitiveAgentTool`), sur un seul niveau : pas les exécutions que cet agent lance à son tour |
 | `sdk.subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | Tous les événements de toutes les exécutions qui correspondent au filtre, jusqu'à ce que vous appeliez la fonction qu'il renvoie |

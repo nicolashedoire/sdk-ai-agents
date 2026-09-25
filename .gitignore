@@ -28,6 +28,7 @@ coverage/
 /events/
 /knowledge/
 /examples/events/
+/examples/study-*.md
 /test-events/
 /test-events-*/
 /test-events-golden/

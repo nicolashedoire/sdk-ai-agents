@@ -35,6 +35,11 @@ features:
     details: Sí, puede imitar cómo razona alguien. Explica algunos temas con tus propias palabras, y destila tu orden de atención, tus prioridades y tus reflejos en un perfil que se escribe en las instrucciones de cada paso del razonamiento. Cada corrección se le añade, y tu grado de acuerdo muestra cuánto se acerca.
     link: /es/guide/thinker-profiles
     linkText: Razonar como una persona concreta
+  - icon: 🧭
+    title: Un investigador que no pierde el rumbo
+    details: Dale un objeto que comprender y rediseñar con los medios de hoy. Busca en tus fuentes, distingue los hechos establecidos de las hipótesis y las novedades, y propone los experimentos que permitirían decidir — con una carta congelada y un guardián que lo mantienen en su objetivo.
+    link: /es/guide/studies
+    linkText: Estudios
   - icon: 🎯
     title: Decisiones tipadas con Jev
     details: Inyecta cualquier contexto, haz preguntas de sí/no, de opción única o múltiple y de valoración, y obtén probabilidades calibradas sobre las que tu código puede actuar.
@@ -104,6 +109,7 @@ console.log(await sdk.getRunCost(runId));     // what it cost, per model
 | --- | --- | --- |
 | Razonar antes de responder | Generación en una sola pasada | Hipótesis, simulación y crítica sobre un estado explícito |
 | Razonar como una persona concreta | Un prompt de sistema largo | Un perfil de pensador versionado, refinado con la retroalimentación |
+| Investigar sin salirse del objetivo | Un chat que se desvía a medida que se acumulan las instrucciones | Un estudio: carta congelada, prompts reconstruidos en cada llamada, un guardián, afirmaciones comprobadas frente a las fuentes |
 | Decisiones rápidas y calibradas | Analizar texto libre | Respuestas tipadas con probabilidades y confianza (Jev) |
 | Conectar las herramientas de la empresa | Código de integración a medida para cada herramienta | Servidor y cliente MCP, gobernados por políticas |
 | Saber qué ha pasado | Logs, si los hay | Registro de eventos, repetición, reconstrucción del estado mental |

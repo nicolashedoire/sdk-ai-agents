@@ -106,6 +106,31 @@ export function progressDescriber(): (event: Event) => string {
         return 'findings remembered';
       case 'incident.reported':
         return 'incident reported';
+      case 'study.started':
+        return 'study started';
+      case 'study.passage_started':
+        return `passage ${passageOf(data)} started`;
+      case 'study.passage_completed':
+        return `passage ${passageOf(data)} done`;
+      case 'study.model_called':
+        return data.passage ? `model answered for passage ${passageOf(data)}` : 'model answered';
+      case 'study.search':
+        return `search in ${passageOf(data)}`;
+      case 'study.drift_rejected':
+        return `item removed from ${passageOf(data)}`;
+      case 'study.capability_demoted':
+        return 'capability judged an improvement';
+      case 'study.amendment_accepted':
+        return 'amendment accepted';
+      case 'study.amendment_refused':
+        return 'amendment refused';
+      case 'study.result_recorded':
+        return 'result recorded';
+      // The run's own end says "study completed": these say the report, once each.
+      case 'study.completed':
+        return 'report ready';
+      case 'study.failed':
+        return 'partial report ready';
       default:
         return event.type;
     }
@@ -131,7 +156,14 @@ function runKind(data: Record<string, unknown>): string {
   if (data.replayOf !== undefined) return 'replay';
   if (data.mode === 'tool') return 'call';
   if (data.mode === 'resource') return 'read';
+  if (data.mode === 'study') return 'study';
+  if (data.mode === 'study-amendment') return 'amendment';
   return 'agent';
+}
+
+/** The passage a study event is about (a word of the method, never a text of the study). */
+function passageOf(data: Record<string, unknown>): string {
+  return typeof data.passage === 'string' ? data.passage : 'the study';
 }
 
 function toolNameOf(data: Record<string, unknown>): string | undefined {

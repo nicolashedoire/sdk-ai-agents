@@ -25,7 +25,7 @@ La version 0.2 ajoute une couche de raisonnement par-dessus l'environnement d'ex
 | Évaluateurs d'hypothèses | `src/cognition/hypothesis-assessor.ts` | `compare` avec des décisions typées : les preuves sont demandées sans le penseur, l'adéquation seulement pour les propositions |
 | Enregistreur et fabrique | `src/cognition/cognitive-run-recorder.ts`, `create-cognitive-agent.ts` | Forme des événements d'une exécution cognitive ; assemblage d'un agent à partir de sa configuration et des services du SDK |
 
-Autour : `src/decisions` (décisions typées, client Jev, service de décision), `src/costs` (tarification et coûts des exécutions), `src/resilience` (politique de nouvelles tentatives et fournisseur qui retente), `src/incidents` (règles, notificateurs, magasin d'événements surveillé) et `src/mcp` (serveur et client, publiés sous `@sdk-ai-agents/core/mcp`).
+Autour : `src/decisions` (décisions typées, client Jev, service de décision), `src/costs` (tarification et coûts des exécutions), `src/resilience` (politique de nouvelles tentatives et fournisseur qui retente), `src/incidents` (règles, notificateurs, magasin d'événements surveillé), `src/mcp` (serveur et client, publiés sous `@sdk-ai-agents/core/mcp`) et `src/study` (les études, qui réutilisent les fournisseurs, le magasin d'événements, l'exécution gouvernée des outils et les coûts, mais pas le moteur cognitif).
 
 Le reste de cette page documente l'environnement d'exécution gouverné (v0.1).
 
@@ -282,7 +282,19 @@ type EventType =
   | 'cognition.evaluated'
   | 'cognition.feedback'
   | 'cognition.knowledge_recorded'
-  | 'decision.evaluated';
+  | 'decision.evaluated'
+  | 'study.started'
+  | 'study.passage_started'
+  | 'study.passage_completed'
+  | 'study.search'
+  | 'study.model_called'
+  | 'study.drift_rejected'
+  | 'study.capability_demoted'
+  | 'study.amendment_accepted'
+  | 'study.amendment_refused'
+  | 'study.result_recorded'
+  | 'study.completed'
+  | 'study.failed';
 ```
 
 ### Structure d'un événement {#event-structure}

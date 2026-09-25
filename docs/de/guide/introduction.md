@@ -61,6 +61,7 @@ Was es nachahmt, ist eine **Denkweise**: Es weiß nicht, was Sie nie aufgeschrie
 - **Denken wie eine bestimmte Person**: Destillieren Sie ein Denkerprofil aus Themen, die Sie in Ihren eigenen Worten erklärt haben, und korrigieren Sie den Agenten dann mit den Urteilen `match`, `partial` oder `mismatch` und einem Prozentsatz an Zustimmung.
 - **Typisierte Entscheidungen** – [TypeSafe Jev](https://docs.typesafe.ai) oder jedes kompatible Backend beantwortet Noul-, Choice- und Score-Fragen mit kalibrierten Wahrscheinlichkeiten.
 - **MCP-Konnektoren** – stellen Sie Ihre Tools als MCP-Server bereit, importieren Sie jeden beliebigen MCP-Server als kontrollierte Tools.
+- **Studien** – ein Forscher, der ein Objekt versteht und dann vorschlägt, wie es mit den Mitteln von heute neu zu entwerfen ist: sieben Phasen, Behauptungen, die anhand der tatsächlich durchsuchten Quellen geprüft werden, und eine eingefrorene Charta mit einem Wächter, der ihn beim Ziel hält. Siehe [Studien](./studies).
 - **Betrieb eingebaut** – API-Kosten pro Lauf, Wiederholungsrichtlinien, die sich nicht stapeln, Incident-Benachrichtigungen per E-Mail oder Webhook.
 - **Natives Event Sourcing** – Replay ohne das LLM, Golden Traces, Erkennung von Regressionen, Denkgraphen.
 

@@ -17,7 +17,7 @@ interface Event {
 
 | Тип | Данные |
 | --- | --- |
-| `run.started` | `input`, `mode` (`cognitive`, `tool` для вызова вне агента, например вызова MCP, `resource` для чтения ресурса MCP, или отсутствует для управляемых запусков), `replayOf?` |
+| `run.started` | `input`, `mode` (`cognitive`, `study` для запуска исследования, `study-amendment` для запуска, который классифицирует дополнение, `tool` для вызова вне агента, например вызова MCP, `resource` для чтения ресурса MCP, или отсутствует для управляемых запусков), `replayOf?` |
 | `run.completed` | `output`, `decision?` (когнитивные) |
 | `run.failed` | `error`, `steps?`, `uri?` (неудачное чтение ресурса) |
 | `run.cancelled` / `run.stopped` | `reason` |
@@ -28,7 +28,7 @@ interface Event {
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` — или `intention` для итогового когнитивного ответа |
 | `policy.checked` | `intention`, `validation`: вердикт движка действий по вызову инструмента. Движок политик также записывает по событию на каждую проверенную политику — `policyId`, `policyType`, `intention`, `conditionEvaluated?`, `validationResult`, `applied` (`true`, когда политика применилась и отклонила) и `reason` — перед вызовом инструмента, а также перед каждым шагом когнитивного запуска для политик бюджета и тайм-аута, которые могут применяться к шагу (тогда `intention` — это `{ type: 'continue' }`) |
-| `policy.violated` | `intention`, `reason`, `violatedPolicies` (`allowed-tools`, когда вызывающая сторона использовала инструмент, который ей не дали; идентификатор политики бюджета, когда её бюджет вызовов исчерпан), а также `step`, когда политика бюджета или тайм-аута отклонила шаг когнитивного запуска (тогда `intention` — это `{ type: 'continue' }`) |
+| `policy.violated` | `intention`, `reason`, `violatedPolicies` (`allowed-tools`, когда вызывающая сторона использовала инструмент, который ей не дали; идентификатор политики бюджета, когда её бюджет вызовов исчерпан), а также `step`, когда политика бюджета или тайм-аута отклонила шаг когнитивного запуска, или `passage`, когда она отклонила этап исследования (тогда `intention` — это `{ type: 'continue' }`) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval`, когда одобрения потребовал собственный `metadata.requiresApproval` инструмента), `reason?` (`cancelled before a decision`, когда вызывающая сторона сдалась или запуск остановился, `no decision within N ms` по истечении `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` — `action.failed` также записывает вызов, отклонённый из-за некорректных аргументов (до любой политики) или потому, что вызывающая сторона ушла после одобрения |
 | `tool.called` | `toolName`, `parameters` |
@@ -53,6 +53,26 @@ interface Event {
 | `cognition.knowledge_recorded` | `scope`, `findings` (утверждение, вид, область, `revises?`, `difference?`, `evidence`: каждый тест с `runId`, `predictionId`, `verdict`, `expected`, `observed`, оценщиком), `error?`, если хранилище дало сбой. Добавляется после `run.completed`, `run.failed` или `run.cancelled` и только если запуск что-то проверял |
 | `cognition.feedback` | `feedback` (`verdict`, `agreement?`, `wrongAbout?`, …), `profileId`, `profileVersionBefore`, `profileVersionAfter` |
 | `decision.evaluated` | `client`, `purpose` (`operation_selection`, `hypothesis_assessment`, `direct`), `model`, `state`, `questions`, `answers` (пусто, если ответ отклонён), `usage?` (отсутствует, если бэкенд не сообщил число токенов), `error?` (почему оплаченный ответ был отклонён), `step?` |
+
+## Исследования {#studies}
+
+Запуски исследования (`mode: 'study'`) и запуски, которые классифицируют его дополнения (`mode: 'study-amendment'`), записывают эти события. Каждое из них несёт `id` исследования как `metadata.agentId` и его имя как `metadata.studyName`. Поиски также записывают события своих управляемых вызовов инструментов (`action.executing`, `policy.checked`, `tool.called`, `action.executed`) в запуск исследования. См. [Исследования](../guide/studies).
+
+| Тип | Данные |
+| --- | --- |
+| `study.started` | `name`, `charter` (`object`, `question`, `objective`, `needs`, `leads`, `scope`, `capability?`, `analogues`), `charterHash` (SHA-256), `language`, `model?`, `sources` (имена инструментов), `limits`, `driftThreshold`, `amendments` (принятые: `number`, `text`), `resumeAt?` (когда запуск возобновляется: первый этап, в котором осталась работа) |
+| `study.passage_started` | `passage`, `number` (от 1 до 7), `amendments` (номера действующих принятых дополнений), `reopenedBy?`, `focus?`, `reason?`, когда его вновь открыл более поздний этап, `redo?` и `resumed?` — для положенной ему переделки, которую выполняет возобновлённый запуск, `outdated?`, когда он выполняется снова ради элементов, которые страж оценил с опозданием |
+| `study.passage_completed` | `passage`, `attempts` (2, когда страж отправил его на переделку), `keptAttempt?` (1, когда первая попытка оказалась лучше переделки и была сохранена), `discarded?` (`attempt`, `items`: переделка, отброшенная в этом случае), `items` (каждый со своими `collection`, `id`, `statement`, `status`, `sources`, `servesObjective`, другими полями утверждения и собственными полями), `reopenedBy?`, `reopen?` (`passage`, `focus`, `reason`: более ранний этап, который он просит вновь открыть; сам он не завершён, пока не выполнится снова), `resumed?` (возобновлённый запуск выполнил его только для того, чтобы закончить), `duplicates?` (повторные вердикты по уже оценённым направлениям: отброшены, это не дрейф) |
+| `study.search` | `passage`, `purpose` (`research` или `priorArt` для предшествующих работ новшеств), `tool`, `query`, `servesObjective`, `claims?` (новшества, для которых выполняется поиск), `resultIds`, `results` (`id`, `title`, `locator`, `date?`), `error?` (поиск завершился ошибкой), `skipped?` (`maxSearches`: не выполнен) |
+| `study.model_called` | `purpose` (`passage`, `queries`, `check`, `priorArtQueries`, `priorArtCheck`, `amendment`), `passage?`, `model?`, `requestedModel?`, `usage` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?`, `unmeteredTokens?`: одно событие на вызов и его исправление), `failed?` (почему ответ не удалось использовать), `usedAttempt?` (1, когда исправление не удалось использовать и был использован первый ответ, прочитанный менее строго) — учитывается в затратах и в бюджетах по периодам |
+| `study.drift_rejected` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason` (`code`, `params?`, `message`), `by` (`guardian`: признан уходящим от цели; `schema`: отклонён раньше, например без `servesObjective`), `attempt` (2 при переделке) |
+| `study.capability_demoted` | `passage`, `item` (идентификатор архитектуры), `name`, `reason` (`code`, `params?`, `message`): возможность, которую страж признал лишь более быстрой или более дешёвой и которая теперь стала улучшением |
+| `study.amendment_accepted` / `study.amendment_refused` | `number?` (только у принятых), `text`, `verdict` (`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason` (`code`, `params?`, `message`; для `unclassified`: `amendmentUnclassified`, `amendmentTimedOut`, `amendmentCancelled` или `amendmentPolicy`), `charterHash` — в собственном запуске дополнения |
+| `study.result_recorded` | `card`, `resultAndError` (`result`, `error?`), `conclusionAndMemory?` — добавляется в запуск, который написал карточку, после его окончания |
+| `study.completed` | `status`, `passages` (`passage`, `state`), `stats` этого запуска (`modelCalls`, на которые ответил поставщик, `searches`, `searchesSkipped`, `redos`, `loops`, `steps`) |
+| `study.failed` | `status` (`stopped`, `failed` или `cancelled`), `stoppedBy?`, `error`, `passages`, `stats` этого запуска, `partial: true` — затем `run.failed` или `run.cancelled` |
+
+`study.model_called` — это то, что читают `getRunCost` и бюджеты для исследования. Когда сравниваются два запуска, события исследования сопоставляются по этапам (`study.model_called` — по назначению и этапу), а `usage` в `study.model_called` не сравнивается. Запуск дополнения содержит `run.started`, `policy.violated`, когда политика бюджета отклонила классификацию, `study.model_called`, когда поставщик ответил, событие дополнения и `run.completed`.
 
 ## Эксплуатация {#operations}
 

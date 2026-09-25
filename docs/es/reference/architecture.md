@@ -25,7 +25,7 @@ La versión 0.2 añade una capa de razonamiento sobre el runtime gobernado que s
 | Valoradores | `src/cognition/hypothesis-assessor.ts` | `compare` con decisiones tipadas: la evidencia se pregunta sin el pensador, el ajuste solo para las propuestas |
 | Registrador y fábrica | `src/cognition/cognitive-run-recorder.ts`, `create-cognitive-agent.ts` | Formas de los eventos de una ejecución cognitiva; ensamblaje de un agente a partir de su configuración y de los servicios del SDK |
 
-A su alrededor: `src/decisions` (decisiones tipadas, cliente de Jev, servicio de decisiones), `src/costs` (precios y costes de las ejecuciones), `src/resilience` (política de reintentos y proveedor con reintentos), `src/incidents` (reglas, notificadores, almacén de eventos monitorizado) y `src/mcp` (servidor y cliente, publicado como `@sdk-ai-agents/core/mcp`).
+A su alrededor: `src/decisions` (decisiones tipadas, cliente de Jev, servicio de decisiones), `src/costs` (precios y costes de las ejecuciones), `src/resilience` (política de reintentos y proveedor con reintentos), `src/incidents` (reglas, notificadores, almacén de eventos monitorizado), `src/mcp` (servidor y cliente, publicado como `@sdk-ai-agents/core/mcp`) y `src/study` (los estudios, que reutilizan los proveedores, el almacén de eventos, la ejecución gobernada de herramientas y los costes, pero no el motor cognitivo).
 
 El resto de esta página documenta el runtime gobernado (v0.1).
 
@@ -282,7 +282,19 @@ type EventType =
   | 'cognition.evaluated'
   | 'cognition.feedback'
   | 'cognition.knowledge_recorded'
-  | 'decision.evaluated';
+  | 'decision.evaluated'
+  | 'study.started'
+  | 'study.passage_started'
+  | 'study.passage_completed'
+  | 'study.search'
+  | 'study.model_called'
+  | 'study.drift_rejected'
+  | 'study.capability_demoted'
+  | 'study.amendment_accepted'
+  | 'study.amendment_refused'
+  | 'study.result_recorded'
+  | 'study.completed'
+  | 'study.failed';
 ```
 
 ### Estructura de un evento {#event-structure}

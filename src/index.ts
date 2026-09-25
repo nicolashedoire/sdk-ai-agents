@@ -177,6 +177,66 @@ export type {
   ThinkerProfileInput,
 } from './cognition/thinker-profile.js';
 
+// Studies: understand an object, then redesign it with today's means
+// `Study` is created by `sdk.createStudy`; the environment it is built with is internal.
+export { MAX_AMENDMENTS, MAX_AMENDMENT_LENGTH, Study } from './study/study.js';
+export { DEFAULT_STUDY_LIMITS, DEFAULT_DRIFT_THRESHOLD } from './study/study-config.js';
+export { renderStudyMarkdown } from './study/study-markdown.js';
+export { studyLabels } from './study/study-labels.js';
+export type { StudyLabelLanguage, StudyLabels } from './study/study-labels.js';
+export type {
+  MechanismCard,
+  StudyAdvance,
+  StudyAmendment,
+  StudyAmendmentVerdict,
+  StudyAmendOptions,
+  StudyAnalogue,
+  StudyArchitecture,
+  StudyAssemblyLink,
+  StudyCapability,
+  StudyCapabilityTarget,
+  StudyChainStage,
+  StudyCharter,
+  StudyChoiceFactor,
+  StudyClaim,
+  StudyClaimStatus,
+  StudyCombination,
+  StudyComponent,
+  StudyConfig,
+  StudyConstraint,
+  StudyDriftEntry,
+  StudyExperiment,
+  StudyExperimentOutcome,
+  StudyHistoricalChoice,
+  StudyIndependentLead,
+  StudyLeadVerdict,
+  StudyLimits,
+  StudyNotice,
+  StudyNoticeCode,
+  StudyNoveltyClaim,
+  StudyObservation,
+  StudyPassage,
+  StudyPassageState,
+  StudyPiece,
+  StudyPieceStates,
+  StudyPrinciple,
+  StudyPriorArt,
+  StudyReason,
+  StudyReasonCode,
+  StudyReference,
+  StudyReport,
+  StudyResult,
+  StudyRevisableDecision,
+  StudyRunOptions,
+  StudySearch,
+  StudySearchResult,
+  StudyStats,
+  StudyStatus,
+  StudyStopReason,
+  StudyThreeState,
+  StudyTrace,
+} from './study/study-types.js';
+
 // Typed decisions (TypeSafe Jev and compatible backends)
 export { DecisionService } from './decisions/decision-service.js';
 export type {

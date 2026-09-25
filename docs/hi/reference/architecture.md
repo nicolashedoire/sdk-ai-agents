@@ -25,7 +25,7 @@
 | आकलनकर्ता | `src/cognition/hypothesis-assessor.ts` | टाइप्ड निर्णयों के साथ `compare`: साक्ष्य विचारक के बिना पूछे जाते हैं, मेल सिर्फ़ प्रस्तावों के लिए पूछा जाता है |
 | रिकॉर्डर और factory | `src/cognition/cognitive-run-recorder.ts`, `create-cognitive-agent.ts` | संज्ञानात्मक run के इवेंट्स का आकार; कॉन्फ़िगरेशन और SDK सेवाओं से एजेंट को जोड़कर बनाना |
 
-इसके आसपास: `src/decisions` (टाइप्ड निर्णय, Jev क्लाइंट, निर्णय सेवा), `src/costs` (कीमतें और run की लागत), `src/resilience` (retry नीति और दोबारा प्रयास करने वाला प्रदाता), `src/incidents` (नियम, notifiers, निगरानी वाला इवेंट स्टोर) और `src/mcp` (सर्वर और क्लाइंट, `@sdk-ai-agents/core/mcp` के रूप में प्रकाशित)।
+इसके आसपास: `src/decisions` (टाइप्ड निर्णय, Jev क्लाइंट, निर्णय सेवा), `src/costs` (कीमतें और run की लागत), `src/resilience` (retry नीति और दोबारा प्रयास करने वाला प्रदाता), `src/incidents` (नियम, notifiers, निगरानी वाला इवेंट स्टोर), `src/mcp` (सर्वर और क्लाइंट, `@sdk-ai-agents/core/mcp` के रूप में प्रकाशित) और `src/study` (अध्ययन, जो प्रदाताओं, इवेंट स्टोर, नियंत्रित टूल execution और लागत को दोबारा इस्तेमाल करते हैं, पर संज्ञानात्मक इंजन को नहीं)।
 
 इस पेज का बाकी हिस्सा नियंत्रित runtime (v0.1) का वर्णन करता है।
 
@@ -282,7 +282,19 @@ type EventType =
   | 'cognition.evaluated'
   | 'cognition.feedback'
   | 'cognition.knowledge_recorded'
-  | 'decision.evaluated';
+  | 'decision.evaluated'
+  | 'study.started'
+  | 'study.passage_started'
+  | 'study.passage_completed'
+  | 'study.search'
+  | 'study.model_called'
+  | 'study.drift_rejected'
+  | 'study.capability_demoted'
+  | 'study.amendment_accepted'
+  | 'study.amendment_refused'
+  | 'study.result_recorded'
+  | 'study.completed'
+  | 'study.failed';
 ```
 
 ### इवेंट की संरचना {#event-structure}

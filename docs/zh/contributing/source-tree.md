@@ -15,6 +15,7 @@ sdk-ai-agents/
 │   ├── mcp.ts                  # Entry point of @sdk-ai-agents/core/mcp
 │   ├── cognition/              # Cognitive agents: mental state, operations, controllers, profiles
 │   ├── decisions/              # Typed decisions (Jev client, DecisionService)
+│   ├── study/                  # Studies: charter, passages, guardian, claim statuses, dossier
 │   ├── engines/                # Reasoning, action, policy and replay engines
 │   ├── stores/                 # Event stores (file, SQLite, PostgreSQL)
 │   ├── providers/              # LLM providers (OpenAI, Anthropic, fallback)
@@ -145,6 +146,12 @@ sdk-ai-agents/
 **用途：** 认知智能体——显式心智状态、认知操作、控制器、思考者画像。
 
 **包含：** `cognitive-agent.ts`（运行循环）、`operation-selector.ts`、`operation-performer.ts`、`cognitive-controller.ts`（启发式）、`typed-decision-controller.ts`（Jev）、`hypothesis-assessor.ts`、`information-seeker.ts`、`llm-thought-generator.ts` 和 `thought-prompts.ts`、`mental-state.ts`（schema 和类型）、`mental-state-reducer.ts` 和 `hypothesis-transitions.ts`、`mental-state-replay.ts`、`thinker-profile.ts`、`profile-distiller.ts`、`create-cognitive-agent.ts`。
+
+### `src/study/` {#src-study}
+
+**用途：** 研究（`sdk.createStudy`）——一位先理解一个对象、再提出如何重新设计它的研究员，独立于认知引擎之外。
+
+**包含：** `study.ts`（`Study` 类：运行、守护者、修正案、现有技术搜索）、`passages.ts`（七个环节及其集合和 schema）、`study-config.ts`（配置、冻结的章程及其哈希）、`study-prompts.ts` 和 `study-replies.ts`（每次调用都重建的 prompt，以及对照 schema 读取的回复）、`study-claims.ts`（由代码检查的论断状态）、`study-sources.ts`（来源、查询参数、结果）、`study-model.ts` 和 `study-run.ts`（模型调用、限制、事件）、`study-report.ts`、`study-markdown.ts` 和 `study-labels.ts`（报告，以及十一种语言的档案）、`study-types.ts`。
 
 ### `src/decisions/`（v0.2） {#src-decisions-v0-2}
 
