@@ -225,7 +225,7 @@ describe('web_fetch', () => {
       server.on('/photo.png', reply(Buffer.alloc(1_000_000), { type: 'image/png' }));
 
       await expect(fetchPage({ url: `${server.url}/photo.png` })).rejects.toThrow(
-        `${server.url}/photo.png is image/png: web_fetch reads HTML and text`
+        `${server.url}/photo.png is image/png: web_fetch reads HTML, text and PDF`
       );
     });
 

@@ -7,6 +7,7 @@ import {
 } from './guarded-http.js';
 import { stripInvisible } from './html-entities.js';
 import { extractPage, type PageFormat } from './html-to-markdown.js';
+import { pdfText } from './pdf-text.js';
 import { isoDate } from './results.js';
 import { WebRequestRefusedError } from './web-errors.js';
 
@@ -35,6 +36,10 @@ export interface FetchSettings {
   format: PageFormat;
   /** Byte cap of an HTML or text body. */
   maxBytes: number;
+  /** Byte cap of a PDF: a cut PDF cannot be read, so a longer one is refused. */
+  maxPdfBytes: number;
+  /** Pages of a PDF read. */
+  maxPdfPages: number;
   /** Least time between two requests to the same host. */
   hostIntervalMs: number;
   language?: string;
@@ -58,7 +63,13 @@ const TEXT_TYPES = new Set([
 /** A page read, before `maxChars` is applied (the full extract is what the cache keeps). */
 export type FetchedPage = Omit<WebFetchOutput, 'untrusted'>;
 
-/** Fetches a URL and extracts its text: HTML to Markdown or text, text types as they are. */
+/** Types that may hold a PDF: their body gets the PDF byte cap, and is checked for `%PDF-`. */
+const PDF_TYPES = new Set(['application/pdf', 'application/x-pdf', 'application/octet-stream']);
+
+/**
+ * Fetches a URL and extracts its text: HTML to Markdown or text, PDF with `unpdf`, text types
+ * as they are. Other types are refused before their body is read.
+ */
 export async function fetchPage(
   http: WebClient,
   url: string,
@@ -71,21 +82,46 @@ export async function fetchPage(
       ...(settings.language ? { 'accept-language': settings.language } : {}),
     },
     minIntervalMs: settings.hostIntervalMs,
-    maxBytes: settings.maxBytes,
+    maxBytes: (type) => (PDF_TYPES.has(mediaType(type)) ? settings.maxPdfBytes : settings.maxBytes),
     inspect: (head) => {
       if (head.status < 200 || head.status >= 300) return;
       const type = mediaType(head.contentType);
-      if (type && !HTML_TYPES.has(type) && !TEXT_TYPES.has(type)) {
+      if (type && !HTML_TYPES.has(type) && !TEXT_TYPES.has(type) && !PDF_TYPES.has(type)) {
         throw new WebRequestRefusedError(
-          `${head.url} is ${type}: web_fetch reads HTML and text`,
+          `${head.url} is ${type}: web_fetch reads HTML, text and PDF`,
           'content-type'
         );
+      }
+      if (PDF_TYPES.has(type) && (head.contentLength ?? 0) > settings.maxPdfBytes) {
+        throw tooLarge(head.url, settings.maxPdfBytes);
       }
     },
     ...(settings.signal ? { signal: settings.signal } : {}),
   });
   ensureOk(response, `GET ${response.url}`);
-  const contentType = mediaType(response.headers['content-type']) || sniff(response.body);
+  const declared = mediaType(response.headers['content-type']);
+  const contentType =
+    declared && declared !== 'application/octet-stream' ? declared : sniff(response.body);
+  if (contentType === 'application/pdf' || contentType === 'application/x-pdf') {
+    // A cut PDF has lost its cross-reference table: it cannot be read at all.
+    if (response.truncated) throw tooLarge(response.url, settings.maxPdfBytes);
+    const pdf = await pdfText(response.body, { maxPages: settings.maxPdfPages });
+    return {
+      url,
+      finalUrl: response.url,
+      ...(pdf.title ? { title: pdf.title } : {}),
+      ...(pdf.date ? { date: pdf.date } : {}),
+      contentType: 'application/pdf',
+      content: pdf.content,
+      truncated: pdf.pagesRead < pdf.pages,
+    };
+  }
+  if (declared === 'application/octet-stream' && !HTML_TYPES.has(contentType)) {
+    throw new WebRequestRefusedError(
+      `${response.url} is application/octet-stream and not a PDF: web_fetch reads HTML, text and PDF`,
+      'content-type'
+    );
+  }
   const base = { url, finalUrl: response.url, contentType, truncated: response.truncated };
   if (HTML_TYPES.has(contentType)) {
     const page = extractPage(htmlText(response), { url: response.url, format: settings.format });
@@ -97,6 +133,13 @@ export async function fetchPage(
     ...(date ? { date } : {}),
     content: stripInvisible(bodyText(response)).trim(),
   };
+}
+
+function tooLarge(url: string, maxBytes: number): WebRequestRefusedError {
+  return new WebRequestRefusedError(
+    `${url} is a PDF larger than ${maxBytes} bytes (maxPdfBytes): refused`,
+    'too-large'
+  );
 }
 
 /** `text/html; charset=utf-8` → `text/html`. */

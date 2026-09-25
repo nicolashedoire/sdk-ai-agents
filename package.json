@@ -101,6 +101,7 @@
     "postcss-rtlcss": "6.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.2",
+    "unpdf": "^1.8.1",
     "vitepress": "1.6.4",
     "vitepress-plugin-mermaid": "2.0.17",
     "vitest": "^1.0.4",
@@ -109,6 +110,7 @@
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "pg": "^8.11.0",
+    "unpdf": "^1.8.1",
     "zod": "^3.25.28"
   },
   "files": [
@@ -133,6 +135,9 @@
       "optional": true
     },
     "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
+    "unpdf": {
       "optional": true
     }
   }
