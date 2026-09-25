@@ -525,7 +525,7 @@ interface ResourceProvider {
 }
 ```
 
-`web_search` asks its providers in order; a provider that throws hands over to the next one, and one that throws `SearchThrottledError` (or fails three times in a row) is skipped for `circuitBreaker.cooldownMs` (2 minutes). The web tools throw `WebRequestRefusedError` for what they refuse on purpose (`reason`: `private-address`, `scheme`, `downgrade`, `redirects`, `robots`, `content-type`, `too-large`, `pacing`), `WebHttpError` for a non-2xx answer (`status`), `WebTimeoutError` (a request, the call's deadline, or the time budget of an extraction), `WebConfigurationError` for a missing setup (`unpdf`, a GitHub token) and `SearchUnavailableError` when no provider answered (`failures`). `retry` never retries a refusal, a missing setup or a search no provider answered.
+`web_search` asks its providers in order; a provider that throws hands over to the next one, and one that throws `SearchThrottledError` (or fails three times in a row) is skipped for `circuitBreaker.cooldownMs` (2 minutes). The web tools throw `WebRequestRefusedError` for what they refuse on purpose (`reason`: `private-address`, `scheme`, `downgrade`, `redirects`, `robots`, `content-type`, `too-large`, `unreadable`, `pacing`), `WebHttpError` for a non-2xx answer (`status`), `WebTimeoutError` (a request, the call's deadline, or the time budget of an extraction), `WebConfigurationError` for a missing setup (`unpdf`, a GitHub token) and `SearchUnavailableError` when no provider answered (`failures`). `retry` never retries a refusal, a missing setup or a search no provider answered.
 
 ```ts
 interface SearchProvider {
