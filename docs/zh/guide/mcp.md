@@ -161,7 +161,7 @@ await crm.close();
 
 ## 值得了解 {#good-to-know}
 
-- MCP 支持位于一个独立的入口 `@sdk-ai-agents/core/mcp` 中，所以除非你用到它，核心包并不依赖 `@modelcontextprotocol/sdk`。工具源（`openApiTools`、`folderTools`、`databaseTools`、`cognitiveAgentTool`……）位于核心包中：你的智能体不经过 MCP 也能使用它们。
+- MCP 支持位于一个独立的入口 `@sdk-ai-agents/core/mcp` 中，所以除非你用到它，核心包并不依赖 `@modelcontextprotocol/sdk`。工具源（`openApiTools`、`folderTools`、`databaseTools`、`cognitiveAgentTool`、`webTools`……）位于核心包中：你的智能体不经过 MCP 也能使用它们。
 - 服务器构建在官方的 MCP TypeScript SDK 1.30 之上，它接受协议修订版 2024-10-07、2024-11-05、2025-03-26、2025-06-18 和 2025-11-25（即它的 `SUPPORTED_PROTOCOL_VERSIONS`，于 2026-09-24 核实）。MCP 网站还记载了一个 2026-07-28 修订版（[架构](https://modelcontextprotocol.io/docs/learn/architecture)，于 2026-09-24 核实），本 SDK 暂不支持。
 - 本 SDK 提供**工具**和**资源**。不提供 Prompt、采样（sampling）和信息征询（elicitation）。
 

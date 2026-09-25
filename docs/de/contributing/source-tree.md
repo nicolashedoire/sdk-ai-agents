@@ -25,7 +25,7 @@ sdk-ai-agents/
 │   ├── resilience/             # Retry policy and retrying provider
 │   ├── incidents/              # Incident detection and notifiers
 │   ├── mcp/                    # MCP server (tools and resources) and client
-│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents
+│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents, the Web
 │   ├── evaluators/             # Policy condition evaluation
 │   ├── errors/                 # Error classes
 │   ├── types/                  # Shared type definitions
@@ -167,7 +167,7 @@ sdk-ai-agents/
 
 ### `src/tools/` {#src-tools}
 
-**Zweck:** Tool-Quellen, die `ToolDefinition`s aus einem System erstellen, ohne Abhängigkeit von MCP: `openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts` (Web-APIs), `folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts` (Ordner und Ressourcen), `sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts` (schreibgeschützte Datenbanken), `agent-tools.ts` (Agenten als Tools), dazu `tool-names.ts` und `bounded-text.ts`.
+**Zweck:** Tool-Quellen, die `ToolDefinition`s aus einem System erstellen, ohne Abhängigkeit von MCP: `openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts` (Web-APIs), `folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts` (Ordner und Ressourcen), `sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts` (schreibgeschützte Datenbanken), `agent-tools.ts` (Agenten als Tools), dazu `tool-names.ts` und `bounded-text.ts`. `web/` enthält die Tools für die Webrecherche: `web-tools.ts` (`webTools`), `guarded-http.ts` und `ip-ranges.ts` (der HTTP-Client und seine Prüfungen von Adressen, Weiterleitungen, Größe und Zeit), `robots.ts` und `politeness.ts` (robots.txt, Abstände pro Host), `web-cache.ts`, `results.ts` (anführbare Ergebnisse), `html-parser.ts` / `html-to-markdown.ts` / `html-entities.ts` (Seiten zu Markdown), `pdf-text.ts` (PDFs mit dem optionalen `unpdf`), `web-fetch.ts`, `search-chain.ts` und `providers/` (DuckDuckGo, SearXNG, Brave, Tavily, Serper), `sources/` (arXiv, Wikipedia, GitHub).
 
 ### `src/__tests__/support/` {#src-tests-support}
 

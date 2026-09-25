@@ -13,7 +13,7 @@ const study = sdk.createStudy({
   objective: 'A browser design whose every choice follows from the investigation',
   leads: ['vectorisation', 'weights', 'ReLU'], // your leads: examples to verify, not truths
   analogues: ['Bitcoin'],                      // breakthroughs by assembly to deconstruct
-  sources: ['brave_web_search'],               // SDK tools the study searches with
+  sources: ['web_search', 'arxiv_search'],     // SDK tools the study searches with (webTools())
 });
 
 const result = await study.run();
@@ -161,7 +161,20 @@ await study.recordResult('M1', {
 
 ## あなたの情報源で調べる {#research-through-your-sources}
 
-SDK には組み込みの Web 検索がありません。研究は、`sources` として **あなたが渡したツール** で検索します。これは SDK のツールの名前で、典型的には [`connectMcpServer`](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) で取り込み、`sdk.defineTool` で定義した MCP サーバーの検索ツールです。
+研究は、`sources` として **あなたが渡したツール** で検索します。これは SDK のツールの名前です。SDK の [Web ツール](./web-research) は準備なしで使えます。`web_search`（別のプロバイダーを設定するまでは DuckDuckGo）、`arxiv_search`、`wikipedia_search`、`github_search` で、その結果には URL と、わかっている場合は日付が付きます。
+
+```ts
+import { webTools } from '@sdk-ai-agents/core';
+
+// Define the tools first: the study checks its sources when it is created.
+const sources = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] }).map(
+  (tool) => sdk.defineTool(tool).name
+);
+
+const study = sdk.createStudy({ name: 'browser', object, objective, sources });
+```
+
+ほかの検索ツールも使えます。たとえば、[`connectMcpServer`](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) で取り込み、`sdk.defineTool` で定義した MCP サーバーの検索ツールです。
 
 ```ts
 import { connectMcpServer } from '@sdk-ai-agents/core/mcp';
@@ -354,12 +367,11 @@ const unsubscribe = sdk.subscribe(listener, { agentId: study.id });
 
 ## 完全な例 {#a-complete-example}
 
-`examples/study.ts` は、1990 年から 2026 年までの Web ブラウザーをフランス語で研究します。検証すべき手がかりを 3 つ与え（ベクトル化、重み（`poids`）、ReLU。どれも、ブラウザーに当てはまるという根拠がどこにもない例です）、能力を指定しないので研究が候補を提案し、組み立てによるブレークスルーとして Bitcoin を分解するよう求めます。その中心部分を、Brave の検索サーバーを情報源として示します。
+`examples/study.ts` は、1990 年から 2026 年までの Web ブラウザーをフランス語で研究します。検証すべき手がかりを 3 つ与え（ベクトル化、重み（`poids`）、ReLU。どれも、ブラウザーに当てはまるという根拠がどこにもない例です）、能力を指定しないので研究が候補を提案し、組み立てによるブレークスルーとして Bitcoin を分解するよう求めます。その中心部分を、SDK の Web ツールで Web を検索する形で示します。
 
 ```ts
 import { writeFileSync } from 'node:fs';
-import { FileEventStore, createSDK } from '@sdk-ai-agents/core';
-import { connectMcpServer } from '@sdk-ai-agents/core/mcp';
+import { FileEventStore, createSDK, webTools } from '@sdk-ai-agents/core';
 
 const eventStore = new FileEventStore('./events');
 const sdk = createSDK({
@@ -370,17 +382,9 @@ const sdk = createSDK({
 });
 
 // The study searches only with the tools you give it, run through the governed pipeline.
-const search = await connectMcpServer({
-  name: 'search',
-  transport: {
-    type: 'stdio',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-brave-search'],
-    env: { BRAVE_API_KEY: process.env.BRAVE_API_KEY ?? '' },
-  },
-  metadata: { readOnly: true },
-});
-const sources = search.tools.map((tool) => sdk.defineTool(tool).name);
+// DuckDuckGo, arXiv and Wikipedia need no key.
+const web = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] });
+const sources = web.map((tool) => sdk.defineTool(tool).name);
 
 const study = sdk.createStudy({
   name: 'navigateur',
@@ -412,11 +416,10 @@ for (const { id, kind, name, capability } of result.report.architectures) {
 }
 console.log(await sdk.getRunCost(result.runId));
 
-await search.close();
 await eventStore.destroy();
 ```
 
-この例自体は、任意の MCP 検索サーバーのコマンドを受け取ります。`OPENAI_API_KEY=… SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=… npm run example:study` で実行してください。`SEARCH_ENV` は、サーバーが必要とする環境変数を指定します。サーバーが受け取るのはそれらの変数と最小限の環境だけで、あなたのモデルのキーを受け取ることは決してありません。`SEARCH_TOOLS` はサーバーのツールの一部を選び、`MODEL` はモデルを選びます。調査書は `examples/study-navigateur.md` に書き出されます。実行が完了しなかった場合は、その理由を表示してから、終了コード 1 で終了します。`SEARCH_MCP` がなければ、情報源なしで実行されます。すべてが仮説のままになり、調査書はまずそのことを述べます。
+この例は `OPENAI_API_KEY=… npm run example:study` で実行してください。ほかのキーは必要ありません。コマンドを指定すれば、MCP の検索サーバーで検索することもできます。`SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=…` は、そのサーバーのツールを情報源に加えます。`SEARCH_ENV` は、サーバーが必要とする環境変数を指定します。サーバーが受け取るのはそれらの変数と最小限の環境だけで、あなたのモデルのキーを受け取ることは決してありません。`SEARCH_TOOLS` はサーバーのツールの一部を選び、`MODEL` はモデルを選びます。調査書は `examples/study-navigateur.md` に書き出されます。実行が完了しなかった場合は、その理由を表示してから、終了コード 1 で終了します。
 
 調査書に期待できる内容：
 
@@ -478,7 +481,7 @@ report.stats;         // model calls, searches, items by status, rejections, red
 ## 研究がしないこと {#what-a-study-does-not-do}
 
 - **何も作らず、実行せず、測定しない。** その予測は、あなたが実験を実行するまで予測にすぎません。
-- **知っているのは情報源が返すことだけ。** SDK には独自の Web 検索がなく、情報源がなければ、すべての主張は仮説です。
+- **知っているのは情報源が返すことだけ。** 情報源がなければ、すべての主張は仮説です。[Web ツール](./web-research) が読むのは公開されているものだけで、ページの JavaScript は実行しません。
 - **チェックされるのは引用であり、その中身ではない。** コードは、`established` の主張が引用した結果が、その主張を書いたプロンプトに一覧されていたことはチェックしますが、その結果が主張どおりのことを述べているかはチェックしません。調査書はすべての情報源をそのリンクとともに一覧します。読んでください。
 - **監視役と先行技術のチェックは、モデルによる判断である。** 逸脱ログと先行技術のメモがそれを示すので、あなたは異を唱えることができます。
 - **研究が読むものは信頼できない。** 検索結果には、モデルに向けた指示（プロンプトインジェクション）が含まれていることがあります。検索結果はデータとして目印で囲まれてモデルに届き、研究は、ポリシーを通して自分の情報源を呼び出すことしかできず、モデルと情報源のテキストは調査書の中でエスケープされます。状態と逸脱のルールは、プロンプトではなくコードで強制されます。目印は危険を減らしますが、なくすわけではありません。

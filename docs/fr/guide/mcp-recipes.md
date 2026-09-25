@@ -9,6 +9,7 @@ Chaque recette transforme un type de système en serveur MCP **en une ligne**, e
 | [Un dossier de documents](#a-folder-of-documents) | `folderTools({ root: './handbook' })` | `list_files`, `read_file`, `search_files` (+ ressources) |
 | [Une base de données, en lecture seule](#a-read-only-database) | `databaseTools({ database: sqliteReadOnly(db) })` | `list_tables`, `describe_table`, `query` |
 | [Un agent](#an-agent-your-reasoning-twin) | `cognitiveAgentTool(agent)` | `ask_<agent>` |
+| [Le Web](./web-research) | `webTools()` | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` |
 
 MCP est nouveau pour vous ? Commencez par [Votre premier serveur MCP en 5 minutes](./mcp-first-server) : cette page montre comment lancer un serveur, le tester avec l'Inspector et le connecter à Claude Desktop ou à Claude Code. Chaque fichier ci-dessous se lance et se connecte de la même façon.
 

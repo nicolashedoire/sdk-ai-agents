@@ -9,6 +9,7 @@ Each recipe turns one kind of system into an MCP server **in one line**, safely.
 | [A folder of documents](#a-folder-of-documents) | `folderTools({ root: './handbook' })` | `list_files`, `read_file`, `search_files` (+ resources) |
 | [A database, read-only](#a-read-only-database) | `databaseTools({ database: sqliteReadOnly(db) })` | `list_tables`, `describe_table`, `query` |
 | [An agent](#an-agent-your-reasoning-twin) | `cognitiveAgentTool(agent)` | `ask_<agent>` |
+| [The Web](./web-research) | `webTools()` | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` |
 
 New to MCP? Start with [Your first MCP server in 5 minutes](./mcp-first-server): it shows how to run a server, test it with the Inspector and connect it to Claude Desktop or Claude Code. Every file below is run and connected the same way.
 

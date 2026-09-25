@@ -84,6 +84,15 @@
     "src/__tests__/study-review.test.ts",
     "src/__tests__/study-review-2.test.ts",
     "src/__tests__/study-categories.test.ts",
+    "src/__tests__/web-search.test.ts",
+    "src/__tests__/web-fetch.test.ts",
+    "src/__tests__/web-pdf.test.ts",
+    "src/__tests__/web-sources.test.ts",
+    "src/__tests__/web-safety.test.ts",
+    "src/__tests__/web-study.test.ts",
+    "src/__tests__/web-robots.test.ts",
+    "src/__tests__/web-html-limits.test.ts",
+    "src/__tests__/web-pdf-prescan.test.ts",
     "examples/cognitive-agent.ts",
     "examples/mcp-server.ts",
     "examples/mcp-openapi.ts",
@@ -93,7 +102,8 @@
     "examples/mcp-http.ts",
     "examples/mcp-approvals.ts",
     "examples/rule-discovery.ts",
-    "examples/study.ts"
+    "examples/study.ts",
+    "examples/web-research.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

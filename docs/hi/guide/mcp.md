@@ -161,7 +161,7 @@ await crm.close();
 
 ## जानने लायक बातें {#good-to-know}
 
-- MCP समर्थन एक अलग entry point, `@sdk-ai-agents/core/mcp`, में है, इसलिए मुख्य पैकेज को `@modelcontextprotocol/sdk` की ज़रूरत तभी होती है जब आप इसे इस्तेमाल करें। टूल स्रोत (`openApiTools`, `folderTools`, `databaseTools`, `cognitiveAgentTool`…) मुख्य पैकेज में हैं: आपके एजेंट इन्हें MCP के बिना भी इस्तेमाल कर सकते हैं।
+- MCP समर्थन एक अलग entry point, `@sdk-ai-agents/core/mcp`, में है, इसलिए मुख्य पैकेज को `@modelcontextprotocol/sdk` की ज़रूरत तभी होती है जब आप इसे इस्तेमाल करें। टूल स्रोत (`openApiTools`, `folderTools`, `databaseTools`, `cognitiveAgentTool`, `webTools`…) मुख्य पैकेज में हैं: आपके एजेंट इन्हें MCP के बिना भी इस्तेमाल कर सकते हैं।
 - सर्वर आधिकारिक MCP TypeScript SDK 1.30 पर बना है, जो प्रोटोकॉल के संशोधन 2024-10-07, 2024-11-05, 2025-03-26, 2025-06-18 और 2025-11-25 स्वीकार करता है (इसका `SUPPORTED_PROTOCOL_VERSIONS`, 2026-09-24 को जाँचा गया)। MCP साइट एक 2026-07-28 संशोधन का भी वर्णन करती है ([आर्किटेक्चर](https://modelcontextprotocol.io/docs/learn/architecture), 2026-09-24 को जाँचा गया), जिसे यह SDK अभी नहीं बोलता।
 - यह SDK **टूल** और **रिसोर्स** सर्व करता है। Prompts, sampling और elicitation उपलब्ध नहीं हैं।
 

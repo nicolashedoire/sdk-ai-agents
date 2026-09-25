@@ -123,7 +123,7 @@
 | **OpenAPI** | किसी वेब API का मानक, मशीन द्वारा पढ़ा जा सकने वाला विवरण: उसके पते, पैरामीटर और उत्तर, अक्सर `openapi.json` के रूप में प्रकाशित। इससे SDK हर operation के लिए एक टूल बनाता है। देखें [एक वेब API](./mcp-recipes#a-web-api-from-its-openapi-description)। |
 | **JSON Schema** | किसी डेटा के आकार का विवरण — यहाँ, किसी टूल के arguments का — जिसे मॉडल और MCP एप्लिकेशन टूल को सही तरह कॉल करने के लिए पढ़ते हैं। SDK इसे आपके Zod स्कीमा या OpenAPI विवरण से लिखता है। |
 | **केवल-पढ़ने-योग्य (Read-only)** | देख सकता है, बदल नहीं सकता। फ़ोल्डर और डेटाबेस स्रोत बनावट से ही केवल-पढ़ने-योग्य हैं; वेब API डिफ़ॉल्ट रूप से केवल-पढ़ने-योग्य हैं (सिर्फ़ `GET` operations)। |
-| **टूल स्रोत (Tool source)** | एक फ़ंक्शन जो किसी सिस्टम से पहले से तैयार टूल बनाता है: `openApiTools`, `folderTools`, `databaseTools`, `cognitiveAgentTool`। इन्हें एक लाइन में MCP पर सर्व करें, या अपने एजेंटों को दें। देखें [किसी भी चीज़ के लिए MCP सर्वर](./mcp-recipes)। |
+| **टूल स्रोत (Tool source)** | एक फ़ंक्शन जो किसी सिस्टम से पहले से तैयार टूल बनाता है: `openApiTools`, `folderTools`, `databaseTools`, `cognitiveAgentTool`, `webTools`। इन्हें एक लाइन में MCP पर सर्व करें, या अपने एजेंटों को दें। देखें [किसी भी चीज़ के लिए MCP सर्वर](./mcp-recipes) और [वेब पर शोध](./web-research)। |
 
 ## production में संचालन {#operating-in-production}
 

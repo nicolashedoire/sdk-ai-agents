@@ -502,6 +502,12 @@ Id агентов новые в каждом процессе, поэтому н
 | `cognitiveAgentTool(agent, { name?, description?, metadata?, maxInputLength?, maxContextLength?, exposeErrors? })` | `ToolDefinition` | `ask_<agent>`: `{ problem, context? }` → `{ runId, status, decisionStatus?, answer?, rationale?, confidence?, missing?, nextActions?, error? }`; отменяется вместе с вызывающей стороной; `error` — общее сообщение, если не задан `exposeErrors` |
 | `governedAgentTool(agent, options)` | `ToolDefinition` | `{ message, context? }` → `{ runId, status, output?, error? }` |
 | `assertSingleQuery(sql, 'sqlite' \| 'postgres')` | `string` | Проверка оператора, используемая адаптерами баз данных (только синтаксис SQLite и PostgreSQL) |
+| `webTools({ include?, prefix?, search?, circuitBreaker?, language?, userAgent?, timeoutMs?, callTimeoutMs?, maxResponseBytes?, maxRedirects?, hostIntervalMs?, robots?, allowPrivateNetwork?, lookup?, maxPdfBytes?, maxPdfPages?, cache?, retry?, arxiv?, wikipedia?, github? })` | `ToolDefinition[]` | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search`, только для чтения (`web_fetch` — средний риск, остальные — низкий). Результаты поиска `{ id, title, url, date?, excerpt, source }`; страница `{ url, finalUrl, title?, date?, language?, contentType, content, truncated, untrusted: true, hint? }`. Никаких адресов вне публичного интернета, если не задан `allowPrivateNetwork`; robots.txt соблюдается; каждый вызов укладывается в `callTimeoutMs` (60 с). См. [Поиск в интернете](../guide/web-research) |
+| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | `SearchProvider` | Провайдер `web_search` по умолчанию, без ключа: HTML-страница DuckDuckGo, 1,5 с между поисками |
+| `searxng({ baseUrl, engines?, categories?, minIntervalMs? })` | `SearchProvider` | JSON API экземпляра SearXNG; результаты называются `searxng:<engine>` и датируются по `publishedDate` |
+| `brave({ apiKey, baseUrl?, minIntervalMs? })`, `tavily(…)`, `serper(…)` | `SearchProvider` | API Brave Search, Tavily и Serper, с их ключом |
+| `citableUrl(url)`, `normalizeUrl(url)` | `string \| undefined` | URL, по которому результат поиска цитируется (без параметров отслеживания и фрагмента), и URL, по которому он узнаётся для своего id и поиска дубликатов (вдобавок хост в нижнем регистре, без завершающей косой черты); `undefined` для всего, кроме http(s) |
+| `isPublicAddress(address)` | `boolean` | Находится ли IP-адрес в публичном интернете (проверка, стоящая за `allowPrivateNetwork`) |
 
 ```ts
 interface ReadOnlyDatabase {
@@ -516,6 +522,40 @@ interface ResourceProvider {
   handles(uri: string): boolean;
   list(): Promise<Array<{ uri: string; name: string; description?: string; mimeType?: string; size?: number }>>;
   read(uri: string): Promise<{ uri: string; mimeType?: string; text: string }>;
+}
+```
+
+`web_search` опрашивает своих провайдеров по порядку; провайдер, выбросивший ошибку, передаёт очередь следующему, а тот, что выбросил `SearchThrottledError` (или дал сбой три раза подряд), пропускается на `circuitBreaker.cooldownMs` (2 минуты). Веб-инструменты выбрасывают `WebRequestRefusedError` для того, что они отклоняют намеренно (`reason`: `private-address`, `scheme`, `downgrade`, `redirects`, `robots`, `content-type`, `too-large`, `unreadable`, `pacing`), `WebHttpError` для ответа не из 2xx (`status`), `WebTimeoutError` (истёк запрос, крайний срок вызова или бюджет времени на извлечение), `WebConfigurationError` при недостающей настройке (`unpdf`, токен GitHub) и `SearchUnavailableError`, когда не ответил ни один провайдер (`failures`). `retry` никогда не повторяет отклонённый запрос, недостающую настройку или поиск, на который не ответил ни один провайдер.
+
+```ts
+interface SearchProvider {
+  readonly name: string;
+  /** The origin of a baseUrl you gave it: its requests there may reach a private network. */
+  readonly configuredOrigin?: string;
+  /** Send every request through `web`: timeouts, byte caps, pacing and address checks. */
+  search(request: SearchRequest, web: WebClient): Promise<SearchHit[]>;
+}
+
+interface SearchRequest {
+  query: string;
+  maxResults: number;
+  site?: string;
+  freshness?: 'day' | 'week' | 'month' | 'year';
+  language?: string;
+  signal?: AbortSignal;
+}
+
+interface SearchHit { title: string; url: string; excerpt: string; date?: string; source?: string }
+
+interface WebClient {
+  request(url: string, init?: {
+    method?: 'GET' | 'POST';
+    headers?: Record<string, string>;
+    body?: string;
+    minIntervalMs?: number;
+    signal?: AbortSignal;
+    maxBytes?: number;
+  }): Promise<{ status: number; url: string; headers: Record<string, string>; body: Buffer; truncated: boolean }>;
 }
 ```
 

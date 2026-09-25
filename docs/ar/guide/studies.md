@@ -13,7 +13,7 @@ const study = sdk.createStudy({
   objective: 'A browser design whose every choice follows from the investigation',
   leads: ['vectorisation', 'weights', 'ReLU'], // your leads: examples to verify, not truths
   analogues: ['Bitcoin'],                      // breakthroughs by assembly to deconstruct
-  sources: ['brave_web_search'],               // SDK tools the study searches with
+  sources: ['web_search', 'arxiv_search'],     // SDK tools the study searches with (webTools())
 });
 
 const result = await study.run();
@@ -161,7 +161,20 @@ await study.recordResult('M1', {
 
 ## البحث عبر مصادرك {#research-through-your-sources}
 
-ليس في حزمة SDK بحث مُدمَج على الويب. تبحث الدراسة **بالأدوات التي تعطيها إياها** في `sources`: أسماء أدوات SDK، وهي عادةً أدوات البحث لخادم MCP مستورَد بـ [`connectMcpServer`](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) ومُعرَّف بـ `sdk.defineTool`:
+تبحث الدراسة **بالأدوات التي تعطيها إياها** في `sources`: أسماء أدوات SDK. و[أدوات الويب](./web-research) في حزمة SDK تعمل دون إعداد — `web_search` (عبر DuckDuckGo إلى أن تضبط مزوّدًا آخر)، و`arxiv_search`، و`wikipedia_search`، و`github_search` — وتأتي نتائجها مع عنوان URL، ومع تاريخ حين يكون معروفًا:
+
+```ts
+import { webTools } from '@sdk-ai-agents/core';
+
+// Define the tools first: the study checks its sources when it is created.
+const sources = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] }).map(
+  (tool) => sdk.defineTool(tool).name
+);
+
+const study = sdk.createStudy({ name: 'browser', object, objective, sources });
+```
+
+وتصلح أي أداة بحث أخرى أيضًا، مثل أدوات البحث لخادم MCP مستورَد بـ [`connectMcpServer`](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) ومُعرَّف بـ `sdk.defineTool`:
 
 ```ts
 import { connectMcpServer } from '@sdk-ai-agents/core/mcp';
@@ -354,12 +367,11 @@ const unsubscribe = sdk.subscribe(listener, { agentId: study.id });
 
 ## مثال كامل {#a-complete-example}
 
-يدرس `examples/study.ts` متصفّح الويب من 1990 إلى 2026، بالفرنسية. ويعطي ثلاثة خيوط للتحقّق منها — التحويل إلى متّجهات (vectorisation)، والأوزان (`poids`)، وReLU، وهي أمثلة لا شيء يقول إنها تنطبق على متصفّح — ولا يسمّي أي قدرة، فتقترح الدراسة قدرات مرشّحة، ويطلب منها تفكيك Bitcoin بوصفه اختراقًا بالتركيب. هذا جوهره، مع خادم البحث Brave مصدرًا:
+يدرس `examples/study.ts` متصفّح الويب من 1990 إلى 2026، بالفرنسية. ويعطي ثلاثة خيوط للتحقّق منها — التحويل إلى متّجهات (vectorisation)، والأوزان (`poids`)، وReLU، وهي أمثلة لا شيء يقول إنها تنطبق على متصفّح — ولا يسمّي أي قدرة، فتقترح الدراسة قدرات مرشّحة، ويطلب منها تفكيك Bitcoin بوصفه اختراقًا بالتركيب. هذا جوهره، وهو يبحث على الويب بأدوات الويب في حزمة SDK:
 
 ```ts
 import { writeFileSync } from 'node:fs';
-import { FileEventStore, createSDK } from '@sdk-ai-agents/core';
-import { connectMcpServer } from '@sdk-ai-agents/core/mcp';
+import { FileEventStore, createSDK, webTools } from '@sdk-ai-agents/core';
 
 const eventStore = new FileEventStore('./events');
 const sdk = createSDK({
@@ -370,17 +382,9 @@ const sdk = createSDK({
 });
 
 // The study searches only with the tools you give it, run through the governed pipeline.
-const search = await connectMcpServer({
-  name: 'search',
-  transport: {
-    type: 'stdio',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-brave-search'],
-    env: { BRAVE_API_KEY: process.env.BRAVE_API_KEY ?? '' },
-  },
-  metadata: { readOnly: true },
-});
-const sources = search.tools.map((tool) => sdk.defineTool(tool).name);
+// DuckDuckGo, arXiv and Wikipedia need no key.
+const web = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] });
+const sources = web.map((tool) => sdk.defineTool(tool).name);
 
 const study = sdk.createStudy({
   name: 'navigateur',
@@ -412,11 +416,10 @@ for (const { id, kind, name, capability } of result.report.architectures) {
 }
 console.log(await sdk.getRunCost(result.runId));
 
-await search.close();
 await eventStore.destroy();
 ```
 
-يأخذ المثال نفسه أمر تشغيل أي خادم MCP للبحث: شغّله بـ `OPENAI_API_KEY=… SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=… npm run example:study`. ويسمّي `SEARCH_ENV` المتغيّرات التي يحتاج إليها الخادم: فيحصل عليها وعلى بيئة دنيا، ولا يحصل أبدًا على مفتاح نموذجك. ويختار `SEARCH_TOOLS` بعض أدوات الخادم، و`MODEL` النموذج. ويكتب الملف البحثي في `examples/study-navigateur.md`، ويطبع لماذا لم يكتمل تشغيلٌ، ثم ينتهي عندئذٍ برمز الخروج 1. ومن دون `SEARCH_MCP`، يعمل دون مصادر: يبقى كل شيء فرضية، ويقول الملف البحثي ذلك أولًا.
+شغّل المثال بـ `OPENAI_API_KEY=… npm run example:study`: لا يحتاج إلى أي مفتاح آخر. ويستطيع أيضًا أن يبحث بخادم MCP للبحث تعطيه أمر تشغيله: `SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=…` يضيف أدوات الخادم إلى المصادر. ويسمّي `SEARCH_ENV` المتغيّرات التي يحتاج إليها الخادم: فيحصل عليها وعلى بيئة دنيا، ولا يحصل أبدًا على مفتاح نموذجك. ويختار `SEARCH_TOOLS` بعض أدوات الخادم، و`MODEL` النموذج. ويكتب الملف البحثي في `examples/study-navigateur.md`، ويطبع لماذا لم يكتمل تشغيلٌ، ثم ينتهي عندئذٍ برمز الخروج 1.
 
 ما تتوقّعه في الملف البحثي:
 
@@ -478,7 +481,7 @@ report.stats;         // model calls, searches, items by status, rejections, red
 ## ما لا تفعله الدراسة {#what-a-study-does-not-do}
 
 - **لا تبني شيئًا، ولا تشغّل شيئًا، ولا تقيس شيئًا.** تبقى تنبؤاتها تنبؤات إلى أن تُجري التجارب.
-- **لا تعرف إلا ما تعيده مصادرها.** ليس في حزمة SDK بحث خاص بها على الويب؛ ومن دون مصادر، يكون كل ادعاء فرضية.
+- **لا تعرف إلا ما تعيده مصادرها.** من دون مصادر، يكون كل ادعاء فرضية؛ و[أدوات الويب](./web-research) لا تقرأ إلا ما هو عامّ، دون تشغيل JavaScript الصفحة.
 - **يُتحقَّق من الاستشهاد، لا من محتواه.** تتحقّق الشيفرة من أن النتيجة التي يستشهد بها ادعاء `established` كانت مُدرَجة في الموجّه الذي كتبه، لا من أن النتيجة تقول ما يقوله الادعاء. يسرد الملف البحثي كل مصدر مع رابطه: اقرأها.
 - **الحارس وفحص الأعمال السابقة أحكامُ نموذج.** يُظهرها سجلّ الانحراف وما يُدوَّن عن الأعمال السابقة، فتستطيع أن تخالفها.
 - **ما تقرؤه غير موثوق.** يمكن أن تحتوي نتائج البحث على تعليمات موجّهة إلى النموذج (حقن الموجّهات، prompt injection). وهي تصل إلى النموذج موسومةً بوصفها بيانات، ولا تستطيع الدراسة إلا استدعاء مصادرها، عبر السياسات، ويُهرَّب نص النموذج ونص المصادر في الملف البحثي؛ والحالات وقواعد الانحراف مفروضة بالشيفرة، لا بالموجّه. والوسم يقلّل الخطر؛ لكنه لا يزيله.

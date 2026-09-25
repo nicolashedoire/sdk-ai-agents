@@ -9,6 +9,7 @@
 | [दस्तावेज़ों का एक फ़ोल्डर](#a-folder-of-documents) | `folderTools({ root: './handbook' })` | `list_files`, `read_file`, `search_files` (+ रिसोर्स) |
 | [एक डेटाबेस, केवल-पढ़ने-योग्य](#a-read-only-database) | `databaseTools({ database: sqliteReadOnly(db) })` | `list_tables`, `describe_table`, `query` |
 | [एक एजेंट](#an-agent-your-reasoning-twin) | `cognitiveAgentTool(agent)` | `ask_<agent>` |
+| [वेब](./web-research) | `webTools()` | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` |
 
 MCP आपके लिए नया है? [5 मिनट में आपका पहला MCP सर्वर](./mcp-first-server) से शुरू करें: यह दिखाता है कि सर्वर कैसे चलाएँ, Inspector से उसे कैसे परखें और उसे Claude Desktop या Claude Code से कैसे जोड़ें। नीचे की हर फ़ाइल इसी तरह चलाई और जोड़ी जाती है।
 

@@ -9,6 +9,7 @@
 | [Папку с документами](#a-folder-of-documents) | `folderTools({ root: './handbook' })` | `list_files`, `read_file`, `search_files` (+ ресурсы) |
 | [Базу данных только для чтения](#a-read-only-database) | `databaseTools({ database: sqliteReadOnly(db) })` | `list_tables`, `describe_table`, `query` |
 | [Агента](#an-agent-your-reasoning-twin) | `cognitiveAgentTool(agent)` | `ask_<agent>` |
+| [Интернет](./web-research) | `webTools()` | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` |
 
 Впервые имеете дело с MCP? Начните со страницы [Ваш первый сервер MCP за 5 минут](./mcp-first-server): там показано, как запустить сервер, проверить его с помощью Inspector и подключить к Claude Desktop или Claude Code. Каждый файл ниже запускается и подключается так же.
 

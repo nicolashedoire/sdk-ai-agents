@@ -502,6 +502,12 @@ runs की तुलना **उनके इवेंट्स के अर�
 | `cognitiveAgentTool(agent, { name?, description?, metadata?, maxInputLength?, maxContextLength?, exposeErrors? })` | `ToolDefinition` | `ask_<agent>`: `{ problem, context? }` → `{ runId, status, decisionStatus?, answer?, rationale?, confidence?, missing?, nextActions?, error? }`; कॉल करने वाले के साथ रद्द होता है; `exposeErrors` न हो तो `error` सामान्य रहता है |
 | `governedAgentTool(agent, options)` | `ToolDefinition` | `{ message, context? }` → `{ runId, status, output?, error? }` |
 | `assertSingleQuery(sql, 'sqlite' \| 'postgres')` | `string` | डेटाबेस adapters द्वारा इस्तेमाल की जाने वाली statement-जाँच (सिर्फ़ SQLite और PostgreSQL syntax) |
+| `webTools({ include?, prefix?, search?, circuitBreaker?, language?, userAgent?, timeoutMs?, callTimeoutMs?, maxResponseBytes?, maxRedirects?, hostIntervalMs?, robots?, allowPrivateNetwork?, lookup?, maxPdfBytes?, maxPdfPages?, cache?, retry?, arxiv?, wikipedia?, github? })` | `ToolDefinition[]` | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search`, केवल-पढ़ने-योग्य (`web_fetch` मध्यम जोखिम, बाकी कम जोखिम)। खोज के परिणाम `{ id, title, url, date?, excerpt, source }`; एक पेज `{ url, finalUrl, title?, date?, language?, contentType, content, truncated, untrusted: true, hint? }`। `allowPrivateNetwork` न हो तो सार्वजनिक इंटरनेट से बाहर का कोई पता नहीं, robots.txt का पालन होता है, हर कॉल `callTimeoutMs` (60 s) के भीतर। देखें [वेब पर शोध](../guide/web-research) |
+| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | `SearchProvider` | `web_search` का डिफ़ॉल्ट प्रदाता, बिना key के: DuckDuckGo का HTML पेज, दो खोजों के बीच 1.5 s |
+| `searxng({ baseUrl, engines?, categories?, minIntervalMs? })` | `SearchProvider` | किसी SearXNG instance का JSON API; परिणामों का नाम `searxng:<engine>`, तारीख़ `publishedDate` से |
+| `brave({ apiKey, baseUrl?, minIntervalMs? })`, `tavily(…)`, `serper(…)` | `SearchProvider` | Brave Search, Tavily और Serper के API, उनकी key के साथ |
+| `citableUrl(url)`, `normalizeUrl(url)` | `string \| undefined` | वह URL जिससे किसी खोज परिणाम का हवाला दिया जाता है (tracking पैरामीटर और fragment हटाकर), और वह जिससे उसे उसके id और duplicates के लिए पहचाना जाता है (host भी छोटे अक्षरों में, आख़िर में कोई slash नहीं); http(s) के अलावा किसी भी चीज़ के लिए `undefined` |
+| `isPublicAddress(address)` | `boolean` | कोई IP पता सार्वजनिक इंटरनेट पर है या नहीं (`allowPrivateNetwork` के पीछे की जाँच) |
 
 ```ts
 interface ReadOnlyDatabase {
@@ -516,6 +522,40 @@ interface ResourceProvider {
   handles(uri: string): boolean;
   list(): Promise<Array<{ uri: string; name: string; description?: string; mimeType?: string; size?: number }>>;
   read(uri: string): Promise<{ uri: string; mimeType?: string; text: string }>;
+}
+```
+
+`web_search` अपने प्रदाताओं से क्रम से पूछता है; जो प्रदाता error फेंके, वह अगले को काम सौंप देता है, और जो `SearchThrottledError` फेंके (या लगातार तीन बार विफल हो), उसे `circuitBreaker.cooldownMs` (2 मिनट) तक छोड़ दिया जाता है। जो चीज़ें वेब टूल जान-बूझकर ठुकराते हैं, उनके लिए वे `WebRequestRefusedError` फेंकते हैं (`reason`: `private-address`, `scheme`, `downgrade`, `redirects`, `robots`, `content-type`, `too-large`, `unreadable`, `pacing`), गैर-2xx उत्तर के लिए `WebHttpError` (`status`), `WebTimeoutError` (किसी अनुरोध, कॉल की समय-सीमा, या सामग्री निकालने के समय-बजट के लिए), अधूरे सेटअप (`unpdf`, GitHub token) के लिए `WebConfigurationError` और जब किसी प्रदाता ने जवाब नहीं दिया तो `SearchUnavailableError` (`failures`)। `retry` किसी अस्वीकृति, अधूरे सेटअप या ऐसी खोज को कभी दोबारा नहीं आज़माता जिसका किसी प्रदाता ने जवाब नहीं दिया।
+
+```ts
+interface SearchProvider {
+  readonly name: string;
+  /** The origin of a baseUrl you gave it: its requests there may reach a private network. */
+  readonly configuredOrigin?: string;
+  /** Send every request through `web`: timeouts, byte caps, pacing and address checks. */
+  search(request: SearchRequest, web: WebClient): Promise<SearchHit[]>;
+}
+
+interface SearchRequest {
+  query: string;
+  maxResults: number;
+  site?: string;
+  freshness?: 'day' | 'week' | 'month' | 'year';
+  language?: string;
+  signal?: AbortSignal;
+}
+
+interface SearchHit { title: string; url: string; excerpt: string; date?: string; source?: string }
+
+interface WebClient {
+  request(url: string, init?: {
+    method?: 'GET' | 'POST';
+    headers?: Record<string, string>;
+    body?: string;
+    minIntervalMs?: number;
+    signal?: AbortSignal;
+    maxBytes?: number;
+  }): Promise<{ status: number; url: string; headers: Record<string, string>; body: Buffer; truncated: boolean }>;
 }
 ```
 

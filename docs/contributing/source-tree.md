@@ -25,7 +25,7 @@ sdk-ai-agents/
 │   ├── resilience/             # Retry policy and retrying provider
 │   ├── incidents/              # Incident detection and notifiers
 │   ├── mcp/                    # MCP server (tools and resources) and client
-│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents
+│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents, the Web
 │   ├── evaluators/             # Policy condition evaluation
 │   ├── errors/                 # Error classes
 │   ├── types/                  # Shared type definitions
@@ -167,7 +167,7 @@ sdk-ai-agents/
 
 ### `src/tools/`
 
-**Purpose:** Tool sources that build `ToolDefinition`s from a system, with no dependency on MCP: `openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts` (web APIs), `folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts` (folders and resources), `sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts` (read-only databases), `agent-tools.ts` (agents as tools), plus `tool-names.ts` and `bounded-text.ts`.
+**Purpose:** Tool sources that build `ToolDefinition`s from a system, with no dependency on MCP: `openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts` (web APIs), `folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts` (folders and resources), `sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts` (read-only databases), `agent-tools.ts` (agents as tools), plus `tool-names.ts` and `bounded-text.ts`. `web/` holds the web research tools: `web-tools.ts` (`webTools`), `guarded-http.ts` and `ip-ranges.ts` (the HTTP client and its address, redirect, size and time checks), `robots.ts` and `politeness.ts` (robots.txt, pacing per host), `web-cache.ts`, `results.ts` (citable results), `html-parser.ts` / `html-to-markdown.ts` / `html-entities.ts` (pages to Markdown), `pdf-text.ts` (PDFs with the optional `unpdf`), `web-fetch.ts`, `search-chain.ts` and `providers/` (DuckDuckGo, SearXNG, Brave, Tavily, Serper), `sources/` (arXiv, Wikipedia, GitHub).
 
 ### `src/__tests__/support/`
 

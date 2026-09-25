@@ -123,7 +123,7 @@
 | **OpenAPI 描述**（OpenAPI） | 对 Web API 的一种标准的、机器可读的描述：它的地址、参数和响应，通常以 `openapi.json` 的形式发布。SDK 根据它为每个操作生成一个工具。参见[一个 Web API](./mcp-recipes#a-web-api-from-its-openapi-description)。 |
 | **JSON 模式**（JSON Schema） | 对某些数据（这里是工具参数）形状的描述，模型和 MCP 应用读取它来正确调用工具。SDK 会根据你的 Zod schema 或 OpenAPI 描述来编写它。 |
 | **只读**（Read-only） | 可以看，不能改。文件夹和数据库这两种来源在构造上就是只读的；Web API 默认只读（只包含 `GET` 操作）。 |
-| **工具源**（Tool source） | 从一个系统构建现成工具的函数：`openApiTools`、`folderTools`、`databaseTools`、`cognitiveAgentTool`。一行代码就能通过 MCP 提供它们，也可以把它们交给你自己的智能体。参见[把任何系统变成 MCP 服务器](./mcp-recipes)。 |
+| **工具源**（Tool source） | 从一个系统构建现成工具的函数：`openApiTools`、`folderTools`、`databaseTools`、`cognitiveAgentTool`、`webTools`。一行代码就能通过 MCP 提供它们，也可以把它们交给你自己的智能体。参见[把任何系统变成 MCP 服务器](./mcp-recipes)和 [Web 调研](./web-research)。 |
 
 ## 在生产环境中运维 {#operating-in-production}
 

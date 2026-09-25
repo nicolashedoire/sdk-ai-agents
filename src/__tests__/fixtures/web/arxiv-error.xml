@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title type="html">ArXiv Query: search_query=&amp;id_list=&amp;start=0&amp;max_results=-1</title>
+  <id>http://arxiv.org/api/errors</id>
+  <entry>
+    <id>http://arxiv.org/api/errors#incorrect_max_results_must_be_nonnegative</id>
+    <title>Error</title>
+    <summary>max_results must be non-negative</summary>
+    <updated>2026-09-25T00:00:00-04:00</updated>
+    <link href="http://arxiv.org/api/errors#incorrect_max_results_must_be_nonnegative" rel="alternate" type="text/html"/>
+    <author>
+      <name>arXiv api core</name>
+    </author>
+  </entry>
+</feed>

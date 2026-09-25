@@ -13,7 +13,7 @@ const study = sdk.createStudy({
   objective: 'A browser design whose every choice follows from the investigation',
   leads: ['vectorisation', 'weights', 'ReLU'], // your leads: examples to verify, not truths
   analogues: ['Bitcoin'],                      // breakthroughs by assembly to deconstruct
-  sources: ['brave_web_search'],               // SDK tools the study searches with
+  sources: ['web_search', 'arxiv_search'],     // SDK tools the study searches with (webTools())
 });
 
 const result = await study.run();
@@ -161,7 +161,20 @@ await study.recordResult('M1', {
 
 ## 여러분의 소스를 통한 조사 {#research-through-your-sources}
 
-SDK에는 웹 검색이 내장되어 있지 않습니다. 연구는 여러분이 `sources`로 **준 도구로** 검색합니다. SDK 도구의 이름으로, 보통 [`connectMcpServer`](./mcp#use-the-tools-of-an-mcp-server-in-your-agents)로 가져와 `sdk.defineTool`로 정의한 MCP 서버의 검색 도구입니다.
+연구는 여러분이 `sources`로 **준 도구로** 검색합니다. SDK 도구의 이름입니다. SDK의 [웹 도구](./web-research)는 설정 없이 작동합니다. `web_search`(다른 프로바이더를 설정하기 전까지는 DuckDuckGo), `arxiv_search`, `wikipedia_search`, `github_search`이며, 그 결과에는 URL과, 알려진 경우 날짜가 함께 옵니다.
+
+```ts
+import { webTools } from '@sdk-ai-agents/core';
+
+// Define the tools first: the study checks its sources when it is created.
+const sources = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] }).map(
+  (tool) => sdk.defineTool(tool).name
+);
+
+const study = sdk.createStudy({ name: 'browser', object, objective, sources });
+```
+
+다른 검색 도구도 무엇이든 쓸 수 있습니다. 예를 들어 [`connectMcpServer`](./mcp#use-the-tools-of-an-mcp-server-in-your-agents)로 가져와 `sdk.defineTool`로 정의한 MCP 서버의 검색 도구입니다.
 
 ```ts
 import { connectMcpServer } from '@sdk-ai-agents/core/mcp';
@@ -354,12 +367,11 @@ const unsubscribe = sdk.subscribe(listener, { agentId: study.id });
 
 ## 전체 예제 {#a-complete-example}
 
-`examples/study.ts`는 1990년부터 2026년까지의 웹 브라우저를 프랑스어로 연구합니다. 검증할 단서 세 가지(벡터화, 가중치(`poids`), ReLU. 브라우저에 적용된다는 근거가 전혀 없는 예시입니다)를 주고, 역량은 지정하지 않아 연구가 후보를 제안하게 하며, 비트코인을 결합에 의한 혁신으로 해체하도록 요청합니다. Brave 검색 서버를 소스로 쓰는 핵심 부분은 다음과 같습니다.
+`examples/study.ts`는 1990년부터 2026년까지의 웹 브라우저를 프랑스어로 연구합니다. 검증할 단서 세 가지(벡터화, 가중치(`poids`), ReLU. 브라우저에 적용된다는 근거가 전혀 없는 예시입니다)를 주고, 역량은 지정하지 않아 연구가 후보를 제안하게 하며, 비트코인을 결합에 의한 혁신으로 해체하도록 요청합니다. SDK의 웹 도구로 웹을 검색하는 핵심 부분은 다음과 같습니다.
 
 ```ts
 import { writeFileSync } from 'node:fs';
-import { FileEventStore, createSDK } from '@sdk-ai-agents/core';
-import { connectMcpServer } from '@sdk-ai-agents/core/mcp';
+import { FileEventStore, createSDK, webTools } from '@sdk-ai-agents/core';
 
 const eventStore = new FileEventStore('./events');
 const sdk = createSDK({
@@ -370,17 +382,9 @@ const sdk = createSDK({
 });
 
 // The study searches only with the tools you give it, run through the governed pipeline.
-const search = await connectMcpServer({
-  name: 'search',
-  transport: {
-    type: 'stdio',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-brave-search'],
-    env: { BRAVE_API_KEY: process.env.BRAVE_API_KEY ?? '' },
-  },
-  metadata: { readOnly: true },
-});
-const sources = search.tools.map((tool) => sdk.defineTool(tool).name);
+// DuckDuckGo, arXiv and Wikipedia need no key.
+const web = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] });
+const sources = web.map((tool) => sdk.defineTool(tool).name);
 
 const study = sdk.createStudy({
   name: 'navigateur',
@@ -412,11 +416,10 @@ for (const { id, kind, name, capability } of result.report.architectures) {
 }
 console.log(await sdk.getRunCost(result.runId));
 
-await search.close();
 await eventStore.destroy();
 ```
 
-예제 자체는 어떤 MCP 검색 서버의 명령이든 받습니다. `OPENAI_API_KEY=… SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=… npm run example:study`로 실행하세요. `SEARCH_ENV`는 서버에 필요한 변수의 이름을 지정합니다. 서버는 그 변수들과 최소한의 환경만 받으며, 여러분의 모델 키는 절대 받지 않습니다. `SEARCH_TOOLS`는 서버의 도구 중 일부를 고르고, `MODEL`은 모델을 고릅니다. 예제는 자료집을 `examples/study-navigateur.md`에 쓰고, 실행이 완료되지 않았으면 그 이유를 출력한 다음 종료 코드 1로 끝납니다. `SEARCH_MCP`가 없으면 소스 없이 실행됩니다. 모든 것이 가설로 남고, 자료집이 가장 먼저 그렇다고 밝힙니다.
+예제는 `OPENAI_API_KEY=… npm run example:study`로 실행하세요. 다른 키는 필요 없습니다. MCP 검색 서버로도 검색할 수 있으며, 그 서버의 명령은 여러분이 줍니다. `SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=…`를 붙이면 그 서버의 도구가 소스에 더해집니다. `SEARCH_ENV`는 서버에 필요한 변수의 이름을 지정합니다. 서버는 그 변수들과 최소한의 환경만 받으며, 여러분의 모델 키는 절대 받지 않습니다. `SEARCH_TOOLS`는 서버의 도구 중 일부를 고르고, `MODEL`은 모델을 고릅니다. 예제는 자료집을 `examples/study-navigateur.md`에 쓰고, 실행이 완료되지 않았으면 그 이유를 출력한 다음 종료 코드 1로 끝납니다.
 
 자료집에서 기대할 수 있는 것은 다음과 같습니다.
 
@@ -478,7 +481,7 @@ report.stats;         // model calls, searches, items by status, rejections, red
 ## 연구가 하지 않는 것 {#what-a-study-does-not-do}
 
 - **아무것도 만들지 않고, 실행하지 않고, 측정하지 않습니다.** 예측은 여러분이 실험을 실행하기 전까지 예측일 뿐입니다.
-- **소스가 반환하는 것만 압니다.** SDK에는 자체 웹 검색이 없습니다. 소스가 없으면 모든 주장이 가설입니다.
+- **소스가 반환하는 것만 압니다.** 소스가 없으면 모든 주장이 가설입니다. [웹 도구](./web-research)는 공개된 것만 읽으며, 페이지의 JavaScript는 실행하지 않습니다.
 - **인용은 검사되지만, 그 내용은 검사되지 않습니다.** 코드는 `established` 주장이 인용한 결과가 그 주장을 작성한 프롬프트에 나열되었는지는 검사하지만, 그 결과가 주장이 말하는 바를 실제로 말하는지는 검사하지 않습니다. 자료집은 모든 소스를 링크와 함께 나열합니다. 직접 읽어 보세요.
 - **감시자와 선행 기술 검사는 모델의 판단입니다.** 이탈 기록과 선행 기술 메모가 그 판단을 보여 주므로, 여러분이 그에 반대할 수도 있습니다.
 - **연구가 읽는 것은 신뢰할 수 없습니다.** 검색 결과에는 모델을 겨냥한 지시가 들어 있을 수 있습니다(프롬프트 인젝션). 검색 결과는 데이터로 표시되어 모델에 전달되고, 연구는 정책을 거쳐 자신의 소스만 호출할 수 있으며, 모델과 소스의 텍스트는 자료집에서 이스케이프되고, 상태와 이탈 규칙은 프롬프트가 아니라 코드로 강제됩니다. 표시는 위험을 줄일 뿐, 없애지는 못합니다.

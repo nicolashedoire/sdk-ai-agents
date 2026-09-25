@@ -9,6 +9,7 @@
 | [مجلد مستندات](#a-folder-of-documents) | `folderTools({ root: './handbook' })` | `list_files`، `read_file`، `search_files` (+ موارد) |
 | [قاعدة بيانات، للقراءة فقط](#a-read-only-database) | `databaseTools({ database: sqliteReadOnly(db) })` | `list_tables`، `describe_table`، `query` |
 | [وكيل](#an-agent-your-reasoning-twin) | `cognitiveAgentTool(agent)` | `ask_<agent>` |
+| [الويب](./web-research) | `webTools()` | `web_search`، `web_fetch`، `arxiv_search`، `wikipedia_search`، `github_search` |
 
 هل أنت جديد على MCP؟ ابدأ بـ [أول خادم MCP لك في 5 دقائق](./mcp-first-server): فهي تبيّن كيف تشغّل خادمًا، وتختبره بـ Inspector، وتوصله بـ Claude Desktop أو Claude Code. كل ملف أدناه يُشغَّل ويوصَل بالطريقة نفسها.
 

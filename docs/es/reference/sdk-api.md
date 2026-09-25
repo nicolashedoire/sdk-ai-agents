@@ -502,6 +502,12 @@ Cada una devuelve `ToolDefinition` listas para usar: pásalas a `sdk.defineTool`
 | `cognitiveAgentTool(agent, { name?, description?, metadata?, maxInputLength?, maxContextLength?, exposeErrors? })` | `ToolDefinition` | `ask_<agent>`: `{ problem, context? }` → `{ runId, status, decisionStatus?, answer?, rationale?, confidence?, missing?, nextActions?, error? }`; se cancela junto con quien llama; `error` es genérico salvo con `exposeErrors` |
 | `governedAgentTool(agent, options)` | `ToolDefinition` | `{ message, context? }` → `{ runId, status, output?, error? }` |
 | `assertSingleQuery(sql, 'sqlite' \| 'postgres')` | `string` | La comprobación de sentencias que usan los adaptadores de base de datos (solo sintaxis de SQLite y PostgreSQL) |
+| `webTools({ include?, prefix?, search?, circuitBreaker?, language?, userAgent?, timeoutMs?, callTimeoutMs?, maxResponseBytes?, maxRedirects?, hostIntervalMs?, robots?, allowPrivateNetwork?, lookup?, maxPdfBytes?, maxPdfPages?, cache?, retry?, arxiv?, wikipedia?, github? })` | `ToolDefinition[]` | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search`, de solo lectura (`web_fetch` de riesgo medio, las demás bajo). Resultados de búsqueda `{ id, title, url, date?, excerpt, source }`; una página `{ url, finalUrl, title?, date?, language?, contentType, content, truncated, untrusted: true, hint? }`. Ninguna dirección fuera de Internet público salvo con `allowPrivateNetwork`; se respeta robots.txt, y cada llamada dura como máximo `callTimeoutMs` (60 s). Consulta [Investigación web](../guide/web-research) |
+| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | `SearchProvider` | El proveedor por defecto de `web_search`, sin clave: la página HTML de DuckDuckGo, 1,5 s entre búsquedas |
+| `searxng({ baseUrl, engines?, categories?, minIntervalMs? })` | `SearchProvider` | La API JSON de una instancia de SearXNG; resultados con el nombre `searxng:<engine>`, fechados por `publishedDate` |
+| `brave({ apiKey, baseUrl?, minIntervalMs? })`, `tavily(…)`, `serper(…)` | `SearchProvider` | Las API de Brave Search, Tavily y Serper, con su clave |
+| `citableUrl(url)`, `normalizeUrl(url)` | `string \| undefined` | La URL con la que se cita un resultado de búsqueda (sin parámetros de seguimiento ni fragmento), y aquella por la que se reconoce para su id y sus duplicados (además, host en minúsculas y sin barra final); `undefined` para todo lo que no sea http(s) |
+| `isPublicAddress(address)` | `boolean` | Si una dirección IP está en Internet público (la comprobación que hay detrás de `allowPrivateNetwork`) |
 
 ```ts
 interface ReadOnlyDatabase {
@@ -516,6 +522,40 @@ interface ResourceProvider {
   handles(uri: string): boolean;
   list(): Promise<Array<{ uri: string; name: string; description?: string; mimeType?: string; size?: number }>>;
   read(uri: string): Promise<{ uri: string; mimeType?: string; text: string }>;
+}
+```
+
+`web_search` consulta a sus proveedores en orden; un proveedor que lanza un error pasa el relevo al siguiente, y uno que lanza `SearchThrottledError` (o falla tres veces seguidas) se omite durante `circuitBreaker.cooldownMs` (2 minutos). Las herramientas web lanzan `WebRequestRefusedError` para lo que rechazan a propósito (`reason`: `private-address`, `scheme`, `downgrade`, `redirects`, `robots`, `content-type`, `too-large`, `unreadable`, `pacing`), `WebHttpError` para una respuesta que no es 2xx (`status`), `WebTimeoutError` (una solicitud, el plazo de la llamada o el presupuesto de tiempo de una extracción), `WebConfigurationError` para una configuración que falta (`unpdf`, un token de GitHub) y `SearchUnavailableError` cuando ningún proveedor respondió (`failures`). `retry` nunca reintenta un rechazo, una configuración que falta ni una búsqueda que ningún proveedor respondió.
+
+```ts
+interface SearchProvider {
+  readonly name: string;
+  /** The origin of a baseUrl you gave it: its requests there may reach a private network. */
+  readonly configuredOrigin?: string;
+  /** Send every request through `web`: timeouts, byte caps, pacing and address checks. */
+  search(request: SearchRequest, web: WebClient): Promise<SearchHit[]>;
+}
+
+interface SearchRequest {
+  query: string;
+  maxResults: number;
+  site?: string;
+  freshness?: 'day' | 'week' | 'month' | 'year';
+  language?: string;
+  signal?: AbortSignal;
+}
+
+interface SearchHit { title: string; url: string; excerpt: string; date?: string; source?: string }
+
+interface WebClient {
+  request(url: string, init?: {
+    method?: 'GET' | 'POST';
+    headers?: Record<string, string>;
+    body?: string;
+    minIntervalMs?: number;
+    signal?: AbortSignal;
+    maxBytes?: number;
+  }): Promise<{ status: number; url: string; headers: Record<string, string>; body: Buffer; truncated: boolean }>;
 }
 ```
 

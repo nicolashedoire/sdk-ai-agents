@@ -9,6 +9,7 @@
 | [一个文档文件夹](#a-folder-of-documents) | `folderTools({ root: './handbook' })` | `list_files`、`read_file`、`search_files`（+ 资源） |
 | [一个只读数据库](#a-read-only-database) | `databaseTools({ database: sqliteReadOnly(db) })` | `list_tables`、`describe_table`、`query` |
 | [一个智能体](#an-agent-your-reasoning-twin) | `cognitiveAgentTool(agent)` | `ask_<agent>` |
+| [整个 Web](./web-research) | `webTools()` | `web_search`、`web_fetch`、`arxiv_search`、`wikipedia_search`、`github_search` |
 
 刚接触 MCP？请从 [5 分钟搭建你的第一个 MCP 服务器](./mcp-first-server)开始：它展示了如何运行服务器、用 Inspector 测试它，以及把它接入 Claude Desktop 或 Claude Code。下面的每个文件都以同样的方式运行和接入。
 

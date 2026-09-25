@@ -125,10 +125,10 @@ Works with TypeSafe's API or any compatible self-hosted clone (`jev.baseUrl`).
 
 <p align="center"><img src="docs/public/images/mcp-bridge.svg" alt="MCP in both directions" width="100%" /></p>
 
-**MCP** is the standard plug between AI applications (Claude Desktop, Claude Code, IDE assistants, agents) and your systems. Turn a web API, a folder, a database or an agent into an MCP server in one line — governed: nothing is exposed unless listed, every call is checked against your policies, write operations of web APIs wait for a human by default, and everything lands in the event log.
+**MCP** is the standard plug between AI applications (Claude Desktop, Claude Code, IDE assistants, agents) and your systems. Turn a web API, a folder, a database, an agent or the Web itself into an MCP server in one line — governed: nothing is exposed unless listed, every call is checked against your policies, write operations of web APIs wait for a human by default, and everything lands in the event log.
 
 ```ts
-import { createSDK, openApiTools, folderTools, folderResources, databaseTools, sqliteReadOnly, cognitiveAgentTool } from '@sdk-ai-agents/core';
+import { createSDK, openApiTools, folderTools, folderResources, databaseTools, sqliteReadOnly, cognitiveAgentTool, webTools } from '@sdk-ai-agents/core';
 import { serveMcpOverStdio } from '@sdk-ai-agents/core/mcp';
 
 const sdk = createSDK({}); // no model key needed for tools (the guide shows where to keep the event log)
@@ -146,6 +146,9 @@ await serveMcpOverStdio(sdk, { name: 'shop', tools: databaseTools({ database: sq
 
 // An agent: "what would Nicolas think?" asked from Claude Desktop to your reasoning twin
 await serveMcpOverStdio(sdk, { name: 'twin', tools: [cognitiveAgentTool(twin, { name: 'ask_nicolas' })] });
+
+// The Web: search (DuckDuckGo, no key), pages and PDFs, arXiv, Wikipedia, GitHub — never your private network
+await serveMcpOverStdio(sdk, { name: 'web', tools: webTools() });
 ```
 
 (One server per process: each line above is its own program.) The other direction works too: `connectMcpServer` gives your agents the tools of any MCP server, governed like local tools. New to MCP? [Your first MCP server in 5 minutes](https://nicolashedoire.github.io/sdk-ai-agents/guide/mcp-first-server) goes from an empty folder to Claude Desktop.

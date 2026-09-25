@@ -161,7 +161,7 @@ Les descriptions et les résultats des outils importés parviennent mot pour mot
 
 ## Bon à savoir {#good-to-know}
 
-- La prise en charge de MCP se trouve dans un point d'entrée séparé, `@sdk-ai-agents/core/mcp`, si bien que le paquet principal n'exige pas `@modelcontextprotocol/sdk` tant que vous ne l'utilisez pas. Les sources d'outils (`openApiTools`, `folderTools`, `databaseTools`, `cognitiveAgentTool`…) se trouvent dans le paquet principal : vos agents peuvent les utiliser sans MCP.
+- La prise en charge de MCP se trouve dans un point d'entrée séparé, `@sdk-ai-agents/core/mcp`, si bien que le paquet principal n'exige pas `@modelcontextprotocol/sdk` tant que vous ne l'utilisez pas. Les sources d'outils (`openApiTools`, `folderTools`, `databaseTools`, `cognitiveAgentTool`, `webTools`…) se trouvent dans le paquet principal : vos agents peuvent les utiliser sans MCP.
 - Le serveur repose sur le SDK TypeScript officiel de MCP 1.30, qui accepte les révisions du protocole 2024-10-07, 2024-11-05, 2025-03-26, 2025-06-18 et 2025-11-25 (son `SUPPORTED_PROTOCOL_VERSIONS`, vérifié le 2026-09-24). Le site de MCP documente aussi une révision 2026-07-28 ([architecture](https://modelcontextprotocol.io/docs/learn/architecture), vérifié le 2026-09-24), que ce SDK ne parle pas encore.
 - Ce SDK sert des **outils** et des **ressources**. Les prompts, l'échantillonnage (*sampling*) et la sollicitation (*elicitation*) ne sont pas fournis.
 

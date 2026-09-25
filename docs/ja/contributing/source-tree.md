@@ -25,7 +25,7 @@ sdk-ai-agents/
 │   ├── resilience/             # Retry policy and retrying provider
 │   ├── incidents/              # Incident detection and notifiers
 │   ├── mcp/                    # MCP server (tools and resources) and client
-│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents
+│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents, the Web
 │   ├── evaluators/             # Policy condition evaluation
 │   ├── errors/                 # Error classes
 │   ├── types/                  # Shared type definitions
@@ -167,7 +167,7 @@ sdk-ai-agents/
 
 ### `src/tools/` {#src-tools}
 
-**目的：** あるシステムから `ToolDefinition` を組み立てるツールソースで、MCP には依存しません。`openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts`（Web API）、`folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts`（フォルダーとリソース）、`sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts`（読み取り専用のデータベース）、`agent-tools.ts`（ツールとしてのエージェント）、さらに `tool-names.ts` と `bounded-text.ts` があります。
+**目的：** あるシステムから `ToolDefinition` を組み立てるツールソースで、MCP には依存しません。`openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts`（Web API）、`folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts`（フォルダーとリソース）、`sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts`（読み取り専用のデータベース）、`agent-tools.ts`（ツールとしてのエージェント）、さらに `tool-names.ts` と `bounded-text.ts` があります。`web/` には、Web で調べるためのツールがあります：`web-tools.ts`（`webTools`）、`guarded-http.ts` と `ip-ranges.ts`（HTTP クライアントと、そのアドレス、リダイレクト、サイズ、時間のチェック）、`robots.ts` と `politeness.ts`（robots.txt、ホストごとの間隔の調整）、`web-cache.ts`、`results.ts`（引用できる結果）、`html-parser.ts` / `html-to-markdown.ts` / `html-entities.ts`（ページを Markdown に）、`pdf-text.ts`（オプションの `unpdf` による PDF）、`web-fetch.ts`、`search-chain.ts` と `providers/`（DuckDuckGo、SearXNG、Brave、Tavily、Serper）、`sources/`（arXiv、Wikipedia、GitHub）。
 
 ### `src/__tests__/support/` {#src-tests-support}
 

@@ -25,7 +25,7 @@ sdk-ai-agents/
 │   ├── resilience/             # Retry policy and retrying provider
 │   ├── incidents/              # Incident detection and notifiers
 │   ├── mcp/                    # MCP server (tools and resources) and client
-│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents
+│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents, the Web
 │   ├── evaluators/             # Policy condition evaluation
 │   ├── errors/                 # Error classes
 │   ├── types/                  # Shared type definitions
@@ -167,7 +167,7 @@ sdk-ai-agents/
 
 ### `src/tools/` {#src-tools}
 
-**用途：** 从一个系统构建 `ToolDefinition` 的工具源，不依赖 MCP：`openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts`（Web API）、`folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts`（文件夹和资源）、`sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts`（只读数据库）、`agent-tools.ts`（作为工具的智能体），以及 `tool-names.ts` 和 `bounded-text.ts`。
+**用途：** 从一个系统构建 `ToolDefinition` 的工具源，不依赖 MCP：`openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts`（Web API）、`folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts`（文件夹和资源）、`sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts`（只读数据库）、`agent-tools.ts`（作为工具的智能体），以及 `tool-names.ts` 和 `bounded-text.ts`。`web/` 存放 Web 调研工具：`web-tools.ts`（`webTools`）、`guarded-http.ts` 和 `ip-ranges.ts`（HTTP 客户端及其地址、重定向、大小和时间检查）、`robots.ts` 和 `politeness.ts`（robots.txt、按主机的节奏控制）、`web-cache.ts`、`results.ts`（可引用的结果）、`html-parser.ts` / `html-to-markdown.ts` / `html-entities.ts`（把网页转换为 Markdown）、`pdf-text.ts`（借助可选的 `unpdf` 读取 PDF）、`web-fetch.ts`、`search-chain.ts` 和 `providers/`（DuckDuckGo、SearXNG、Brave、Tavily、Serper）、`sources/`（arXiv、Wikipedia、GitHub）。
 
 ### `src/__tests__/support/` {#src-tests-support}
 

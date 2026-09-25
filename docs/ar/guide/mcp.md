@@ -161,7 +161,7 @@ await crm.close();
 
 ## من المفيد معرفته {#good-to-know}
 
-- يوجد دعم MCP في نقطة دخول منفصلة، `@sdk-ai-agents/core/mcp`، فلا تتطلّب الحزمة الأساسية `@modelcontextprotocol/sdk` ما لم تستخدمه. أما مصادر الأدوات (`openApiTools`، و`folderTools`، و`databaseTools`، و`cognitiveAgentTool`…) فهي في الحزمة الأساسية: يستطيع وكلاؤك استخدامها دون MCP.
+- يوجد دعم MCP في نقطة دخول منفصلة، `@sdk-ai-agents/core/mcp`، فلا تتطلّب الحزمة الأساسية `@modelcontextprotocol/sdk` ما لم تستخدمه. أما مصادر الأدوات (`openApiTools`، و`folderTools`، و`databaseTools`، و`cognitiveAgentTool`، و`webTools`…) فهي في الحزمة الأساسية: يستطيع وكلاؤك استخدامها دون MCP.
 - الخادم مبني على حزمة MCP TypeScript SDK الرسمية 1.30، التي تقبل مراجعات البروتوكول 2024-10-07، و2024-11-05، و2025-03-26، و2025-06-18، و2025-11-25 (قيمة `SUPPORTED_PROTOCOL_VERSIONS` لديها، تم التحقّق منها في 2026-09-24). ويوثّق موقع MCP أيضًا مراجعة 2026-07-28 ([البنية المعمارية](https://modelcontextprotocol.io/docs/learn/architecture)، تم التحقّق منها في 2026-09-24)، ولا تتحدّثها حزمة SDK هذه بعد.
 - تقدّم حزمة SDK هذه **الأدوات** و**الموارد**. أما الموجّهات (prompts)، والاستعانة بنموذج العميل (sampling)، وطلب المعلومات من المستخدم (elicitation) فغير متوفرة.
 

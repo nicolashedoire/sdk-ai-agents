@@ -13,7 +13,7 @@ const study = sdk.createStudy({
   objective: 'A browser design whose every choice follows from the investigation',
   leads: ['vectorisation', 'weights', 'ReLU'], // your leads: examples to verify, not truths
   analogues: ['Bitcoin'],                      // breakthroughs by assembly to deconstruct
-  sources: ['brave_web_search'],               // SDK tools the study searches with
+  sources: ['web_search', 'arxiv_search'],     // SDK tools the study searches with (webTools())
 });
 
 const result = await study.run();
@@ -161,7 +161,20 @@ A claim whose prior art could not be searched or assessed stays to verify (`toVe
 
 ## Research through your sources
 
-The SDK has no built-in Web search. A study searches with **the tools you give it** as `sources`: the names of SDK tools, typically the search tools of an MCP server imported with [`connectMcpServer`](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) and defined with `sdk.defineTool`:
+A study searches with **the tools you give it** as `sources`: the names of SDK tools. The SDK's [web tools](./web-research) work without setup — `web_search` (DuckDuckGo until you configure another provider), `arxiv_search`, `wikipedia_search` and `github_search` — and their results come with a URL and, when known, a date:
+
+```ts
+import { webTools } from '@sdk-ai-agents/core';
+
+// Define the tools first: the study checks its sources when it is created.
+const sources = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] }).map(
+  (tool) => sdk.defineTool(tool).name
+);
+
+const study = sdk.createStudy({ name: 'browser', object, objective, sources });
+```
+
+Any other search tool works too, for instance the search tools of an MCP server imported with [`connectMcpServer`](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) and defined with `sdk.defineTool`:
 
 ```ts
 import { connectMcpServer } from '@sdk-ai-agents/core/mcp';
@@ -354,12 +367,11 @@ A study records twelve event types: `study.started`, `study.passage_started`, `s
 
 ## A complete example
 
-`examples/study.ts` studies the Web browser from 1990 to 2026, in French. It gives three leads to verify — vectorisation, weights (`poids`) and ReLU, examples that nothing says apply to a browser — names no capability, so the study proposes candidates, and asks it to deconstruct Bitcoin as a breakthrough by assembly. Its core, with the Brave search server as source:
+`examples/study.ts` studies the Web browser from 1990 to 2026, in French. It gives three leads to verify — vectorisation, weights (`poids`) and ReLU, examples that nothing says apply to a browser — names no capability, so the study proposes candidates, and asks it to deconstruct Bitcoin as a breakthrough by assembly. Its core, searching the Web with the SDK's web tools:
 
 ```ts
 import { writeFileSync } from 'node:fs';
-import { FileEventStore, createSDK } from '@sdk-ai-agents/core';
-import { connectMcpServer } from '@sdk-ai-agents/core/mcp';
+import { FileEventStore, createSDK, webTools } from '@sdk-ai-agents/core';
 
 const eventStore = new FileEventStore('./events');
 const sdk = createSDK({
@@ -370,17 +382,9 @@ const sdk = createSDK({
 });
 
 // The study searches only with the tools you give it, run through the governed pipeline.
-const search = await connectMcpServer({
-  name: 'search',
-  transport: {
-    type: 'stdio',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-brave-search'],
-    env: { BRAVE_API_KEY: process.env.BRAVE_API_KEY ?? '' },
-  },
-  metadata: { readOnly: true },
-});
-const sources = search.tools.map((tool) => sdk.defineTool(tool).name);
+// DuckDuckGo, arXiv and Wikipedia need no key.
+const web = webTools({ include: ['web_search', 'arxiv_search', 'wikipedia_search'] });
+const sources = web.map((tool) => sdk.defineTool(tool).name);
 
 const study = sdk.createStudy({
   name: 'navigateur',
@@ -412,11 +416,10 @@ for (const { id, kind, name, capability } of result.report.architectures) {
 }
 console.log(await sdk.getRunCost(result.runId));
 
-await search.close();
 await eventStore.destroy();
 ```
 
-The example itself takes the command of any MCP search server: run it with `OPENAI_API_KEY=… SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=… npm run example:study`. `SEARCH_ENV` names the variables the server needs: it gets those and a minimal environment, never your model key. `SEARCH_TOOLS` picks some of the server's tools, `MODEL` the model. It writes the dossier to `examples/study-navigateur.md`, prints why a run did not complete, and then exits with the code 1. Without `SEARCH_MCP`, it runs without sources: everything stays a hypothesis, and the dossier says so first.
+Run the example with `OPENAI_API_KEY=… npm run example:study`: it needs no other key. It can also search with an MCP search server, whose command you give: `SEARCH_MCP="npx -y @modelcontextprotocol/server-brave-search" SEARCH_ENV=BRAVE_API_KEY BRAVE_API_KEY=…` adds the server's tools to the sources. `SEARCH_ENV` names the variables the server needs: it gets those and a minimal environment, never your model key. `SEARCH_TOOLS` picks some of the server's tools, `MODEL` the model. It writes the dossier to `examples/study-navigateur.md`, prints why a run did not complete, and then exits with the code 1.
 
 What to expect in the dossier:
 
@@ -478,7 +481,7 @@ Every claim shows its status and the results it cites (`S1, S3`), and the ids it
 ## What a study does not do
 
 - **It builds, runs and measures nothing.** Its predictions are predictions until you run the experiments.
-- **It knows only what its sources return.** The SDK has no Web search of its own; without sources, every claim is a hypothesis.
+- **It knows only what its sources return.** Without sources, every claim is a hypothesis; the [web tools](./web-research) read only what is public, without running a page's JavaScript.
 - **A citation is checked, not its content.** The code checks that a result cited by an `established` claim was listed in the prompt that wrote it, not that the result says what the claim says. The dossier lists every source with its link: read them.
 - **The guardian and the prior-art check are model judgements.** The drift log and the prior-art notes show them, so you can disagree.
 - **What it reads is untrusted.** Search results can hold instructions aimed at the model (prompt injection). They reach the model marked as data, a study can only call its sources, through the policies, and the text of the model and of the sources is escaped in the dossier; the statuses and the drift rules are enforced in code, not by the prompt. Marking reduces the risk; it does not remove it.

@@ -502,6 +502,12 @@ Each returns ready-made `ToolDefinition`s: pass them to `sdk.defineTool`, to an 
 | `cognitiveAgentTool(agent, { name?, description?, metadata?, maxInputLength?, maxContextLength?, exposeErrors? })` | `ToolDefinition` | `ask_<agent>`: `{ problem, context? }` → `{ runId, status, decisionStatus?, answer?, rationale?, confidence?, missing?, nextActions?, error? }`; cancelled with the caller; `error` is generic unless `exposeErrors` |
 | `governedAgentTool(agent, options)` | `ToolDefinition` | `{ message, context? }` → `{ runId, status, output?, error? }` |
 | `assertSingleQuery(sql, 'sqlite' \| 'postgres')` | `string` | The statement check used by the database adapters (SQLite and PostgreSQL syntax only) |
+| `webTools({ include?, prefix?, search?, circuitBreaker?, language?, userAgent?, timeoutMs?, callTimeoutMs?, maxResponseBytes?, maxRedirects?, hostIntervalMs?, robots?, allowPrivateNetwork?, lookup?, maxPdfBytes?, maxPdfPages?, cache?, retry?, arxiv?, wikipedia?, github? })` | `ToolDefinition[]` | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search`, read-only (`web_fetch` medium risk, the others low). Search results `{ id, title, url, date?, excerpt, source }`; a page `{ url, finalUrl, title?, date?, language?, contentType, content, truncated, untrusted: true, hint? }`. No address outside the public Internet unless `allowPrivateNetwork`, robots.txt respected, each call within `callTimeoutMs` (60 s). See [Web research](../guide/web-research) |
+| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | `SearchProvider` | The default provider of `web_search`, with no key: DuckDuckGo's HTML page, 1.5 s between searches |
+| `searxng({ baseUrl, engines?, categories?, minIntervalMs? })` | `SearchProvider` | A SearXNG instance's JSON API; results named `searxng:<engine>`, dated by `publishedDate` |
+| `brave({ apiKey, baseUrl?, minIntervalMs? })`, `tavily(…)`, `serper(…)` | `SearchProvider` | The Brave Search, Tavily and Serper APIs, with their key |
+| `citableUrl(url)`, `normalizeUrl(url)` | `string \| undefined` | The URL a search result is cited by (tracking parameters and fragment removed), and the one it is known by for its id and duplicates (also host in lower case, no trailing slash); `undefined` for anything but http(s) |
+| `isPublicAddress(address)` | `boolean` | Whether an IP address is on the public Internet (the check behind `allowPrivateNetwork`) |
 
 ```ts
 interface ReadOnlyDatabase {
@@ -516,6 +522,40 @@ interface ResourceProvider {
   handles(uri: string): boolean;
   list(): Promise<Array<{ uri: string; name: string; description?: string; mimeType?: string; size?: number }>>;
   read(uri: string): Promise<{ uri: string; mimeType?: string; text: string }>;
+}
+```
+
+`web_search` asks its providers in order; a provider that throws hands over to the next one, and one that throws `SearchThrottledError` (or fails three times in a row) is skipped for `circuitBreaker.cooldownMs` (2 minutes). The web tools throw `WebRequestRefusedError` for what they refuse on purpose (`reason`: `private-address`, `scheme`, `downgrade`, `redirects`, `robots`, `content-type`, `too-large`, `unreadable`, `pacing`), `WebHttpError` for a non-2xx answer (`status`), `WebTimeoutError` (a request, the call's deadline, or the time budget of an extraction), `WebConfigurationError` for a missing setup (`unpdf`, a GitHub token) and `SearchUnavailableError` when no provider answered (`failures`). `retry` never retries a refusal, a missing setup or a search no provider answered.
+
+```ts
+interface SearchProvider {
+  readonly name: string;
+  /** The origin of a baseUrl you gave it: its requests there may reach a private network. */
+  readonly configuredOrigin?: string;
+  /** Send every request through `web`: timeouts, byte caps, pacing and address checks. */
+  search(request: SearchRequest, web: WebClient): Promise<SearchHit[]>;
+}
+
+interface SearchRequest {
+  query: string;
+  maxResults: number;
+  site?: string;
+  freshness?: 'day' | 'week' | 'month' | 'year';
+  language?: string;
+  signal?: AbortSignal;
+}
+
+interface SearchHit { title: string; url: string; excerpt: string; date?: string; source?: string }
+
+interface WebClient {
+  request(url: string, init?: {
+    method?: 'GET' | 'POST';
+    headers?: Record<string, string>;
+    body?: string;
+    minIntervalMs?: number;
+    signal?: AbortSignal;
+    maxBytes?: number;
+  }): Promise<{ status: number; url: string; headers: Record<string, string>; body: Buffer; truncated: boolean }>;
 }
 ```
 

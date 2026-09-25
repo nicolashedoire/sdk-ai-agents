@@ -25,7 +25,7 @@ sdk-ai-agents/
 │   ├── resilience/             # Retry policy and retrying provider
 │   ├── incidents/              # Incident detection and notifiers
 │   ├── mcp/                    # MCP server (tools and resources) and client
-│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents
+│   ├── tools/                  # Tool sources: OpenAPI, folder, read-only database, agents, the Web
 │   ├── evaluators/             # Policy condition evaluation
 │   ├── errors/                 # Error classes
 │   ├── types/                  # Shared type definitions
@@ -167,7 +167,7 @@ sdk-ai-agents/
 
 ### `src/tools/` {#src-tools}
 
-**목적:** MCP에 의존하지 않고 시스템으로부터 `ToolDefinition`을 만드는 도구 소스: `openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts`(웹 API), `folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts`(폴더와 리소스), `sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts`(읽기 전용 데이터베이스), `agent-tools.ts`(도구로서의 에이전트), 그리고 `tool-names.ts`와 `bounded-text.ts`.
+**목적:** MCP에 의존하지 않고 시스템으로부터 `ToolDefinition`을 만드는 도구 소스: `openapi-spec.ts` / `openapi-call.ts` / `openapi-tools.ts`(웹 API), `folder-access.ts` / `folder-tools.ts` / `glob-pattern.ts`(폴더와 리소스), `sql-statement-guard.ts` / `database-tools.ts` / `sqlite-read-only.ts` / `postgres-read-only.ts` / `sql-values.ts`(읽기 전용 데이터베이스), `agent-tools.ts`(도구로서의 에이전트), 그리고 `tool-names.ts`와 `bounded-text.ts`. `web/`에는 웹 조사 도구가 있습니다: `web-tools.ts`(`webTools`), `guarded-http.ts`와 `ip-ranges.ts`(HTTP 클라이언트와 그 주소, 리디렉션, 크기, 시간 검사), `robots.ts`와 `politeness.ts`(robots.txt, 호스트별 요청 간격), `web-cache.ts`, `results.ts`(인용할 수 있는 결과), `html-parser.ts` / `html-to-markdown.ts` / `html-entities.ts`(페이지를 Markdown으로), `pdf-text.ts`(선택 패키지 `unpdf`를 쓰는 PDF), `web-fetch.ts`, `search-chain.ts`와 `providers/`(DuckDuckGo, SearXNG, Brave, Tavily, Serper), `sources/`(arXiv, Wikipedia, GitHub).
 
 ### `src/__tests__/support/` {#src-tests-support}
 
