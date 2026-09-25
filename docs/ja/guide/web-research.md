@@ -93,7 +93,7 @@ const tools = webTools({
 
 各プロバイダーは、`site`、`freshness`、`language` を自分のパラメーターに変換します（クエリの中の `site:`、`df`、`time_range`、`freshness=pw`、`tbs=qdr:w`、`kl`、`search_lang`…）。`site` 以外のサイトからの結果は、どのプロバイダーが見つけたものであっても取り除かれます。
 
-**スロットリング。** 検索を制限したプロバイダー（HTTP 429、DuckDuckGo の CAPTCHA のページや空のページ）は、求められた待ち時間（`Retry-After`）または `throttleWaitMs`（10 秒）だけ待った後に、もう一度だけ試されます。待ち時間は最大 30 秒で、呼び出しの期限にその余裕があるときに限ります。
+**スロットリング。** 検索を制限したプロバイダー（HTTP 429、DuckDuckGo の CAPTCHA のページや空のページ）は、求められた待ち時間（`Retry-After`）または `throttleWaitMs`（10 秒）だけ待った後に、もう一度だけ試されます。ただし、呼び出しの期限にその余裕があるときに限ります。30 秒を超える待ち時間を求めたプロバイダーは、求めたよりも早く再び試されることは決してありません。そのあいだ（少なくとも `circuitBreaker.cooldownMs`）は飛ばされ、ほかのどのプロバイダーも答えないときは、呼び出しはすぐに `throttled` で失敗し、求められた待ち時間（`retryAfterMs`）を示します。
 
 **サーキットブレーカー。** その 2 回目の試行の後もまだ制限されているプロバイダーはすぐに、それ以外のプロバイダーは 3 回続けて失敗した後に、休止されます。休止中の 2 分間は、リクエストを送らずに飛ばされます（いつまでかは `errors` が示します）。その後、もう一度だけ試されます。`circuitBreaker: { cooldownMs, failureThreshold }` で、この 2 つを変更できます。どのプロバイダーも答えなかったとき、そのエラー（`SearchUnavailableError`）は、すべてが制限されていたかどうか（`throttled`）と、飛ばされたプロバイダーがいつ再び試されるか（`retryAfterMs`）を示します。研究は、そのような検索を後でもう一度試します。
 
@@ -140,7 +140,7 @@ const intranetSearch: SearchProvider = {
 | `maxPdfBytes` | `10000000` | 読み取る PDF の最大サイズ。それより大きいものは拒否される。 |
 | `maxPdfPages` | `30` | PDF の読み取るページ数。 |
 | `cache` | `{ ttlMs: 600000, maxEntries: 200, maxBytes: 20000000 }` | ツールと引数ごとにメモリに保持される結果。JSON として測って最大 `maxBytes` まで。`false` で無効にする。 |
-| `retry` | — | 失敗した呼び出しのリトライ（`{ maxRetries }`）：レート制限、サーバーエラー、タイムアウト、ネットワーク障害のとき。拒否、準備の不足（`WebConfigurationError`）、どのプロバイダーも答えなかった検索（`SearchUnavailableError`）は決してリトライしない。 |
+| `retry` | — | 失敗した呼び出しのリトライ（`{ maxRetries }`）：サーバーエラー、タイムアウト、ネットワーク障害のとき。拒否、準備の不足（`WebConfigurationError`）、どのプロバイダーも答えなかった検索（`SearchUnavailableError`）、ツールがすでに 2 回目の試行をした制限（HTTP 429、`SearchThrottledError`）は決してリトライしない。 |
 | `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | arXiv の API は、リクエストを一度に 1 つずつ、3 秒の間隔を空けて送るよう求めている。間隔は前のリクエストが終わってから数える。拒否（HTTP 406、429、503）は、待った後にもう一度だけ試される。 |
 | `wikipedia` | `{ baseUrl: 'https://{language}.wikipedia.org', language: 'en' }` | `{language}` は検索の言語に置き換えられる。あなたが指定した `baseUrl` は、そのホストに `{language}` が含まれないときに限り、プライベートネットワークのチェックから除外される。 |
 | `github` | `{ baseUrl: 'https://api.github.com' }` | `token` はレート制限を引き上げ（なければ 1 分あたり 10 回の検索）、コードの検索に必要。 |

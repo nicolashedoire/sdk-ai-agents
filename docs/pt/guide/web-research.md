@@ -93,7 +93,7 @@ const tools = webTools({
 
 Cada provedor transforma `site`, `freshness` e `language` nos seus próprios parâmetros (`site:` na consulta, `df`, `time_range`, `freshness=pw`, `tbs=qdr:w`, `kl`, `search_lang`…). Os resultados de um site diferente de `site` são descartados, qualquer que seja o provedor que os encontrou.
 
-**Limite de requisições.** Um provedor que limita uma pesquisa (HTTP 429, a página de captcha ou a página vazia do DuckDuckGo) recebe mais uma tentativa, depois da espera que ele pediu (`Retry-After`) ou de `throttleWaitMs` (10 s), no máximo 30 s, quando o prazo da chamada deixa tempo para isso.
+**Limite de requisições.** Um provedor que limita uma pesquisa (HTTP 429, a página de captcha ou a página vazia do DuckDuckGo) recebe mais uma tentativa, depois da espera que ele pediu (`Retry-After`) ou de `throttleWaitMs` (10 s), quando o prazo da chamada deixa tempo para isso. Um provedor que pede mais de 30 s nunca é tentado de novo mais cedo do que pediu: ele é pulado durante esse tempo (no mínimo `circuitBreaker.cooldownMs`) e, quando nenhum outro provedor responde, a chamada falha na hora, `throttled`, com a espera pedida (`retryAfterMs`).
 
 **Disjuntor (circuit breaker).** Um provedor que ainda atinge um limite de requisições depois dessa segunda tentativa é deixado de lado imediatamente; qualquer outro, depois de três falhas seguidas: durante dois minutos, ele é pulado sem nenhuma requisição (`errors` diz até quando). Depois, ele recebe mais uma tentativa. `circuitBreaker: { cooldownMs, failureThreshold }` muda as duas coisas. Quando nenhum provedor respondeu, o erro (`SearchUnavailableError`) diz se todos estavam limitados (`throttled`) e quando um provedor pulado será tentado de novo (`retryAfterMs`): um estudo tenta essa pesquisa mais uma vez, mais tarde.
 
@@ -140,7 +140,7 @@ const intranetSearch: SearchProvider = {
 | `maxPdfBytes` | `10000000` | Maior PDF lido. Um maior é recusado. |
 | `maxPdfPages` | `30` | Páginas de um PDF lidas. |
 | `cache` | `{ ttlMs: 600000, maxEntries: 200, maxBytes: 20000000 }` | Resultados guardados em memória por ferramenta e argumentos, no máximo `maxBytes` medidos como JSON; `false` desativa isso. |
-| `retry` | — | Novas tentativas das chamadas que falharam (`{ maxRetries }`): limites de requisições, erros de servidor, timeouts e falhas de rede; nunca uma recusa, uma configuração ausente (`WebConfigurationError`) ou uma pesquisa à qual nenhum provedor respondeu (`SearchUnavailableError`). |
+| `retry` | — | Novas tentativas das chamadas que falharam (`{ maxRetries }`): erros de servidor, timeouts e falhas de rede; nunca uma recusa, uma configuração ausente (`WebConfigurationError`), uma pesquisa à qual nenhum provedor respondeu (`SearchUnavailableError`) ou um limite de requisições (HTTP 429, `SearchThrottledError`), para o qual a ferramenta já fez a segunda tentativa. |
 | `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | A API do arXiv pede 3 s entre requisições, uma de cada vez: os 3 s contam a partir do fim da anterior. Uma recusa (HTTP 406, 429, 503) recebe mais uma tentativa depois de uma espera. |
 | `wikipedia` | `{ baseUrl: 'https://{language}.wikipedia.org', language: 'en' }` | `{language}` é substituído pelo idioma da pesquisa. Um `baseUrl` seu só fica isento da verificação de rede privada quando `{language}` não está no seu host. |
 | `github` | `{ baseUrl: 'https://api.github.com' }` | `token` aumenta o limite de requisições (10 pesquisas por minuto sem ele) e é necessário para pesquisar código. |

@@ -93,7 +93,7 @@ const tools = webTools({
 
 हर प्रदाता `site`, `freshness` और `language` को अपने पैरामीटरों में बदलता है (क्वेरी में `site:`, `df`, `time_range`, `freshness=pw`, `tbs=qdr:w`, `kl`, `search_lang`…)। `site` के अलावा किसी दूसरी साइट के परिणाम हटा दिए जाते हैं, चाहे उन्हें किसी भी प्रदाता ने ढूँढा हो।
 
-**Throttling।** जो प्रदाता किसी खोज पर throttling लगाए (HTTP 429, DuckDuckGo का captcha पेज या खाली पेज), उसे एक और प्रयास मिलता है, उसके माँगे इंतज़ार (`Retry-After`) या `throttleWaitMs` (10 s) के बाद, अधिकतम 30 s, जब कॉल की समय-सीमा में इसके लिए जगह हो।
+**Throttling।** जो प्रदाता किसी खोज पर throttling लगाए (HTTP 429, DuckDuckGo का captcha पेज या खाली पेज), उसे एक और प्रयास मिलता है, उसके माँगे इंतज़ार (`Retry-After`) या `throttleWaitMs` (10 s) के बाद, जब कॉल की समय-सीमा में इसके लिए जगह हो। जो प्रदाता 30 s से ज़्यादा माँगे, उसे उसके माँगे समय से पहले कभी दोबारा नहीं आज़माया जाता: उसे उतनी देर के लिए छोड़ दिया जाता है (कम से कम `circuitBreaker.cooldownMs`), और जब कोई दूसरा प्रदाता जवाब न दे, तो कॉल तुरंत विफल हो जाती है, `throttled`, माँगे गए इंतज़ार (`retryAfterMs`) के साथ।
 
 **Circuit breaker।** जिस प्रदाता पर उस दूसरे प्रयास के बाद भी throttling लगी रहे, उसे तुरंत अलग रख दिया जाता है, किसी दूसरे प्रदाता को लगातार तीन विफलताओं के बाद: दो मिनट तक उसे बिना कोई अनुरोध भेजे छोड़ दिया जाता है (`errors` बताता है कब तक)। फिर उसे एक और मौका मिलता है। `circuitBreaker: { cooldownMs, failureThreshold }` ये दोनों बातें बदलता है। जब किसी प्रदाता ने जवाब नहीं दिया, तो error (`SearchUnavailableError`) बताता है कि क्या सब पर throttling लगी थी (`throttled`) और छोड़े गए प्रदाता को फिर कब आज़माया जाएगा (`retryAfterMs`): अध्ययन ऐसी खोज को बाद में एक बार और आज़माता है।
 
@@ -140,7 +140,7 @@ const intranetSearch: SearchProvider = {
 | `maxPdfBytes` | `10000000` | पढ़ी जाने वाली सबसे बड़ी PDF। इससे लंबी PDF ठुकरा दी जाती है। |
 | `maxPdfPages` | `30` | किसी PDF के कितने पेज पढ़े जाते हैं। |
 | `cache` | `{ ttlMs: 600000, maxEntries: 200, maxBytes: 20000000 }` | हर टूल और arguments के हिसाब से मेमोरी में रखे गए परिणाम, JSON के रूप में मापे गए ज़्यादा से ज़्यादा `maxBytes`; `false` इसे बंद करता है। |
-| `retry` | — | विफल कॉल के दोबारा प्रयास (`{ maxRetries }`): rate limits, सर्वर errors, timeouts और नेटवर्क विफलताओं पर; किसी अस्वीकृति, अधूरे सेटअप (`WebConfigurationError`) या ऐसी खोज पर कभी नहीं जिसका किसी प्रदाता ने जवाब नहीं दिया (`SearchUnavailableError`)। |
+| `retry` | — | विफल कॉल के दोबारा प्रयास (`{ maxRetries }`): सर्वर errors, timeouts और नेटवर्क विफलताओं पर; किसी अस्वीकृति, अधूरे सेटअप (`WebConfigurationError`), ऐसी खोज जिसका किसी प्रदाता ने जवाब नहीं दिया (`SearchUnavailableError`) या ऐसी throttling (HTTP 429, `SearchThrottledError`) पर कभी नहीं जिसके बाद टूल पहले ही दूसरा प्रयास कर चुका है। |
 | `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | arXiv API अनुरोधों के बीच 3 s का अंतर माँगता है, एक समय में एक अनुरोध: यह अंतर पिछले अनुरोध के खत्म होने से गिना जाता है। किसी अस्वीकृति (HTTP 406, 429, 503) को इंतज़ार के बाद एक और प्रयास मिलता है। |
 | `wikipedia` | `{ baseUrl: 'https://{language}.wikipedia.org', language: 'en' }` | `{language}` की जगह खोज की भाषा आती है। आपका दिया `baseUrl` निजी नेटवर्क की जाँच से तभी छूट पाता है जब `{language}` उसके host में न हो। |
 | `github` | `{ baseUrl: 'https://api.github.com' }` | `token` rate limit बढ़ाता है (उसके बिना एक मिनट में 10 खोजें) और code खोजने के लिए ज़रूरी है। |

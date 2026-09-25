@@ -93,7 +93,7 @@ const tools = webTools({
 
 각 프로바이더는 `site`, `freshness`, `language`를 자신의 매개변수로 바꿉니다(쿼리 안의 `site:`, `df`, `time_range`, `freshness=pw`, `tbs=qdr:w`, `kl`, `search_lang`…). `site`와 다른 사이트의 결과는 어느 프로바이더가 찾았든 버려집니다.
 
-**요청 속도 제한.** 검색에 속도 제한을 건 프로바이더(HTTP 429, DuckDuckGo의 캡차 페이지나 빈 페이지)는 한 번 더 시도할 기회를 얻습니다. 프로바이더가 요구한 대기 시간(`Retry-After`)이나 `throttleWaitMs`(10초)만큼, 최대 30초를 기다린 뒤이며, 호출의 마감 시간에 그만한 여유가 있을 때에 한합니다.
+**요청 속도 제한.** 검색에 속도 제한을 건 프로바이더(HTTP 429, DuckDuckGo의 캡차 페이지나 빈 페이지)는 한 번 더 시도할 기회를 얻습니다. 프로바이더가 요구한 대기 시간(`Retry-After`)이나 `throttleWaitMs`(10초)만큼 기다린 뒤이며, 호출의 마감 시간에 그만한 여유가 있을 때에 한합니다. 30초보다 긴 대기를 요구한 프로바이더는 요구한 시간보다 일찍 다시 시도하는 일이 결코 없습니다. 그동안(최소 `circuitBreaker.cooldownMs`) 건너뛰며, 다른 어느 프로바이더도 답하지 않으면 호출은 즉시 `throttled`로 실패하고 요구된 대기 시간(`retryAfterMs`)을 밝힙니다.
 
 **서킷 브레이커.** 그 두 번째 시도 뒤에도 여전히 요청 속도 제한에 걸린 프로바이더는 즉시, 그 밖의 실패는 세 번 연속 실패한 뒤에 잠시 쉬게 됩니다. 2분 동안 그 프로바이더에는 요청을 보내지 않고 건너뛰며(`errors`가 언제까지인지 밝힙니다), 그다음 한 번 더 시도할 기회를 줍니다. `circuitBreaker: { cooldownMs, failureThreshold }`로 둘 다 바꿀 수 있습니다. 어느 프로바이더도 답하지 않았을 때, 오류(`SearchUnavailableError`)는 모두 요청 속도 제한에 걸렸는지(`throttled`), 그리고 건너뛴 프로바이더를 언제 다시 시도할지(`retryAfterMs`)를 밝힙니다. 연구는 그런 검색을 나중에 한 번 더 시도합니다.
 
@@ -140,7 +140,7 @@ const intranetSearch: SearchProvider = {
 | `maxPdfBytes` | `10000000` | 읽는 PDF의 최대 크기. 더 큰 PDF는 거부됩니다. |
 | `maxPdfPages` | `30` | 읽는 PDF 페이지 수. |
 | `cache` | `{ ttlMs: 600000, maxEntries: 200, maxBytes: 20000000 }` | 도구와 인자별로 메모리에 보관하는 결과. JSON으로 잰 크기로 최대 `maxBytes`까지 보관합니다. `false`면 끕니다. |
-| `retry` | — | 실패한 호출의 재시도(`{ maxRetries }`). 요청 속도 제한, 서버 오류, 타임아웃, 네트워크 실패를 재시도하며, 거부, 빠진 설정(`WebConfigurationError`), 어느 프로바이더도 답하지 않은 검색(`SearchUnavailableError`)은 절대 재시도하지 않습니다. |
+| `retry` | — | 실패한 호출의 재시도(`{ maxRetries }`). 서버 오류, 타임아웃, 네트워크 실패를 재시도하며, 거부, 빠진 설정(`WebConfigurationError`), 어느 프로바이더도 답하지 않은 검색(`SearchUnavailableError`), 도구가 이미 두 번째 시도를 한 요청 속도 제한(HTTP 429, `SearchThrottledError`)은 절대 재시도하지 않습니다. |
 | `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | arXiv API는 요청 사이에 3초를 두고 한 번에 하나씩 보내라고 요구합니다. 간격은 이전 요청이 끝난 때부터 셉니다. 거부(HTTP 406, 429, 503)는 기다린 뒤 한 번 더 시도합니다. |
 | `wikipedia` | `{ baseUrl: 'https://{language}.wikipedia.org', language: 'en' }` | `{language}`는 검색 언어로 바뀝니다. 여러분이 준 `baseUrl`은 호스트에 `{language}`가 없을 때에만 사설 네트워크 검사에서 면제됩니다. |
 | `github` | `{ baseUrl: 'https://api.github.com' }` | `token`은 요청 한도를 높이며(토큰이 없으면 1분에 검색 10회), 코드를 검색하는 데 필요합니다. |

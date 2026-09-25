@@ -93,7 +93,7 @@ const tools = webTools({
 
 每个提供商都会把 `site`、`freshness` 和 `language` 转换成它自己的参数（查询中的 `site:`、`df`、`time_range`、`freshness=pw`、`tbs=qdr:w`、`kl`、`search_lang`……）。来自 `site` 以外网站的结果会被丢弃，无论是哪个提供商找到的。
 
-**限流。** 对搜索限流的提供商（HTTP 429、DuckDuckGo 的验证码页面或空白页面）会再得到一次尝试的机会：在它要求的等待时间（`Retry-After`）或 `throttleWaitMs`（10 秒）之后，最多等待 30 秒，前提是调用的时限还留有足够的时间。
+**限流。** 对搜索限流的提供商（HTTP 429、DuckDuckGo 的验证码页面或空白页面）会再得到一次尝试的机会：在它要求的等待时间（`Retry-After`）或 `throttleWaitMs`（10 秒）之后，前提是调用的时限还留有足够的时间。要求等待超过 30 秒的提供商，绝不会早于它要求的时间被再次尝试：在这段时间内（至少 `circuitBreaker.cooldownMs`）它会被跳过；当没有其他提供商作答时，调用会立即以 `throttled` 失败，并给出它要求的等待时间（`retryAfterMs`）。
 
 **熔断器。** 在第二次尝试之后仍然被限流的提供商会立即被搁置，其他提供商则在连续失败三次之后被搁置：在两分钟内，它会被直接跳过，不发出任何请求（`errors` 会说明搁置到什么时候）。之后它会再得到一次尝试的机会。`circuitBreaker: { cooldownMs, failureThreshold }` 可以修改这两个值。当没有任何提供商作答时，错误（`SearchUnavailableError`）会说明它们是否全都被限流了（`throttled`），以及被跳过的提供商什么时候会再被尝试（`retryAfterMs`）：研究会在稍后把这样的搜索再尝试一次。
 
@@ -140,7 +140,7 @@ const intranetSearch: SearchProvider = {
 | `maxPdfBytes` | `10000000` | 读取的 PDF 的最大字节数。更大的 PDF 会被拒绝。 |
 | `maxPdfPages` | `30` | 读取的 PDF 页数。 |
 | `cache` | `{ ttlMs: 600000, maxEntries: 200, maxBytes: 20000000 }` | 按工具和参数在内存中保留的结果，按 JSON 计算最多 `maxBytes`；设为 `false` 则关闭。 |
-| `retry` | — | 对失败调用的重试（`{ maxRetries }`）：针对限流、服务器错误、超时和网络故障；从不针对拒绝、缺少的配置（`WebConfigurationError`）或没有任何提供商作答的搜索（`SearchUnavailableError`）重试。 |
+| `retry` | — | 对失败调用的重试（`{ maxRetries }`）：针对服务器错误、超时和网络故障；从不针对拒绝、缺少的配置（`WebConfigurationError`）、没有任何提供商作答的搜索（`SearchUnavailableError`）或限流（HTTP 429、`SearchThrottledError`，工具已经给过它第二次尝试）重试。 |
 | `arxiv` | `{ baseUrl: 'https://export.arxiv.org', minIntervalMs: 3000 }` | arXiv API 要求两次请求之间间隔 3 秒，并且一次只发一个请求：间隔从上一次请求结束时算起。被拒绝的请求（HTTP 406、429、503）会在等待之后再得到一次尝试的机会。 |
 | `wikipedia` | `{ baseUrl: 'https://{language}.wikipedia.org', language: 'en' }` | `{language}` 会被替换为搜索所用的语言。你自己提供的 `baseUrl` 只有在其主机中不含 `{language}` 时，才免于私有网络检查。 |
 | `github` | `{ baseUrl: 'https://api.github.com' }` | `token` 可以提高速率限制（没有它时每分钟 10 次搜索），搜索代码也需要它。 |

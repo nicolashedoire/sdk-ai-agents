@@ -503,7 +503,7 @@ interface ModelCostLine {
 | `governedAgentTool(agent, options)` | `ToolDefinition` | `{ message, context? }` → `{ runId, status, output?, error? }` |
 | `assertSingleQuery(sql, 'sqlite' \| 'postgres')` | `string` | 数据库适配器所用的语句检查（仅支持 SQLite 和 PostgreSQL 语法） |
 | `webTools({ include?, prefix?, search?, circuitBreaker?, throttleWaitMs?, language?, userAgent?, timeoutMs?, callTimeoutMs?, maxResponseBytes?, maxRedirects?, hostIntervalMs?, robots?, allowPrivateNetwork?, lookup?, maxPdfBytes?, maxPdfPages?, cache?, retry?, arxiv?, wikipedia?, github? })` | `ToolDefinition[]` | `web_search`、`web_fetch`、`arxiv_search`、`wikipedia_search`、`github_search`，都是只读的（`web_fetch` 为中等风险，其他为低风险）。搜索结果为 `{ id, title, url, date?, excerpt, source }`；一个网页为 `{ url, finalUrl, title?, date?, language?, contentType, content, truncated, untrusted: true, hint? }`。除非设置了 `allowPrivateNetwork`，否则不访问公共互联网之外的任何地址；遵守 robots.txt；每次调用都在 `callTimeoutMs`（60 秒）之内完成。参见 [Web 调研](../guide/web-research) |
-| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | `SearchProvider` | `web_search` 的默认提供商，不需要密钥：读取 DuckDuckGo 的 HTML 页面，两次搜索之间间隔 1.5 秒 |
+| `duckDuckGo({ region?, minIntervalMs?, baseUrl? })` | `SearchProvider` | `web_search` 的默认提供商，不需要密钥：读取 DuckDuckGo 的 HTML 页面，两次搜索之间间隔 4 秒，从上一次搜索结束时算起 |
 | `searxng({ baseUrl, engines?, categories?, minIntervalMs? })` | `SearchProvider` | 一个 SearXNG 实例的 JSON API；结果名为 `searxng:<engine>`，日期取自 `publishedDate` |
 | `brave({ apiKey, baseUrl?, minIntervalMs? })`、`tavily(…)`、`serper(…)` | `SearchProvider` | Brave Search、Tavily 和 Serper 的 API，使用各自的密钥 |
 | `citableUrl(url)`、`normalizeUrl(url)` | `string \| undefined` | 搜索结果被引用时所用的 URL（去掉跟踪参数和片段），以及用于它的 id 和去重的 URL（另外把主机名改为小写，并去掉末尾的斜杠）；对于 http(s) 以外的任何地址返回 `undefined` |
@@ -525,7 +525,7 @@ interface ResourceProvider {
 }
 ```
 
-`web_search` 按顺序询问它的提供商；抛出错误的提供商会把请求交给下一个。抛出 `SearchThrottledError`（`retryAfterMs?`：它要求的等待时间）或以 HTTP 429 作答的提供商，会在这段等待时间或 `throttleWaitMs`（10 秒）之后再得到一次尝试的机会，最多等待 30 秒，前提是调用的时限还留有足够的时间；如果仍然被限流（或连续失败三次），它会在 `circuitBreaker.cooldownMs`（2 分钟）内被跳过。对一个主机的请求在整个进程中一次只发一个，每个请求都在上一个请求结束 `minIntervalMs` 之后发出（DuckDuckGo 默认为 4 秒）。Web 工具对它们有意拒绝的请求抛出 `WebRequestRefusedError`（`reason`：`private-address`、`scheme`、`downgrade`、`redirects`、`robots`、`content-type`、`too-large`、`unreadable`、`pacing`），对非 2xx 的应答抛出 `WebHttpError`（`status`），超时则抛出 `WebTimeoutError`（单个请求、调用的时限或提取的时间预算），缺少配置时抛出 `WebConfigurationError`（`unpdf`、GitHub 令牌），没有任何提供商作答时抛出 `SearchUnavailableError`（`failures`；全都被限流时有 `throttled`，被跳过的提供商何时会再被尝试由 `retryAfterMs?` 说明）。`retry` 从不重试被拒绝的请求、缺少的配置或没有任何提供商作答的搜索。
+`web_search` 按顺序询问它的提供商；抛出错误的提供商会把请求交给下一个。抛出 `SearchThrottledError`（`retryAfterMs?`：它要求的等待时间）或以 HTTP 429 作答的提供商，会在这段等待时间或 `throttleWaitMs`（10 秒）之后再得到一次尝试的机会，前提是调用的时限还留有足够的时间，而它要求等待超过 30 秒时则没有这次机会；如果仍然被限流（或连续失败三次），它会在 `circuitBreaker.cooldownMs`（2 分钟）内被跳过，如果它要求的时间更长，则在它要求的时间内被跳过。对一个主机的请求在整个进程中一次只发一个，每个请求都在上一个请求结束 `minIntervalMs` 之后发出（DuckDuckGo 默认为 4 秒）。Web 工具对它们有意拒绝的请求抛出 `WebRequestRefusedError`（`reason`：`private-address`、`scheme`、`downgrade`、`redirects`、`robots`、`content-type`、`too-large`、`unreadable`、`pacing`），对非 2xx 的应答抛出 `WebHttpError`（`status`），超时则抛出 `WebTimeoutError`（单个请求、调用的时限或提取的时间预算），缺少配置时抛出 `WebConfigurationError`（`unpdf`、GitHub 令牌），没有任何提供商作答时抛出 `SearchUnavailableError`（`failures`；全都被限流时有 `throttled`，被跳过的提供商何时会再被尝试由 `retryAfterMs?` 说明）。`retry` 从不重试被拒绝的请求、缺少的配置、没有任何提供商作答的搜索或限流（HTTP 429、`SearchThrottledError`）。
 
 ```ts
 interface SearchProvider {
