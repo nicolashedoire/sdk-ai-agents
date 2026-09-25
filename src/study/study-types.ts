@@ -377,8 +377,11 @@ export type StudyStopReason = 'maxModelCalls' | 'timeoutMs' | 'policy';
 
 export interface StudyPassageState {
   passage: StudyPassage;
-  /** `unchecked`: it has items the guardian did not judge yet. */
-  state: 'complete' | 'unchecked' | 'notRun';
+  /**
+   * `unchecked`: it has items the guardian did not judge yet. `partial`: its items were judged,
+   * but the run stopped before the passage ended (its redo, or the prior-art search of design).
+   */
+  state: 'complete' | 'partial' | 'unchecked' | 'notRun';
   /** Times it was generated in its last run: 2 when the guardian made it redo. */
   attempts: number;
   /** The passages that reopened it (loops). */
