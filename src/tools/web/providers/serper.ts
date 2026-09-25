@@ -8,6 +8,7 @@ import {
   type SearchProvider,
   trimBase,
 } from '../search-provider.js';
+import { retryAfterOf } from '../throttle.js';
 import { SearchThrottledError } from '../web-errors.js';
 import { type KeyedProviderOptions, requireKey } from './brave.js';
 import { listOf, text } from '../json-fields.js';
@@ -44,7 +45,7 @@ export function serper(options: KeyedProviderOptions): SearchProvider {
         ...(request.signal ? { signal: request.signal } : {}),
       });
       if (response.status === 429)
-        throw new SearchThrottledError('Serper is rate limited (HTTP 429)');
+        throw new SearchThrottledError('Serper is rate limited (HTTP 429)', retryAfterOf(response));
       ensureOk(response, 'Serper');
       return listOf(jsonBody(response, 'Serper'), 'organic').flatMap((entry): SearchHit[] => {
         const url = text(entry.link);

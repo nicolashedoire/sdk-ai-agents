@@ -10,13 +10,20 @@ import {
   trimBase,
 } from '../search-provider.js';
 import { SearchThrottledError } from '../web-errors.js';
+import { retryAfterOf } from '../throttle.js';
+
+/** Default least time between two DuckDuckGo searches, from the end of the previous one. */
+export const DUCKDUCKGO_INTERVAL_MS = 4_000;
 
 export interface DuckDuckGoOptions {
   /** Default `https://html.duckduckgo.com`. */
   baseUrl?: string;
   /** DuckDuckGo region (`kl`), e.g. `fr-fr`, `us-en`. Default: from the search language. */
   region?: string;
-  /** Least time between two searches. Default 1 500 ms: DuckDuckGo throttles faster callers. */
+  /**
+   * Least time between the end of one search and the start of the next. Default 4 000 ms:
+   * DuckDuckGo's HTML endpoint answers empty pages to callers much faster than that.
+   */
   minIntervalMs?: number;
 }
 
@@ -43,11 +50,13 @@ const REGIONS: Record<string, string> = {
 /**
  * DuckDuckGo's HTML endpoint: no key, no setup. It gives titles, snippets and, for some
  * results, a date. A captcha or "unusual traffic" page, or an empty page where results were
- * expected (after one retry), throws `SearchThrottledError`, so `web_search` moves on.
+ * expected (DuckDuckGo's way of throttling), throws `SearchThrottledError`: `web_search` waits
+ * and tries once more, then moves on. Queries are spaced by 4 s by default, from the end of
+ * the previous one: the HTML endpoint throttles callers that go faster.
  */
 export function duckDuckGo(options: DuckDuckGoOptions = {}): SearchProvider {
   const endpoint = `${trimBase(options.baseUrl ?? 'https://html.duckduckgo.com')}/html/`;
-  const minIntervalMs = options.minIntervalMs ?? 1_500;
+  const minIntervalMs = options.minIntervalMs ?? DUCKDUCKGO_INTERVAL_MS;
   return {
     name: 'duckduckgo',
     ...configuredOrigin(options.baseUrl),
@@ -59,34 +68,33 @@ export function duckDuckGo(options: DuckDuckGoOptions = {}): SearchProvider {
       const region = options.region ?? regionOf(request.language);
       if (region) form.set('kl', region);
       if (request.freshness) form.set('df', request.freshness.charAt(0));
-      // DuckDuckGo answers a throttled caller with an empty page: one more try, paced.
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const response = await web.request(endpoint, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/x-www-form-urlencoded',
-            accept: 'text/html',
-            ...(request.language ? { 'accept-language': request.language } : {}),
-          },
-          body: form.toString(),
-          minIntervalMs,
-          ...(request.signal ? { signal: request.signal } : {}),
-        });
-        if (response.status === 403 || response.status === 429) {
-          throw new SearchThrottledError(`DuckDuckGo refused the search (HTTP ${response.status})`);
-        }
-        ensureOk(response, 'DuckDuckGo');
-        const page = parseDuckDuckGoPage(bodyText(response));
-        if (page.results.length > 0) return page.results;
-        // "No results." first: the page echoes the query, which may say "captcha".
-        if (page.noResults) return [];
-        if (page.blocked) {
-          throw new SearchThrottledError(
-            'DuckDuckGo answered with a captcha page (unusual traffic)'
-          );
-        }
+      const response = await web.request(endpoint, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          accept: 'text/html',
+          ...(request.language ? { 'accept-language': request.language } : {}),
+        },
+        body: form.toString(),
+        minIntervalMs,
+        ...(request.signal ? { signal: request.signal } : {}),
+      });
+      if (response.status === 403 || response.status === 429) {
+        throw new SearchThrottledError(
+          `DuckDuckGo refused the search (HTTP ${response.status})`,
+          retryAfterOf(response)
+        );
       }
-      throw new SearchThrottledError('DuckDuckGo answered an empty page twice (throttled)');
+      ensureOk(response, 'DuckDuckGo');
+      const page = parseDuckDuckGoPage(bodyText(response));
+      if (page.results.length > 0) return page.results;
+      // "No results." first: the page echoes the query, which may say "captcha".
+      if (page.noResults) return [];
+      if (page.blocked) {
+        throw new SearchThrottledError('DuckDuckGo answered with a captcha page (unusual traffic)');
+      }
+      // An empty page where results were expected: DuckDuckGo's way of throttling.
+      throw new SearchThrottledError('DuckDuckGo answered an empty page (throttled)');
     },
   };
 }

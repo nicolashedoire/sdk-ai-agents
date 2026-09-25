@@ -50,7 +50,16 @@ export class WebTimeoutError extends Error {
  * skips this one for a while (its circuit breaker opens at once).
  */
 export class SearchThrottledError extends Error {
-  constructor(message: string) {
+  /** A throttle: the same search may work later. Read by studies to try again. */
+  readonly throttled = true;
+
+  /**
+   * @param retryAfterMs how long the service asked to wait (`Retry-After`), when it said
+   */
+  constructor(
+    message: string,
+    readonly retryAfterMs?: number
+  ) {
     super(message);
     this.name = 'SearchThrottledError';
   }
@@ -72,9 +81,16 @@ export class WebConfigurationError extends Error {
  * Not retried at once: the same providers would be skipped or fail again.
  */
 export class SearchUnavailableError extends Error {
+  /**
+   * @param throttled every provider was throttled, or skipped because it was: the same search
+   *   may work later
+   * @param retryAfterMs when a skipped provider will be tried again, if one was
+   */
   constructor(
     message: string,
-    readonly failures: Array<{ provider: string; message: string }>
+    readonly failures: Array<{ provider: string; message: string }>,
+    readonly throttled = false,
+    readonly retryAfterMs?: number
   ) {
     super(message);
     this.name = 'SearchUnavailableError';

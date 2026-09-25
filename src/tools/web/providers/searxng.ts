@@ -7,6 +7,7 @@ import {
   type SearchProvider,
   trimBase,
 } from '../search-provider.js';
+import { retryAfterOf } from '../throttle.js';
 import { SearchThrottledError, WebHttpError } from '../web-errors.js';
 import { listOf, text, valuesOf } from '../json-fields.js';
 
@@ -50,7 +51,10 @@ export function searxng(options: SearxngOptions): SearchProvider {
         ...(request.signal ? { signal: request.signal } : {}),
       });
       if (response.status === 429)
-        throw new SearchThrottledError('SearXNG is rate limited (HTTP 429)');
+        throw new SearchThrottledError(
+          'SearXNG is rate limited (HTTP 429)',
+          retryAfterOf(response)
+        );
       if (response.status === 403) {
         throw new WebHttpError(
           'SearXNG refused the JSON format (HTTP 403): enable `formats: [html, json]` in its settings.yml',
@@ -82,7 +86,8 @@ export function searxng(options: SearxngOptions): SearchProvider {
           .filter(Boolean);
         if (failed.length > 0) {
           throw new SearchThrottledError(
-            `SearXNG's engines did not answer ${quoteUntrusted(failed.join(', '))}`
+            `SearXNG's engines did not answer ${quoteUntrusted(failed.join(', '))}`,
+            retryAfterOf(response)
           );
         }
       }

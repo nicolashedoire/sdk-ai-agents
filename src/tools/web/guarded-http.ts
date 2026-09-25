@@ -6,7 +6,7 @@ import type { Readable } from 'node:stream';
 import zlib from 'node:zlib';
 import { quoteUntrusted } from './html-entities.js';
 import { nonPublicKind } from './ip-ranges.js';
-import type { HostPacer } from './politeness.js';
+import { HOST_PACER, type HostPacer } from './politeness.js';
 import { WebHttpError, WebRequestRefusedError, WebTimeoutError } from './web-errors.js';
 
 /** What a request through the web tools' HTTP client got back. */
@@ -67,7 +67,10 @@ export interface GuardedHttpOptions {
   maxRedirects: number;
   /** Default byte cap of a body. */
   maxBytes: number;
-  pacer: HostPacer;
+  /** Default: the process's own (`HOST_PACER`), shared by every `webTools()`. */
+  pacer?: HostPacer;
+  /** Longest wait for a host's turn, past its previous request. */
+  maxPacingWaitMs?: number;
   /**
    * Reach addresses that are not the public Internet: `true` for all of them, or a list of
    * hosts (`intranet.example`, `127.0.0.1:8080`). Off by default.
@@ -142,8 +145,21 @@ export class GuardedHttpClient implements WebClient {
       checkLiteralAddress(url, privateAllowed);
       const admitted = await init.admit?.(url);
       const interval = Math.max(init.minIntervalMs ?? 0, admitted?.minIntervalMs ?? 0);
-      if (scope.paced) await this.options.pacer.wait(url.host, interval, init.signal);
-      const answer = await this.send(url, method, headers, body, init, privateAllowed);
+      const release = scope.paced
+        ? await (this.options.pacer ?? HOST_PACER).acquire(
+            url.host,
+            interval,
+            this.options.maxPacingWaitMs ?? 30_000,
+            init.signal
+          )
+        : undefined;
+      let answer: { response: WebResponse; location?: string };
+      try {
+        answer = await this.send(url, method, headers, body, init, privateAllowed);
+      } finally {
+        // Paced from the end of this request: the next one to this host waits its interval.
+        release?.();
+      }
       if (answer.location === undefined) return answer.response;
       if (hop >= this.options.maxRedirects) {
         throw new WebRequestRefusedError(

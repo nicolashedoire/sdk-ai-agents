@@ -30,7 +30,8 @@ describe('web_search', () => {
   });
 
   function searchTool(options: WebToolsOptions): ToolDefinition {
-    const [tool] = webTools({ include: ['web_search'], cache: false, ...options });
+    // A throttled provider's second try comes after a short wait here (10 s by default).
+    const [tool] = webTools({ include: ['web_search'], cache: false, throttleWaitMs: 20, ...options });
     if (!tool) throw new Error('no web_search tool');
     return tool;
   }
@@ -158,10 +159,11 @@ describe('web_search', () => {
       expect(first.errors).toEqual([
         { provider: 'duckduckgo', message: 'DuckDuckGo answered with a captcha page (unusual traffic)' },
       ]);
-      // Its circuit breaker is open: skipped without a request.
+      // Tried twice (a throttle gets a second try); then its circuit breaker is open: skipped
+      // without a request.
       expect(second.provider).toBe('searxng');
       expect(second.errors?.[0]?.message).toMatch(/^skipped until .+ after: DuckDuckGo answered with a captcha page/);
-      expect(server.hits('/html/')).toHaveLength(1);
+      expect(server.hits('/html/')).toHaveLength(2);
     });
 
     it('tries a throttled provider again once its cooldown is over', async () => {
@@ -182,7 +184,7 @@ describe('web_search', () => {
       expect((await search(tool, { query: 'layout' })).provider).toBe('duckduckgo');
     });
 
-    it('retries an empty page once, paced, then hands over', async () => {
+    it('tries an empty page once more after a wait, paced, then hands over', async () => {
       const started: number[] = [];
       server.on('/html/', (request, response) => {
         started.push(Date.now());
@@ -197,7 +199,7 @@ describe('web_search', () => {
 
       expect(output.provider).toBe('searxng');
       expect(output.errors).toEqual([
-        { provider: 'duckduckgo', message: 'DuckDuckGo answered an empty page twice (throttled)' },
+        { provider: 'duckduckgo', message: 'DuckDuckGo answered an empty page (throttled)' },
       ]);
       expect(started).toHaveLength(2);
       expect((started[1] ?? 0) - (started[0] ?? 0)).toBeGreaterThanOrEqual(50);

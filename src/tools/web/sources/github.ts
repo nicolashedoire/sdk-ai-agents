@@ -3,7 +3,8 @@ import { quoteUntrusted, stripInvisible } from '../html-entities.js';
 import { isRecord, listOf, text } from '../json-fields.js';
 import { isoDate, oneLine } from '../results.js';
 import { trimBase } from '../search-provider.js';
-import { WebConfigurationError, WebHttpError } from '../web-errors.js';
+import { retryAfterOf } from '../throttle.js';
+import { SearchThrottledError, WebConfigurationError, WebHttpError } from '../web-errors.js';
 
 export interface GithubOptions {
   /** Default `https://api.github.com` (GitHub Enterprise: `https://<host>/api/v3`). */
@@ -94,9 +95,11 @@ function ensureGithubOk(response: WebResponse, withToken: boolean): void {
     const reset = Number(response.headers['x-ratelimit-reset']);
     const when =
       Number.isFinite(reset) && reset > 0 ? ` until ${new Date(reset * 1000).toISOString()}` : '';
-    throw new WebHttpError(
+    throw new SearchThrottledError(
       `GitHub's search rate limit is reached${when}${withToken ? '' : ': a token raises it (webTools({ github: { token } }))'}`,
-      429
+      Number.isFinite(reset) && reset > 0
+        ? Math.max(0, reset * 1000 - Date.now())
+        : retryAfterOf(response)
     );
   }
   throw new WebHttpError(

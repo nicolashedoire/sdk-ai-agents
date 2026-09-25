@@ -1,51 +1,95 @@
 import { WebRequestRefusedError } from './web-errors.js';
 
 /**
- * Spaces the requests to each host: a request starts at least `intervalMs` after the previous
- * one to the same host started. Concurrent calls queue in order. A wait longer than
- * `maxWaitMs` is refused rather than made (the host asked for more patience than a tool call
- * has).
+ * Spaces the requests to each host, one at a time: a request starts only once the previous
+ * one to the same host has finished, and `intervalMs` after it finished. A service that asks
+ * for "one request every 3 s, one connection at a time" (arXiv) gets exactly that, however
+ * slowly it answers. Concurrent callers queue in order; one that gives up leaves its turn to
+ * the next. A wait longer than `maxWaitMs`, past the previous request, is refused rather than
+ * made (the host asked for more patience than a tool call has).
  */
 export class HostPacer {
-  /** When the last request to each host was scheduled to start. */
-  private readonly last = new Map<string, number>();
+  /** Per host: when the last request queued finishes (its end time), and when that is known. */
+  private readonly hosts = new Map<string, { tail: Promise<number>; lastEnd: number }>();
 
-  constructor(private readonly maxWaitMs: number) {}
-
-  async wait(host: string, intervalMs: number, signal?: AbortSignal): Promise<void> {
-    const now = Date.now();
-    const previous = this.last.get(host);
-    const start = previous === undefined ? now : Math.max(now, previous + intervalMs);
-    const delay = start - now;
-    if (delay > this.maxWaitMs) {
-      throw new WebRequestRefusedError(
-        `${host} asks for ${Math.ceil(intervalMs / 1000)} s between requests: try again in ${Math.ceil(delay / 1000)} s`,
-        'pacing'
-      );
-    }
-    // The slot is taken before waiting, so the next caller queues behind it.
-    this.last.set(host, start);
-    this.forgetOld(now);
-    if (delay <= 0) return;
+  /**
+   * Waits for this host's turn. Call the function it gives once the request has finished
+   * (body read or failed): the next request is paced from that moment.
+   */
+  async acquire(
+    host: string,
+    intervalMs: number,
+    maxWaitMs: number,
+    signal?: AbortSignal
+  ): Promise<() => void> {
+    const state = this.hosts.get(host);
+    const previous = state?.tail ?? Promise.resolve(Number.NEGATIVE_INFINITY);
+    let finish: (end: number) => void = () => undefined;
+    const mine = new Promise<number>((resolve) => {
+      finish = resolve;
+    });
+    this.hosts.set(host, { tail: mine, lastEnd: state?.lastEnd ?? Number.NEGATIVE_INFINITY });
+    this.forgetOld();
     try {
-      await sleep(delay, signal);
-    } catch (error) {
-      // A caller that gives up frees its slot, unless someone has queued behind it since.
-      if (this.last.get(host) === start) {
-        if (previous === undefined) this.last.delete(host);
-        else this.last.set(host, previous);
+      const previousEnd = await untilAborted(previous, signal);
+      const delay = previousEnd + intervalMs - Date.now();
+      if (delay > maxWaitMs) {
+        throw new WebRequestRefusedError(
+          `${host} asks for ${Math.ceil(intervalMs / 1000)} s between requests: try again in ${Math.ceil(delay / 1000)} s`,
+          'pacing'
+        );
       }
+      if (delay > 0) await sleep(delay, signal);
+    } catch (error) {
+      // A caller that gives up passes its turn on: the next one is paced from the previous.
+      void previous.then(finish);
       throw error;
     }
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const end = Date.now();
+      const current = this.hosts.get(host);
+      if (current) current.lastEnd = end;
+      finish(end);
+    };
   }
 
   /** Hosts not asked for in a while are forgotten, so the map stays small. */
-  private forgetOld(now: number): void {
-    if (this.last.size < 1_000) return;
-    for (const [host, time] of this.last) {
-      if (now - time > 600_000) this.last.delete(host);
+  private forgetOld(): void {
+    if (this.hosts.size < 1_000) return;
+    const now = Date.now();
+    for (const [host, state] of this.hosts) {
+      if (now - state.lastEnd > 600_000) this.hosts.delete(host);
     }
   }
+}
+
+/**
+ * The pacer of the process: every `webTools()` shares it, so two sets of tools (an agent's and
+ * a study's) never go faster together than one would alone.
+ */
+export const HOST_PACER = new HostPacer();
+
+/** The promise's outcome, or the signal's reason as soon as it aborts. */
+function untilAborted<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(abortReason(signal));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(abortReason(signal));
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      }
+    );
+  });
 }
 
 /** Waits `ms`, or rejects as soon as `signal` aborts. */

@@ -8,6 +8,7 @@ import {
   type SearchProvider,
   trimBase,
 } from '../search-provider.js';
+import { retryAfterOf } from '../throttle.js';
 import { SearchThrottledError } from '../web-errors.js';
 import { listOf, text } from '../json-fields.js';
 
@@ -49,7 +50,7 @@ export function brave(options: KeyedProviderOptions): SearchProvider {
         ...(request.signal ? { signal: request.signal } : {}),
       });
       if (response.status === 429)
-        throw new SearchThrottledError('Brave is rate limited (HTTP 429)');
+        throw new SearchThrottledError('Brave is rate limited (HTTP 429)', retryAfterOf(response));
       ensureOk(response, 'Brave');
       const body = jsonBody(response, 'Brave');
       const web_ = typeof body === 'object' && body !== null ? Reflect.get(body, 'web') : undefined;

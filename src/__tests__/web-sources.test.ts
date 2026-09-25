@@ -23,7 +23,9 @@ describe('arxiv_search, wikipedia_search, github_search', () => {
   });
 
   function tool(name: string, options: WebToolsOptions = {}): ToolDefinition {
-    const found = webTools({ cache: false, ...options }).find((candidate) => candidate.name === name);
+    const found = webTools({ cache: false, throttleWaitMs: 20, ...options }).find(
+      (candidate) => candidate.name === name
+    );
     if (!found) throw new Error(`no ${name} tool`);
     return found;
   }
@@ -102,7 +104,7 @@ describe('arxiv_search, wikipedia_search, github_search', () => {
       server.on('/api/query', reply('Not Acceptable', { status: 406, type: 'text/plain' }));
 
       await expect(call('arxiv_search', { query: 'x' }, arxiv())).rejects.toThrow(
-        'arXiv refused the request (HTTP 406): it allows one request every 3 s; try again later'
+        'arXiv refused the request (HTTP 406): it allows one request every 3 s, one at a time; try again later'
       );
     });
 
