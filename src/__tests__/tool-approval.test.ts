@@ -211,4 +211,53 @@ describe('tools marked requiresApproval', () => {
     expect(executed).toEqual([]);
     expect(env.sdk.getPendingApprovals()).toEqual([]);
   }, 15_000);
+
+  it('refuses a call another policy forbids, without asking for an approval it could not honour', async () => {
+    env = createTestSDK();
+    const executed: string[] = [];
+    env.sdk.defineTool({
+      name: 'refund_order',
+      description: 'Refunds an order',
+      schema: z.object({ orderId: z.string() }),
+      handler: async ({ orderId }) => {
+        executed.push(orderId);
+        return { refunded: orderId };
+      },
+    });
+    const onRefund = {
+      type: 'condition' as const,
+      conditions: [
+        { field: 'intention.toolName', operator: 'in' as const, value: ['refund_order'] },
+      ],
+    };
+    env.sdk.defineGlobalPolicy({
+      id: 'approve-refunds',
+      type: 'custom',
+      scope: 'global',
+      enabled: true,
+      rules: [{ condition: onRefund, action: 'require_approval' }],
+    });
+    env.sdk.defineGlobalPolicy({
+      id: 'refunds-frozen',
+      type: 'custom',
+      scope: 'global',
+      enabled: true,
+      rules: [
+        {
+          condition: onRefund,
+          action: 'deny',
+          metadata: { validator: () => false, reason: 'Refunds are frozen' },
+        },
+      ],
+    });
+
+    const call = env.sdk.executeTool('refund_order', { orderId: 'o-9' });
+
+    // Before: the approval was asked, and once approved the refund ran, whatever the deny rule
+    // said. A refusal now wins: no approval is asked, and nothing runs.
+    await expect(within(call, 2_000)).rejects.toBeInstanceOf(PolicyViolationError);
+    await expect(call).rejects.toThrow('Refunds are frozen');
+    expect(env.sdk.getPendingApprovals()).toEqual([]);
+    expect(executed).toEqual([]);
+  });
 });

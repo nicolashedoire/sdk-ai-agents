@@ -191,7 +191,12 @@ export class PolicyEngine {
       }
     }
 
-    // If approval is required, return requiresApproval
+    // A refusal wins over an approval: a human cannot approve what another policy forbids (a
+    // deny rule, an allowlist, a budget). Only a call no policy refuses waits for approval.
+    if (violatedPolicies.length > 0) {
+      return this.createViolationResult(intention, policies, violatedPolicies, reasons);
+    }
+
     if (approvalRequiredPolicies.length > 0) {
       return {
         allowed: false,
@@ -201,11 +206,7 @@ export class PolicyEngine {
       };
     }
 
-    if (violatedPolicies.length === 0) {
-      return { allowed: true };
-    }
-
-    return this.createViolationResult(intention, policies, violatedPolicies, reasons);
+    return { allowed: true };
   }
 
   /**
