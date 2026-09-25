@@ -15,6 +15,7 @@ sdk-ai-agents/
 │   ├── mcp.ts                  # Entry point of @sdk-ai-agents/core/mcp
 │   ├── cognition/              # Cognitive agents: mental state, operations, controllers, profiles
 │   ├── decisions/              # Typed decisions (Jev client, DecisionService)
+│   ├── study/                  # Studies: charter, passages, guardian, claim statuses, dossier
 │   ├── engines/                # Reasoning, action, policy and replay engines
 │   ├── stores/                 # Event stores (file, SQLite, PostgreSQL)
 │   ├── providers/              # LLM providers (OpenAI, Anthropic, fallback)
@@ -145,6 +146,12 @@ sdk-ai-agents/
 **目的：** 認知エージェントです。明示的な心的状態、認知オペレーション、コントローラー、思考者プロファイルを扱います。
 
 **内容：** `cognitive-agent.ts`（実行ループ）、`operation-selector.ts`、`operation-performer.ts`、`cognitive-controller.ts`（ヒューリスティック）、`typed-decision-controller.ts`（Jev）、`hypothesis-assessor.ts`、`information-seeker.ts`、`llm-thought-generator.ts` と `thought-prompts.ts`、`mental-state.ts`（スキーマと型）、`mental-state-reducer.ts` と `hypothesis-transitions.ts`、`mental-state-replay.ts`、`thinker-profile.ts`、`profile-distiller.ts`、`create-cognitive-agent.ts`。
+
+### `src/study/` {#src-study}
+
+**目的：** 研究（`sdk.createStudy`）です。対象を理解し、それからどう設計し直すかを提案する研究者で、認知エンジンとは切り離されています。
+
+**内容：** `study.ts`（`Study` クラス：実行、監視役、追加指示、先行技術の検索）、`passages.ts`（7 つの工程、そのコレクションとスキーマ）、`study-config.ts`（設定、凍結された憲章とそのハッシュ）、`study-prompts.ts` と `study-replies.ts`（呼び出しのたびに組み立て直されるプロンプトと、スキーマと照らし合わせて読まれる応答）、`study-claims.ts`（コードでチェックされる主張の状態）、`study-sources.ts`（情報源、クエリのパラメーター、結果）、`study-model.ts` と `study-run.ts`（モデル呼び出し、制限、イベント）、`study-report.ts`、`study-markdown.ts`、`study-labels.ts`（レポートと、11 の言語の調査書）、`study-types.ts`。
 
 ### `src/decisions/`（v0.2） {#src-decisions-v0-2}
 

@@ -35,6 +35,11 @@ features:
     details: Ja, es kann nachahmen, wie jemand denkt. Erklären Sie einige Themen in Ihren eigenen Worten, und es destilliert daraus Ihre Aufmerksamkeitsreihenfolge, Ihre Prioritäten und Reflexe zu einem Profil, das in die Anweisungen jedes Denkschritts geschrieben wird. Jede Korrektur wird hinzugefügt, und Ihre Zustimmung zeigt, wie nah es herankommt.
     link: /de/guide/thinker-profiles
     linkText: Wie eine bestimmte Person denken
+  - icon: 🧭
+    title: Ein Forscher, der auf Kurs bleibt
+    details: Geben Sie ihm ein Objekt, das er verstehen und mit den Mitteln von heute neu entwerfen soll. Er durchsucht Ihre Quellen, unterscheidet belegte Fakten von Hypothesen und Neuheiten und schlägt die Experimente vor, die entscheiden würden – mit einer eingefrorenen Charta und einem Wächter, die ihn beim Ziel halten.
+    link: /de/guide/studies
+    linkText: Studien
   - icon: 🎯
     title: Typisierte Entscheidungen mit Jev
     details: Übergeben Sie beliebigen Kontext, stellen Sie Ja/Nein-, Einfach- oder Mehrfachauswahl- und Bewertungsfragen, und erhalten Sie kalibrierte Wahrscheinlichkeiten, auf die Ihr Code reagieren kann.
@@ -104,6 +109,7 @@ console.log(await sdk.getRunCost(runId));     // what it cost, per model
 | --- | --- | --- |
 | Nachdenken vor dem Antworten | Generierung in einem Durchgang | Hypothesen, Simulation und Kritik auf einem expliziten Zustand |
 | Wie eine bestimmte Person denken | Ein langer System-Prompt | Ein versioniertes Denkerprofil, verfeinert durch Feedback |
+| Forschung, die beim Ziel bleibt | Ein Chat, der abdriftet, je mehr sich die Anweisungen häufen | Eine Studie: eingefrorene Charta, bei jedem Aufruf neu gebaute Prompts, ein Wächter, anhand der Quellen geprüfte Behauptungen |
 | Schnelle, kalibrierte Entscheidungen | Freitext parsen | Typisierte Antworten mit Wahrscheinlichkeiten und Konfidenz (Jev) |
 | Unternehmens-Tools anbinden | Eigener Verbindungscode pro Tool | MCP-Server und -Client, kontrolliert durch Richtlinien |
 | Wissen, was passiert ist | Logs, falls vorhanden | Ereignisprotokoll, Replay, Rekonstruktion des mentalen Zustands |

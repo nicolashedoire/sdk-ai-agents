@@ -25,7 +25,7 @@
 | 가설 평가기 | `src/cognition/hypothesis-assessor.ts` | 타입 지정 결정을 이용한 `compare`: 증거는 사고자 없이 묻고, 적합도는 제안에 대해서만 묻습니다 |
 | 기록기와 팩토리 | `src/cognition/cognitive-run-recorder.ts`, `create-cognitive-agent.ts` | 인지 실행의 이벤트 형태, 설정과 SDK 서비스로부터의 에이전트 조립 |
 
-그 주변에는 `src/decisions`(타입 지정 결정, Jev 클라이언트, 결정 서비스), `src/costs`(가격과 실행 비용), `src/resilience`(재시도 정책과 재시도 프로바이더), `src/incidents`(규칙, 알림기, 모니터링되는 이벤트 저장소), `src/mcp`(서버와 클라이언트, `@sdk-ai-agents/core/mcp`로 게시됨)가 있습니다.
+그 주변에는 `src/decisions`(타입 지정 결정, Jev 클라이언트, 결정 서비스), `src/costs`(가격과 실행 비용), `src/resilience`(재시도 정책과 재시도 프로바이더), `src/incidents`(규칙, 알림기, 모니터링되는 이벤트 저장소), `src/mcp`(서버와 클라이언트, `@sdk-ai-agents/core/mcp`로 게시됨), `src/study`(프로바이더, 이벤트 저장소, 통제된 도구 실행, 비용은 재사용하지만 인지 엔진은 쓰지 않는 연구)가 있습니다.
 
 이 페이지의 나머지 부분은 통제형 런타임(v0.1)을 설명합니다.
 
@@ -282,7 +282,18 @@ type EventType =
   | 'cognition.evaluated'
   | 'cognition.feedback'
   | 'cognition.knowledge_recorded'
-  | 'decision.evaluated';
+  | 'decision.evaluated'
+  | 'study.started'
+  | 'study.passage_started'
+  | 'study.passage_completed'
+  | 'study.search'
+  | 'study.model_called'
+  | 'study.drift_rejected'
+  | 'study.amendment_accepted'
+  | 'study.amendment_refused'
+  | 'study.result_recorded'
+  | 'study.completed'
+  | 'study.failed';
 ```
 
 ### 이벤트 구조 {#event-structure}

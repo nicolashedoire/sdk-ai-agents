@@ -24,6 +24,7 @@ export const text: LocaleText = {
     'guide/memory': 'Memoria entre ejecuciones',
     'guide/thinker-profiles': 'Razonar como una persona concreta',
     'guide/governed-agents': 'Agentes gobernados',
+    'guide/studies': 'Estudios',
     'guide/typed-decisions': 'Decisiones tipadas (Jev)',
     'guide/mcp': 'MCP en palabras sencillas',
     'guide/mcp-first-server': 'Tu primer servidor MCP',

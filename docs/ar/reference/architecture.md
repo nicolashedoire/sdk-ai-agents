@@ -25,7 +25,7 @@
 | المقيِّمات التقديرية | `src/cognition/hypothesis-assessor.ts` | `compare` بالقرارات المُنمَّطة: يُسأل عن الأدلة دون المفكّر، ويُسأل عن الملاءمة للمقترحات فقط |
 | المُسجِّل والمصنع | `src/cognition/cognitive-run-recorder.ts`، `create-cognitive-agent.ts` | أشكال أحداث التشغيل المعرفي؛ وتجميع وكيل من إعداداته ومن خدمات حزمة SDK |
 
-وحول ذلك: `src/decisions` (القرارات المُنمَّطة، وعميل Jev، وخدمة القرارات)، و`src/costs` (التسعير وتكاليف التشغيل)، و`src/resilience` (سياسة إعادة المحاولة والمزوّد الذي يعيد المحاولة)، و`src/incidents` (القواعد، والمُبلِّغون، ومخزن الأحداث المراقَب)، و`src/mcp` (الخادم والعميل، منشورَين بوصفهما `@sdk-ai-agents/core/mcp`).
+وحول ذلك: `src/decisions` (القرارات المُنمَّطة، وعميل Jev، وخدمة القرارات)، و`src/costs` (التسعير وتكاليف التشغيل)، و`src/resilience` (سياسة إعادة المحاولة والمزوّد الذي يعيد المحاولة)، و`src/incidents` (القواعد، والمُبلِّغون، ومخزن الأحداث المراقَب)، و`src/mcp` (الخادم والعميل، منشورَين بوصفهما `@sdk-ai-agents/core/mcp`)، و`src/study` (الدراسات، التي تعيد استخدام المزوّدات، ومخزن الأحداث، والتنفيذ الخاضع للحوكمة للأدوات، والتكاليف، لكن لا تعيد استخدام المحرّك المعرفي).
 
 توثّق بقية هذه الصفحة بيئة التشغيل الخاضعة للحوكمة (v0.1).
 
@@ -282,7 +282,18 @@ type EventType =
   | 'cognition.evaluated'
   | 'cognition.feedback'
   | 'cognition.knowledge_recorded'
-  | 'decision.evaluated';
+  | 'decision.evaluated'
+  | 'study.started'
+  | 'study.passage_started'
+  | 'study.passage_completed'
+  | 'study.search'
+  | 'study.model_called'
+  | 'study.drift_rejected'
+  | 'study.amendment_accepted'
+  | 'study.amendment_refused'
+  | 'study.result_recorded'
+  | 'study.completed'
+  | 'study.failed';
 ```
 
 ### بنية الحدث {#event-structure}

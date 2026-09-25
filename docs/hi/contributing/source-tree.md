@@ -15,6 +15,7 @@ sdk-ai-agents/
 │   ├── mcp.ts                  # Entry point of @sdk-ai-agents/core/mcp
 │   ├── cognition/              # Cognitive agents: mental state, operations, controllers, profiles
 │   ├── decisions/              # Typed decisions (Jev client, DecisionService)
+│   ├── study/                  # Studies: charter, passages, guardian, claim statuses, dossier
 │   ├── engines/                # Reasoning, action, policy and replay engines
 │   ├── stores/                 # Event stores (file, SQLite, PostgreSQL)
 │   ├── providers/              # LLM providers (OpenAI, Anthropic, fallback)
@@ -145,6 +146,12 @@ sdk-ai-agents/
 **उद्देश्य:** संज्ञानात्मक एजेंट — स्पष्ट मानसिक स्थिति, संज्ञानात्मक ऑपरेशन, कंट्रोलर, विचारक प्रोफ़ाइल।
 
 **इसमें है:** `cognitive-agent.ts` (run का चक्र), `operation-selector.ts`, `operation-performer.ts`, `cognitive-controller.ts` (ह्यूरिस्टिक), `typed-decision-controller.ts` (Jev), `hypothesis-assessor.ts`, `information-seeker.ts`, `llm-thought-generator.ts` और `thought-prompts.ts`, `mental-state.ts` (स्कीमा और टाइप), `mental-state-reducer.ts` और `hypothesis-transitions.ts`, `mental-state-replay.ts`, `thinker-profile.ts`, `profile-distiller.ts`, `create-cognitive-agent.ts`।
+
+### `src/study/` {#src-study}
+
+**उद्देश्य:** अध्ययन (`sdk.createStudy`) — एक शोधकर्ता जो किसी वस्तु को समझता है, फिर उसे नए सिरे से डिज़ाइन करने का प्रस्ताव रखता है, संज्ञानात्मक इंजन से अलग।
+
+**इसमें है:** `study.ts` (`Study` class: runs, संरक्षक, संशोधन, पूर्व कार्य की खोज), `passages.ts` (सात चरण, उनके संग्रह और स्कीमा), `study-config.ts` (कॉन्फ़िगरेशन, फ़्रीज़ किया गया चार्टर और उसका hash), `study-prompts.ts` और `study-replies.ts` (हर कॉल पर नए सिरे से बने prompts, अपने स्कीमा के सामने पढ़े गए जवाब), `study-claims.ts` (कोड में जाँची गई दावों की स्थितियाँ), `study-sources.ts` (स्रोत, क्वेरी पैरामीटर, परिणाम), `study-model.ts` और `study-run.ts` (मॉडल कॉल, सीमाएँ, इवेंट), `study-report.ts`, `study-markdown.ts` और `study-labels.ts` (रिपोर्ट, और ग्यारह भाषाओं में डोज़ियर), `study-types.ts`।
 
 ### `src/decisions/` (v0.2) {#src-decisions-v0-2}
 

@@ -88,7 +88,7 @@ unsubscribe();
 
 | 位置 | 监听器收到什么 |
 | --- | --- |
-| `run({ onEvent })`、`think({ onEvent })` | 这次运行的每一个事件 |
+| `run({ onEvent })`、`think({ onEvent })`、`study.run({ onEvent })` | 这次运行的每一个事件 |
 | `replay(runId, modifications, { onEvent })` | 这次回放的每一个事件 |
 | `executeTool(name, params, { onEvent })` | 这次调用的事件，以及它的工具所启动的那次智能体运行的事件（`governedAgentTool`、`cognitiveAgentTool`），只跟随一层：不包括该智能体再启动的运行 |
 | `sdk.subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | 与过滤条件匹配的每一次运行的每一个事件，直到你调用它返回的函数为止 |

@@ -132,6 +132,161 @@ Veja [Evidências e verificação](../guide/evidence-and-verification).
 | `distillThinkerProfile({ id, name, samples, model })` | `Promise<ThinkerProfile>` |
 | `exportControllerDataset(runIds?)` | `Promise<string>` — JSON Lines |
 
+## Estudos {#studies}
+
+Um estudo é um pesquisador: ele entende um objeto, depois propõe como redesenhá-lo com os conhecimentos e as técnicas de hoje, e concebe os experimentos que permitiriam decidir. Veja [Estudos](../guide/studies).
+
+| Método | Devolve | |
+| --- | --- | --- |
+| `createStudy(config)` | `Study` | Verifica a configuração, resolve as fontes e congela a carta. Lança um `ValidationError` para uma configuração inválida, ou para uma fonte que não é uma ferramenta definida ou que não aceita nenhuma consulta em texto |
+
+### `StudyConfig` {#studyconfig}
+
+| Opção | Padrão | |
+| --- | --- | --- |
+| `name`, `object`, `objective` | — | Obrigatórios, não vazios. `name` é registrado com os eventos do estudo (`metadata.studyName`); o objetivo nunca muda: um novo objetivo é um novo estudo |
+| `question` | A pergunta norteadora do método e o alvo de uma nova capacidade, em `language` | A pergunta norteadora |
+| `needs`, `leads`, `analogues` | `[]` | Necessidades e critérios de hoje; as suas pistas, exemplos a verificar, cada uma recebendo um veredito; rupturas por montagem a desconstruir (`['Bitcoin']`) |
+| `scope` | `{ exclude: [] }` | O que está fora do escopo |
+| `capability` | — | A nova capacidade visada; sem ela, o estudo propõe candidatas |
+| `sources` | `[]` | Nomes das ferramentas do SDK com as quais o estudo pesquisa, definidas antes do estudo (por exemplo, as ferramentas de `connectMcpServer`); sem fontes, nada pode ser estabelecido |
+| `model` | O padrão do provedor | Modelo de todas as chamadas |
+| `llmProvider` | O provedor do SDK | Um provedor para este estudo |
+| `language` | `'en'` | Idioma dos textos e do dossiê, como uma tag de idioma (`fr`, `pt-BR`…) |
+| `limits` | Veja [`StudyLimits`](#studylimits) | Um limite omitido mantém o seu padrão |
+| `driftThreshold` | `1/3` (`DEFAULT_DRIFT_THRESHOLD`) | Parcela dos itens de uma passagem, de 0 a 1, que pode ser rejeitada antes que a passagem seja refeita uma vez |
+| `temperature`, `maxTokens` | `0.4`, — | Das passagens e dos pedidos de pesquisa; o guardião, as emendas e a verificação do estado da técnica rodam a 0 |
+
+A carta (`StudyCharter`) contém `object`, `question`, `objective`, `needs`, `leads`, `scope`, `capability` e `analogues`, sem as entradas repetidas das listas (sem diferenciar maiúsculas e minúsculas). Ela é congelada e o seu hash é calculado; `name` não faz parte dela.
+
+### `StudyLimits` {#studylimits}
+
+Por execução. `DEFAULT_STUDY_LIMITS` contém os padrões; um valor fora do intervalo lança um `ValidationError`.
+
+| Limite | Padrão | Intervalo | |
+| --- | --- | --- | --- |
+| `maxModelCalls` | 60 | 1 a 10 000 | Chamadas ao modelo, incluindo correções e verificações; quando atingido, a execução para (`stoppedBy: 'maxModelCalls'`) |
+| `maxSearches` | 20 | 0 a 10 000 | Pesquisas; depois de esgotado, a execução continua sem pesquisar (aviso `searchesSkipped`) |
+| `maxLoops` | 1 | 0 a 10 | Passagens anteriores que a execução pode reabrir |
+| `timeoutMs` | 1 200 000 (20 minutos) | 1 a 2 147 483 647 | Duração da execução; quando atingido, a execução é interrompida (`stoppedBy: 'timeoutMs'`) |
+| `maxResultsPerSearch` | 5 | 1 a 50 | Resultados guardados de uma pesquisa |
+
+### `Study` {#study}
+
+| Membro | |
+| --- | --- |
+| `id` | `study_…`, novo para cada estudo: o `metadata.agentId` dos seus eventos e o id de agente dos seus orçamentos e das suas chamadas de ferramenta |
+| `name`, `language`, `charter`, `charterHash` | O nome, o idioma, a `StudyCharter` congelada e o seu SHA-256 (hexadecimal), registrado em `study.started` e com cada emenda |
+| `amendments` | `StudyAmendment[]`: aceitas e recusadas, em ordem |
+| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`. Executa as passagens a partir da primeira que não está completa, ou a partir da primeira com `restart`. Um limite, uma política, um cancelamento ou um erro encerra a execução com o seu status e o relatório do que foi feito; ele só lança uma exceção para uma execução já em andamento, um `onEvent` que não pode ser atendido ou um armazenamento de eventos que falha. `onEvent` funciona como em `agent.run` |
+| `amend(text)` | `Promise<StudyAmendment>`. Classificada em relação à carta em uma execução própria (`mode: 'study-amendment'`); só `refines` é aceita, e aparece em todos os prompts seguintes |
+| `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`. Preenche os campos 10 e 11 de uma ficha e registra `study.result_recorded` na execução que a escreveu; um `ValidationError` para uma ficha desconhecida ou um `result` vazio |
+| `report()` | `StudyReport`: o relatório tal como está, incluindo os resultados registrados desde a última execução |
+
+`Study` e `StudyEnvironment` (o que um estudo usa do SDK: o seu provedor, armazenamento de eventos, eventos em tempo real, motor de políticas e ferramentas governadas) são exportados para configurações personalizadas.
+
+### `StudyResult` {#studyresult}
+
+`{ runId, status, stoppedBy?, error?, report, markdown }` — `status` é `completed`; `stopped` quando um limite ou uma política de orçamento ou de timeout encerrou a execução, com `stoppedBy` (`maxModelCalls`, `timeoutMs` ou `policy`); `failed` quando um erro a encerrou; ou `cancelled`. `error` é o `Error` que encerrou a execução, `report` o `StudyReport` no momento em que ela terminou, e `markdown` o mesmo como dossiê.
+
+### `StudyReport` {#studyreport}
+
+```ts
+interface StudyReport {
+  studyId: string;
+  name: string;
+  language: string;
+  charter: StudyCharter;
+  charterHash: string;
+  amendments: StudyAmendment[];
+  status: StudyStatus | 'notRun';
+  stoppedBy?: StudyStopReason;
+  error?: string;
+  notices: StudyNotice[];                       // { code, message, details? }
+  passages: StudyPassageState[];                // { passage, state, attempts, reopenedBy, runId? }
+  observations: StudyObservation[];             // O1…
+  pieces: StudyPiece[];                         // P1…
+  chain: StudyChainStage[];                     // C1…
+  threeStates: StudyPieceStates[];              // { piece, atItsTime, currentBest, proposal }
+  historicalChoices: StudyHistoricalChoice[];   // H1…
+  advances: StudyAdvance[];                     // V1…
+  leadVerdicts: StudyLeadVerdict[];             // L1…
+  unverifiedLeads: string[];
+  independentLeads: StudyIndependentLead[];     // I1…
+  references: StudyReference[];                 // R1…
+  analogues: StudyAnalogue[];                   // B1…
+  undeconstructedAnalogues: string[];
+  constraints: StudyConstraint[];               // K1…
+  revisableDecisions: StudyRevisableDecision[]; // D1…
+  combinations: StudyCombination[];             // X1…
+  capabilities: StudyCapability[];              // Y1…
+  architectures: StudyArchitecture[];           // A1…, capabilities first
+  noveltyClaims: StudyNoveltyClaim[];           // N1…
+  experiments: StudyExperiment[];               // E1…
+  cards: MechanismCard[];                       // M1…
+  results: StudySearchResult[];                 // S1…
+  searches: StudySearch[];
+  driftLog: StudyDriftEntry[];
+  stats: StudyStats;
+  runIds: string[];                             // runs and amendment runs, oldest first
+}
+
+interface StudyClaim {
+  id: string;
+  passage: StudyPassage;
+  statement: string;
+  status: 'established' | 'hypothesis' | 'novelty'; // after the study's checks
+  declaredStatus?: StudyClaimStatus;                // the model's, when the study changed it
+  statusReason?: string;
+  sources: string[];                                // results retrieved in this study
+  unretrievedSources?: string[];                    // cited, never retrieved: they support nothing
+  servesObjective: string;
+  toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
+  priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
+  unchecked?: boolean;                              // the guardian had not judged it when the run stopped
+  runId: string;
+}
+```
+
+Todo item é uma `StudyClaim` com campos próprios:
+
+| Tipo | Os seus próprios campos |
+| --- | --- |
+| `StudyObservation` | `kind` (`behaviour`, `use`, `variation`, `failure`), `conditions`, `era?` |
+| `StudyPiece` | `name`, `function`, `inputs`, `outputs`, `relations`, `unknowns`, `parent?` (a peça que ela detalha) |
+| `StudyChainStage` | `stage`, `pieces` |
+| `StudyHistoricalChoice` | `choice`, `piece?`, `factors` (`hardware`, `tools`, `uses`, `knowledge`, `costs`, `compatibility`, `other`), `era?` |
+| `StudyAdvance` | `mechanism`, `date?`, `domain` (`object` ou `other`), `field?`, `evidence`, `conditions`, `availability`, `piece?` |
+| `StudyLeadVerdict` | `lead` (como a carta a escreve), `verdict` (`relevant`, `partlyRelevant`, `notRelevant`), `reasons` |
+| `StudyIndependentLead` | `tool`, `kind` (`mathematical`, `technical`, `other`), `piece?` |
+| `StudyReference` | `name`, `piece?`, `date?` |
+| `StudyAnalogue` | `breakthrough`, `domain?`, `date?`, `components` (dois ou mais `{ name, date? }`), `liftedConstraint`, `capability`, `pattern` |
+| `StudyConstraint` | `constraint`, `state` (`remains`, `weakened`, `newRequirement`), `piece?` |
+| `StudyRevisableDecision` | `decision`, `because` (a condição que mudou), `opens` |
+| `StudyCombination` | `a`, `b`, `enables` (o que A permite a B fazer), `exchange`, `cost`, `changes` (`representation`, `distribution`, `responsibilities`) |
+| `StudyCapability` | `capability`, `forWhom`, `hardToday`, `principle?` |
+| `StudyArchitecture` | `name`, `kind` (`capability` ou `improvement`), `declaredKind?`, `capability` (`what`, `forWhom`, `liftedConstraint`), `principleChange?` (`principle`: `representation`, `distribution`, `responsibility`, `trust`, `verification` ou `other`; `change`), `mechanism`, `components` (`StudyComponent[]`: `name`, `statement`, `date?`, `status`, `declaredStatus?`, `statusReason?`, `sources`, `unretrievedSources?`), `assembly` (`component`, `gives`, `exchanges`, `cost`), `conditions`, `benefit`, `addedCost`, `counterexample`, `chain` (`stage`, `how`), `uncoveredStages` (etapas da cadeia completa que ela deixa de fora, conforme verificado pelo estudo), `predictions` |
+| `StudyThreeState` | `piece`, `state` (`atItsTime`, `currentBest`, `proposal`), `architecture?` |
+| `StudyNoveltyClaim` | `architecture?` |
+| `StudyExperiment` | `name`, `architectures`, `protocol`, `measures`, `criteria`, `expected` (`architecture`, `result`), `wholeChain` |
+| `MechanismCard` | Campos 1 a 9: `observation`, `mechanism`, `unknown`, `historicalChoice`, `evolution`, `newPossibility`, `proposedCombination`, `prediction`, `experiment`; campos 10 e 11 depois que você os registrou: `resultAndError?` (`result`, `error?`), `conclusionAndMemory?`, e `resultRecordedAt?` |
+
+As outras entradas do relatório não são afirmações:
+
+| Tipo | Campos |
+| --- | --- |
+| `StudyAmendment` | `number?` (somente as aceitas, a partir de 1), `text`, `verdict` (`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason`, `runId` |
+| `StudyDriftEntry` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason`, `by` (`guardian`: fora do objetivo; `schema`: recusado antes, por exemplo sem `servesObjective`), `attempt` (2 em uma passagem refeita), `runId` |
+| `StudySearchResult` | `id` (`S1`…, mantido quando o mesmo resultado é encontrado de novo), `title`, `locator` (uma URL ou outro localizador), `date?`, `excerpt`, `tool`, `query`, `runId` |
+| `StudySearch` | `passage`, `purpose` (`research` ou `priorArt`), `tool`, `query`, `servesObjective`, `claims?`, `resultIds`, `error?`, `skipped?` (`maxSearches`), `runId` |
+| `StudyPassageState` | `passage`, `state` (`complete`, `partial`: julgada, mas a execução parou antes do fim dela, `unchecked`: itens ainda não julgados, `notRun`), `attempts` (2 depois de ser refeita), `reopenedBy`, `runId?` |
+| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noCapability`, `noveltiesToVerify`), `message` (em inglês), `details?` |
+| `StudyStats` | `runs`, `modelCalls`, `searches`, `searchesSkipped`, `results`, `items`, `rejected`, `byStatus` (por status), `downgraded` (afirmações cujo status o estudo rebaixou), `noveltiesToVerify`, `redos`, `loops` — para todas as execuções do estudo |
+
+### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}
+
+Devolve o relatório como um dossiê Markdown legível, no idioma do relatório: o `markdown` de um `StudyResult`. Chame-a sobre `study.report()` para incluir os resultados registrados desde então. As suas palavras vêm de `studyLabels(language)` (`StudyLabels`), que existem nos onze idiomas desta documentação (`StudyLabelLanguage`); outro idioma, ou um idioma desconhecido, recebe as palavras em inglês, e `fr-CA` recebe as francesas.
+
 ## Decisões tipadas — `sdk.decisions` {#typed-decisions-—-sdk-decisions}
 
 Lança um `ValidationError` quando nenhum backend está configurado.
@@ -211,7 +366,7 @@ interface ModelCostLine {
 | `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | As mesmas diferenças como regressões, cada uma com uma gravidade e um impacto: `no_regression` ou `regressions_detected` |
 | `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | Faz o replay da execução e depois valida o replay. Um replay não chama nenhum modelo: compare-o com `validateAspects: ['tools', 'policies']` |
 
-As execuções são comparadas **pelo que os seus eventos significam**, nunca pelo id dos eventos (cada execução tem ids novos). Os eventos são emparelhados em ordem: primeiro os eventos idênticos, depois os do mesmo tipo e assunto (a ferramenta, a operação, a resposta) cujos dados mudaram, depois aqueles cujo tipo mudou para o mesmo assunto. Nunca são comparados: os ids dos eventos, os horários, os metadados, os eventos `incident.reported` (eles registram os envios e a limitação de alertas; o evento que provocou o incidente é comparado) e os valores que o SDK escreve e que mudam de uma execução para outra: a duração de uma chamada de ferramenta, o consumo de tokens, as esperas antes de novas tentativas, os ids de aprovação, a execução de origem de um replay, o horário e o evento de origem de uma observação. O texto que um modelo escreve junto a uma chamada de ferramenta só é comparado em `intention.generated`. Os parâmetros, o resultado e a entrada de uma ferramenta são sempre comparados, sejam quais forem os nomes das suas chaves: um argumento `duration` que passou de 30 para 60 é uma mudança. Uma execução que volta a fazer a mesma coisa passa; uma ferramenta chamada com outros argumentos é apontada onde a chamada aconteceu (`parameters.metric: "churn" → "revenue"`); uma chamada inserida antes de outra idêntica é uma única chamada acrescentada; um `action.executed` que virou `action.failed` é uma única mudança, não uma perda mais um acréscimo.
+As execuções são comparadas **pelo que os seus eventos significam**, nunca pelo id dos eventos (cada execução tem ids novos). Os eventos são emparelhados em ordem: primeiro os eventos idênticos, depois os do mesmo tipo e assunto (a ferramenta, a operação, a passagem de um estudo, a resposta) cujos dados mudaram, depois aqueles cujo tipo mudou para o mesmo assunto. Nunca são comparados: os ids dos eventos, os horários, os metadados, os eventos `incident.reported` (eles registram os envios e a limitação de alertas; o evento que provocou o incidente é comparado) e os valores que o SDK escreve e que mudam de uma execução para outra: a duração de uma chamada de ferramenta, o consumo de tokens, as esperas antes de novas tentativas, os ids de aprovação, a execução de origem de um replay, o horário e o evento de origem de uma observação. O texto que um modelo escreve junto a uma chamada de ferramenta só é comparado em `intention.generated`. Os parâmetros, o resultado e a entrada de uma ferramenta são sempre comparados, sejam quais forem os nomes das suas chaves: um argumento `duration` que passou de 30 para 60 é uma mudança. Uma execução que volta a fazer a mesma coisa passa; uma ferramenta chamada com outros argumentos é apontada onde a chamada aconteceu (`parameters.metric: "churn" → "revenue"`); uma chamada inserida antes de outra idêntica é uma única chamada acrescentada; um `action.executed` que virou `action.failed` é uma única mudança, não uma perda mais um acréscimo.
 
 | Opção | Para | |
 | --- | --- | --- |
@@ -286,6 +441,7 @@ Um listener é `(event: Event) => unknown`. Ele recebe um evento de cada vez, na
 | --- | --- |
 | `RunInput.onEvent`: `agent.run({ message, onEvent })` | Todos os eventos da execução; `run()` só se resolve quando o listener tiver sido concluído para cada um deles, ou antes, quando a execução foi interrompida ou cancelada ou quando `signal` é abortado (a inscrição do listener é então cancelada). O listener não é registrado |
 | `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | O mesmo para uma execução cognitiva, cujo `limits.timeoutMs` também encerra a espera |
+| `StudyRunOptions.onEvent`: `study.run({ onEvent })` | O mesmo para a execução de um estudo, cujo `limits.timeoutMs` também encerra a espera |
 | `replay(runId, modifications?, { onEvent })` | O mesmo para um replay, que não pode ser cancelado: ele sempre espera |
 | `executeTool(name, params, { onEvent })` | Os eventos da chamada, e os das execuções que a ferramenta chamada inicia, em um único nível: o handler recebe o listener como `context.onEvent`, que `governedAgentTool` e `cognitiveAgentTool` repassam ao agente deles (um agente construído à mão sobre um armazenamento sem eventos em tempo real é executado sem ele). `signal` encerra a espera |
 | `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: todos os eventos de todas as execuções que correspondem ao filtro (`agentId` é `metadata.agentId`), até você chamar a função devolvida, que descarta os eventos ainda não entregues. As execuções das suítes de regressão e os replays são execuções reais: o listener também recebe os eventos deles (uma suíte não guarda o `onEvent` nem o `onText` da sua entrada) |

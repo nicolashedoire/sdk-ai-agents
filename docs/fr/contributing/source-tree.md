@@ -15,6 +15,7 @@ sdk-ai-agents/
 │   ├── mcp.ts                  # Entry point of @sdk-ai-agents/core/mcp
 │   ├── cognition/              # Cognitive agents: mental state, operations, controllers, profiles
 │   ├── decisions/              # Typed decisions (Jev client, DecisionService)
+│   ├── study/                  # Studies: charter, passages, guardian, claim statuses, dossier
 │   ├── engines/                # Reasoning, action, policy and replay engines
 │   ├── stores/                 # Event stores (file, SQLite, PostgreSQL)
 │   ├── providers/              # LLM providers (OpenAI, Anthropic, fallback)
@@ -145,6 +146,12 @@ sdk-ai-agents/
 **Rôle :** les agents cognitifs — état mental explicite, opérations cognitives, contrôleurs, profils de penseur.
 
 **Contenu :** `cognitive-agent.ts` (boucle d'exécution), `operation-selector.ts`, `operation-performer.ts`, `cognitive-controller.ts` (heuristique), `typed-decision-controller.ts` (Jev), `hypothesis-assessor.ts`, `information-seeker.ts`, `llm-thought-generator.ts` et `thought-prompts.ts`, `mental-state.ts` (schémas et types), `mental-state-reducer.ts` et `hypothesis-transitions.ts`, `mental-state-replay.ts`, `thinker-profile.ts`, `profile-distiller.ts`, `create-cognitive-agent.ts`.
+
+### `src/study/` {#src-study}
+
+**Rôle :** les études (`sdk.createStudy`) — un chercheur qui comprend un objet, puis propose de le repenser, séparé du moteur cognitif.
+
+**Contenu :** `study.ts` (la classe `Study` : exécutions, gardien, amendements, recherche de l'existant), `passages.ts` (les sept passages, leurs collections et leurs schémas), `study-config.ts` (configuration, charte figée et son empreinte), `study-prompts.ts` et `study-replies.ts` (prompts reconstruits à chaque appel, réponses lues au regard de leurs schémas), `study-claims.ts` (statuts des affirmations vérifiés par le code), `study-sources.ts` (sources, paramètres de requête, résultats), `study-model.ts` et `study-run.ts` (appels au modèle, limites, événements), `study-report.ts`, `study-markdown.ts` et `study-labels.ts` (le rapport, et le dossier en onze langues), `study-types.ts`.
 
 ### `src/decisions/` (v0.2) {#src-decisions-v0-2}
 

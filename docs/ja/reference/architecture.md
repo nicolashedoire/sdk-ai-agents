@@ -25,7 +25,7 @@
 | アセッサー | `src/cognition/hypothesis-assessor.ts` | 型付き決定による `compare`：証拠については思考者のプロファイルなしで問い、適合度は提案についてだけ問う |
 | レコーダーとファクトリー | `src/cognition/cognitive-run-recorder.ts`、`create-cognitive-agent.ts` | 認知エージェントの実行が記録するイベントの形。設定と SDK のサービスからエージェントを組み立てる |
 
-その周りには、`src/decisions`（型付き決定、Jev クライアント、決定サービス）、`src/costs`（料金表と実行のコスト）、`src/resilience`（リトライポリシーと、リトライするプロバイダー）、`src/incidents`（ルール、通知手段、監視付きのイベントストア）、`src/mcp`（サーバーとクライアント。`@sdk-ai-agents/core/mcp` として公開）があります。
+その周りには、`src/decisions`（型付き決定、Jev クライアント、決定サービス）、`src/costs`（料金表と実行のコスト）、`src/resilience`（リトライポリシーと、リトライするプロバイダー）、`src/incidents`（ルール、通知手段、監視付きのイベントストア）、`src/mcp`（サーバーとクライアント。`@sdk-ai-agents/core/mcp` として公開）、`src/study`（研究。プロバイダー、イベントストア、ガバナンス付きのツール実行、コストを再利用するが、認知エンジンは使わない）があります。
 
 このページの残りの部分では、ガバナンス付きランタイム（v0.1）について説明します。
 
@@ -282,7 +282,18 @@ type EventType =
   | 'cognition.evaluated'
   | 'cognition.feedback'
   | 'cognition.knowledge_recorded'
-  | 'decision.evaluated';
+  | 'decision.evaluated'
+  | 'study.started'
+  | 'study.passage_started'
+  | 'study.passage_completed'
+  | 'study.search'
+  | 'study.model_called'
+  | 'study.drift_rejected'
+  | 'study.amendment_accepted'
+  | 'study.amendment_refused'
+  | 'study.result_recorded'
+  | 'study.completed'
+  | 'study.failed';
 ```
 
 ### イベントの構造 {#event-structure}

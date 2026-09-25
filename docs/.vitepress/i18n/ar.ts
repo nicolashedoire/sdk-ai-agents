@@ -24,6 +24,7 @@ export const text: LocaleText = {
     'guide/memory': 'الذاكرة عبر عمليات التشغيل',
     'guide/thinker-profiles': 'الاستدلال على طريقة شخص معيّن',
     'guide/governed-agents': 'الوكلاء الخاضعون للحوكمة',
+    'guide/studies': 'الدراسات',
     'guide/typed-decisions': 'القرارات المُنمَّطة (Jev)',
     'guide/mcp': 'MCP بكلمات بسيطة',
     'guide/mcp-first-server': 'أول خادم MCP لك',

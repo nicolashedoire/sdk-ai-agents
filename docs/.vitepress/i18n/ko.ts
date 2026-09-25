@@ -24,6 +24,7 @@ export const text: LocaleText = {
     'guide/memory': '실행 간 기억',
     'guide/thinker-profiles': '특정 인물처럼 추론하기',
     'guide/governed-agents': '통제형 에이전트',
+    'guide/studies': '연구',
     'guide/typed-decisions': '타입 지정 결정 (Jev)',
     'guide/mcp': '쉽게 풀어 쓴 MCP',
     'guide/mcp-first-server': '첫 번째 MCP 서버',

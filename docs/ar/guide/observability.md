@@ -88,7 +88,7 @@ unsubscribe();
 
 | أين | ما يتلقّاه المستمِع (listener) |
 | --- | --- |
-| `run({ onEvent })`، `think({ onEvent })` | كل حدث من أحداث ذلك التشغيل |
+| `run({ onEvent })`، `think({ onEvent })`، `study.run({ onEvent })` | كل حدث من أحداث ذلك التشغيل |
 | `replay(runId, modifications, { onEvent })` | كل حدث من أحداث إعادة التشغيل |
 | `executeTool(name, params, { onEvent })` | أحداث الاستدعاء، وأحداث تشغيل الوكيل الذي تبدؤه أداته (`governedAgentTool`، `cognitiveAgentTool`)، على مستوى واحد فقط: لا عمليات التشغيل التي يبدؤها ذلك الوكيل بدوره |
 | `sdk.subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | كل حدث من كل تشغيل يطابق المرشِّح، إلى أن تستدعي الدالة التي يعيدها |

@@ -25,7 +25,7 @@ Version 0.2 fügt über der unten beschriebenen kontrollierten Laufzeitumgebung 
 | Assessoren | `src/cognition/hypothesis-assessor.ts` | `compare` mit typisierten Entscheidungen: Belege ohne den Denker abgefragt, Passung nur für Vorschläge abgefragt |
 | Recorder & Factory | `src/cognition/cognitive-run-recorder.ts`, `create-cognitive-agent.ts` | Ereignisformen eines kognitiven Laufs; Zusammenbau eines Agenten aus seiner Konfiguration und den Diensten des SDK |
 
-Darum herum: `src/decisions` (typisierte Entscheidungen, Jev-Client, Entscheidungsdienst), `src/costs` (Preise und Laufkosten), `src/resilience` (Wiederholungsrichtlinie und wiederholender Anbieter), `src/incidents` (Regeln, Notifier, überwachter Ereignisspeicher) und `src/mcp` (Server und Client, veröffentlicht als `@sdk-ai-agents/core/mcp`).
+Darum herum: `src/decisions` (typisierte Entscheidungen, Jev-Client, Entscheidungsdienst), `src/costs` (Preise und Laufkosten), `src/resilience` (Wiederholungsrichtlinie und wiederholender Anbieter), `src/incidents` (Regeln, Notifier, überwachter Ereignisspeicher), `src/mcp` (Server und Client, veröffentlicht als `@sdk-ai-agents/core/mcp`) und `src/study` (Studien, die die Anbieter, den Ereignisspeicher, die kontrollierte Tool-Ausführung und die Kosten wiederverwenden, nicht aber die kognitive Engine).
 
 Der Rest dieser Seite dokumentiert die kontrollierte Laufzeitumgebung (v0.1).
 
@@ -282,7 +282,18 @@ type EventType =
   | 'cognition.evaluated'
   | 'cognition.feedback'
   | 'cognition.knowledge_recorded'
-  | 'decision.evaluated';
+  | 'decision.evaluated'
+  | 'study.started'
+  | 'study.passage_started'
+  | 'study.passage_completed'
+  | 'study.search'
+  | 'study.model_called'
+  | 'study.drift_rejected'
+  | 'study.amendment_accepted'
+  | 'study.amendment_refused'
+  | 'study.result_recorded'
+  | 'study.completed'
+  | 'study.failed';
 ```
 
 ### Struktur eines Ereignisses {#event-structure}

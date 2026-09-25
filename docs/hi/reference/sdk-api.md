@@ -132,6 +132,161 @@ interface OutcomeEvaluator {
 | `distillThinkerProfile({ id, name, samples, model })` | `Promise<ThinkerProfile>` |
 | `exportControllerDataset(runIds?)` | `Promise<string>` — JSON Lines |
 
+## अध्ययन {#studies}
+
+अध्ययन एक शोधकर्ता है: वह किसी वस्तु को समझता है, फिर आज के ज्ञान और तकनीकों से उसे नए सिरे से डिज़ाइन करने का प्रस्ताव रखता है, और वे प्रयोग डिज़ाइन करता है जो फ़ैसला करेंगे। देखें [अध्ययन](../guide/studies)।
+
+| Method | लौटाता है | |
+| --- | --- | --- |
+| `createStudy(config)` | `Study` | कॉन्फ़िगरेशन जाँचता है, स्रोतों की पहचान करता है और चार्टर को फ़्रीज़ करता है। गलत कॉन्फ़िगरेशन पर, या ऐसे स्रोत पर जो परिभाषित टूल नहीं है या कोई टेक्स्ट क्वेरी नहीं लेता, `ValidationError` फेंकता है |
+
+### `StudyConfig` {#studyconfig}
+
+| विकल्प | डिफ़ॉल्ट | |
+| --- | --- | --- |
+| `name`, `object`, `objective` | — | ज़रूरी, खाली नहीं। `name` अध्ययन के इवेंट्स के साथ दर्ज होता है (`metadata.studyName`); उद्देश्य कभी नहीं बदलता: नया उद्देश्य नया अध्ययन है |
+| `question` | `language` में पद्धति का मार्गदर्शक सवाल और क्षमता का लक्ष्य | मार्गदर्शक सवाल |
+| `needs`, `leads`, `analogues` | `[]` | आज की ज़रूरतें और मानदंड; आपके सुराग, जाँचे जाने वाले उदाहरण, जिनमें से हर एक पर फ़ैसला दिया जाता है; विखंडित की जाने वाली संयोजन से बनी सफलताएँ (`['Bitcoin']`) |
+| `scope` | `{ exclude: [] }` | क्या दायरे से बाहर है |
+| `capability` | — | लक्षित नई क्षमता; इसके बिना, अध्ययन संभावित क्षमताएँ प्रस्तावित करता है |
+| `sources` | `[]` | उन SDK टूल के नाम जिनसे अध्ययन खोजता है, जो अध्ययन से पहले परिभाषित हों (जैसे `connectMcpServer` के टूल); स्रोतों के बिना कुछ भी स्थापित नहीं हो सकता |
+| `model` | प्रदाता का डिफ़ॉल्ट | हर कॉल का मॉडल |
+| `llmProvider` | SDK का प्रदाता | इस अध्ययन के लिए एक प्रदाता |
+| `language` | `'en'` | टेक्स्ट और डोज़ियर की भाषा, एक language tag के रूप में (`fr`, `pt-BR`…) |
+| `limits` | देखें [`StudyLimits`](#studylimits) | जो सीमा छोड़ दी जाए, वह अपना डिफ़ॉल्ट रखती है |
+| `driftThreshold` | `1/3` (`DEFAULT_DRIFT_THRESHOLD`) | किसी चरण के आइटमों का वह हिस्सा, 0 से 1 तक, जिसे ठुकराया जा सकता है, इससे पहले कि चरण एक बार दोबारा किया जाए |
+| `temperature`, `maxTokens` | `0.4`, — | चरणों और खोज के अनुरोधों के लिए; संरक्षक, संशोधन और पूर्व कार्य की जाँच 0 पर चलते हैं |
+
+चार्टर (`StudyCharter`) में `object`, `question`, `objective`, `needs`, `leads`, `scope`, `capability` और `analogues` होते हैं, और सूचियों की दोहराई गई entries (अक्षर छोटे-बड़े का फ़र्क छोड़कर) हटा दी जाती हैं। यह फ़्रीज़ किया जाता है और इसका hash बनाया जाता है; `name` इसका हिस्सा नहीं है।
+
+### `StudyLimits` {#studylimits}
+
+हर run के लिए। `DEFAULT_STUDY_LIMITS` में डिफ़ॉल्ट होते हैं; मान्य सीमा से बाहर का मान `ValidationError` फेंकता है।
+
+| सीमा | डिफ़ॉल्ट | मान्य मान | |
+| --- | --- | --- | --- |
+| `maxModelCalls` | 60 | 1 से 10 000 | मॉडल कॉल, सुधार और जाँचें समेत; पहुँचने पर run रुक जाता है (`stoppedBy: 'maxModelCalls'`) |
+| `maxSearches` | 20 | 0 से 10 000 | खोजें; खत्म होने पर run बिना खोजे आगे बढ़ता है (सूचना `searchesSkipped`) |
+| `maxLoops` | 1 | 0 से 10 | पहले के वे चरण जिन्हें run दोबारा खोल सकता है |
+| `timeoutMs` | 1 200 000 (20 मिनट) | 1 से 2 147 483 647 | run की अवधि; पहुँचने पर run बीच में रोक (abort) दिया जाता है (`stoppedBy: 'timeoutMs'`) |
+| `maxResultsPerSearch` | 5 | 1 से 50 | एक खोज से रखे जाने वाले परिणाम |
+
+### `Study` {#study}
+
+| सदस्य | |
+| --- | --- |
+| `id` | `study_…`, हर अध्ययन के लिए नया: उसके इवेंट्स का `metadata.agentId`, और उसके बजट और टूल कॉल का एजेंट id |
+| `name`, `language`, `charter`, `charterHash` | नाम, भाषा, फ़्रीज़ किया गया `StudyCharter`, और उसका SHA-256 (hexadecimal), जो `study.started` में और हर संशोधन के साथ दर्ज होता है |
+| `amendments` | `StudyAmendment[]`: स्वीकार और अस्वीकार किए गए, क्रम से |
+| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`। पहले अधूरे चरण से चरण चलाता है, या `restart` के साथ पहले चरण से। कोई सीमा, नीति, रद्दीकरण या error run को उसकी स्थिति और अब तक किए गए काम की रिपोर्ट के साथ खत्म करता है; यह error सिर्फ़ तब फेंकता है जब कोई run पहले से चल रहा हो, `onEvent` सर्व न किया जा सके, या इवेंट स्टोर विफल हो। `onEvent` वैसे ही काम करता है जैसे `agent.run` के साथ |
+| `amend(text)` | `Promise<StudyAmendment>`। एक अलग run (`mode: 'study-amendment'`) में चार्टर के सामने वर्गीकृत किया जाता है; सिर्फ़ `refines` स्वीकार होता है, और वह बाद के हर prompt में दिखता है |
+| `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`। किसी कार्ड के फ़ील्ड 10 और 11 भरता है और उसे लिखने वाले run में `study.result_recorded` दर्ज करता है; अज्ञात कार्ड या खाली `result` पर `ValidationError` |
+| `report()` | `StudyReport`: रिपोर्ट अपनी मौजूदा हालत में, पिछले run के बाद दर्ज परिणामों समेत |
+
+`Study` और `StudyEnvironment` (अध्ययन SDK से जो इस्तेमाल करता है: उसका प्रदाता, इवेंट स्टोर, लाइव इवेंट, नीति इंजन और नियंत्रित टूल) कस्टम सेटअप के लिए export किए जाते हैं।
+
+### `StudyResult` {#studyresult}
+
+`{ runId, status, stoppedBy?, error?, report, markdown }` — `status` होता है `completed`; `stopped` जब किसी सीमा ने, या किसी बजट या timeout नीति ने run खत्म किया, `stoppedBy` (`maxModelCalls`, `timeoutMs` या `policy`) के साथ; `failed` जब किसी error ने उसे खत्म किया; या `cancelled`। `error` वह `Error` है जिसने run खत्म किया, `report` खत्म होने के समय का `StudyReport`, और `markdown` वही, डोज़ियर के रूप में।
+
+### `StudyReport` {#studyreport}
+
+```ts
+interface StudyReport {
+  studyId: string;
+  name: string;
+  language: string;
+  charter: StudyCharter;
+  charterHash: string;
+  amendments: StudyAmendment[];
+  status: StudyStatus | 'notRun';
+  stoppedBy?: StudyStopReason;
+  error?: string;
+  notices: StudyNotice[];                       // { code, message, details? }
+  passages: StudyPassageState[];                // { passage, state, attempts, reopenedBy, runId? }
+  observations: StudyObservation[];             // O1…
+  pieces: StudyPiece[];                         // P1…
+  chain: StudyChainStage[];                     // C1…
+  threeStates: StudyPieceStates[];              // { piece, atItsTime, currentBest, proposal }
+  historicalChoices: StudyHistoricalChoice[];   // H1…
+  advances: StudyAdvance[];                     // V1…
+  leadVerdicts: StudyLeadVerdict[];             // L1…
+  unverifiedLeads: string[];
+  independentLeads: StudyIndependentLead[];     // I1…
+  references: StudyReference[];                 // R1…
+  analogues: StudyAnalogue[];                   // B1…
+  undeconstructedAnalogues: string[];
+  constraints: StudyConstraint[];               // K1…
+  revisableDecisions: StudyRevisableDecision[]; // D1…
+  combinations: StudyCombination[];             // X1…
+  capabilities: StudyCapability[];              // Y1…
+  architectures: StudyArchitecture[];           // A1…, capabilities first
+  noveltyClaims: StudyNoveltyClaim[];           // N1…
+  experiments: StudyExperiment[];               // E1…
+  cards: MechanismCard[];                       // M1…
+  results: StudySearchResult[];                 // S1…
+  searches: StudySearch[];
+  driftLog: StudyDriftEntry[];
+  stats: StudyStats;
+  runIds: string[];                             // runs and amendment runs, oldest first
+}
+
+interface StudyClaim {
+  id: string;
+  passage: StudyPassage;
+  statement: string;
+  status: 'established' | 'hypothesis' | 'novelty'; // after the study's checks
+  declaredStatus?: StudyClaimStatus;                // the model's, when the study changed it
+  statusReason?: string;
+  sources: string[];                                // results retrieved in this study
+  unretrievedSources?: string[];                    // cited, never retrieved: they support nothing
+  servesObjective: string;
+  toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
+  priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
+  unchecked?: boolean;                              // the guardian had not judged it when the run stopped
+  runId: string;
+}
+```
+
+हर आइटम एक `StudyClaim` है, जिसके अपने फ़ील्ड भी होते हैं:
+
+| टाइप | उसके अपने फ़ील्ड |
+| --- | --- |
+| `StudyObservation` | `kind` (`behaviour`, `use`, `variation`, `failure`), `conditions`, `era?` |
+| `StudyPiece` | `name`, `function`, `inputs`, `outputs`, `relations`, `unknowns`, `parent?` (वह पुर्ज़ा जिसका यह विस्तार है) |
+| `StudyChainStage` | `stage`, `pieces` |
+| `StudyHistoricalChoice` | `choice`, `piece?`, `factors` (`hardware`, `tools`, `uses`, `knowledge`, `costs`, `compatibility`, `other`), `era?` |
+| `StudyAdvance` | `mechanism`, `date?`, `domain` (`object` या `other`), `field?`, `evidence`, `conditions`, `availability`, `piece?` |
+| `StudyLeadVerdict` | `lead` (जैसा चार्टर उसे लिखता है), `verdict` (`relevant`, `partlyRelevant`, `notRelevant`), `reasons` |
+| `StudyIndependentLead` | `tool`, `kind` (`mathematical`, `technical`, `other`), `piece?` |
+| `StudyReference` | `name`, `piece?`, `date?` |
+| `StudyAnalogue` | `breakthrough`, `domain?`, `date?`, `components` (दो या ज़्यादा `{ name, date? }`), `liftedConstraint`, `capability`, `pattern` |
+| `StudyConstraint` | `constraint`, `state` (`remains`, `weakened`, `newRequirement`), `piece?` |
+| `StudyRevisableDecision` | `decision`, `because` (वह शर्त जो बदली), `opens` |
+| `StudyCombination` | `a`, `b`, `enables` (A, B को क्या करने देता है), `exchange`, `cost`, `changes` (`representation`, `distribution`, `responsibilities`) |
+| `StudyCapability` | `capability`, `forWhom`, `hardToday`, `principle?` |
+| `StudyArchitecture` | `name`, `kind` (`capability` या `improvement`), `declaredKind?`, `capability` (`what`, `forWhom`, `liftedConstraint`), `principleChange?` (`principle`: `representation`, `distribution`, `responsibility`, `trust`, `verification` या `other`; `change`), `mechanism`, `components` (`StudyComponent[]`: `name`, `statement`, `date?`, `status`, `declaredStatus?`, `statusReason?`, `sources`, `unretrievedSources?`), `assembly` (`component`, `gives`, `exchanges`, `cost`), `conditions`, `benefit`, `addedCost`, `counterexample`, `chain` (`stage`, `how`), `uncoveredStages` (पूरी श्रृंखला की वे कड़ियाँ जिन्हें यह छोड़ देता है, जैसा अध्ययन ने जाँचा), `predictions` |
+| `StudyThreeState` | `piece`, `state` (`atItsTime`, `currentBest`, `proposal`), `architecture?` |
+| `StudyNoveltyClaim` | `architecture?` |
+| `StudyExperiment` | `name`, `architectures`, `protocol`, `measures`, `criteria`, `expected` (`architecture`, `result`), `wholeChain` |
+| `MechanismCard` | फ़ील्ड 1 से 9: `observation`, `mechanism`, `unknown`, `historicalChoice`, `evolution`, `newPossibility`, `proposedCombination`, `prediction`, `experiment`; फ़ील्ड 10 और 11, जब आप उन्हें दर्ज कर लें: `resultAndError?` (`result`, `error?`), `conclusionAndMemory?`, और `resultRecordedAt?` |
+
+रिपोर्ट की बाकी entries दावे नहीं हैं:
+
+| टाइप | फ़ील्ड |
+| --- | --- |
+| `StudyAmendment` | `number?` (सिर्फ़ स्वीकार किए गए, 1 से), `text`, `verdict` (`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason`, `runId` |
+| `StudyDriftEntry` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason`, `by` (`guardian`: उद्देश्य से भटका हुआ; `schema`: पहले ही ठुकराया गया, जैसे `servesObjective` के बिना), `attempt` (दोबारा करने पर 2), `runId` |
+| `StudySearchResult` | `id` (`S1`…, वही परिणाम दोबारा मिलने पर बना रहता है), `title`, `locator` (एक URL या कोई दूसरा पता), `date?`, `excerpt`, `tool`, `query`, `runId` |
+| `StudySearch` | `passage`, `purpose` (`research` या `priorArt`), `tool`, `query`, `servesObjective`, `claims?`, `resultIds`, `error?`, `skipped?` (`maxSearches`), `runId` |
+| `StudyPassageState` | `passage`, `state` (`complete`; `partial`: परखा गया पर run उसके अंत से पहले रुक गया; `unchecked`: आइटम अभी परखे नहीं गए; `notRun`), `attempts` (दोबारा करने के बाद 2), `reopenedBy`, `runId?` |
+| `StudyNotice` | `code` (`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noCapability`, `noveltiesToVerify`), `message` (अंग्रेज़ी में), `details?` |
+| `StudyStats` | `runs`, `modelCalls`, `searches`, `searchesSkipped`, `results`, `items`, `rejected`, `byStatus` (हर स्थिति के लिए), `downgraded` (वे दावे जिनकी स्थिति अध्ययन ने घटाई), `noveltiesToVerify`, `redos`, `loops` — अध्ययन के सभी runs के लिए |
+
+### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}
+
+रिपोर्ट को पढ़ने योग्य Markdown डोज़ियर के रूप में लौटाता है, रिपोर्ट की भाषा में: किसी `StudyResult` का `markdown`। तब से दर्ज परिणाम शामिल करने के लिए इसे `study.report()` पर कॉल करें। इसके शब्द `studyLabels(language)` (`StudyLabels`) से आते हैं, जो इस दस्तावेज़ की ग्यारह भाषाओं (`StudyLabelLanguage`) में मौजूद हैं; किसी दूसरी भाषा, या अज्ञात भाषा, को अंग्रेज़ी शब्द मिलते हैं, और `fr-CA` को फ़्रेंच शब्द।
+
 ## टाइप्ड निर्णय — `sdk.decisions` {#typed-decisions-—-sdk-decisions}
 
 कोई backend कॉन्फ़िगर न होने पर `ValidationError` फेंकता है।
@@ -211,7 +366,7 @@ interface ModelCostLine {
 | `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | वही अंतर रिग्रेशन के रूप में, हर एक की गंभीरता और असर के साथ: `no_regression` या `regressions_detected` |
 | `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | run को रीप्ले करता है, फिर रीप्ले को सत्यापित करता है। रीप्ले कोई मॉडल कॉल नहीं करता: उसकी तुलना `validateAspects: ['tools', 'policies']` के साथ करें |
 
-runs की तुलना **उनके इवेंट्स के अर्थ से** होती है, इवेंट id से कभी नहीं (हर run में नए id होते हैं)। इवेंट्स को क्रम से जोड़ा जाता है: पहले एक जैसे इवेंट्स, फिर एक ही प्रकार और विषय (टूल, ऑपरेशन, जवाब) वाले वे इवेंट्स जिनका डेटा बदला, फिर वे इवेंट्स जिनका प्रकार उसी विषय के लिए बदला। जिनकी तुलना कभी नहीं होती: इवेंट id, समय, metadata, `incident.reported` इवेंट्स (ये सूचनाएँ भेजने और उन पर रोक को दर्ज करते हैं; घटना शुरू करने वाले इवेंट की तुलना होती है), और वे मान जो SDK लिखता है और जो हर run में बदलते हैं: किसी टूल कॉल की अवधि, tokens का इस्तेमाल, दोबारा कोशिश से पहले का इंतज़ार, मंज़ूरी के id, वह run जिससे कोई रीप्ले आया, किसी observation का समय और स्रोत इवेंट। टूल कॉल के साथ मॉडल जो टेक्स्ट लिखता है, उसकी तुलना सिर्फ़ `intention.generated` में होती है। किसी टूल के पैरामीटर, नतीजे और इनपुट की तुलना हमेशा होती है, उनकी keys के नाम चाहे जो हों: 30 से 60 हुआ `duration` argument एक बदलाव है। वही काम दोबारा करने वाला run पास होता है; दूसरे arguments के साथ कॉल किया गया टूल वहीं बताया जाता है जहाँ कॉल हुई (`parameters.metric: "churn" → "revenue"`); किसी एक जैसी कॉल से पहले जोड़ी गई कॉल एक ही जोड़ी गई कॉल है; `action.executed` जो `action.failed` बन गया, वह एक ही बदलाव है, कोई कमी और एक जोड़ नहीं।
+runs की तुलना **उनके इवेंट्स के अर्थ से** होती है, इवेंट id से कभी नहीं (हर run में नए id होते हैं)। इवेंट्स को क्रम से जोड़ा जाता है: पहले एक जैसे इवेंट्स, फिर एक ही प्रकार और विषय (टूल, ऑपरेशन, अध्ययन का चरण, जवाब) वाले वे इवेंट्स जिनका डेटा बदला, फिर वे इवेंट्स जिनका प्रकार उसी विषय के लिए बदला। जिनकी तुलना कभी नहीं होती: इवेंट id, समय, metadata, `incident.reported` इवेंट्स (ये सूचनाएँ भेजने और उन पर रोक को दर्ज करते हैं; घटना शुरू करने वाले इवेंट की तुलना होती है), और वे मान जो SDK लिखता है और जो हर run में बदलते हैं: किसी टूल कॉल की अवधि, tokens का इस्तेमाल, दोबारा कोशिश से पहले का इंतज़ार, मंज़ूरी के id, वह run जिससे कोई रीप्ले आया, किसी observation का समय और स्रोत इवेंट। टूल कॉल के साथ मॉडल जो टेक्स्ट लिखता है, उसकी तुलना सिर्फ़ `intention.generated` में होती है। किसी टूल के पैरामीटर, नतीजे और इनपुट की तुलना हमेशा होती है, उनकी keys के नाम चाहे जो हों: 30 से 60 हुआ `duration` argument एक बदलाव है। वही काम दोबारा करने वाला run पास होता है; दूसरे arguments के साथ कॉल किया गया टूल वहीं बताया जाता है जहाँ कॉल हुई (`parameters.metric: "churn" → "revenue"`); किसी एक जैसी कॉल से पहले जोड़ी गई कॉल एक ही जोड़ी गई कॉल है; `action.executed` जो `action.failed` बन गया, वह एक ही बदलाव है, कोई कमी और एक जोड़ नहीं।
 
 | विकल्प | किसके लिए | |
 | --- | --- | --- |
@@ -286,6 +441,7 @@ runs की तुलना **उनके इवेंट्स के अर�
 | --- | --- |
 | `RunInput.onEvent`: `agent.run({ message, onEvent })` | run का हर इवेंट; `run()` तब resolve होता है जब listener उनमें से हर एक को निपटा चुका हो, या उससे पहले, जब run रोका या रद्द किया गया हो या `signal` abort हो (तब listener की सदस्यता खत्म कर दी जाती है)। listener दर्ज नहीं किया जाता |
 | `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | संज्ञानात्मक run के लिए भी यही, जिसका `limits.timeoutMs` भी इंतज़ार खत्म करता है |
+| `StudyRunOptions.onEvent`: `study.run({ onEvent })` | अध्ययन के run के लिए भी यही, जिसका `limits.timeoutMs` भी इंतज़ार खत्म करता है |
 | `replay(runId, modifications?, { onEvent })` | रीप्ले के लिए भी यही, जिसे रद्द नहीं किया जा सकता: वह हमेशा इंतज़ार करता है |
 | `executeTool(name, params, { onEvent })` | कॉल के इवेंट, और उसके टूल द्वारा शुरू किए गए runs के इवेंट, सिर्फ़ एक स्तर तक: handler को listener `context.onEvent` के रूप में मिलता है, जिसे `governedAgentTool` और `cognitiveAgentTool` अपने एजेंट को देते हैं (लाइव इवेंट के बिना वाले स्टोर पर हाथ से बनाया गया एजेंट इसके बिना चलता है)। `signal` इंतज़ार खत्म करता है |
 | `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: फ़िल्टर से मेल खाने वाले हर run का हर इवेंट (`agentId` का मतलब `metadata.agentId` है), जब तक आप लौटाया गया फ़ंक्शन कॉल नहीं करते, जो अभी तक न पहुँचाए गए इवेंट छोड़ देता है। रिग्रेशन सूट के run और रीप्ले असली run हैं: listener को उनके इवेंट भी मिलते हैं (सूट अपने इनपुट का `onEvent` या `onText` नहीं रखता) |

@@ -132,6 +132,161 @@ interface OutcomeEvaluator {
 | `distillThinkerProfile({ id, name, samples, model })` | `Promise<ThinkerProfile>` |
 | `exportControllerDataset(runIds?)` | `Promise<string>`——JSON Lines |
 
+## 研究 {#studies}
+
+研究是一位研究员：它先理解一个对象，再提出如何用今天的知识和技术重新设计它，并设计能做出裁决的实验。参见[研究](../guide/studies)。
+
+| 方法 | 返回值 | |
+| --- | --- | --- |
+| `createStudy(config)` | `Study` | 检查配置，解析来源并冻结章程。配置有误，或者某个来源不是已定义的工具或不接受文本查询时，抛出 `ValidationError` |
+
+### `StudyConfig` {#studyconfig}
+
+| 选项 | 默认值 | |
+| --- | --- | --- |
+| `name`、`object`、`objective` | — | 必需，不能为空。`name` 会随研究的事件一起记录（`metadata.studyName`）；目标永不改变：新的目标就是一项新的研究 |
+| `question` | 方法的指导性问题和对新能力的追求，使用 `language` 指定的语言 | 指导性问题 |
+| `needs`、`leads`、`analogues` | `[]` | 今天的需求和标准；你的线索，即有待核实的例子，每一条都会得到判定；要拆解的组装式突破（`['Bitcoin']`） |
+| `scope` | `{ exclude: [] }` | 超出范围的内容 |
+| `capability` | — | 所追求的新能力；没有它时，研究会提出候选能力 |
+| `sources` | `[]` | 研究用来搜索的 SDK 工具的名称，需在研究之前定义（例如 `connectMcpServer` 的工具）；没有来源就什么也无法确立 |
+| `model` | 提供商的默认模型 | 每次调用所用的模型 |
+| `llmProvider` | SDK 的提供商 | 这项研究专用的提供商 |
+| `language` | `'en'` | 文本和档案的语言，以语言标签表示（`fr`、`pt-BR`……） |
+| `limits` | 参见 [`StudyLimits`](#studylimits) | 省略的限制保留其默认值 |
+| `driftThreshold` | `1/3`（`DEFAULT_DRIFT_THRESHOLD`） | 一个环节的条目中可以被拒绝的比例，从 0 到 1，超过后该环节会重做一次 |
+| `temperature`、`maxTokens` | `0.4`、— | 用于环节和搜索请求；守护者、修正案和现有技术检查以 0 运行 |
+
+章程（`StudyCharter`）包含 `object`、`question`、`objective`、`needs`、`leads`、`scope`、`capability` 和 `analogues`，列表中重复的条目（不区分大小写）会被去掉。它被冻结并计算哈希；`name` 不属于章程。
+
+### `StudyLimits` {#studylimits}
+
+按运行计算。`DEFAULT_STUDY_LIMITS` 保存默认值；超出范围的值会抛出 `ValidationError`。
+
+| 限制 | 默认值 | 范围 | |
+| --- | --- | --- | --- |
+| `maxModelCalls` | 60 | 1 到 10 000 | 模型调用，包括修复和检查；达到时运行停止（`stoppedBy: 'maxModelCalls'`） |
+| `maxSearches` | 20 | 0 到 10 000 | 搜索次数；用完后运行在不搜索的情况下继续（提示 `searchesSkipped`） |
+| `maxLoops` | 1 | 0 到 10 | 运行可以重开的较早环节的次数 |
+| `timeoutMs` | 1 200 000（20 分钟） | 1 到 2 147 483 647 | 运行的时长；达到时运行被中止（`stoppedBy: 'timeoutMs'`） |
+| `maxResultsPerSearch` | 5 | 1 到 50 | 每次搜索保留的结果数 |
+
+### `Study` {#study}
+
+| 成员 | |
+| --- | --- |
+| `id` | `study_…`，每项研究都是新的：它的事件的 `metadata.agentId`，也是它的预算和工具调用所用的智能体 id |
+| `name`、`language`、`charter`、`charterHash` | 名称、语言、冻结的 `StudyCharter`，以及它的 SHA-256（十六进制），记录在 `study.started` 中，并随每条修正案一起记录 |
+| `amendments` | `StudyAmendment[]`：已接受和被拒绝的修正案，按顺序排列 |
+| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`。从第一个尚未完成的环节开始运行各环节，使用 `restart` 时则从第一个环节开始。限制、策略、取消或错误会以相应的状态和已完成内容的报告结束运行；它只在以下情况抛出异常：已有运行在进行中、无法提供 `onEvent`，或者事件存储出错。`onEvent` 的用法与 `agent.run` 相同 |
+| `amend(text)` | `Promise<StudyAmendment>`。在单独的运行中（`mode: 'study-amendment'`）对照章程进行分类；只有 `refines` 会被接受，并显示在此后的每个 prompt 中 |
+| `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`。填写卡片的第 10 和第 11 个字段，并在写出这张卡片的那次运行中记录 `study.result_recorded`；卡片未知或 `result` 为空时抛出 `ValidationError` |
+| `report()` | `StudyReport`：报告当前的样子，包括上次运行以来记录的结果 |
+
+`Study` 和 `StudyEnvironment`（研究从 SDK 中使用的东西：它的提供商、事件存储、实时事件、策略引擎和受治理的工具）都已导出，供自定义配置使用。
+
+### `StudyResult` {#studyresult}
+
+`{ runId, status, stoppedBy?, error?, report, markdown }`——`status` 为 `completed`；当某个限制、或者某个预算或超时策略结束了运行时为 `stopped`，并带有 `stoppedBy`（`maxModelCalls`、`timeoutMs` 或 `policy`）；当某个错误结束了运行时为 `failed`；或者为 `cancelled`。`error` 是结束运行的那个 `Error`，`report` 是运行结束时的 `StudyReport`，`markdown` 则是以档案形式呈现的同一份内容。
+
+### `StudyReport` {#studyreport}
+
+```ts
+interface StudyReport {
+  studyId: string;
+  name: string;
+  language: string;
+  charter: StudyCharter;
+  charterHash: string;
+  amendments: StudyAmendment[];
+  status: StudyStatus | 'notRun';
+  stoppedBy?: StudyStopReason;
+  error?: string;
+  notices: StudyNotice[];                       // { code, message, details? }
+  passages: StudyPassageState[];                // { passage, state, attempts, reopenedBy, runId? }
+  observations: StudyObservation[];             // O1…
+  pieces: StudyPiece[];                         // P1…
+  chain: StudyChainStage[];                     // C1…
+  threeStates: StudyPieceStates[];              // { piece, atItsTime, currentBest, proposal }
+  historicalChoices: StudyHistoricalChoice[];   // H1…
+  advances: StudyAdvance[];                     // V1…
+  leadVerdicts: StudyLeadVerdict[];             // L1…
+  unverifiedLeads: string[];
+  independentLeads: StudyIndependentLead[];     // I1…
+  references: StudyReference[];                 // R1…
+  analogues: StudyAnalogue[];                   // B1…
+  undeconstructedAnalogues: string[];
+  constraints: StudyConstraint[];               // K1…
+  revisableDecisions: StudyRevisableDecision[]; // D1…
+  combinations: StudyCombination[];             // X1…
+  capabilities: StudyCapability[];              // Y1…
+  architectures: StudyArchitecture[];           // A1…, capabilities first
+  noveltyClaims: StudyNoveltyClaim[];           // N1…
+  experiments: StudyExperiment[];               // E1…
+  cards: MechanismCard[];                       // M1…
+  results: StudySearchResult[];                 // S1…
+  searches: StudySearch[];
+  driftLog: StudyDriftEntry[];
+  stats: StudyStats;
+  runIds: string[];                             // runs and amendment runs, oldest first
+}
+
+interface StudyClaim {
+  id: string;
+  passage: StudyPassage;
+  statement: string;
+  status: 'established' | 'hypothesis' | 'novelty'; // after the study's checks
+  declaredStatus?: StudyClaimStatus;                // the model's, when the study changed it
+  statusReason?: string;
+  sources: string[];                                // results retrieved in this study
+  unretrievedSources?: string[];                    // cited, never retrieved: they support nothing
+  servesObjective: string;
+  toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
+  priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
+  unchecked?: boolean;                              // the guardian had not judged it when the run stopped
+  runId: string;
+}
+```
+
+每个条目都是一个 `StudyClaim`，并带有它自己的字段：
+
+| 类型 | 它自己的字段 |
+| --- | --- |
+| `StudyObservation` | `kind`（`behaviour`、`use`、`variation`、`failure`）、`conditions`、`era?` |
+| `StudyPiece` | `name`、`function`、`inputs`、`outputs`、`relations`、`unknowns`、`parent?`（它所细化的部件） |
+| `StudyChainStage` | `stage`、`pieces` |
+| `StudyHistoricalChoice` | `choice`、`piece?`、`factors`（`hardware`、`tools`、`uses`、`knowledge`、`costs`、`compatibility`、`other`）、`era?` |
+| `StudyAdvance` | `mechanism`、`date?`、`domain`（`object` 或 `other`）、`field?`、`evidence`、`conditions`、`availability`、`piece?` |
+| `StudyLeadVerdict` | `lead`（按章程中的写法）、`verdict`（`relevant`、`partlyRelevant`、`notRelevant`）、`reasons` |
+| `StudyIndependentLead` | `tool`、`kind`（`mathematical`、`technical`、`other`）、`piece?` |
+| `StudyReference` | `name`、`piece?`、`date?` |
+| `StudyAnalogue` | `breakthrough`、`domain?`、`date?`、`components`（两个或更多 `{ name, date? }`）、`liftedConstraint`、`capability`、`pattern` |
+| `StudyConstraint` | `constraint`、`state`（`remains`、`weakened`、`newRequirement`）、`piece?` |
+| `StudyRevisableDecision` | `decision`、`because`（改变了的条件）、`opens` |
+| `StudyCombination` | `a`、`b`、`enables`（A 让 B 能做什么）、`exchange`、`cost`、`changes`（`representation`、`distribution`、`responsibilities`） |
+| `StudyCapability` | `capability`、`forWhom`、`hardToday`、`principle?` |
+| `StudyArchitecture` | `name`、`kind`（`capability` 或 `improvement`）、`declaredKind?`、`capability`（`what`、`forWhom`、`liftedConstraint`）、`principleChange?`（`principle`：`representation`、`distribution`、`responsibility`、`trust`、`verification` 或 `other`；`change`）、`mechanism`、`components`（`StudyComponent[]`：`name`、`statement`、`date?`、`status`、`declaredStatus?`、`statusReason?`、`sources`、`unretrievedSources?`）、`assembly`（`component`、`gives`、`exchanges`、`cost`）、`conditions`、`benefit`、`addedCost`、`counterexample`、`chain`（`stage`、`how`）、`uncoveredStages`（经研究检查，它遗漏的完整链条阶段）、`predictions` |
+| `StudyThreeState` | `piece`、`state`（`atItsTime`、`currentBest`、`proposal`）、`architecture?` |
+| `StudyNoveltyClaim` | `architecture?` |
+| `StudyExperiment` | `name`、`architectures`、`protocol`、`measures`、`criteria`、`expected`（`architecture`、`result`）、`wholeChain` |
+| `MechanismCard` | 字段 1 到 9：`observation`、`mechanism`、`unknown`、`historicalChoice`、`evolution`、`newPossibility`、`proposedCombination`、`prediction`、`experiment`；你记录之后的字段 10 和 11：`resultAndError?`（`result`、`error?`）、`conclusionAndMemory?`，以及 `resultRecordedAt?` |
+
+报告的其他条目不是论断：
+
+| 类型 | 字段 |
+| --- | --- |
+| `StudyAmendment` | `number?`（仅限已接受的，从 1 开始）、`text`、`verdict`（`refines`、`conflicts`、`changesObjective`、`unclassified`）、`accepted`、`reason`、`runId` |
+| `StudyDriftEntry` | `passage`、`collection`、`item`（`id?`、`statement?`、`servesObjective?`）、`reason`、`by`（`guardian`：偏离目标；`schema`：在此之前就被拒绝，例如缺少 `servesObjective`）、`attempt`（重做时为 2）、`runId` |
+| `StudySearchResult` | `id`（`S1`……，再次找到同一结果时保持不变）、`title`、`locator`（URL 或其他定位符）、`date?`、`excerpt`、`tool`、`query`、`runId` |
+| `StudySearch` | `passage`、`purpose`（`research` 或 `priorArt`）、`tool`、`query`、`servesObjective`、`claims?`、`resultIds`、`error?`、`skipped?`（`maxSearches`）、`runId` |
+| `StudyPassageState` | `passage`、`state`（`complete`；`partial`：已评判，但运行在它结束之前停止了；`unchecked`：条目尚未评判；`notRun`）、`attempts`（重做后为 2）、`reopenedBy`、`runId?` |
+| `StudyNotice` | `code`（`noSources`、`stopped`、`failed`、`cancelled`、`passagesNotRun`、`uncheckedItems`、`searchesSkipped`、`leadsNotVerified`、`analoguesNotDeconstructed`、`noCapability`、`noveltiesToVerify`）、`message`（英文）、`details?` |
+| `StudyStats` | `runs`、`modelCalls`、`searches`、`searchesSkipped`、`results`、`items`、`rejected`、`byStatus`（按状态）、`downgraded`（被研究降低了状态的论断）、`noveltiesToVerify`、`redos`、`loops`——涵盖研究的所有运行 |
+
+### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}
+
+以可读的 Markdown 档案形式返回报告，使用报告的语言：即 `StudyResult` 的 `markdown`。对 `study.report()` 调用它，可以包含此后记录的结果。它的用语来自 `studyLabels(language)`（`StudyLabels`），有本文档的十一种语言版本（`StudyLabelLanguage`）；其他语言或未知语言会得到英文用语，`fr-CA` 会得到法语用语。
+
 ## 类型化决策——`sdk.decisions` {#typed-decisions-—-sdk-decisions}
 
 没有配置后端时抛出 `ValidationError`。
@@ -211,7 +366,7 @@ interface ModelCostLine {
 | `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | 把同样的差异作为回归返回，每个回归带有严重程度和影响：`no_regression` 或 `regressions_detected` |
 | `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | 回放这次运行，再验证回放。回放不调用任何模型：请用 `validateAspects: ['tools', 'policies']` 来比较 |
 
-运行按照**事件的含义**来比较，从不按事件 id 比较（每次运行的 id 都是新的）。事件依次配对：先是完全相同的事件，然后是类型和对象（工具、操作、回答）相同但数据改变的事件，最后是对象相同但类型改变的事件。从不比较的内容：事件 id、时间、元数据、`incident.reported` 事件（它们记录通知的发送和限流；引发事故的那个事件本身会被比较），以及由 SDK 写入、每次运行都会变化的值：工具调用的耗时、token 用量、重试前的等待时间、审批 id、回放所来自的运行、观察的时间和来源事件。模型在工具调用旁边写下的文字只在 `intention.generated` 中比较。工具的参数、结果和输入总是会被比较，无论其键名是什么：从 30 变成 60 的 `duration` 参数就是一处改变。再次做同样事情的运行会通过；用别的参数调用的工具会在调用发生的位置被报告（`parameters.metric: "churn" → "revenue"`）；插在一次相同调用之前的调用算作一次新增的调用；从 `action.executed` 变成 `action.failed` 算作一处改变，而不是一次丢失加一次新增。
+运行按照**事件的含义**来比较，从不按事件 id 比较（每次运行的 id 都是新的）。事件依次配对：先是完全相同的事件，然后是类型和对象（工具、操作、研究的环节、回答）相同但数据改变的事件，最后是对象相同但类型改变的事件。从不比较的内容：事件 id、时间、元数据、`incident.reported` 事件（它们记录通知的发送和限流；引发事故的那个事件本身会被比较），以及由 SDK 写入、每次运行都会变化的值：工具调用的耗时、token 用量、重试前的等待时间、审批 id、回放所来自的运行、观察的时间和来源事件。模型在工具调用旁边写下的文字只在 `intention.generated` 中比较。工具的参数、结果和输入总是会被比较，无论其键名是什么：从 30 变成 60 的 `duration` 参数就是一处改变。再次做同样事情的运行会通过；用别的参数调用的工具会在调用发生的位置被报告（`parameters.metric: "churn" → "revenue"`）；插在一次相同调用之前的调用算作一次新增的调用；从 `action.executed` 变成 `action.failed` 算作一处改变，而不是一次丢失加一次新增。
 
 | 选项 | 用于 | |
 | --- | --- | --- |
@@ -286,6 +441,7 @@ interface ModelCostLine {
 | --- | --- |
 | `RunInput.onEvent`：`agent.run({ message, onEvent })` | 这次运行的每一个事件；`run()` 会等到监听器处理完其中每一个事件之后才返回结果，而当运行被停止或被取消、或 `signal` 被中止时，会更早返回（此时监听器会被取消订阅）。监听器本身不会被记录 |
 | `ThinkInput.onEvent`：`agent.think({ problem, onEvent })` | 对认知运行同样如此，它的 `limits.timeoutMs` 也会结束这段等待 |
+| `StudyRunOptions.onEvent`：`study.run({ onEvent })` | 对研究的运行同样如此，它的 `limits.timeoutMs` 也会结束这段等待 |
 | `replay(runId, modifications?, { onEvent })` | 对回放同样如此，回放无法被取消：它总是会等待 |
 | `executeTool(name, params, { onEvent })` | 这次调用的事件，以及它的工具所启动的运行的事件，只跟随一层：处理函数以 `context.onEvent` 的形式得到监听器，`governedAgentTool` 和 `cognitiveAgentTool` 会把它传给它们的智能体（在没有实时事件的存储上手动构建的智能体会在没有它的情况下运行）。`signal` 会结束这段等待 |
 | `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`：与过滤条件匹配的每一次运行的每一个事件（`agentId` 即 `metadata.agentId`），直到你调用返回的函数为止；调用它时，尚未送达的事件会被丢弃。回归测试套件的运行和回放也是真实的运行，监听器同样会收到它们的事件（套件不会保存其输入中的 `onEvent` 和 `onText`） |

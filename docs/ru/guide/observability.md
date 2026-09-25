@@ -88,7 +88,7 @@ unsubscribe();
 
 | Где | Что получает слушатель |
 | --- | --- |
-| `run({ onEvent })`, `think({ onEvent })` | Каждое событие этого запуска |
+| `run({ onEvent })`, `think({ onEvent })`, `study.run({ onEvent })` | Каждое событие этого запуска |
 | `replay(runId, modifications, { onEvent })` | Каждое событие воспроизведения |
 | `executeTool(name, params, { onEvent })` | События вызова, а также запуска агента, который начинает его инструмент (`governedAgentTool`, `cognitiveAgentTool`), только на один уровень: без запусков, которые, в свою очередь, начинает этот агент |
 | `sdk.subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | Каждое событие каждого запуска, подходящего под фильтр, пока вы не вызовете функцию, которую он возвращает |

@@ -132,6 +132,161 @@ interface OutcomeEvaluator {
 | `distillThinkerProfile({ id, name, samples, model })` | `Promise<ThinkerProfile>` |
 | `exportControllerDataset(runIds?)` | `Promise<string>` — بصيغة JSON Lines |
 
+## الدراسات {#studies}
+
+الدراسة باحث: تفهم موضوعًا، ثم تقترح كيف يُعاد تصميمه بمعارف اليوم وتقنياته، وتصمّم التجارب التي من شأنها أن تحسم. انظر [الدراسات](../guide/studies).
+
+| الدالة | تعيد | |
+| --- | --- | --- |
+| `createStudy(config)` | `Study` | تتحقّق من الإعدادات، وتحدّد المصادر، وتجمّد الميثاق. وترمي `ValidationError` لإعدادات غير صالحة، أو لمصدر ليس أداة معرَّفة أو لا يقبل استعلامًا نصيًا |
+
+### `StudyConfig` {#studyconfig}
+
+| الخيار | القيمة الافتراضية | |
+| --- | --- | --- |
+| `name`، `object`، `objective` | — | مطلوبة، وغير فارغة. يُسجَّل `name` مع أحداث الدراسة (`metadata.studyName`)؛ والهدف لا يتغيّر أبدًا: الهدف الجديد دراسة جديدة |
+| `question` | السؤال الموجِّه للمنهج وغاية القدرة، بلغة `language` | السؤال الموجِّه |
+| `needs`، `leads`، `analogues` | `[]` | احتياجات اليوم ومعاييره؛ وخيوطك، وهي أمثلة يجب التحقّق منها، ويحصل كلٌّ منها على حكم؛ والاختراقات بالتركيب المطلوب تفكيكها (`['Bitcoin']`) |
+| `scope` | `{ exclude: [] }` | ما هو خارج النطاق |
+| `capability` | — | القدرة الجديدة المستهدفة؛ ومن دونها، تقترح الدراسة قدرات مرشّحة |
+| `sources` | `[]` | أسماء أدوات SDK التي تبحث بها الدراسة، مُعرَّفة قبل الدراسة (مثل أدوات `connectMcpServer`)؛ ومن دون مصادر لا يمكن إثبات شيء |
+| `model` | النموذج الافتراضي للمزوّد | نموذج كل استدعاء |
+| `llmProvider` | مزوّد حزمة SDK | مزوّد لهذه الدراسة |
+| `language` | `'en'` | لغة النصوص والملف البحثي، في صورة وسم لغة (`fr`، `pt-BR`…) |
+| `limits` | انظر [`StudyLimits`](#studylimits) | الحدّ الذي يُغفَل يحتفظ بقيمته الافتراضية |
+| `driftThreshold` | `1/3` (`DEFAULT_DRIFT_THRESHOLD`) | حصة عناصر المرحلة، من 0 إلى 1، التي يجوز رفضها قبل أن تُعاد المرحلة مرة واحدة |
+| `temperature`، `maxTokens` | `0.4`، — | للمراحل وطلبات البحث؛ أما الحارس، والتعديلات، وفحص الأعمال السابقة فتعمل بـ 0 |
+
+يحتوي الميثاق (`StudyCharter`) على `object`، و`question`، و`objective`، و`needs`، و`leads`، و`scope`، و`capability`، و`analogues`، مع حذف مدخلات القوائم المكرَّرة (بصرف النظر عن حالة الأحرف). وهو مُجمَّد وتُحسَب بصمته؛ و`name` ليس جزءًا منه.
+
+### `StudyLimits` {#studylimits}
+
+لكل تشغيل. يحتوي `DEFAULT_STUDY_LIMITS` على القيم الافتراضية؛ والقيمة الخارجة عن المدى ترمي `ValidationError`.
+
+| الحدّ | القيمة الافتراضية | المدى | |
+| --- | --- | --- | --- |
+| `maxModelCalls` | 60 | من 1 إلى 10 000 | استدعاءات النموذج، بما فيها الإصلاحات والفحوص؛ وحين يُبلَغ، يتوقّف التشغيل (`stoppedBy: 'maxModelCalls'`) |
+| `maxSearches` | 20 | من 0 إلى 10 000 | عمليات البحث؛ وما إن تُستنفَد حتى يمضي التشغيل دون بحث (الإشعار `searchesSkipped`) |
+| `maxLoops` | 1 | من 0 إلى 10 | المراحل السابقة التي يجوز للتشغيل إعادة فتحها |
+| `timeoutMs` | 1 200 000 (20 دقيقة) | من 1 إلى 2 147 483 647 | مدة التشغيل؛ وحين تُبلَغ، يُلغى التشغيل (`stoppedBy: 'timeoutMs'`) |
+| `maxResultsPerSearch` | 5 | من 1 إلى 50 | النتائج المحتفَظ بها من بحث واحد |
+
+### `Study` {#study}
+
+| العضو | |
+| --- | --- |
+| `id` | `study_…`، جديد لكل دراسة: `metadata.agentId` لأحداثها، ومعرّف الوكيل لميزانياتها واستدعاءات أدواتها |
+| `name`، `language`، `charter`، `charterHash` | الاسم، واللغة، و`StudyCharter` المُجمَّد، وبصمته SHA-256 (بالنظام الست عشري)، المسجَّلة في `study.started` ومع كل تعديل |
+| `amendments` | `StudyAmendment[]`: المقبولة والمرفوضة، بالترتيب |
+| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`. يشغّل المراحل بدءًا من أول مرحلة غير مكتملة، أو من الأولى مع `restart`. ينهي الحدُّ أو السياسةُ أو الإلغاءُ أو الخطأُ التشغيلَ بحالته وبتقرير ما أُنجِز؛ ولا يرمي إلا لتشغيل جارٍ بالفعل، أو لـ `onEvent` يتعذّر تقديمه، أو لمخزن أحداث يفشل. ويعمل `onEvent` كما مع `agent.run` |
+| `amend(text)` | `Promise<StudyAmendment>`. يُصنَّف مقابل الميثاق في تشغيل خاص به (`mode: 'study-amendment'`)؛ ولا يُقبَل إلا `refines`، ويظهر في كل موجّه لاحق |
+| `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`. يملأ الحقلين 10 و11 من بطاقة ويسجّل `study.result_recorded` في التشغيل الذي كتبها؛ و`ValidationError` لبطاقة مجهولة أو لـ `result` فارغ |
+| `report()` | `StudyReport`: التقرير كما هو الآن، بما فيه النتائج المسجَّلة منذ آخر تشغيل |
+
+يُصدَّر `Study` و`StudyEnvironment` (ما تستخدمه الدراسة من حزمة SDK: مزوّدها، ومخزن أحداثها، وأحداثها المباشرة، ومحرّك سياساتها، وأدواتها الخاضعة للحوكمة) لعمليات الإعداد المخصّصة.
+
+### `StudyResult` {#studyresult}
+
+`{ runId, status, stoppedBy?, error?, report, markdown }` — قيمة `status` هي `completed`؛ أو `stopped` حين يُنهي التشغيلَ حدٌّ أو سياسةُ ميزانية أو مهلة زمنية، مع `stoppedBy` (`maxModelCalls` أو `timeoutMs` أو `policy`)؛ أو `failed` حين يُنهيه خطأ؛ أو `cancelled`. و`error` هو `Error` الذي أنهى التشغيل، و`report` هو `StudyReport` عند انتهائه، و`markdown` الشيء نفسه في صورة ملف بحثي.
+
+### `StudyReport` {#studyreport}
+
+```ts
+interface StudyReport {
+  studyId: string;
+  name: string;
+  language: string;
+  charter: StudyCharter;
+  charterHash: string;
+  amendments: StudyAmendment[];
+  status: StudyStatus | 'notRun';
+  stoppedBy?: StudyStopReason;
+  error?: string;
+  notices: StudyNotice[];                       // { code, message, details? }
+  passages: StudyPassageState[];                // { passage, state, attempts, reopenedBy, runId? }
+  observations: StudyObservation[];             // O1…
+  pieces: StudyPiece[];                         // P1…
+  chain: StudyChainStage[];                     // C1…
+  threeStates: StudyPieceStates[];              // { piece, atItsTime, currentBest, proposal }
+  historicalChoices: StudyHistoricalChoice[];   // H1…
+  advances: StudyAdvance[];                     // V1…
+  leadVerdicts: StudyLeadVerdict[];             // L1…
+  unverifiedLeads: string[];
+  independentLeads: StudyIndependentLead[];     // I1…
+  references: StudyReference[];                 // R1…
+  analogues: StudyAnalogue[];                   // B1…
+  undeconstructedAnalogues: string[];
+  constraints: StudyConstraint[];               // K1…
+  revisableDecisions: StudyRevisableDecision[]; // D1…
+  combinations: StudyCombination[];             // X1…
+  capabilities: StudyCapability[];              // Y1…
+  architectures: StudyArchitecture[];           // A1…, capabilities first
+  noveltyClaims: StudyNoveltyClaim[];           // N1…
+  experiments: StudyExperiment[];               // E1…
+  cards: MechanismCard[];                       // M1…
+  results: StudySearchResult[];                 // S1…
+  searches: StudySearch[];
+  driftLog: StudyDriftEntry[];
+  stats: StudyStats;
+  runIds: string[];                             // runs and amendment runs, oldest first
+}
+
+interface StudyClaim {
+  id: string;
+  passage: StudyPassage;
+  statement: string;
+  status: 'established' | 'hypothesis' | 'novelty'; // after the study's checks
+  declaredStatus?: StudyClaimStatus;                // the model's, when the study changed it
+  statusReason?: string;
+  sources: string[];                                // results retrieved in this study
+  unretrievedSources?: string[];                    // cited, never retrieved: they support nothing
+  servesObjective: string;
+  toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
+  priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
+  unchecked?: boolean;                              // the guardian had not judged it when the run stopped
+  runId: string;
+}
+```
+
+كل عنصر `StudyClaim` له حقوله الخاصة:
+
+| النوع | حقوله الخاصة |
+| --- | --- |
+| `StudyObservation` | `kind` (`behaviour`، `use`، `variation`، `failure`)، و`conditions`، و`era?` |
+| `StudyPiece` | `name`، و`function`، و`inputs`، و`outputs`، و`relations`، و`unknowns`، و`parent?` (الجزء الذي يفصّله) |
+| `StudyChainStage` | `stage`، و`pieces` |
+| `StudyHistoricalChoice` | `choice`، و`piece?`، و`factors` (`hardware`، `tools`، `uses`، `knowledge`، `costs`، `compatibility`، `other`)، و`era?` |
+| `StudyAdvance` | `mechanism`، و`date?`، و`domain` (`object` أو `other`)، و`field?`، و`evidence`، و`conditions`، و`availability`، و`piece?` |
+| `StudyLeadVerdict` | `lead` (كما يكتبه الميثاق)، و`verdict` (`relevant`، `partlyRelevant`، `notRelevant`)، و`reasons` |
+| `StudyIndependentLead` | `tool`، و`kind` (`mathematical`، `technical`، `other`)، و`piece?` |
+| `StudyReference` | `name`، و`piece?`، و`date?` |
+| `StudyAnalogue` | `breakthrough`، و`domain?`، و`date?`، و`components` (اثنان أو أكثر من `{ name, date? }`)، و`liftedConstraint`، و`capability`، و`pattern` |
+| `StudyConstraint` | `constraint`، و`state` (`remains`، `weakened`، `newRequirement`)، و`piece?` |
+| `StudyRevisableDecision` | `decision`، و`because` (الشرط الذي تغيّر)، و`opens` |
+| `StudyCombination` | `a`، و`b`، و`enables` (ما يتيحه A لـ B)، و`exchange`، و`cost`، و`changes` (`representation`، `distribution`، `responsibilities`) |
+| `StudyCapability` | `capability`، و`forWhom`، و`hardToday`، و`principle?` |
+| `StudyArchitecture` | `name`، و`kind` (`capability` أو `improvement`)، و`declaredKind?`، و`capability` (`what`، `forWhom`، `liftedConstraint`)، و`principleChange?` (`principle`: `representation` أو `distribution` أو `responsibility` أو `trust` أو `verification` أو `other`؛ `change`)، و`mechanism`، و`components` (`StudyComponent[]`: `name`، `statement`، `date?`، `status`، `declaredStatus?`، `statusReason?`، `sources`، `unretrievedSources?`)، و`assembly` (`component`، `gives`، `exchanges`، `cost`)، و`conditions`، و`benefit`، و`addedCost`، و`counterexample`، و`chain` (`stage`، `how`)، و`uncoveredStages` (حلقات السلسلة الكاملة التي تتركها البنية، كما تحقّقت منها الدراسة)، و`predictions` |
+| `StudyThreeState` | `piece`، و`state` (`atItsTime`، `currentBest`، `proposal`)، و`architecture?` |
+| `StudyNoveltyClaim` | `architecture?` |
+| `StudyExperiment` | `name`، و`architectures`، و`protocol`، و`measures`، و`criteria`، و`expected` (`architecture`، `result`)، و`wholeChain` |
+| `MechanismCard` | الحقول من 1 إلى 9: `observation`، و`mechanism`، و`unknown`، و`historicalChoice`، و`evolution`، و`newPossibility`، و`proposedCombination`، و`prediction`، و`experiment`؛ والحقلان 10 و11 بعد أن تسجّلهما: `resultAndError?` (`result`، `error?`)، و`conclusionAndMemory?`، و`resultRecordedAt?` |
+
+أما المدخلات الأخرى في التقرير فليست ادعاءات:
+
+| النوع | الحقول |
+| --- | --- |
+| `StudyAmendment` | `number?` (للمقبول فقط، بدءًا من 1)، و`text`، و`verdict` (`refines`، `conflicts`، `changesObjective`، `unclassified`)، و`accepted`، و`reason`، و`runId` |
+| `StudyDriftEntry` | `passage`، و`collection`، و`item` (`id?`، `statement?`، `servesObjective?`)، و`reason`، و`by` (`guardian`: خارج عن الهدف؛ `schema`: رُفض قبل ذلك، مثلًا لغياب `servesObjective`)، و`attempt` (2 في الإعادة)، و`runId` |
+| `StudySearchResult` | `id` (`S1`…، ويُحتفَظ به حين يُعثَر على النتيجة نفسها مرة أخرى)، و`title`، و`locator` (رابط URL أو محدِّد موقع آخر)، و`date?`، و`excerpt`، و`tool`، و`query`، و`runId` |
+| `StudySearch` | `passage`، و`purpose` (`research` أو `priorArt`)، و`tool`، و`query`، و`servesObjective`، و`claims?`، و`resultIds`، و`error?`، و`skipped?` (`maxSearches`)، و`runId` |
+| `StudyPassageState` | `passage`، و`state` (`complete`، و`partial`: حُكم عليها لكن التشغيل توقّف قبل نهايتها، و`unchecked`: عناصر لم يُحكَم عليها بعد، و`notRun`)، و`attempts` (2 بعد إعادة)، و`reopenedBy`، و`runId?` |
+| `StudyNotice` | `code` (`noSources`، `stopped`، `failed`، `cancelled`، `passagesNotRun`، `uncheckedItems`، `searchesSkipped`، `leadsNotVerified`، `analoguesNotDeconstructed`، `noCapability`، `noveltiesToVerify`)، و`message` (بالإنجليزية)، و`details?` |
+| `StudyStats` | `runs`، و`modelCalls`، و`searches`، و`searchesSkipped`، و`results`، و`items`، و`rejected`، و`byStatus` (لكل حالة)، و`downgraded` (الادعاءات التي خفّضت الدراسة حالتها)، و`noveltiesToVerify`، و`redos`، و`loops` — لكل عمليات تشغيل الدراسة |
+
+### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}
+
+تعيد التقرير في صورة ملف بحثي مقروء بصيغة Markdown، بلغة التقرير: وهو `markdown` الخاص بـ `StudyResult`. استدعِها على `study.report()` لتضمين النتائج المسجَّلة منذ ذلك الحين. تأتي كلماتها من `studyLabels(language)` (`StudyLabels`)، وهي موجودة باللغات الإحدى عشرة لهذا التوثيق (`StudyLabelLanguage`)؛ وتحصل أي لغة أخرى، أو لغة مجهولة، على الكلمات الإنجليزية، ويحصل `fr-CA` على الكلمات الفرنسية.
+
 ## القرارات المُنمَّطة — `sdk.decisions` {#typed-decisions-—-sdk-decisions}
 
 ترمي `ValidationError` حين لا تكون هناك واجهة خلفية مُعدّة.
@@ -211,7 +366,7 @@ interface ModelCostLine {
 | `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | الفروق نفسها في صورة تراجعات، لكلٍّ منها خطورة وأثر: `no_regression` أو `regressions_detected` |
 | `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | تعيد تشغيل التشغيل ثم تتحقّق من إعادة التشغيل. لا تستدعي إعادة التشغيل أي نموذج: قارنها باستخدام `validateAspects: ['tools', 'policies']` |
 
-تُقارَن عمليات التشغيل **بحسب ما تعنيه أحداثها**، ولا تُقارَن أبدًا بمعرّفات الأحداث (لكل تشغيل معرّفات جديدة). تُطابَق الأحداث بالترتيب: أولًا الأحداث المتطابقة، ثم الأحداث التي لها النوع والموضوع نفسهما (الأداة، أو العملية، أو الإجابة) وتغيّرت بياناتها، ثم الأحداث التي تغيّر نوعها للموضوع نفسه. ما لا يُقارَن أبدًا: معرّفات الأحداث، والأوقات، والبيانات الوصفية، وأحداث `incident.reported` (تسجّل إرسال التنبيهات وتقييدها؛ أما الحدث الذي أطلق الحادثة فيُقارَن)، والقيم التي يكتبها SDK وتتغيّر من تشغيل إلى آخر: مدة استدعاء أداة، واستهلاك الرموز، وفترات الانتظار قبل إعادة المحاولة، ومعرّفات الموافقات، والتشغيل الذي جاءت منه إعادة التشغيل، ووقت الملاحظة وحدثها المصدر. النص الذي يكتبه النموذج بجانب استدعاء أداة لا يُقارَن إلا في `intention.generated`. أما معاملات الأداة ونتيجتها ومُدخلها فتُقارَن دائمًا، أيًّا كانت أسماء مفاتيحها: الوسيط `duration` الذي تغيّر من 30 إلى 60 تغيير. التشغيل الذي يفعل الشيء نفسه مرة أخرى ينجح؛ والأداة التي تُستدعى بوسائط أخرى يُبلَّغ عنها حيث وقع الاستدعاء (`parameters.metric: "churn" → "revenue"`)؛ والاستدعاء المُدرَج قبل استدعاء مطابق استدعاءٌ واحد مضاف؛ و`action.executed` الذي صار `action.failed` تغيير واحد، لا فقدان وإضافة.
+تُقارَن عمليات التشغيل **بحسب ما تعنيه أحداثها**، ولا تُقارَن أبدًا بمعرّفات الأحداث (لكل تشغيل معرّفات جديدة). تُطابَق الأحداث بالترتيب: أولًا الأحداث المتطابقة، ثم الأحداث التي لها النوع والموضوع نفسهما (الأداة، أو العملية، أو مرحلة الدراسة، أو الإجابة) وتغيّرت بياناتها، ثم الأحداث التي تغيّر نوعها للموضوع نفسه. ما لا يُقارَن أبدًا: معرّفات الأحداث، والأوقات، والبيانات الوصفية، وأحداث `incident.reported` (تسجّل إرسال التنبيهات وتقييدها؛ أما الحدث الذي أطلق الحادثة فيُقارَن)، والقيم التي يكتبها SDK وتتغيّر من تشغيل إلى آخر: مدة استدعاء أداة، واستهلاك الرموز، وفترات الانتظار قبل إعادة المحاولة، ومعرّفات الموافقات، والتشغيل الذي جاءت منه إعادة التشغيل، ووقت الملاحظة وحدثها المصدر. النص الذي يكتبه النموذج بجانب استدعاء أداة لا يُقارَن إلا في `intention.generated`. أما معاملات الأداة ونتيجتها ومُدخلها فتُقارَن دائمًا، أيًّا كانت أسماء مفاتيحها: الوسيط `duration` الذي تغيّر من 30 إلى 60 تغيير. التشغيل الذي يفعل الشيء نفسه مرة أخرى ينجح؛ والأداة التي تُستدعى بوسائط أخرى يُبلَّغ عنها حيث وقع الاستدعاء (`parameters.metric: "churn" → "revenue"`)؛ والاستدعاء المُدرَج قبل استدعاء مطابق استدعاءٌ واحد مضاف؛ و`action.executed` الذي صار `action.failed` تغيير واحد، لا فقدان وإضافة.
 
 | الخيار | يخص | |
 | --- | --- | --- |
@@ -286,6 +441,7 @@ interface ModelCostLine {
 | --- | --- |
 | `RunInput.onEvent`: `agent.run({ message, onEvent })` | كل حدث من أحداث التشغيل؛ ولا تعيد `run()` نتيجتها إلا بعد أن يفرغ المستمِع من كل واحد منها، أو قبل ذلك حين يكون التشغيل قد أُوقِف أو أُلغي أو حين يُلغى `signal` (ويُلغى عندئذٍ اشتراك المستمِع). والمستمِع نفسه لا يُسجَّل |
 | `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | الشيء نفسه لتشغيل معرفي، تُنهي `limits.timeoutMs` الخاصة به الانتظارَ أيضًا |
+| `StudyRunOptions.onEvent`: `study.run({ onEvent })` | الشيء نفسه لتشغيل دراسة، تُنهي `limits.timeoutMs` الخاصة به الانتظارَ أيضًا |
 | `replay(runId, modifications?, { onEvent })` | الشيء نفسه لإعادة تشغيل، وهي لا يمكن إلغاؤها: فتنتظر دائمًا |
 | `executeTool(name, params, { onEvent })` | أحداث الاستدعاء، وأحداث عمليات التشغيل التي تبدؤها أداته، على مستوى واحد فقط: يتلقّى المعالج المستمِع بوصفه `context.onEvent`، وتمرّره `governedAgentTool` و`cognitiveAgentTool` إلى وكيلهما (أما الوكيل المبني يدويًا على مخزن دون أحداث مباشرة فيعمل من دونه). ويُنهي `signal` الانتظار |
 | `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: كل حدث من كل تشغيل يطابق المرشِّح (`agentId` هو `metadata.agentId`)، إلى أن تستدعي الدالة المُعادة، التي تُسقِط الأحداث التي لم تُسلَّم بعد. وتشغيلات مجموعات اختبار التراجعات وإعادات التشغيل تشغيلات حقيقية: فيتلقى المستمِع أحداثها أيضًا (لا تحفظ المجموعة `onEvent` ولا `onText` من مُدخَلها) |

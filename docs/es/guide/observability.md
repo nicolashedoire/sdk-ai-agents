@@ -88,7 +88,7 @@ unsubscribe();
 
 | Dónde | Qué recibe el listener |
 | --- | --- |
-| `run({ onEvent })`, `think({ onEvent })` | Todos los eventos de esa ejecución |
+| `run({ onEvent })`, `think({ onEvent })`, `study.run({ onEvent })` | Todos los eventos de esa ejecución |
 | `replay(runId, modifications, { onEvent })` | Todos los eventos de la repetición |
 | `executeTool(name, params, { onEvent })` | Los eventos de la llamada, y los de la ejecución de agente que inicia su herramienta (`governedAgentTool`, `cognitiveAgentTool`), a un solo nivel de profundidad: no los de las ejecuciones que ese agente inicia a su vez |
 | `sdk.subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | Todos los eventos de todas las ejecuciones que coinciden con el filtro, hasta que llamas a la función que devuelve |

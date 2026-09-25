@@ -61,6 +61,7 @@ Ce qu'il imite, c'est une **façon de raisonner** : il ne sait pas ce que vous 
 - **Raisonner comme une personne donnée** : distillez un profil de penseur à partir de sujets expliqués avec vos propres mots, puis corrigez l'agent avec les verdicts `match`, `partial` ou `mismatch` et un pourcentage d'accord.
 - **Des décisions typées** — [TypeSafe Jev](https://docs.typesafe.ai) ou tout backend compatible répond aux questions Noul, Choice et Score avec des probabilités calibrées.
 - **Des connecteurs MCP** — exposez vos outils sous forme de serveur MCP, importez n'importe quel serveur MCP sous forme d'outils gouvernés.
+- **Des études** — un chercheur qui comprend un objet, puis propose de le repenser avec les moyens d'aujourd'hui : sept passages, des affirmations vérifiées par rapport aux sources qu'il a réellement consultées, et une charte figée avec un gardien qui le maintient sur son objectif. Voir [Études](./studies).
 - **L'exploitation intégrée** — coûts d'API par exécution, politiques de nouvelles tentatives qui ne s'empilent pas, alertes d'incident par e-mail ou par webhook.
 - **Un event sourcing natif** — rejeu sans le LLM, traces de référence, détection des régressions, graphes de raisonnement.
 

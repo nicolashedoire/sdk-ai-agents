@@ -61,6 +61,7 @@ O que ele imita é um **modo de raciocinar**: ele não sabe o que você nunca es
 - **Raciocínio como uma pessoa específica**: destile um perfil de pensador a partir de temas explicados com suas próprias palavras e, depois, corrija o agente com vereditos `match`, `partial` ou `mismatch` e uma porcentagem de concordância.
 - **Decisões tipadas** — o [TypeSafe Jev](https://docs.typesafe.ai) ou qualquer backend compatível responde a perguntas Noul, Choice e Score com probabilidades calibradas.
 - **Conectores MCP** — exponha suas ferramentas como um servidor MCP, importe qualquer servidor MCP como ferramentas governadas.
+- **Estudos** — um pesquisador que entende um objeto e depois propõe como redesenhá-lo com os meios de hoje: sete passagens, afirmações verificadas em relação às fontes que ele realmente pesquisou, e uma carta congelada com um guardião que o mantém no seu objetivo. Veja [Estudos](./studies).
 - **Operação já incluída** — custos de API por execução, políticas de novas tentativas que não se acumulam, alertas de incidentes por e-mail ou webhook.
 - **Event sourcing nativo** — replay sem o LLM, golden traces, detecção de regressões, grafos de raciocínio.
 

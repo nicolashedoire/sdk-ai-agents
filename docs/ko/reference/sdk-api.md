@@ -132,6 +132,161 @@ interface OutcomeEvaluator {
 | `distillThinkerProfile({ id, name, samples, model })` | `Promise<ThinkerProfile>` |
 | `exportControllerDataset(runIds?)` | `Promise<string>` — JSON Lines |
 
+## 연구 {#studies}
+
+연구는 연구자입니다. 대상을 이해한 다음, 오늘날의 지식과 기술로 그것을 어떻게 다시 설계할지 제안하고, 결정을 내려 줄 실험을 설계합니다. [연구](../guide/studies)를 보세요.
+
+| 메서드 | 반환값 | |
+| --- | --- | --- |
+| `createStudy(config)` | `Study` | 설정을 검사하고, 소스를 해석하고, 헌장을 고정합니다. 잘못된 설정이나, 정의된 도구가 아니거나 텍스트 쿼리를 받지 않는 소스에는 `ValidationError`를 던집니다 |
+
+### `StudyConfig` {#studyconfig}
+
+| 옵션 | 기본값 | |
+| --- | --- | --- |
+| `name`, `object`, `objective` | — | 필수이며 비어 있으면 안 됩니다. `name`은 연구의 이벤트와 함께 기록됩니다(`metadata.studyName`). 목표는 절대 바뀌지 않습니다. 새로운 목표는 새로운 연구입니다 |
+| `question` | `language`로 쓴 방법의 길잡이 질문과 역량 지향점 | 길잡이 질문 |
+| `needs`, `leads`, `analogues` | `[]` | 오늘날의 필요 사항과 기준, 여러분의 단서(검증할 예시로, 각각 판정을 받음), 해체할 결합에 의한 혁신(`['Bitcoin']`) |
+| `scope` | `{ exclude: [] }` | 범위 밖인 것 |
+| `capability` | — | 겨냥하는 새로운 역량. 없으면 연구가 후보를 제안합니다 |
+| `sources` | `[]` | 연구가 검색에 쓰는 SDK 도구의 이름으로, 연구보다 먼저 정의되어 있어야 합니다(예: `connectMcpServer`의 도구). 소스가 없으면 아무것도 확립될 수 없습니다 |
+| `model` | 프로바이더의 기본값 | 모든 호출의 모델 |
+| `llmProvider` | SDK의 프로바이더 | 이 연구에 쓸 프로바이더 |
+| `language` | `'en'` | 텍스트와 자료집의 언어로, 언어 태그(`fr`, `pt-BR`…)로 지정합니다 |
+| `limits` | [`StudyLimits`](#studylimits) 참고 | 생략한 한도는 기본값을 유지합니다 |
+| `driftThreshold` | `1/3`(`DEFAULT_DRIFT_THRESHOLD`) | 과정이 한 번 다시 수행되기 전까지 거부될 수 있는, 과정 항목의 비율로 0부터 1까지입니다 |
+| `temperature`, `maxTokens` | `0.4`, — | 과정과 검색 요청에 적용됩니다. 감시자, 개정안, 선행 기술 검사는 0으로 실행됩니다 |
+
+헌장(`StudyCharter`)은 `object`, `question`, `objective`, `needs`, `leads`, `scope`, `capability`, `analogues`를 담으며, (대소문자를 무시하고) 반복된 목록 항목은 제거됩니다. 헌장은 고정되고 해시되며, `name`은 헌장에 포함되지 않습니다.
+
+### `StudyLimits` {#studylimits}
+
+실행마다 적용됩니다. `DEFAULT_STUDY_LIMITS`에 기본값이 들어 있으며, 범위를 벗어난 값은 `ValidationError`를 던집니다.
+
+| 한도 | 기본값 | 범위 | |
+| --- | --- | --- | --- |
+| `maxModelCalls` | 60 | 1부터 10 000까지 | 수정과 검사를 포함한 모델 호출. 도달하면 실행이 멈춥니다(`stoppedBy: 'maxModelCalls'`) |
+| `maxSearches` | 20 | 0부터 10 000까지 | 검색. 다 쓰면 실행이 검색 없이 계속됩니다(주의 사항 `searchesSkipped`) |
+| `maxLoops` | 1 | 0부터 10까지 | 실행이 다시 열 수 있는 앞선 과정의 수 |
+| `timeoutMs` | 1 200 000(20분) | 1부터 2 147 483 647까지 | 실행의 길이. 도달하면 실행이 중단됩니다(`stoppedBy: 'timeoutMs'`) |
+| `maxResultsPerSearch` | 5 | 1부터 50까지 | 검색 한 번에서 보관하는 결과 수 |
+
+### `Study` {#study}
+
+| 멤버 | |
+| --- | --- |
+| `id` | `study_…`, 연구마다 새로 생깁니다. 연구 이벤트의 `metadata.agentId`이자, 예산과 도구 호출의 에이전트 id입니다 |
+| `name`, `language`, `charter`, `charterHash` | 이름, 언어, 고정된 `StudyCharter`, 그리고 그 SHA-256(16진수)으로, `study.started`와 각 개정안에 기록됩니다 |
+| `amendments` | `StudyAmendment[]`: 수락된 것과 거부된 것, 순서대로 |
+| `run({ signal?, onEvent?, restart? })` | `Promise<StudyResult>`. 완료되지 않은 첫 과정부터, `restart`를 주면 첫 과정부터 과정들을 실행합니다. 한도, 정책, 취소, 오류는 실행을 그 상태와 함께, 한 일의 보고서와 함께 끝냅니다. 예외를 던지는 경우는 이미 진행 중인 실행, 처리할 수 없는 `onEvent`, 실패하는 이벤트 저장소뿐입니다. `onEvent`는 `agent.run`에서와 똑같이 동작합니다 |
+| `amend(text)` | `Promise<StudyAmendment>`. 자체 실행(`mode: 'study-amendment'`)에서 헌장에 비추어 분류됩니다. `refines`만 수락되며, 이후의 모든 프롬프트에 표시됩니다 |
+| `recordResult(cardId, { result, error?, conclusion? })` | `Promise<MechanismCard>`. 카드의 10번과 11번 필드를 채우고, 그 카드를 작성한 실행에 `study.result_recorded`를 기록합니다. 알 수 없는 카드나 빈 `result`에는 `ValidationError` |
+| `report()` | `StudyReport`: 현재 상태의 보고서로, 마지막 실행 이후에 기록된 결과를 포함합니다 |
+
+`Study`와 `StudyEnvironment`(연구가 SDK에서 쓰는 것: 프로바이더, 이벤트 저장소, 실시간 이벤트, 정책 엔진, 통제된 도구)는 커스텀 구성을 위해 export되어 있습니다.
+
+### `StudyResult` {#studyresult}
+
+`{ runId, status, stoppedBy?, error?, report, markdown }` — `status`는 `completed`이거나, 한도 또는 예산·타임아웃 정책이 실행을 끝냈을 때 `stoppedBy`(`maxModelCalls`, `timeoutMs` 또는 `policy`)와 함께 `stopped`, 오류가 실행을 끝냈을 때 `failed`, 또는 `cancelled`입니다. `error`는 실행을 끝낸 `Error`, `report`는 실행이 끝났을 때의 `StudyReport`, `markdown`은 같은 내용을 담은 자료집입니다.
+
+### `StudyReport` {#studyreport}
+
+```ts
+interface StudyReport {
+  studyId: string;
+  name: string;
+  language: string;
+  charter: StudyCharter;
+  charterHash: string;
+  amendments: StudyAmendment[];
+  status: StudyStatus | 'notRun';
+  stoppedBy?: StudyStopReason;
+  error?: string;
+  notices: StudyNotice[];                       // { code, message, details? }
+  passages: StudyPassageState[];                // { passage, state, attempts, reopenedBy, runId? }
+  observations: StudyObservation[];             // O1…
+  pieces: StudyPiece[];                         // P1…
+  chain: StudyChainStage[];                     // C1…
+  threeStates: StudyPieceStates[];              // { piece, atItsTime, currentBest, proposal }
+  historicalChoices: StudyHistoricalChoice[];   // H1…
+  advances: StudyAdvance[];                     // V1…
+  leadVerdicts: StudyLeadVerdict[];             // L1…
+  unverifiedLeads: string[];
+  independentLeads: StudyIndependentLead[];     // I1…
+  references: StudyReference[];                 // R1…
+  analogues: StudyAnalogue[];                   // B1…
+  undeconstructedAnalogues: string[];
+  constraints: StudyConstraint[];               // K1…
+  revisableDecisions: StudyRevisableDecision[]; // D1…
+  combinations: StudyCombination[];             // X1…
+  capabilities: StudyCapability[];              // Y1…
+  architectures: StudyArchitecture[];           // A1…, capabilities first
+  noveltyClaims: StudyNoveltyClaim[];           // N1…
+  experiments: StudyExperiment[];               // E1…
+  cards: MechanismCard[];                       // M1…
+  results: StudySearchResult[];                 // S1…
+  searches: StudySearch[];
+  driftLog: StudyDriftEntry[];
+  stats: StudyStats;
+  runIds: string[];                             // runs and amendment runs, oldest first
+}
+
+interface StudyClaim {
+  id: string;
+  passage: StudyPassage;
+  statement: string;
+  status: 'established' | 'hypothesis' | 'novelty'; // after the study's checks
+  declaredStatus?: StudyClaimStatus;                // the model's, when the study changed it
+  statusReason?: string;
+  sources: string[];                                // results retrieved in this study
+  unretrievedSources?: string[];                    // cited, never retrieved: they support nothing
+  servesObjective: string;
+  toVerify?: boolean;                               // a novelty whose prior art is not assessed yet
+  priorArt?: { closest: string; sources: string[]; verdict: 'novel' | 'partlyNovel' | 'exists' };
+  unchecked?: boolean;                              // the guardian had not judged it when the run stopped
+  runId: string;
+}
+```
+
+모든 항목은 고유 필드를 가진 `StudyClaim`입니다.
+
+| 타입 | 고유 필드 |
+| --- | --- |
+| `StudyObservation` | `kind`(`behaviour`, `use`, `variation`, `failure`), `conditions`, `era?` |
+| `StudyPiece` | `name`, `function`, `inputs`, `outputs`, `relations`, `unknowns`, `parent?`(이 부품이 세분하는 부품) |
+| `StudyChainStage` | `stage`, `pieces` |
+| `StudyHistoricalChoice` | `choice`, `piece?`, `factors`(`hardware`, `tools`, `uses`, `knowledge`, `costs`, `compatibility`, `other`), `era?` |
+| `StudyAdvance` | `mechanism`, `date?`, `domain`(`object` 또는 `other`), `field?`, `evidence`, `conditions`, `availability`, `piece?` |
+| `StudyLeadVerdict` | `lead`(헌장에 적힌 그대로), `verdict`(`relevant`, `partlyRelevant`, `notRelevant`), `reasons` |
+| `StudyIndependentLead` | `tool`, `kind`(`mathematical`, `technical`, `other`), `piece?` |
+| `StudyReference` | `name`, `piece?`, `date?` |
+| `StudyAnalogue` | `breakthrough`, `domain?`, `date?`, `components`(두 개 이상의 `{ name, date? }`), `liftedConstraint`, `capability`, `pattern` |
+| `StudyConstraint` | `constraint`, `state`(`remains`, `weakened`, `newRequirement`), `piece?` |
+| `StudyRevisableDecision` | `decision`, `because`(바뀐 조건), `opens` |
+| `StudyCombination` | `a`, `b`, `enables`(A가 B에게 가능하게 하는 것), `exchange`, `cost`, `changes`(`representation`, `distribution`, `responsibilities`) |
+| `StudyCapability` | `capability`, `forWhom`, `hardToday`, `principle?` |
+| `StudyArchitecture` | `name`, `kind`(`capability` 또는 `improvement`), `declaredKind?`, `capability`(`what`, `forWhom`, `liftedConstraint`), `principleChange?`(`principle`: `representation`, `distribution`, `responsibility`, `trust`, `verification` 또는 `other`. 그리고 `change`), `mechanism`, `components`(`StudyComponent[]`: `name`, `statement`, `date?`, `status`, `declaredStatus?`, `statusReason?`, `sources`, `unretrievedSources?`), `assembly`(`component`, `gives`, `exchanges`, `cost`), `conditions`, `benefit`, `addedCost`, `counterexample`, `chain`(`stage`, `how`), `uncoveredStages`(연구가 검사한 결과, 이 아키텍처가 다루지 않는 전체 사슬의 단계), `predictions` |
+| `StudyThreeState` | `piece`, `state`(`atItsTime`, `currentBest`, `proposal`), `architecture?` |
+| `StudyNoveltyClaim` | `architecture?` |
+| `StudyExperiment` | `name`, `architectures`, `protocol`, `measures`, `criteria`, `expected`(`architecture`, `result`), `wholeChain` |
+| `MechanismCard` | 1번부터 9번 필드: `observation`, `mechanism`, `unknown`, `historicalChoice`, `evolution`, `newPossibility`, `proposedCombination`, `prediction`, `experiment`. 여러분이 기록한 뒤에는 10번과 11번 필드: `resultAndError?`(`result`, `error?`), `conclusionAndMemory?`, 그리고 `resultRecordedAt?` |
+
+보고서의 다른 항목은 주장이 아닙니다.
+
+| 타입 | 필드 |
+| --- | --- |
+| `StudyAmendment` | `number?`(수락된 경우만, 1부터), `text`, `verdict`(`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason`, `runId` |
+| `StudyDriftEntry` | `passage`, `collection`, `item`(`id?`, `statement?`, `servesObjective?`), `reason`, `by`(`guardian`: 목표를 벗어남. `schema`: 그 전에 거부됨, 예를 들어 `servesObjective`가 없음), `attempt`(재수행에서는 2), `runId` |
+| `StudySearchResult` | `id`(`S1`…, 같은 결과를 다시 찾으면 유지됨), `title`, `locator`(URL 또는 다른 위치 정보), `date?`, `excerpt`, `tool`, `query`, `runId` |
+| `StudySearch` | `passage`, `purpose`(`research` 또는 `priorArt`), `tool`, `query`, `servesObjective`, `claims?`, `resultIds`, `error?`, `skipped?`(`maxSearches`), `runId` |
+| `StudyPassageState` | `passage`, `state`(`complete`, `partial`: 판단은 되었지만 과정이 끝나기 전에 실행이 멈춤, `unchecked`: 아직 판단되지 않은 항목, `notRun`), `attempts`(재수행 뒤에는 2), `reopenedBy`, `runId?` |
+| `StudyNotice` | `code`(`noSources`, `stopped`, `failed`, `cancelled`, `passagesNotRun`, `uncheckedItems`, `searchesSkipped`, `leadsNotVerified`, `analoguesNotDeconstructed`, `noCapability`, `noveltiesToVerify`), `message`(영어), `details?` |
+| `StudyStats` | `runs`, `modelCalls`, `searches`, `searchesSkipped`, `results`, `items`, `rejected`, `byStatus`(상태별), `downgraded`(연구가 상태를 낮춘 주장), `noveltiesToVerify`, `redos`, `loops` — 연구의 모든 실행에 대한 값 |
+
+### `renderStudyMarkdown(report)` {#renderstudymarkdown-report}
+
+보고서를 보고서의 언어로 된, 읽기 쉬운 Markdown 자료집으로 반환합니다. `StudyResult`의 `markdown`과 같습니다. 그 뒤에 기록된 결과를 포함하려면 `study.report()`에 대해 호출하세요. 그 문구는 `studyLabels(language)`(`StudyLabels`)에서 오며, 이 문서의 열한 개 언어로 준비되어 있습니다(`StudyLabelLanguage`). 그 밖의 언어나 알 수 없는 언어는 영어 문구를 받고, `fr-CA`는 프랑스어 문구를 받습니다.
+
 ## 타입 지정 결정 — `sdk.decisions` {#typed-decisions-—-sdk-decisions}
 
 백엔드가 구성되어 있지 않으면 `ValidationError`를 던집니다.
@@ -211,7 +366,7 @@ interface ModelCostLine {
 | `detectRegressions(runId, goldenTraceId, options?)` | `Promise<RegressionReport>` | 같은 차이를 심각도와 영향이 붙은 회귀로 돌려줍니다: `no_regression` 또는 `regressions_detected` |
 | `replayAndValidate(runId, goldenTraceId, options?)` | `Promise<ValidationResult>` | 실행을 리플레이한 뒤 그 리플레이를 검증합니다. 리플레이는 모델을 호출하지 않으므로 `validateAspects: ['tools', 'policies']`로 비교하세요 |
 
-실행은 **이벤트가 뜻하는 바로** 비교되며, 이벤트 id로는 절대 비교되지 않습니다(실행마다 id가 새로 생깁니다). 이벤트는 순서대로 짝지어집니다. 먼저 똑같은 이벤트, 그다음 종류와 대상(도구, 작업, 답변)이 같지만 데이터가 바뀐 이벤트, 마지막으로 대상은 같지만 종류가 바뀐 이벤트입니다. 비교하지 않는 것: 이벤트 id, 시각, 메타데이터, `incident.reported` 이벤트(알림 전송과 발송 제한을 기록합니다. 인시던트를 일으킨 이벤트는 비교됩니다), 그리고 SDK가 기록하며 실행마다 바뀌는 값인 도구 호출의 소요 시간, 토큰 사용량, 재시도 전 대기 시간, 승인 id, 리플레이의 원본 실행, 관찰의 시각과 원본 이벤트. 모델이 도구 호출 옆에 쓰는 텍스트는 `intention.generated`에서만 비교됩니다. 도구의 매개변수, 결과, 입력은 키 이름과 상관없이 항상 비교됩니다. 30에서 60으로 바뀐 `duration` 인수는 변경입니다. 같은 일을 다시 하는 실행은 통과하고, 다른 인수로 호출된 도구는 호출이 일어난 자리에서 보고됩니다(`parameters.metric: "churn" → "revenue"`). 똑같은 호출 앞에 끼워 넣은 호출은 추가된 호출 하나입니다. `action.executed`가 `action.failed`로 바뀐 것은 사라짐과 추가가 아니라 하나의 변경입니다.
+실행은 **이벤트가 뜻하는 바로** 비교되며, 이벤트 id로는 절대 비교되지 않습니다(실행마다 id가 새로 생깁니다). 이벤트는 순서대로 짝지어집니다. 먼저 똑같은 이벤트, 그다음 종류와 대상(도구, 작업, 연구의 과정, 답변)이 같지만 데이터가 바뀐 이벤트, 마지막으로 대상은 같지만 종류가 바뀐 이벤트입니다. 비교하지 않는 것: 이벤트 id, 시각, 메타데이터, `incident.reported` 이벤트(알림 전송과 발송 제한을 기록합니다. 인시던트를 일으킨 이벤트는 비교됩니다), 그리고 SDK가 기록하며 실행마다 바뀌는 값인 도구 호출의 소요 시간, 토큰 사용량, 재시도 전 대기 시간, 승인 id, 리플레이의 원본 실행, 관찰의 시각과 원본 이벤트. 모델이 도구 호출 옆에 쓰는 텍스트는 `intention.generated`에서만 비교됩니다. 도구의 매개변수, 결과, 입력은 키 이름과 상관없이 항상 비교됩니다. 30에서 60으로 바뀐 `duration` 인수는 변경입니다. 같은 일을 다시 하는 실행은 통과하고, 다른 인수로 호출된 도구는 호출이 일어난 자리에서 보고됩니다(`parameters.metric: "churn" → "revenue"`). 똑같은 호출 앞에 끼워 넣은 호출은 추가된 호출 하나입니다. `action.executed`가 `action.failed`로 바뀐 것은 사라짐과 추가가 아니라 하나의 변경입니다.
 
 | 옵션 | 대상 | |
 | --- | --- | --- |
@@ -286,6 +441,7 @@ interface ModelCostLine {
 | --- | --- |
 | `RunInput.onEvent`: `agent.run({ message, onEvent })` | 실행의 모든 이벤트. `run()`은 리스너가 이벤트 하나하나의 처리를 마친 뒤에 완료되며, 실행이 중지되거나 취소되었을 때 또는 `signal`이 중단될 때는 더 일찍 완료됩니다(그러면 리스너는 구독 해제됩니다). 리스너는 기록되지 않습니다 |
 | `ThinkInput.onEvent`: `agent.think({ problem, onEvent })` | 인지 실행에 대해 위와 같습니다. 인지 실행에서는 `limits.timeoutMs`도 기다림을 끝냅니다 |
+| `StudyRunOptions.onEvent`: `study.run({ onEvent })` | 연구의 실행에 대해 위와 같습니다. 연구의 실행에서는 `limits.timeoutMs`도 기다림을 끝냅니다 |
 | `replay(runId, modifications?, { onEvent })` | 리플레이에 대해 위와 같습니다. 리플레이는 취소할 수 없으므로 항상 기다립니다 |
 | `executeTool(name, params, { onEvent })` | 호출의 이벤트, 그리고 그 도구가 시작하는 실행의 이벤트(한 단계 깊이까지만). 핸들러는 리스너를 `context.onEvent`로 받으며, `governedAgentTool`과 `cognitiveAgentTool`은 이를 자신의 에이전트에 넘깁니다(실시간 이벤트가 없는 저장소 위에 직접 만든 에이전트는 리스너 없이 실행됩니다). `signal`은 기다림을 끝냅니다 |
 | `subscribe(listener, { runId?, agentId?, types?, maxQueued? })` | `() => void`: 필터에 맞는 모든 실행의 모든 이벤트(`agentId`는 `metadata.agentId`). 반환된 함수를 호출할 때까지 받으며, 그 함수는 아직 전달되지 않은 이벤트를 버립니다. 회귀 테스트 스위트의 실행과 리플레이도 실제 실행이므로 리스너는 그 이벤트도 받습니다(스위트는 입력의 `onEvent`와 `onText`를 저장하지 않습니다) |

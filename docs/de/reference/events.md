@@ -17,7 +17,7 @@ interface Event {
 
 | Typ | Daten |
 | --- | --- |
-| `run.started` | `input`, `mode` (`cognitive`, `tool` für einen Aufruf außerhalb eines Agenten wie einen MCP-Aufruf, `resource` für das Lesen einer MCP-Ressource, oder nicht vorhanden bei kontrollierten Läufen), `replayOf?` |
+| `run.started` | `input`, `mode` (`cognitive`, `study` für den Lauf einer Studie, `study-amendment` für den Lauf, der einen Nachtrag einordnet, `tool` für einen Aufruf außerhalb eines Agenten wie einen MCP-Aufruf, `resource` für das Lesen einer MCP-Ressource, oder nicht vorhanden bei kontrollierten Läufen), `replayOf?` |
 | `run.completed` | `output`, `decision?` (kognitiv) |
 | `run.failed` | `error`, `steps?`, `uri?` (fehlgeschlagenes Lesen einer Ressource) |
 | `run.cancelled` / `run.stopped` | `reason` |
@@ -28,7 +28,7 @@ interface Event {
 | --- | --- |
 | `intention.generated` | `message`, `toolCalls`, `model`, `requestedModel`, `usage` – oder `intention` für eine kognitive endgültige Antwort |
 | `policy.checked` | `intention`, `validation`: das Urteil der Action Engine über einen Tool-Aufruf. Die Policy Engine zeichnet außerdem ein Ereignis pro geprüfter Richtlinie auf – `policyId`, `policyType`, `intention`, `conditionEvaluated?`, `validationResult`, `applied` (`true`, wenn die Richtlinie galt und abgelehnt hat) und `reason` –, vor einem Tool-Aufruf und vor jedem Schritt eines kognitiven Laufs für die Budget- und Timeout-Richtlinien, die für einen Schritt gelten können (`intention` ist dann `{ type: 'continue' }`) |
-| `policy.violated` | `intention`, `reason`, `violatedPolicies` (`allowed-tools`, wenn ein Aufrufer ein Tool verwendet hat, das ihm nicht gegeben wurde; die Kennung der Budgetrichtlinie, wenn ihr Aufrufbudget aufgebraucht ist), und `step`, wenn eine Budget- oder Timeout-Richtlinie einen Schritt eines kognitiven Laufs abgelehnt hat (sein `intention` ist dann `{ type: 'continue' }`) |
+| `policy.violated` | `intention`, `reason`, `violatedPolicies` (`allowed-tools`, wenn ein Aufrufer ein Tool verwendet hat, das ihm nicht gegeben wurde; die Kennung der Budgetrichtlinie, wenn ihr Aufrufbudget aufgebraucht ist), und `step`, wenn eine Budget- oder Timeout-Richtlinie einen Schritt eines kognitiven Laufs abgelehnt hat, oder `passage`, wenn sie eine Phase einer Studie abgelehnt hat (sein `intention` ist dann `{ type: 'continue' }`) |
 | `approval.requested` / `approval.approved` / `approval.rejected` | `approvalId`, `intention`, `policyId` (`tool-requires-approval`, wenn das eigene `metadata.requiresApproval` des Tools sie verlangt hat), `reason?` (`cancelled before a decision`, wenn der Aufrufer aufgegeben hat oder der Lauf angehalten wurde, `no decision within N ms` nach `approvalTimeoutMs`) |
 | `action.executing` / `action.executed` / `action.failed` | `toolName`, `parameters`, `result` / `error`, `duration` – `action.failed` zeichnet auch einen Aufruf auf, der wegen ungültiger Argumente (vor jeder Richtlinie) abgelehnt wurde oder weil sein Aufrufer nach einer Freigabe gegangen war |
 | `tool.called` | `toolName`, `parameters` |
@@ -53,6 +53,25 @@ interface Event {
 | `cognition.knowledge_recorded` | `scope`, `findings` (Aussage, Art, Geltungsbereich, `revises?`, `difference?`, `evidence`: jeder Test mit `runId`, `predictionId`, `verdict`, `expected`, `observed`, Evaluator), `error?`, wenn der Speicher fehlgeschlagen ist. Angehängt nach `run.completed`, `run.failed` oder `run.cancelled`, und nur, wenn der Lauf etwas getestet hat |
 | `cognition.feedback` | `feedback` (`verdict`, `agreement?`, `wrongAbout?`, …), `profileId`, `profileVersionBefore`, `profileVersionAfter` |
 | `decision.evaluated` | `client`, `purpose` (`operation_selection`, `hypothesis_assessment`, `direct`), `model`, `state`, `questions`, `answers` (leer, wenn die Antwort abgelehnt wurde), `usage?` (fehlt, wenn das Backend keine Token-Anzahl gemeldet hat), `error?` (warum eine berechnete Antwort abgelehnt wurde), `step?` |
+
+## Studien {#studies}
+
+Die Läufe einer Studie (`mode: 'study'`) und die Läufe, die ihre Nachträge einordnen (`mode: 'study-amendment'`), zeichnen diese Ereignisse auf. Jedes trägt die `id` der Studie als `metadata.agentId` und ihren Namen als `metadata.studyName`. Die Suchen zeichnen außerdem die Ereignisse ihrer kontrollierten Tool-Aufrufe (`action.executing`, `policy.checked`, `tool.called`, `action.executed`) im Lauf der Studie auf. Siehe [Studien](../guide/studies).
+
+| Typ | Daten |
+| --- | --- |
+| `study.started` | `name`, `charter` (`object`, `question`, `objective`, `needs`, `leads`, `scope`, `capability?`, `analogues`), `charterHash` (SHA-256), `language`, `model?`, `sources` (Tool-Namen), `limits`, `driftThreshold`, `amendments` (die angenommenen: `number`, `text`), `resumeAt?` (die Phase, bei der ein fortgesetzter Lauf beginnt) |
+| `study.passage_started` | `passage`, `number` (1 bis 7), `amendments` (Nummern der geltenden angenommenen Nachträge) sowie `reopenedBy?`, `focus?`, `reason?`, wenn eine spätere Phase sie wieder geöffnet hat |
+| `study.passage_completed` | `passage`, `attempts` (2, wenn der Wächter sie wiederholen ließ), `items` (jedes mit seiner `collection`, `id`, `statement`, `status`, `sources`, `servesObjective`, den übrigen Feldern einer Behauptung und seinen eigenen Feldern), `reopenedBy?`, `reopen?` (`passage`, `focus`, `reason`: die frühere Phase, deren Wiederöffnung sie verlangt) |
+| `study.search` | `passage`, `purpose` (`research` oder `priorArt` für den Stand der Technik der Neuheiten), `tool`, `query`, `servesObjective`, `claims?` (die Neuheiten, nach denen sie sucht), `resultIds`, `results` (`id`, `title`, `locator`, `date?`), `error?` (die Suche ist fehlgeschlagen), `skipped?` (`maxSearches`: nicht ausgeführt) |
+| `study.model_called` | `purpose` (`passage`, `queries`, `check`, `priorArtQueries`, `priorArtCheck`, `amendment`), `passage?`, `model?`, `requestedModel?`, `usage` (`promptTokens`, `completionTokens`, `calls`, `unmeteredCalls?`, `unmeteredTokens?`: ein Ereignis für einen Aufruf und seine Reparatur), `failed?` (warum die Antwort nicht verwendet werden konnte) – zählt in den Kosten und in den Budgets pro Zeitraum |
+| `study.drift_rejected` | `passage`, `collection`, `item` (`id?`, `statement?`, `servesObjective?`), `reason`, `by` (`guardian`: als vom Ziel abweichend beurteilt; `schema`: vorher abgelehnt, zum Beispiel ohne `servesObjective`), `attempt` (2 bei einer Wiederholung) |
+| `study.amendment_accepted` / `study.amendment_refused` | `number?` (nur angenommene), `text`, `verdict` (`refines`, `conflicts`, `changesObjective`, `unclassified`), `accepted`, `reason`, `charterHash` – im eigenen Lauf des Nachtrags |
+| `study.result_recorded` | `card`, `resultAndError` (`result`, `error?`), `conclusionAndMemory?` – an den Lauf angehängt, der die Karte geschrieben hat, nach dessen Ende |
+| `study.completed` | `status`, `passages` (`passage`, `state`), `stats` |
+| `study.failed` | `status` (`stopped`, `failed` oder `cancelled`), `stoppedBy?`, `error`, `passages`, `stats`, `partial: true` – danach `run.failed` oder `run.cancelled` |
+
+`study.model_called` ist das, was `getRunCost` und die Budgets für eine Studie lesen. Wenn zwei Läufe verglichen werden, werden die Ereignisse einer Studie nach Phase einander zugeordnet (`study.model_called` nach Zweck und Phase), und das `usage` von `study.model_called` wird nicht verglichen.
 
 ## Betrieb {#operations}
 
