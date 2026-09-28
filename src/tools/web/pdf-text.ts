@@ -71,12 +71,13 @@ type WorkerAnswer =
 const WORKER_SOURCE = `
 const { parentPort, workerData } = require('node:worker_threads');
 const zlib = require('node:zlib');
+const crypto = require('node:crypto');
 // Bundlers that keep function names wrap them in __name(…): harmless here.
 var __name = (target) => target;
 const prescan = ${prescanPdf.toString()};
 (async () => {
   // Measured before pdf.js reads anything: a bomb is refused here, event loops or not.
-  const verdict = prescan(new Uint8Array(workerData.bytes), zlib, workerData.maxDecodedBytes);
+  const verdict = prescan(new Uint8Array(workerData.bytes), zlib, workerData.maxDecodedBytes, crypto);
   if (!verdict.ok) {
     parentPort.postMessage({ ok: false, refused: verdict.kind, message: verdict.reason });
     return;
@@ -108,7 +109,7 @@ const prescan = ${prescanPdf.toString()};
  * - before pdf.js reads it, the worker parses it and inflates its streams (every filter chain,
  *   Flate and the other decoders that expand) within `maxDecodedMb` in all, and refuses it
  *   past that, or when it cannot read it (`prescanPdf`, which fails closed); an encrypted PDF
- *   cannot be measured and has only the limits below;
+ *   is decrypted to be measured, as pdf.js decrypts it;
  * - the worker is stopped when the process grows by more than `maxMemoryMb`, when `timeoutMs`
  *   has passed, or when `signal` aborts. Waiting for the reader counts against `deadline` and
  *   `signal`.

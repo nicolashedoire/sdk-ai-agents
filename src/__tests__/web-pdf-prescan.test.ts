@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import zlib from 'node:zlib';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { prescanPdf } from '../tools/web/pdf-prescan.js';
@@ -115,8 +116,8 @@ describe('prescanPdf', () => {
       expect(scan(file(object(1, '<< /Filter /FlateDecode >> % a comment >>', bomb)))).toEqual(TOO_LARGE);
       const padding = `(${'x'.repeat(70_000)})`;
       expect(scan(file(object(1, `<< /Filter /FlateDecode /Padding ${padding} >>`, bomb)))).toEqual(TOO_LARGE);
-      // A stream dictionary it cannot read refuses the PDF.
-      expect(scan(file(object(1, '<< /Filter /FlateDecode ) >>', bomb)))).toEqual(unreadable('a stream dictionary cannot be read'));
+      // A ")" outside a string: pdf.js's lexer throws there, so pdf.js reads no stream.
+      expect(scan(file(object(1, '<< /Filter /FlateDecode ) >>', bomb)))).toMatchObject({ ok: true, decodedBytes: 0 });
     });
 
     it('5. accepts spaces and tabs after the stream keyword', () => {
@@ -167,13 +168,14 @@ describe('prescanPdf', () => {
     expect(scan(file(object(5, '<< /Type /ObjStm /N 0 /First 0 /Filter /FlateDecode >>', bomb)))).toEqual(TOO_LARGE);
   });
 
-  it('lets an encrypted PDF through unmeasured, and says so', () => {
+  it('refuses an encrypted PDF it cannot decrypt (see web-pdf-prescan-pdfjs.test.ts for the others)', () => {
     const encrypted = Buffer.concat([
       Buffer.from('%PDF-1.7\n', 'latin1'),
       object(1, '<< /Filter /FlateDecode >>', bomb),
       Buffer.from('trailer\n<< /Size 3 /Root 2 0 R /Encrypt 3 0 R >>\n%%EOF\n', 'latin1'),
     ]);
-    expect(scan(encrypted)).toEqual({ ok: true, decodedBytes: 0, streams: 1, encrypted: true });
+    expect(scan(encrypted)).toEqual(unreadable('it is encrypted, and it cannot be decrypted here to be measured'));
+    expect(prescanPdf(encrypted, zlib, BUDGET, crypto)).toEqual(unreadable('its encryption dictionary cannot be read'));
   });
 
   it('refuses a file built to make its reading slow, quickly', () => {
