@@ -78,6 +78,8 @@ export interface GuardedHttpOptions {
   allowPrivateNetwork?: boolean | string[];
   /** DNS resolution; every address it gives is checked when the connection opens. */
   lookup?: WebLookup;
+  /** Certificate authorities (PEM) trusted instead of Node's own: for tests. */
+  ca?: string;
 }
 
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
@@ -96,14 +98,22 @@ const CROSS_ORIGIN_HEADERS = new Set(['accept', 'accept-language', 'user-agent']
  *   through). `allowPrivateNetwork` lifts this; the endpoint you configured for a provider or
  *   a source is exempt on its own origin only, for that provider's requests (`forOrigin`);
  * - a timeout per request, a byte cap on the decoded body (the rest is never downloaded),
- *   pacing per host, TLS certificates always verified.
+ *   pacing per host, TLS certificates always verified, HTTP/1.1 named in the TLS handshake.
  */
 export class GuardedHttpClient implements WebClient {
   private readonly resolve: WebLookup;
 
+  /**
+   * The TLS handshake says the client speaks HTTP/1.1 (ALPN), as browsers and curl do: arXiv's
+   * CDN answers HTTP 406, with an empty body, to a client that names no protocol (Node's
+   * default) whenever the answer is not in its cache — every long or new query.
+   */
+  private readonly tlsOptions: { ALPNProtocols: string[]; ca?: string };
+
   constructor(private readonly options: GuardedHttpOptions) {
     this.resolve =
       options.lookup ?? ((hostname) => dns.lookup(hostname, { all: true, verbatim: true }));
+    this.tlsOptions = { ALPNProtocols: ['http/1.1'], ...(options.ca ? { ca: options.ca } : {}) };
   }
 
   request(rawUrl: string, init: WebRequestInit = {}): Promise<WebResponse> {
@@ -281,6 +291,7 @@ export class GuardedHttpClient implements WebClient {
         agent: false,
         lookup: this.lookupFor(privateAllowed),
         signal: hop.signal,
+        ...(url.protocol === 'https:' ? this.tlsOptions : {}),
       });
       request.on('error', fail);
       request.on('response', (response) => {

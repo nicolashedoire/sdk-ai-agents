@@ -266,7 +266,7 @@ describe('throttling: one more try after a wait, within the call deadline', () =
     expect(error).toMatchObject({ name: 'SearchUnavailableError', throttled: false });
   });
 
-  it("tries arXiv again after its 406 (it refused two of a real study's queries)", async () => {
+  it('tries arXiv again after a 406 from its CDN', async () => {
     let calls = 0;
     server.on('/api/query', (request, response) => {
       calls++;

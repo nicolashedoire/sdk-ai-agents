@@ -1,9 +1,12 @@
 import {
   createServer,
   type IncomingHttpHeaders,
+  type IncomingMessage,
   type Server,
   type ServerResponse,
 } from 'node:http';
+import { createServer as createTlsServer } from 'node:https';
+import type { TLSSocket } from 'node:tls';
 
 export interface WebRequest {
   method: string;
@@ -13,6 +16,8 @@ export interface WebRequest {
   query: URLSearchParams;
   headers: IncomingHttpHeaders;
   body: string;
+  /** Over https: the protocol the client named in the TLS handshake (ALPN), or `false`. */
+  alpn?: string | false;
 }
 
 /** Answers one request; it may write anything, stream, or never end. */
@@ -21,13 +26,15 @@ export type Route = (request: WebRequest, response: ServerResponse) => void | Pr
 /**
  * A real HTTP server on an ephemeral local port that answers by path, for the web tools: the
  * pages, APIs, robots.txt files and redirects of a small Web. Requests are recorded. A path
- * without a route answers 404.
+ * without a route answers 404. With `tls` (a key and its certificate), it speaks https.
  */
 export class WebServer {
   readonly requests: WebRequest[] = [];
   private readonly routes = new Map<string, Route>();
   private server?: Server;
   private base = '';
+
+  constructor(private readonly tls?: { key: string; cert: string }) {}
 
   /** Sets what a path answers (the query string is ignored when matching). */
   on(path: string, route: Route): this {
@@ -45,7 +52,7 @@ export class WebServer {
   }
 
   async start(): Promise<string> {
-    this.server = createServer((request, response) => {
+    const handle = (request: IncomingMessage, response: ServerResponse) => {
       let body = '';
       request.on('data', (chunk) => {
         body += chunk;
@@ -59,6 +66,7 @@ export class WebServer {
           query: url.searchParams,
           headers: request.headers,
           body,
+          ...(this.tls ? { alpn: (request.socket as TLSSocket).alpnProtocol ?? false } : {}),
         };
         this.requests.push(recorded);
         const route = this.routes.get(url.pathname);
@@ -71,12 +79,15 @@ export class WebServer {
           response.end(String(error));
         });
       });
-    });
+    };
+    this.server = this.tls
+      ? createTlsServer({ ...this.tls, ALPNProtocols: ['http/1.1'] }, handle)
+      : createServer(handle);
     await new Promise<void>((resolve) => this.server?.listen(0, '127.0.0.1', resolve));
     const address = this.server.address();
     if (!address || typeof address === 'string')
       throw new Error('the web server has no TCP address');
-    this.base = `http://127.0.0.1:${address.port}`;
+    this.base = `${this.tls ? 'https' : 'http'}://127.0.0.1:${address.port}`;
     return this.base;
   }
 
