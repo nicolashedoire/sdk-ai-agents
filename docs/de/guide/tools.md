@@ -184,6 +184,8 @@ sdk.defineGlobalPolicy({
 
 Ein `budgetLimit` kann auch `maxTokens` und `maxCost` begrenzen, gezählt über die Modellaufrufe: Sobald der Verbrauch des Zeitraums eine Grenze überschreitet, werden Tool-Aufrufe abgelehnt, und `maxCost` lehnt sie außerdem ab, sobald die Kosten eines Aufrufs unbekannt sind (ein Modell ohne Preis, ein Aufruf ohne Token-Zahlen). Siehe [API-Kosten](./costs#budgets).
 
+Ein Aufruf zählt in seinen Aufrufbudgets erst, wenn er gleich ausgeführt wird; ein Aufruf, der auf eine Freigabe wartet, zählt also erst nach der Freigabe: Wenn andere Aufrufe das Budget während der Wartezeit aufbrauchen, wird der freigegebene Aufruf abgelehnt.
+
 ### Nicht vertrauenswürdige Ausgaben {#untrusted-output}
 
 Was ein Tool zurückgibt, geht zurück an das Modell, und eine Seite, eine Datei oder eine API-Antwort kann Anweisungen enthalten, die für das Modell geschrieben wurden (Prompt Injection). Die Web-Tools markieren jede Antwort mit `untrusted: true`, und ihre Beschreibungen weisen das Modell an, nie Anweisungen zu folgen, die darin stehen. Die anderen Quellen geben ihren Inhalt so zurück, wie er ist. Sagen Sie im System-Prompt, dass Tool-Ergebnisse Daten sind, geben Sie jedem Agenten nur die Tools, die er braucht, und schützen Sie die Tools, die etwas ändern, mit Freigaben. Eine Studie zeigt ihrem Modell jedes Ergebnis als Daten. Siehe [die Sicherheitsregeln der Web-Tools](./web-research#security-rules).

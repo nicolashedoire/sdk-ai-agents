@@ -184,6 +184,8 @@ sdk.defineGlobalPolicy({
 
 Um `budgetLimit` também pode limitar `maxTokens` e `maxCost`, contados nas chamadas ao modelo: quando o consumo do período ultrapassa um limite, as chamadas de ferramentas são recusadas, e `maxCost` também as recusa assim que o custo de uma chamada é desconhecido (um modelo sem preço, uma chamada sem contagem de tokens). Veja [Custos de API](./costs#budgets).
 
+Uma chamada conta nos seus orçamentos de chamadas quando está prestes a ser executada, então uma chamada que aguarda uma aprovação só conta depois de aprovada: se outras chamadas esgotarem o orçamento durante a espera, a chamada aprovada é recusada.
+
 ### Resultados não confiáveis {#untrusted-output}
 
 O que uma ferramenta devolve volta para o modelo, e uma página, um arquivo ou uma resposta de API pode conter instruções escritas para ele (prompt injection). As ferramentas Web marcam cada resposta como `untrusted: true`, e as suas descrições dizem ao modelo que nunca siga instruções encontradas nela. As outras fontes devolvem o seu conteúdo tal como está. Diga no prompt de sistema que os resultados das ferramentas são dados, dê a cada agente apenas as ferramentas de que ele precisa, e proteja com aprovações as ferramentas que alteram coisas. Um estudo mostra cada resultado ao seu modelo como dados. Veja [as regras de segurança das ferramentas Web](./web-research#security-rules).

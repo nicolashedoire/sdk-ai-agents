@@ -122,7 +122,7 @@
 | **전송 방식** (Transport) | MCP 애플리케이션과 서버가 메시지를 주고받는 방법입니다. **stdio**(애플리케이션이 같은 컴퓨터에서 서버를 프로그램으로 시작하고 그 입력과 출력으로 대화함) 또는 **Streamable HTTP**(서버가 웹 서비스임)입니다. [stdio 또는 HTTP?](./mcp-deploy#stdio-or-http)를 보세요. |
 | **OpenAPI** | 웹 API를 기계가 읽을 수 있게 기술하는 표준으로, 주소, 매개변수, 응답을 담으며 흔히 `openapi.json`으로 게시됩니다. SDK는 이것으로부터 오퍼레이션마다 도구를 하나씩 만듭니다. [웹 API](./mcp-recipes#a-web-api-from-its-openapi-description)를 보세요. |
 | **JSON Schema** | 어떤 데이터(여기서는 도구의 인자)의 형태를 기술한 것으로, 모델과 MCP 애플리케이션이 도구를 올바르게 호출하기 위해 읽습니다. SDK가 여러분의 Zod 스키마나 OpenAPI 기술로부터 작성해 줍니다. |
-| **읽기 전용** (Read-only) | 볼 수는 있지만 바꿀 수는 없습니다. 폴더와 데이터베이스 소스는 구조상 읽기 전용이고, 웹 API는 기본적으로 읽기 전용입니다(`GET` 오퍼레이션만). |
+| **읽기 전용** (Read-only) | 볼 수는 있지만 바꿀 수는 없습니다. 폴더 소스는 구조상 읽기 전용이고, 데이터베이스 소스는 모든 쿼리를 읽기 전용으로 실행하며(PostgreSQL에서는 읽기만 할 수 있는 역할로도 연결하세요. 읽기 전용 트랜잭션은 `dblink` 같은 함수를 막지 못합니다), 웹 API는 기본적으로 읽기 전용입니다(`GET` 오퍼레이션만). |
 | **도구 소스** (Tool source) | 시스템으로부터 바로 쓸 수 있는 도구를 만들어 주는 함수입니다. `openApiTools`, `folderTools`, `databaseTools`, `webTools`, `governedAgentTool`, `cognitiveAgentTool`, 그리고 어떤 MCP 서버의 도구든 가져오는 `connectMcpServer`가 있습니다. 한 줄로 MCP를 통해 제공하거나, 여러분의 에이전트에게 줄 수 있습니다. [도구](./tools), [무엇이든 MCP 서버로](./mcp-recipes), [웹 조사](./web-research)를 보세요. |
 
 ## 프로덕션 운영 {#operating-in-production}
