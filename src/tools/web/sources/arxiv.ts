@@ -65,9 +65,17 @@ export async function searchArxiv(
     minIntervalMs: options.minIntervalMs ?? 3_000,
     ...(request.signal ? { signal: request.signal } : {}),
   });
-  if ([403, 406, 429, 503].includes(response.status)) {
+  if (response.status === 406) {
+    // Its CDN's refusal, with an empty body: of clients that do not name HTTP/1.1 in the TLS
+    // handshake (the web tools do), and of others at times.
+    throw new SearchThrottledError(
+      "arXiv's CDN refused the request (HTTP 406, empty answer); try again later",
+      retryAfterOf(response)
+    );
+  }
+  if ([403, 429, 503].includes(response.status)) {
     // arXiv's API refuses clients that go faster than one request every 3 s, one connection at
-    // a time, sometimes with a 406 from its CDN: a throttle, tried again once after a wait.
+    // a time: a throttle, tried again once after a wait.
     throw new SearchThrottledError(
       `arXiv refused the request (HTTP ${response.status}): it allows one request every 3 s, one at a time; try again later`,
       retryAfterOf(response)

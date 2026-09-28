@@ -1,13 +1,32 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { arxivQuery } from '../tools/web/sources/arxiv.js';
+import { GuardedHttpClient } from '../tools/web/guarded-http.js';
+import { HostPacer } from '../tools/web/politeness.js';
+import { arxivQuery, searchArxiv } from '../tools/web/sources/arxiv.js';
 import { isRetryableWebError, WebConfigurationError } from '../tools/web/web-errors.js';
-import { type WebToolsOptions, webTools } from '../tools/web/web-tools.js';
+import { DEFAULT_USER_AGENT, type WebToolsOptions, webTools } from '../tools/web/web-tools.js';
 import type { ToolDefinition } from '../types/tool.js';
-import { reply, replyJson, WebServer } from './support/web-server.js';
+import { selfSignedCertificate } from './support/test-certificate.js';
+import { type Route, reply, replyJson, WebServer } from './support/web-server.js';
 
 const fixture = (name: string) =>
   readFileSync(new URL(`./fixtures/web/${name}`, import.meta.url), 'utf8');
+
+/**
+ * arXiv's CDN refusing a request, as it answered one on 2026-09-28: HTTP 406, an empty body,
+ * never cached, from its Varnish caches (no `via: 1.1 google`: the API never saw it).
+ */
+const arxivCdnRefusal: Route = (_request, response) => {
+  response
+    .writeHead(406, {
+      'cache-control': 'private, no-store',
+      'accept-ranges': 'bytes',
+      via: '1.1 varnish, 1.1 varnish',
+      'x-cache': 'MISS, MISS',
+      'x-cache-hits': '0, 0',
+    })
+    .end();
+};
 
 // arXiv, Wikipedia and GitHub are local servers speaking their real formats.
 describe('arxiv_search, wikipedia_search, github_search', () => {
@@ -100,11 +119,17 @@ describe('arxiv_search, wikipedia_search, github_search', () => {
       );
     });
 
-    it('explains a refusal of its rate limit (arXiv answers 406 or 503)', async () => {
-      server.on('/api/query', reply('Not Acceptable', { status: 406, type: 'text/plain' }));
+    it("explains a refusal: its CDN's 406, or its rate limit's 503", async () => {
+      server.on('/api/query', arxivCdnRefusal);
 
       await expect(call('arxiv_search', { query: 'x' }, arxiv())).rejects.toThrow(
-        'arXiv refused the request (HTTP 406): it allows one request every 3 s, one at a time; try again later'
+        "arXiv's CDN refused the request (HTTP 406, empty answer); try again later"
+      );
+
+      server.on('/api/query', reply('Service Unavailable', { status: 503, type: 'text/plain' }));
+
+      await expect(call('arxiv_search', { query: 'x' }, arxiv())).rejects.toThrow(
+        'arXiv refused the request (HTTP 503): it allows one request every 3 s, one at a time; try again later'
       );
     });
 
@@ -392,5 +417,67 @@ describe('arxiv_search, wikipedia_search, github_search', () => {
       ['github_search', 'low'],
     ]);
     expect(tools.every((definition) => definition.metadata?.readOnly === true)).toBe(true);
+  });
+});
+
+describe("arxiv_search over https, as arXiv's CDN answers", () => {
+  const certificate = selfSignedCertificate();
+  let edge: WebServer;
+
+  beforeEach(async () => {
+    edge = new WebServer(certificate);
+    await edge.start();
+  });
+
+  afterEach(async () => {
+    await edge.stop();
+  });
+
+  const client = () =>
+    new GuardedHttpClient({
+      userAgent: DEFAULT_USER_AGENT,
+      timeoutMs: 5_000,
+      maxRedirects: 0,
+      maxBytes: 1_000_000,
+      pacer: new HostPacer(),
+      ca: certificate.cert,
+    }).forOrigin(edge.url);
+
+  it('names HTTP/1.1 in the TLS handshake: the CDN refused every query it had not cached (a real study lost them all)', async () => {
+    // arXiv's CDN answers 406 to a client that names no protocol (ALPN), for a query not in
+    // its cache: every long query of a study.
+    edge.on('/api/query', (request, response) =>
+      request.alpn === 'http/1.1'
+        ? reply(fixture('arxiv-feed.xml'), { type: 'application/atom+xml; charset=utf-8' })(
+            request,
+            response
+          )
+        : arxivCdnRefusal(request, response)
+    );
+
+    const results = await searchArxiv(
+      client(),
+      { baseUrl: edge.url, minIntervalMs: 0 },
+      {
+        query:
+          'web browser shared components typed interfaces verification cross-site caching WebAssembly modules architecture',
+        maxResults: 5,
+      }
+    );
+
+    expect(results.map((result) => result.id)).toEqual(['arxiv:1706.03762', 'arxiv:hep-th/9901001']);
+    expect(edge.hits('/api/query').map((request) => request.alpn)).toEqual(['http/1.1']);
+  });
+
+  it("reports the CDN's 406 as a throttle, with what arXiv answered", async () => {
+    edge.on('/api/query', arxivCdnRefusal);
+
+    await expect(
+      searchArxiv(client(), { baseUrl: edge.url, minIntervalMs: 0 }, { query: 'x', maxResults: 5 })
+    ).rejects.toMatchObject({
+      name: 'SearchThrottledError',
+      throttled: true,
+      message: "arXiv's CDN refused the request (HTTP 406, empty answer); try again later",
+    });
   });
 });
