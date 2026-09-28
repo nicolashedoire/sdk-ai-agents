@@ -155,8 +155,8 @@ sdk.defineCapability({
   tools: ['calculator'],
 });
 
-// Option 2: With Tool objects not registered yet (built with defineTool):
-// defineCapability registers them. A tool already registered would throw.
+// Option 2: With Tool objects: defineCapability registers them, or reuses the one
+// sdk.defineTool returned. Another tool with a taken name is refused.
 const percentTool = defineTool({
   name: 'percent',
   description: 'Computes what percentage a part is of a total',

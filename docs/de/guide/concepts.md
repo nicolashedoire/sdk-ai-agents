@@ -261,7 +261,7 @@ Agenten, Tools und Fähigkeiten werden zur Nachverfolgung und Nachvollziehbarkei
 - Tools logisch gruppieren
 - Fähigkeiten in mehreren Agenten wiederverwenden
 - Fähigkeiten dokumentieren
-- **Empfohlener Ablauf:** Sie können `defineCapability()` entweder Tool-Namen (Strings) oder direkt Tool-Objekte übergeben. Wenn Sie Tool-Objekte übergeben, werden diese automatisch registriert.
+- **Empfohlener Ablauf:** Sie können `defineCapability()` entweder Tool-Namen (Strings) oder direkt Tool-Objekte übergeben. Wenn Sie Tool-Objekte übergeben, werden diese registriert oder wiederverwendet, wenn eines bereits das registrierte Tool seines Namens ist; ein anderes Tool mit einem bereits vergebenen Namen wird abgelehnt.
 
 ### Versionierung {#versioning}
 - Semantische Versionierung verwenden

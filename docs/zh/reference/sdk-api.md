@@ -73,10 +73,10 @@ const analyst = sdk.createAgent({
 
 | 方法 | 返回值 | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | 受治理智能体：`run({ message, context?, signal?, onText?, onTextRestart? })`、`stop(runId?)`、`addTools()`、`setPolicy()`、`id`、`name`、`version`、`configHash`。它只能运行自己的工具（`tools`、`capabilities`），即使模型点名了 SDK 中注册的另一个工具；`signal` 用于取消运行；`onText` 在模型写出文本的同时接收这些文本，`onTextRestart` 则在失败的模型调用被再次尝试时接收需要丢弃的部分（参见[流式输出回答](../guide/governed-agents#_7-streaming-the-answer)） |
-| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`、`stop(runId?)`、`learnFromFeedback(runId, feedback)`、`getProfile()`、`setProfile()`。它的思维是结构化的，不进行流式输出 |
-| `defineTool(definition)` | `Tool` | 注册一个工具；处理函数的类型根据其 Zod schema 推导 |
-| `defineCapability(definition)` | `Capability` | 对工具分组 |
+| `createAgent(config)` | `AgentImpl` | 受治理智能体：`run({ message, context?, signal?, onText?, onTextRestart? })`、`stop(runId?)`、`addTools()`、`setPolicy()`、`id`、`name`、`version`、`configHash`。它只能运行自己的工具（`tools`、`capabilities`），即使模型点名了 SDK 中注册的另一个工具；未知的能力，或者名称已被另一个工具占用的工具，都会以 `ValidationError` 被拒绝，并且什么都不会被注册；`signal` 用于取消运行；`onText` 在模型写出文本的同时接收这些文本，`onTextRestart` 则在失败的模型调用被再次尝试时接收需要丢弃的部分（参见[流式输出回答](../guide/governed-agents#_7-streaming-the-answer)） |
+| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`、`stop(runId?)`、`learnFromFeedback(runId, feedback)`、`getProfile()`、`setProfile()`。它的思维是结构化的，不进行流式输出。名称已被另一个工具占用的工具会以 `ValidationError` 被拒绝 |
+| `defineTool(definition)` | `Tool` | 注册一个工具；处理函数的类型根据其 Zod schema 推导。一个名称只能注册一次，无论版本如何：第二次注册会抛出错误 |
+| `defineCapability(definition)` | `Capability` | 对工具分组。`tools` 接受名称或 Tool 对象：Tool 对象会被注册，如果它本身就是该名称已注册的工具，则会被复用；名称已被占用的其他工具会以 `ValidationError` 被拒绝 |
 | `listTools()` | `Tool[]` | 所有已注册的工具 |
 | `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs?, onEvent? })` | `Promise<unknown>` | 在智能体之外进行受治理的执行（MCP 服务器会用到）：参数、策略、审批、预算（在调用开始时计数），然后是工具本身。`signal` 会取消待处理的审批并传递给处理函数；`approvalTimeoutMs` 会取消一个无人决定的审批 |
 | `traceResourceRead(uri, read, { agentId? })` | `Promise<ResourceContent>` | 把 `read()` 作为一次独立的运行来执行：`run.started`、`resource.read`（URI、大小、SHA-256）、`run.completed` 或 `run.failed` |
@@ -565,7 +565,7 @@ interface WebClient {
 | --- | --- |
 | `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | 一个 MCP `Server`，恰好暴露 `tools` 所列出的内容：已定义工具的名称和/或 `ToolDefinition`（会替你在 SDK 上定义；同一个定义可以再次传入，名称已被占用的另一个工具会被拒绝）。`resources`：一个或多个 `ResourceProvider`；每一次读取都会被追踪。调用以 `mcp:<name>`（或 `agentId`）的身份运行；在 `approvalTimeoutMs`（默认 50 000 毫秒）内无人决定的审批会被取消；对输入的拒绝会向客户端解释，其他原因只有在设置 `exposeErrorDetails` 时才会给出。带有 `progressToken` 的调用会为每个事件收到一条 `notifications/progress`，全部在结果之前发送（[进度通知](../guide/mcp-deploy#progress-notifications)） |
 | `serveMcpOverStdio(sdk, options)` | 同上，但连接到 stdin/stdout；向 stderr 写入一行“ready”，并在 stdin 结束时关闭（进行中的调用会被中止，待处理的审批会被取消）。`approvalTimeoutMs` 默认为 50 000，与 `createMcpServer` 相同 |
-| `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry? })` | `{ tools, client, close() }`——任何 MCP 服务器的工具，以 `ToolDefinition` 的形式提供 |
+| `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry?, validateArguments? })` | `{ tools, client, close() }`——任何 MCP 服务器的工具，以 `ToolDefinition` 的形式提供。除非设置了 `validateArguments: false`，否则它们的参数会对照服务器的 `inputSchema` 检查（`type`、`properties`、`required`、`additionalProperties`、`enum`、`const`、`items`、长度和上下限、`allOf`、`anyOf`、`oneOf`；其他关键字交给服务器）。`readOnlyHint` 对应 `metadata.readOnly`，`destructiveHint: true` 对应 `riskLevel: 'high'`，`metadata` 的每个字段都优先于它们。调用方放弃时，会取消服务器上的这次调用（`notifications/cancelled`） |
 
 `GovernedToolHost` 是服务器对 SDK 的需求（`listTools`、`defineTool`、`executeTool`、`traceResourceRead`）；`createSDK()` 返回的对象实现了它。
 

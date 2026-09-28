@@ -69,9 +69,9 @@ const refundOrder = sdk.defineTool({
 | `await openApiTools({ spec })` | 调用一个 Web API，每个操作一个工具：默认是 `GET` 操作；`include` 会用它列出的操作取代它们，这是获得写操作的唯一方式 | `operationId`，没有时则是方法加路径（`get_pets_petId`） | `GET`：低，只读。其他：高，需要审批 | 一份 OpenAPI 3 描述（URL、文件或对象） | [一个 Web API](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | 搜索 Web，阅读一个网页或一份 PDF，搜索 arXiv、Wikipedia 和 GitHub | `web_search`、`web_fetch`、`arxiv_search`、`wikipedia_search`、`github_search` | `web_fetch` 为中，其他为低；全部只读 | 起步什么都不需要（DuckDuckGo）；读取 PDF 需要 `unpdf`；搜索代码需要一个 GitHub 令牌 | [Web 调研](./web-research) |
 | `governedAgentTool(agent)`、`cognitiveAgentTool(agent)` | 询问另一个智能体：受治理智能体回答一条 `message`，认知智能体针对一个 `problem` 进行推理并返回它的决策 | `ask_<agent name>` | 中，未标记为只读 | 一个智能体，因此需要一个模型密钥 | [一个智能体](./mcp-recipes#an-agent-your-reasoning-twin) |
-| `await connectMcpServer({ name, transport })` | 使用任何 MCP 服务器的工具 | 服务器自己的名称，前面加上 `toolPrefix` | 不设置：`metadata` 会应用到每一个导入的工具 | `@sdk-ai-agents/core/mcp` 和 `@modelcontextprotocol/sdk`；用完后调用 `close()` | [使用 MCP 服务器的工具](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
+| `await connectMcpServer({ name, transport })` | 使用任何 MCP 服务器的工具 | 服务器自己的名称，前面加上 `toolPrefix` | 来自服务器的提示：`readOnlyHint` 对应 `readOnly`，`destructiveHint: true` 对应高风险；你的 `metadata` 会覆盖它们 | `@sdk-ai-agents/core/mcp` 和 `@modelcontextprotocol/sdk`；用完后调用 `close()` | [使用 MCP 服务器的工具](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
 
-MCP 工具有两点不同：SDK 只检查它们的参数是否构成一个对象（其余的由服务器检查）；服务器自己给出的提示（例如只读）不会被导入：请自己设置 `metadata`。
+对于 MCP 工具，SDK 会对照服务器的 `inputSchema` 检查每次调用的参数，覆盖常见的 JSON Schema 关键字（其余的由服务器检查；`validateArguments: false` 可以关闭这项检查），而调用方放弃时，服务器上的这次调用也会被取消。这些提示只是服务器自己的声明：它们给工具打上标签，但从不放宽任何策略。
 
 ## 把工具交给智能体 {#giving-tools-to-an-agent}
 
@@ -85,11 +85,11 @@ const support = sdk.createAgent({
 });
 ```
 
-从包中导入的 `defineTool` 只构建工具，并不注册它：SDK 会在创建使用它的智能体时注册它。如果同名的工具已经注册，保留并运行的是已注册的那一个。
+从包中导入的 `defineTool` 只构建工具，并不注册它：SDK 会在创建使用它的智能体时注册它，多个智能体可以共用它。如果一个工具的名称已经被另一个工具占用，`createAgent`、`createCognitiveAgent`、`addTools` 和 `defineCapability` 都会以 `ValidationError` 拒绝它：调用是按名称运行的，所以它永远不会被运行。
 
 ### 能力 {#capabilities}
 
-能力为一组工具命名，以便把它们交给多个智能体。工具的 `capability` 标签并不是能力：能力要用 `sdk.defineCapability` 来定义。
+能力为一组工具命名，以便把它们交给多个智能体。工具的 `capability` 标签并不是能力：能力要用 `sdk.defineCapability` 来定义。如果交给智能体的能力从未定义过，这个智能体会以 `ValidationError` 被拒绝。
 
 ```ts
 sdk.defineCapability({

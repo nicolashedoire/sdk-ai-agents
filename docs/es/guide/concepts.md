@@ -261,7 +261,7 @@ Los agentes, las herramientas y las capacidades están versionados para su segui
 - Agrupa las herramientas de forma lógica
 - Reutiliza las capacidades entre agentes
 - Documenta las capacidades
-- **Flujo de trabajo recomendado:** puedes pasar a `defineCapability()` nombres de herramientas (cadenas) u objetos Tool directamente. Si pasas objetos Tool, se registran automáticamente.
+- **Flujo de trabajo recomendado:** puedes pasar a `defineCapability()` nombres de herramientas (cadenas) u objetos Tool directamente. Si pasas objetos Tool, se registran, o se reutilizan cuando uno ya es la herramienta registrada con su nombre; otra herramienta con un nombre ya ocupado se rechaza.
 
 ### Versionado {#versioning}
 - Usa el versionado semántico

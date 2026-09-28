@@ -73,10 +73,10 @@ const analyst = sdk.createAgent({
 
 | 메서드 | 반환값 | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | 통제형 에이전트: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`, `version`, `configHash`. 모델이 SDK에 등록된 다른 도구의 이름을 대더라도 자신의 도구(`tools`, `capabilities`)만 실행할 수 있습니다. `signal`은 실행을 취소합니다. `onText`는 모델이 쓰는 텍스트를 쓰이는 대로 받고, `onTextRestart`는 실패한 모델 호출을 다시 시도할 때 지워야 할 부분을 받습니다([답변 스트리밍하기](../guide/governed-agents#_7-streaming-the-answer) 참고) |
-| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()`. 사고는 구조화되어 있으며 스트리밍되지 않습니다 |
-| `defineTool(definition)` | `Tool` | 도구를 등록합니다. 핸들러의 타입은 Zod 스키마로부터 정해집니다 |
-| `defineCapability(definition)` | `Capability` | 도구를 묶습니다 |
+| `createAgent(config)` | `AgentImpl` | 통제형 에이전트: `run({ message, context?, signal?, onText?, onTextRestart? })`, `stop(runId?)`, `addTools()`, `setPolicy()`, `id`, `name`, `version`, `configHash`. 모델이 SDK에 등록된 다른 도구의 이름을 대더라도 자신의 도구(`tools`, `capabilities`)만 실행할 수 있습니다. 알 수 없는 역량이나, 다른 도구가 이미 차지한 이름의 도구는 `ValidationError`로 거부되며, 아무것도 등록되지 않습니다. `signal`은 실행을 취소합니다. `onText`는 모델이 쓰는 텍스트를 쓰이는 대로 받고, `onTextRestart`는 실패한 모델 호출을 다시 시도할 때 지워야 할 부분을 받습니다([답변 스트리밍하기](../guide/governed-agents#_7-streaming-the-answer) 참고) |
+| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`, `stop(runId?)`, `learnFromFeedback(runId, feedback)`, `getProfile()`, `setProfile()`. 사고는 구조화되어 있으며 스트리밍되지 않습니다. 다른 도구가 이미 차지한 이름의 도구는 `ValidationError`로 거부됩니다 |
+| `defineTool(definition)` | `Tool` | 도구를 등록합니다. 핸들러의 타입은 Zod 스키마로부터 정해집니다. 이름은 버전과 상관없이 한 번만 등록되며, 두 번째 등록은 오류를 던집니다 |
+| `defineCapability(definition)` | `Capability` | 도구를 묶습니다. `tools`는 이름이나 Tool 객체를 받습니다. Tool 객체는 등록되거나, 그 객체가 이미 그 이름으로 등록된 도구라면 재사용됩니다. 다른 도구가 이미 차지한 이름의 도구는 `ValidationError`로 거부됩니다 |
 | `listTools()` | `Tool[]` | 등록된 모든 도구 |
 | `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs?, onEvent? })` | `Promise<unknown>` | 에이전트 밖에서의 통제된 실행(MCP 서버가 사용): 인자, 정책, 승인, 예산(호출이 시작될 때 계수), 그다음 도구. `signal`은 대기 중인 승인을 취소하고 핸들러에 전달됩니다. `approvalTimeoutMs`는 아무도 결정하지 않은 승인을 취소합니다 |
 | `traceResourceRead(uri, read, { agentId? })` | `Promise<ResourceContent>` | `read()`를 자체 실행으로 실행합니다: `run.started`, `resource.read`(URI, 크기, SHA-256), `run.completed` 또는 `run.failed` |
@@ -565,7 +565,7 @@ interface WebClient {
 | --- | --- |
 | `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | `tools`가 나열한 것만 정확히 노출하는 MCP `Server`: 정의된 도구의 이름과/또는 `ToolDefinition`(SDK에 대신 정의됩니다. 같은 정의는 다시 넘겨도 되지만, 이미 쓰인 이름을 가진 다른 도구는 거부됩니다). `resources`: 하나 이상의 `ResourceProvider`. 모든 읽기가 추적됩니다. 호출은 `mcp:<name>`(또는 `agentId`)으로 실행됩니다. 아무도 `approvalTimeoutMs`(기본값 50 000 ms) 안에 결정하지 않은 승인은 취소됩니다. 입력 거부는 클라이언트에게 설명되고, 그 밖의 원인은 `exposeErrorDetails`를 쓸 때만 설명됩니다. `progressToken`이 있는 호출은 이벤트마다 `notifications/progress`를 하나씩 받으며, 모두 결과보다 먼저 보내집니다([진행 알림](../guide/mcp-deploy#progress-notifications)) |
 | `serveMcpOverStdio(sdk, options)` | 위와 같지만 stdin/stdout에 연결됩니다. stderr에 "ready" 한 줄을 쓰고, stdin이 끝나면 닫힙니다(진행 중인 호출은 중단되고, 대기 중인 승인은 취소됩니다). `approvalTimeoutMs`의 기본값은 `createMcpServer`와 마찬가지로 50 000입니다 |
-| `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry? })` | `{ tools, client, close() }` — 어떤 MCP 서버든 그 도구를 `ToolDefinition`으로 |
+| `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry?, validateArguments? })` | `{ tools, client, close() }` — 어떤 MCP 서버든 그 도구를 `ToolDefinition`으로. `validateArguments: false`가 아니면 인자를 서버의 `inputSchema`에 대해 검사합니다(`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, `items`, 길이와 범위, `allOf`, `anyOf`, `oneOf`. 그 밖의 키워드는 서버에 맡깁니다). `readOnlyHint`는 `metadata.readOnly`가 되고 `destructiveHint: true`는 `riskLevel: 'high'`가 되며, `metadata`의 각 필드가 이들보다 우선합니다. 호출하는 쪽이 포기하면 서버에서도 호출이 취소됩니다(`notifications/cancelled`) |
 
 `GovernedToolHost`는 서버가 SDK에 요구하는 것(`listTools`, `defineTool`, `executeTool`, `traceResourceRead`)입니다. `createSDK()`는 이를 구현하는 객체를 반환합니다.
 

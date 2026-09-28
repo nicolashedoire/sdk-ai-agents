@@ -69,9 +69,9 @@ const refundOrder = sdk.defineTool({
 | `await openApiTools({ spec })` | 웹 API를 호출합니다. 오퍼레이션마다 도구가 하나이며, 기본적으로 `GET` 오퍼레이션입니다. `include`는 이를 자신이 나열한 오퍼레이션으로 대체하며, 쓰기 오퍼레이션을 얻는 유일한 방법입니다 | `operationId`, 없으면 메서드와 경로(`get_pets_petId`) | `GET`: 낮음, 읽기 전용. 그 밖: 높음, 승인 필요 | OpenAPI 3 기술(URL, 파일 또는 객체) | [웹 API](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | 웹을 검색하고, 페이지나 PDF를 읽고, arXiv, Wikipedia, GitHub를 검색합니다 | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` | `web_fetch`는 중간, 나머지는 낮음. 모두 읽기 전용 | 시작하는 데는 아무것도 필요 없음(DuckDuckGo). PDF에는 `unpdf`, 코드 검색에는 GitHub 토큰 | [웹 조사](./web-research) |
 | `governedAgentTool(agent)`, `cognitiveAgentTool(agent)` | 다른 에이전트에게 묻습니다. 통제형 에이전트는 `message`에 답하고, 인지 에이전트는 `problem`에 대해 추론한 뒤 결정을 반환합니다 | `ask_<agent name>` | 중간, 읽기 전용으로 표시되지 않음 | 에이전트, 따라서 모델 키 | [에이전트](./mcp-recipes#an-agent-your-reasoning-twin) |
-| `await connectMcpServer({ name, transport })` | 어떤 MCP 서버의 도구든 사용합니다 | 서버가 붙인 이름, 앞에 `toolPrefix`가 붙음 | 설정되지 않음. `metadata`가 가져온 모든 도구에 적용됩니다 | `@sdk-ai-agents/core/mcp`와 `@modelcontextprotocol/sdk`. 다 쓰면 `close()` | [MCP 서버의 도구 사용하기](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
+| `await connectMcpServer({ name, transport })` | 어떤 MCP 서버의 도구든 사용합니다 | 서버가 붙인 이름, 앞에 `toolPrefix`가 붙음 | 서버의 힌트에서 가져옴. `readOnlyHint`는 `readOnly`가 되고, `destructiveHint: true`는 높은 위험이 됩니다. 여러분의 `metadata`가 이를 덮어씁니다 | `@sdk-ai-agents/core/mcp`와 `@modelcontextprotocol/sdk`. 다 쓰면 `close()` | [MCP 서버의 도구 사용하기](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
 
-MCP 도구는 두 가지가 다릅니다. SDK는 인자가 객체인지만 검사하고(나머지는 서버가 검사합니다), 읽기 전용 같은 서버 자체의 힌트는 가져오지 않습니다. `metadata`를 직접 설정하세요.
+MCP 도구의 경우, SDK는 각 호출의 인자를 서버의 `inputSchema`와 대조해 흔히 쓰이는 JSON Schema 키워드에 대해 검사합니다(나머지는 서버가 검사하며, `validateArguments: false`로 끌 수 있습니다). 또 호출하는 쪽이 포기하면 서버에서도 호출이 취소됩니다. 힌트는 서버 자신의 주장일 뿐입니다. 도구에 레이블을 붙일 뿐, 어떤 정책도 절대 완화하지 않습니다.
 
 ## 에이전트에게 도구 주기 {#giving-tools-to-an-agent}
 
@@ -85,11 +85,11 @@ const support = sdk.createAgent({
 });
 ```
 
-패키지에서 가져온 `defineTool`은 도구를 등록하지 않고 만들기만 합니다. 그 도구를 쓰는 에이전트가 만들어질 때 SDK가 등록합니다. 그 이름의 도구가 이미 등록되어 있다면, 등록된 도구가 유지되고 그 도구가 실행됩니다.
+패키지에서 가져온 `defineTool`은 도구를 등록하지 않고 만들기만 합니다. 그 도구를 쓰는 에이전트가 만들어질 때 SDK가 등록하며, 여러 에이전트가 그 도구를 함께 쓸 수 있습니다. 다른 도구가 이미 차지한 이름의 도구는 `createAgent`, `createCognitiveAgent`, `addTools`, `defineCapability`가 `ValidationError`로 거부합니다. 호출은 이름으로 실행되므로, 그런 도구는 절대 실행되지 않을 것이기 때문입니다.
 
 ### 역량 {#capabilities}
 
-역량은 여러 에이전트에게 줄 도구 묶음에 이름을 붙인 것입니다. 도구의 `capability` 레이블은 역량이 아닙니다. 역량은 `sdk.defineCapability`로 정의하세요.
+역량은 여러 에이전트에게 줄 도구 묶음에 이름을 붙인 것입니다. 도구의 `capability` 레이블은 역량이 아닙니다. 역량은 `sdk.defineCapability`로 정의하세요. 정의된 적 없는 역량을 받은 에이전트는 `ValidationError`로 거부됩니다.
 
 ```ts
 sdk.defineCapability({

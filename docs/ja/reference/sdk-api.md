@@ -73,10 +73,10 @@ const analyst = sdk.createAgent({
 
 | メソッド | 戻り値 | |
 | --- | --- | --- |
-| `createAgent(config)` | `AgentImpl` | ガバナンス付きエージェント：`run({ message, context?, signal?, onText?, onTextRestart? })`、`stop(runId?)`、`addTools()`、`setPolicy()`、`id`、`name`、`version`、`configHash`。モデルが SDK に登録されている別のツールの名前を挙げても、実行できるのは自分のツール（`tools`、`capabilities`）だけ。`signal` は実行をキャンセルする。`onText` はモデルが書くテキストを書かれるそばから受け取り、`onTextRestart` は失敗したモデル呼び出しがもう一度試されるときに捨てる部分を受け取る（[回答のストリーミング](../guide/governed-agents#_7-streaming-the-answer) を参照） |
-| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`、`stop(runId?)`、`learnFromFeedback(runId, feedback)`、`getProfile()`、`setProfile()`。その思考は構造化されており、ストリーミングされない |
-| `defineTool(definition)` | `Tool` | ツールを登録する。ハンドラーの型は、その Zod スキーマから決まる |
-| `defineCapability(definition)` | `Capability` | ツールをグループにまとめる |
+| `createAgent(config)` | `AgentImpl` | ガバナンス付きエージェント：`run({ message, context?, signal?, onText?, onTextRestart? })`、`stop(runId?)`、`addTools()`、`setPolicy()`、`id`、`name`、`version`、`configHash`。モデルが SDK に登録されている別のツールの名前を挙げても、実行できるのは自分のツール（`tools`、`capabilities`）だけ。未知のケイパビリティや、名前を別のツールが持っているツールは `ValidationError` で拒否され、何も登録されない。`signal` は実行をキャンセルする。`onText` はモデルが書くテキストを書かれるそばから受け取り、`onTextRestart` は失敗したモデル呼び出しがもう一度試されるときに捨てる部分を受け取る（[回答のストリーミング](../guide/governed-agents#_7-streaming-the-answer) を参照） |
+| `createCognitiveAgent(config)` | `CognitiveAgent` | `think({ problem, context?, observations?, metadata? })`、`stop(runId?)`、`learnFromFeedback(runId, feedback)`、`getProfile()`、`setProfile()`。その思考は構造化されており、ストリーミングされない。名前を別のツールが持っているツールは `ValidationError` で拒否される |
+| `defineTool(definition)` | `Tool` | ツールを登録する。ハンドラーの型は、その Zod スキーマから決まる。1 つの名前は、バージョンにかかわらず 1 回だけ登録される。2 回目はエラーをスローする |
+| `defineCapability(definition)` | `Capability` | ツールをグループにまとめる。`tools` は名前か Tool オブジェクトを受け取る。Tool オブジェクトは登録されるか、その名前の登録済みのツールであれば再利用される。すでに使われている名前を持つ別のツールは `ValidationError` で拒否される |
 | `listTools()` | `Tool[]` | 登録されているすべてのツール |
 | `executeTool(name, params, { agentId?, runId?, allowedTools?, signal?, approvalTimeoutMs?, onEvent? })` | `Promise<unknown>` | エージェントの外でのガバナンス付き実行（MCP サーバーが使う）：引数、ポリシー、承認、予算（呼び出しの開始時に数えられる）の順にチェックし、それからツールを実行する。`signal` は承認待ちをキャンセルし、ハンドラーにも届く。`approvalTimeoutMs` は、誰も判断しなかった承認をキャンセルする |
 | `traceResourceRead(uri, read, { agentId? })` | `Promise<ResourceContent>` | `read()` を独立した 1 つの実行として行う：`run.started`、`resource.read`（URI、サイズ、SHA-256）、`run.completed` または `run.failed` |
@@ -565,7 +565,7 @@ interface WebClient {
 | --- | --- |
 | `createMcpServer(sdk, { name, tools, resources?, version?, agentId?, instructions?, approvalTimeoutMs?, exposeErrorDetails? })` | `tools` に列挙したものだけを公開する MCP の `Server`。`tools` には、定義済みツールの名前と `ToolDefinition` のどちらか、または両方を指定する（`ToolDefinition` は自動的に SDK 上で定義される。同じ定義をもう一度渡すのはかまわないが、すでに使われている名前を持つ別のツールは拒否される）。`resources`：1 つまたは複数の `ResourceProvider`。すべての読み取りがトレースされる。呼び出しは `mcp:<name>`（または `agentId`）として実行される。`approvalTimeoutMs`（デフォルトは 50 000 ms）以内に誰も判断しない承認はキャンセルされる。入力の拒否はクライアントに説明され、それ以外の原因は `exposeErrorDetails` を指定した場合にだけ伝えられる。`progressToken` 付きの呼び出しは、イベントごとに `notifications/progress` を 1 つ受け取り、それらはすべて結果より前に送られる（[進捗通知](../guide/mcp-deploy#progress-notifications)） |
 | `serveMcpOverStdio(sdk, options)` | 同じサーバーを stdin/stdout に接続したもの。stderr に「ready」の行を 1 行書き込み、stdin が終わると閉じる（進行中の呼び出しは中断され、承認待ちはキャンセルされる）。`approvalTimeoutMs` のデフォルトは、`createMcpServer` と同じく 50 000 |
-| `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry? })` | `{ tools, client, close() }` — 任意の MCP サーバーのツールを、`ToolDefinition` として返す |
+| `connectMcpServer({ name, transport, toolPrefix?, include?, metadata?, retry?, validateArguments? })` | `{ tools, client, close() }` — 任意の MCP サーバーのツールを、`ToolDefinition` として返す。`validateArguments: false` でない限り、その引数はサーバーの `inputSchema` と照合してチェックされる（`type`、`properties`、`required`、`additionalProperties`、`enum`、`const`、`items`、長さと範囲、`allOf`、`anyOf`、`oneOf`。それ以外はサーバーに任せる）。`readOnlyHint` は `metadata.readOnly` に、`destructiveHint: true` は `riskLevel: 'high'` になり、`metadata` の各フィールドがそれらより優先される。呼び出し元が待つのをやめると、呼び出しはサーバーでもキャンセルされる（`notifications/cancelled`） |
 
 `GovernedToolHost` は、サーバーが SDK に求めるもの（`listTools`、`defineTool`、`executeTool`、`traceResourceRead`）です。`createSDK()` が返すオブジェクトは、これを実装しています。
 
