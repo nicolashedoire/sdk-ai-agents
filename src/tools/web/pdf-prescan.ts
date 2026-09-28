@@ -725,6 +725,8 @@ export function prescanPdf(
           embedded?.k === 'dict' &&
           isName(first(embedded.v.AuthEvent), 'EFOpen');
         if (!onlyEmbedded) return unreadable('it is protected by a password');
+      } else if (algorithm === 5 && key.length !== 32) {
+        return unreadable('its encryption key cannot be read');
       } else if (algorithm === 4 && key.length < 16) {
         const padded = new Uint8Array(16);
         padded.set(key);

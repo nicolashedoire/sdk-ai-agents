@@ -90,6 +90,37 @@ describe('the pre-scan measures what pdf.js reads (#34)', () => {
       await expect(getDocumentProxy(new Uint8Array(locked))).rejects.toThrow(/password/i);
     }, 30_000);
 
+    it('refuses a malformed encryption dictionary, never throws on one', () => {
+      const pdf = (encrypt: string) =>
+        Buffer.from(
+          `%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n2 0 obj\n<< /Length 40 >>\nstream\n${'x'.repeat(40)}\nendstream\nendobj\n3 0 obj\n${encrypt}\nendobj\ntrailer\n<< /Root 1 0 R /Encrypt 3 0 R /ID [<00> <00>] >>\n%%EOF\n`,
+          'latin1'
+        );
+      // The empty password passes the check of this /U (revision 5), but /UE is too short to hold a key.
+      const passes =
+        '<8a851ff82ee7048ad09ec3847f1ddf44944104d2cbd17ef4e3db22c6785a0d45000102030405060708090a0b0c0d0e0f>';
+      const cases: Array<[string, string]> = [
+        ['<< /Filter /Other /V 1 >>', 'it is encrypted by a security handler pdf.js cannot open'],
+        ['<< /Filter /Standard /V 3 /R 3 >>', 'it is encrypted by a method pdf.js cannot open'],
+        [
+          '<< /Filter /Standard /V 5 /R 6 /O <00> /U <00> >>',
+          'its encryption key length cannot be read',
+        ],
+        ['<< /Filter /Standard /V 1 /R 2 >>', 'its encryption dictionary cannot be read'],
+        [
+          `<< /Filter /Standard /V 5 /R 5 /Length 256 /CF << /StdCF << /CFM /AESV3 >> >> /StmF /StdCF /O <00> /U ${passes} /UE <0011> >>`,
+          'its encryption key cannot be read',
+        ],
+        [
+          '<< /Filter /Standard /V 4 /R 4 /Length 128 /StmF /StdCF /O <00> /U <00> >>',
+          'it is protected by a password',
+        ],
+      ];
+      for (const [encrypt, reason] of cases) {
+        expect(scan(pdf(encrypt))).toEqual({ ok: false, kind: 'unreadable', reason });
+      }
+    });
+
     it('decrypts a stream under a shorter number the cross-reference points inside', async () => {
       // `123 0 obj`, and the cross-reference points at `23 0 obj` inside it: pdf.js reads object
       // 23 there, and decrypts it with 23's key.
