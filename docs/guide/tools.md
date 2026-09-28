@@ -184,6 +184,8 @@ sdk.defineGlobalPolicy({
 
 A `budgetLimit` can also cap `maxTokens` and `maxCost`, counted on the model calls: once the period's usage exceeds a cap, tool calls are refused, and `maxCost` also refuses them as soon as a call's cost is unknown (a model without a price, a call without token counts). See [API costs](./costs#budgets).
 
+A call counts in its call budgets when it is about to run, so a call that waits for an approval counts only once approved: if other calls use up the budget during the wait, the approved call is refused.
+
 ### Untrusted output
 
 What a tool returns goes back to the model, and a page, a file or an API answer can hold instructions written for it (prompt injection). The web tools mark every answer `untrusted: true`, and their descriptions tell the model never to follow instructions found in it. The other sources return their content as it is. Say in the system prompt that tool results are data, give each agent only the tools it needs, and protect the tools that change things with approvals. A study shows every result to its model as data. See [the web tools' security rules](./web-research#security-rules).

@@ -184,6 +184,8 @@ sdk.defineGlobalPolicy({
 
 Un `budgetLimit` peut aussi plafonner `maxTokens` et `maxCost`, comptés sur les appels au modèle : une fois un plafond dépassé par la consommation de la période, les appels d'outils sont refusés, et `maxCost` les refuse aussi dès que le coût d'un appel est inconnu (un modèle sans tarif, un appel sans nombres de tokens). Voir [Coûts d'API](./costs#budgets).
 
+Un appel compte dans ses budgets d'appels au moment où il va s'exécuter, donc un appel qui attend une approbation ne compte qu'une fois approuvé : si d'autres appels épuisent le budget pendant l'attente, l'appel approuvé est refusé.
+
 ### Résultats non fiables {#untrusted-output}
 
 Ce que renvoie un outil retourne au modèle, et une page, un fichier ou une réponse d'API peuvent contenir des instructions écrites à son intention (injection de prompt). Les outils Web marquent chaque réponse `untrusted: true`, et leurs descriptions disent au modèle de ne jamais suivre les instructions qu'il y trouve. Les autres sources renvoient leur contenu tel quel. Dites dans le prompt système que les résultats des outils sont des données, ne donnez à chaque agent que les outils dont il a besoin, et protégez par des approbations les outils qui modifient quelque chose. Une étude montre chaque résultat à son modèle comme des données. Voir [les règles de sécurité des outils Web](./web-research#security-rules).
