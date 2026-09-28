@@ -9,7 +9,7 @@ import { connectMcpServer, createMcpServer } from '../mcp.js';
 import { ToolRegistry } from '../registry/tool-registry.js';
 import { defineTool } from '../sdk.js';
 import { jsonSchemaProblems } from '../utils/json-schema-check.js';
-import { createTestSDK, type TestSDK } from './support/test-sdk.js';
+import { createTestSDK, scriptBuildOrBuy, type TestSDK } from './support/test-sdk.js';
 
 const lookupDefinition = {
   name: 'lookup',
@@ -159,6 +159,15 @@ describe('tools given to agents and capabilities', () => {
     await agent.run({ message: 'look customer c-1 up' });
 
     expect(env.provider.requests[0]?.tools?.map((tool) => tool.function.name)).toEqual(['shared']);
+
+    const thinker = createTestSDK();
+    environments.push(thinker);
+    scriptBuildOrBuy(thinker.provider).always('tool-selection', { content: 'nothing to look up' });
+    const analyst = thinker.sdk.createCognitiveAgent({ name: 'analyst', model: 'test-model', tools: [shared, shared] });
+    await analyst.think({ problem: 'Should we build or buy the billing system?' });
+    const offered = thinker.provider.requests.filter((request) => request.tools && request.tools.length > 0);
+    expect(offered.length).toBeGreaterThan(0);
+    for (const request of offered) expect(request.tools?.map((tool) => tool.function.name)).toEqual(['shared']);
   });
 
   it('refuses to serve over MCP a copy of a registered tool with other metadata', () => {

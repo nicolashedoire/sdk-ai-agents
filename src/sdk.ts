@@ -518,8 +518,12 @@ export class SDKImpl implements SDK {
   createCognitiveAgent(config: CognitiveAgentConfig): CognitiveAgent {
     for (const policy of config.policies ?? []) assertCheckableLimits(policy);
     const agentId = uuidv4();
+    // Once per name, as a governed agent's: a provider may refuse two tools of one name.
+    const tools = config.tools && [
+      ...new Map(config.tools.map((tool) => [tool.name, tool])).values(),
+    ];
     // Assembled first, which checks its limits; policies are read when it thinks.
-    const agent = assembleCognitiveAgent(config, {
+    const agent = assembleCognitiveAgent(tools ? { ...config, tools } : config, {
       agentId,
       provider: this.provider,
       eventStore: this.eventStore,
@@ -529,7 +533,7 @@ export class SDKImpl implements SDK {
     });
     // Then its tools, all or none: a tool whose name another tool holds would never run. A
     // refused agent registers nothing and applies no policy.
-    this.toolRegistry.registerOrReuse(config.tools ?? []);
+    this.toolRegistry.registerOrReuse(tools ?? []);
     for (const policy of config.policies ?? []) {
       this.policyEngine.applyAgentPolicy(agentId, policy);
     }
