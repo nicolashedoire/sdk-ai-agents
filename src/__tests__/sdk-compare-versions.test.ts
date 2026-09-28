@@ -168,6 +168,8 @@ describe.skipIf(!nodeSqlite)('compareVersions on SQLite', () => {
 
 describe('configHash', () => {
   let env: TestSDK;
+  /** One SDK per hashed agent: an SDK refuses two different tools of the same name. */
+  const others: TestSDK[] = [];
 
   beforeEach(() => {
     env = createTestSDK();
@@ -175,6 +177,7 @@ describe('configHash', () => {
 
   afterEach(async () => {
     await env.dispose();
+    for (const other of others.splice(0)) await other.dispose();
   });
 
   const caps = (maxToolCalls: number): Policy => ({
@@ -191,8 +194,11 @@ describe('configHash', () => {
     ],
   });
 
-  const hashOf = (config: Partial<AgentConfig>) =>
-    env.sdk.createAgent({ name: 'greeter', model: 'test-model', ...config }).configHash;
+  const hashOf = (config: Partial<AgentConfig>) => {
+    const own = createTestSDK();
+    others.push(own);
+    return own.sdk.createAgent({ name: 'greeter', model: 'test-model', ...config }).configHash;
+  };
 
   it('changes with what makes the agent behave differently', () => {
     const tool = (description: string, schema: z.ZodTypeAny) =>

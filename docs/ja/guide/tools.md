@@ -69,9 +69,9 @@ const refundOrder = sdk.defineTool({
 | `await openApiTools({ spec })` | Web API を呼び出す。オペレーションごとに 1 つのツール。デフォルトでは `GET` オペレーション。`include` はそれを、列挙したオペレーションで置き換える。書き込みオペレーションを得る唯一の方法 | `operationId`、なければメソッドとパス（`get_pets_petId`） | `GET`：低、読み取り専用。それ以外：高、承認が必要 | OpenAPI 3 の記述（URL、ファイル、またはオブジェクト） | [Web API](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | Web を検索する、ページや PDF を読む、arXiv、Wikipedia、GitHub を検索する | `web_search`、`web_fetch`、`arxiv_search`、`wikipedia_search`、`github_search` | `web_fetch` は中、それ以外は低。すべて読み取り専用 | 始めるのに必要なものはない（DuckDuckGo）。PDF には `unpdf`、コードの検索には GitHub のトークン | [Web で調べる](./web-research) |
 | `governedAgentTool(agent)`、`cognitiveAgentTool(agent)` | 別のエージェントに尋ねる。ガバナンス付きエージェントは `message` に答え、認知エージェントは `problem` について推論して、その決定を返す | `ask_<agent name>` | 中、読み取り専用の印はない | エージェント。したがってモデルのキー | [エージェント](./mcp-recipes#an-agent-your-reasoning-twin) |
-| `await connectMcpServer({ name, transport })` | 任意の MCP サーバーのツールを使う | サーバーでの名前（前に `toolPrefix` が付く） | 何も設定されない。`metadata` を指定すると、取り込んだすべてのツールに適用される | `@sdk-ai-agents/core/mcp` と `@modelcontextprotocol/sdk`。使い終わったら `close()` | [MCP サーバーのツールをエージェントで使う](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
+| `await connectMcpServer({ name, transport })` | 任意の MCP サーバーのツールを使う | サーバーでの名前（前に `toolPrefix` が付く） | サーバーのヒントから決まる。`readOnlyHint` は `readOnly` に、`destructiveHint: true` は、ツールが読み取り専用でない限り高リスクになる。あなたの `metadata` がそれらより優先される | `@sdk-ai-agents/core/mcp` と `@modelcontextprotocol/sdk`。使い終わったら `close()` | [MCP サーバーのツールをエージェントで使う](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
 
-MCP のツールでは、2 つの点が異なります。SDK がチェックするのは引数がオブジェクトであることだけで（残りはサーバーがチェックします）、読み取り専用などのサーバー自身のヒントは取り込まれません。`metadata` は自分で設定してください。
+MCP のツールでは、SDK が各呼び出しの引数を、よく使われる JSON Schema のキーワードについて、サーバーの `inputSchema` と照合してチェックします（残りはサーバーがチェックします。`validateArguments: false` で無効にできます）。また、呼び出し元が待つのをやめると、呼び出しはサーバーでもキャンセルされます。ヒントはサーバー自身の申告です。ツールにラベルを付けるだけで、ポリシーを緩めることは決してありません。
 
 ## エージェントにツールを渡す {#giving-tools-to-an-agent}
 
@@ -85,11 +85,11 @@ const support = sdk.createAgent({
 });
 ```
 
-パッケージからインポートした `defineTool` は、ツールを登録せずに組み立てます。SDK は、そのツールを使うエージェントが作成されたときにそれを登録します。その名前のツールがすでに登録されている場合は、登録済みのほうが残り、そちらが実行されます。
+パッケージからインポートした `defineTool` は、ツールを登録せずに組み立てます。SDK は、そのツールを使うエージェントが作成されたときにそれを登録し、複数のエージェントがそのツールを共有できます。名前がすでに別のツールに使われているツールは、`createAgent`、`createCognitiveAgent`、`addTools`、`defineCapability` によって `ValidationError` で拒否されます。呼び出しは名前で実行されるので、そのツールが実行されることは決してないからです。ツールは一度だけ組み立て、そのオブジェクトをすべてのエージェントに渡してください。エージェントごとに組み立て直したツールは新しい `handler` を持つので、別のツールになります。
 
 ### ケイパビリティ {#capabilities}
 
-ケイパビリティは、複数のエージェントに渡すツールのグループに名前を付けたものです。ツールの `capability` ラベルは、ケイパビリティではありません。ケイパビリティは `sdk.defineCapability` で定義してください。
+ケイパビリティは、複数のエージェントに渡すツールのグループに名前を付けたものです。ツールの `capability` ラベルは、ケイパビリティではありません。ケイパビリティは `sdk.defineCapability` で定義してください。定義されたことのないケイパビリティを渡されたエージェントは、`ValidationError` で拒否されます。
 
 ```ts
 sdk.defineCapability({

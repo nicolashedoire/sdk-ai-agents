@@ -69,9 +69,9 @@ Chaque source renvoie des définitions d'outils, prêtes pour `sdk.defineTool` (
 | `await openApiTools({ spec })` | Appeler une API web, un outil par opération : les opérations `GET` par défaut ; `include` les remplace par les opérations qu'il liste, seul moyen d'obtenir des écritures | Le `operationId`, sinon la méthode et le chemin (`get_pets_petId`) | `GET` : faible, lecture seule. Les autres : élevé, approbation requise | Une description OpenAPI 3 (URL, fichier ou objet) | [Une API web](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | Chercher sur le Web, lire une page ou un PDF, chercher dans arXiv, Wikipédia et GitHub | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` | `web_fetch` moyen, les autres faible ; tous en lecture seule | Rien pour commencer (DuckDuckGo) ; `unpdf` pour les PDF ; un jeton GitHub pour chercher dans le code | [Recherche sur le Web](./web-research) |
 | `governedAgentTool(agent)`, `cognitiveAgentTool(agent)` | Consulter un autre agent : un agent gouverné répond à un `message`, un agent cognitif raisonne sur un `problem` et renvoie sa décision | `ask_<agent name>` | moyen, non marqué en lecture seule | Un agent, donc une clé de modèle | [Un agent](./mcp-recipes#an-agent-your-reasoning-twin) |
-| `await connectMcpServer({ name, transport })` | Utiliser les outils de n'importe quel serveur MCP | Les noms du serveur, précédés de `toolPrefix` | Rien de défini : `metadata` s'applique à chaque outil importé | `@sdk-ai-agents/core/mcp` et `@modelcontextprotocol/sdk` ; `close()` une fois terminé | [Utiliser les outils d'un serveur MCP](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
+| `await connectMcpServer({ name, transport })` | Utiliser les outils de n'importe quel serveur MCP | Les noms du serveur, précédés de `toolPrefix` | D'après les indications du serveur : `readOnlyHint` donne `readOnly`, `destructiveHint: true` donne un risque élevé, sauf si l'outil est en lecture seule ; votre `metadata` les remplace | `@sdk-ai-agents/core/mcp` et `@modelcontextprotocol/sdk` ; `close()` une fois terminé | [Utiliser les outils d'un serveur MCP](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
 
-Deux choses changent pour les outils MCP : le SDK vérifie seulement que leurs arguments forment un objet (le serveur vérifie le reste), et les indications propres au serveur, comme la lecture seule, ne sont pas importées : définissez `metadata` vous-même.
+Pour les outils MCP, le SDK vérifie les arguments de chaque appel par rapport au `inputSchema` du serveur, pour les mots-clés courants de JSON Schema (le serveur vérifie le reste ; `validateArguments: false` désactive cette vérification), et un appelant qui abandonne annule aussi l'appel sur le serveur. Les indications n'engagent que le serveur : elles étiquettent un outil, elles n'assouplissent jamais une politique.
 
 ## Donner des outils à un agent {#giving-tools-to-an-agent}
 
@@ -85,11 +85,11 @@ const support = sdk.createAgent({
 });
 ```
 
-`defineTool`, importé du paquet, construit un outil sans l'enregistrer : le SDK l'enregistre à la création d'un agent qui l'utilise. Si un outil de ce nom est déjà enregistré, c'est celui-là qui est gardé et qui s'exécute.
+`defineTool`, importé du paquet, construit un outil sans l'enregistrer : le SDK l'enregistre à la création d'un agent qui l'utilise, et plusieurs agents peuvent le partager. Un outil dont un autre outil porte déjà le nom est refusé avec une `ValidationError`, par `createAgent`, `createCognitiveAgent`, `addTools` et `defineCapability` : les appels s'exécutent par nom, il ne s'exécuterait donc jamais. Construisez un outil une seule fois et donnez cet objet à chaque agent : un outil reconstruit pour chaque agent a un nouveau `handler`, c'est donc un autre outil.
 
 ### Capacités {#capabilities}
 
-Une capacité nomme un groupe d'outils à donner à plusieurs agents. L'étiquette `capability` d'un outil n'en est pas une : définissez-la avec `sdk.defineCapability`.
+Une capacité nomme un groupe d'outils à donner à plusieurs agents. L'étiquette `capability` d'un outil n'en est pas une : définissez-la avec `sdk.defineCapability`. Un agent auquel on donne une capacité qui n'a jamais été définie est refusé avec une `ValidationError`.
 
 ```ts
 sdk.defineCapability({

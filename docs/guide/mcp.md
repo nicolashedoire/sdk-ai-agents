@@ -153,7 +153,7 @@ await crm.close();
 | `http` | Remote servers over Streamable HTTP (`url`, `headers`) |
 | `custom` | Any transport you build (WebSocket, in-memory for tests…) |
 
-Imported tools keep the server's JSON Schema, so the model sees the real arguments. Once defined with `sdk.defineTool`, they behave exactly like local tools: allowlists, policies, approvals (`metadata: { requiresApproval: true }` makes every call wait for a human), budgets, retries and traces apply to every call. If the tool listing fails, the connection (and the stdio process) is closed before the error is thrown.
+Imported tools keep the server's JSON Schema, so the model sees the real arguments, and the SDK checks each call against it for the common keywords (`validateArguments: false` turns this off; the server checks the rest). The server's hints become metadata: `readOnlyHint` gives `readOnly`, and `destructiveHint: true`, on a tool not marked read-only, gives `riskLevel: 'high'`; each field of your `metadata` replaces theirs. When a caller gives up, the call is cancelled on the server too (`notifications/cancelled`). Once defined with `sdk.defineTool`, they behave exactly like local tools: allowlists, policies, approvals (`metadata: { requiresApproval: true }` makes every call wait for a human), budgets, retries and traces apply to every call. If the tool listing fails, the connection (and the stdio process) is closed before the error is thrown.
 
 ::: warning Only connect servers you trust
 Descriptions and results of imported tools reach the model word for word: a malicious server can write instructions into them. Connect servers you trust, give each agent only the tools it needs, and protect destructive tools with approvals.

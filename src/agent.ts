@@ -58,7 +58,12 @@ export class AgentImpl {
     private reasoningEngine: ReasoningEngine,
     private actionEngine: ActionEngine,
     private policyEngine: PolicyEngine,
-    private eventStore: IEventStore
+    private eventStore: IEventStore,
+    /**
+     * Registers the tools `addTools` is given, or refuses them (`ToolRegistry.registerOrReuse`).
+     * An agent built by hand without it takes them as they are.
+     */
+    private registerTools?: (tools: readonly Tool[]) => void
   ) {}
 
   get id(): string {
@@ -130,8 +135,16 @@ export class AgentImpl {
     }
   }
 
+  /**
+   * Gives the agent more tools. They are registered in the SDK first, all or none: a tool whose
+   * name another tool holds is refused with a `ValidationError`, since it would never run. A
+   * tool the agent already has is not offered twice.
+   */
   addTools(tools: Tool[]): void {
-    this.agent.tools.push(...tools);
+    this.registerTools?.(tools);
+    for (const tool of tools) {
+      if (!this.agent.tools.some((held) => held.name === tool.name)) this.agent.tools.push(tool);
+    }
     this.configurationChanged();
   }
 

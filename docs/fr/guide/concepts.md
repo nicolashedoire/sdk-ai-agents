@@ -261,7 +261,7 @@ Les agents, les outils et les capacités sont versionnés pour le suivi et la tr
 - Regroupez les outils de façon logique
 - Réutilisez les capacités d'un agent à l'autre
 - Documentez les capacités
-- **Démarche recommandée :** vous pouvez passer à `defineCapability()` soit des noms d'outils (chaînes de caractères), soit directement des objets Tool. Si vous passez des objets Tool, ils seront enregistrés automatiquement.
+- **Démarche recommandée :** vous pouvez passer à `defineCapability()` soit des noms d'outils (chaînes de caractères), soit directement des objets Tool. Si vous passez des objets Tool, ils sont enregistrés, ou réutilisés quand l'un d'eux est déjà l'outil enregistré sous son nom ; un autre outil dont le nom est déjà pris est refusé.
 
 ### Versionnage {#versioning}
 - Utilisez le versionnage sémantique

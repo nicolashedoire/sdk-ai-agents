@@ -69,9 +69,9 @@ Cada fuente devuelve definiciones de herramientas, listas para `sdk.defineTool` 
 | `await openApiTools({ spec })` | Llamar a una API web, una herramienta por operación: las operaciones `GET` por defecto; `include` las sustituye por las operaciones que enumera, la única forma de obtener escrituras | El `operationId`, si no, el método y la ruta (`get_pets_petId`) | `GET`: bajo, solo lectura. Las demás: alto, aprobación obligatoria | Una descripción OpenAPI 3 (URL, archivo u objeto) | [Una API web](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | Buscar en la Web, leer una página o un PDF, buscar en arXiv, Wikipedia y GitHub | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` | `web_fetch` medio, las demás bajo; todas de solo lectura | Nada para empezar (DuckDuckGo); `unpdf` para los PDF; un token de GitHub para buscar código | [Investigación web](./web-research) |
 | `governedAgentTool(agent)`, `cognitiveAgentTool(agent)` | Preguntar a otro agente: un agente gobernado responde a un `message`, un agente cognitivo razona sobre un `problem` y devuelve su decisión | `ask_<agent name>` | medio, no marcada como de solo lectura | Un agente, y por tanto una clave de modelo | [Un agente](./mcp-recipes#an-agent-your-reasoning-twin) |
-| `await connectMcpServer({ name, transport })` | Usar las herramientas de cualquier servidor MCP | Los nombres del servidor, precedidos de `toolPrefix` | Nada fijado: `metadata` se aplica a todas las herramientas importadas | `@sdk-ai-agents/core/mcp` y `@modelcontextprotocol/sdk`; `close()` al terminar | [Usar las herramientas de un servidor MCP](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
+| `await connectMcpServer({ name, transport })` | Usar las herramientas de cualquier servidor MCP | Los nombres del servidor, precedidos de `toolPrefix` | A partir de las indicaciones del servidor: `readOnlyHint` da `readOnly`, `destructiveHint: true` da riesgo alto salvo si la herramienta es de solo lectura; tu `metadata` prevalece sobre ellas | `@sdk-ai-agents/core/mcp` y `@modelcontextprotocol/sdk`; `close()` al terminar | [Usar las herramientas de un servidor MCP](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
 
-Con las herramientas MCP cambian dos cosas: el SDK solo comprueba que sus argumentos formen un objeto (el servidor comprueba el resto), y las indicaciones propias del servidor, como la de solo lectura, no se importan: fija `metadata` tú mismo.
+Con las herramientas MCP, el SDK comprueba los argumentos de cada llamada contra el `inputSchema` del servidor, para las palabras clave comunes de JSON Schema (el servidor comprueba el resto; `validateArguments: false` lo desactiva), y cuando quien llama se rinde, la llamada también se cancela en el servidor. Las indicaciones son afirmaciones del propio servidor: etiquetan una herramienta, nunca relajan una política.
 
 ## Dar herramientas a un agente {#giving-tools-to-an-agent}
 
@@ -85,11 +85,11 @@ const support = sdk.createAgent({
 });
 ```
 
-`defineTool`, importada del paquete, construye una herramienta sin registrarla: el SDK la registra cuando se crea un agente que la usa. Si ya hay una herramienta registrada con ese nombre, se conserva la registrada, y es esa la que se ejecuta.
+`defineTool`, importada del paquete, construye una herramienta sin registrarla: el SDK la registra cuando se crea un agente que la usa, y varios agentes pueden compartirla. `createAgent`, `createCognitiveAgent`, `addTools` y `defineCapability` rechazan con un `ValidationError` una herramienta cuyo nombre ya tiene otra herramienta: las llamadas se ejecutan por nombre, así que nunca se ejecutaría. Construye una herramienta una sola vez y da ese objeto a cada agente: una herramienta reconstruida para cada agente tiene un `handler` nuevo, así que es otra herramienta.
 
 ### Capacidades {#capabilities}
 
-Una capacidad da nombre a un grupo de herramientas para dárselo a varios agentes. La etiqueta `capability` de una herramienta no es una capacidad: defínela con `sdk.defineCapability`.
+Una capacidad da nombre a un grupo de herramientas para dárselo a varios agentes. La etiqueta `capability` de una herramienta no es una capacidad: defínela con `sdk.defineCapability`. Un agente al que se da una capacidad que nunca se definió se rechaza con un `ValidationError`.
 
 ```ts
 sdk.defineCapability({

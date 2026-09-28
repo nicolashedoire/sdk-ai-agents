@@ -261,7 +261,7 @@ Agentes, ferramentas e capacidades são versionados para acompanhamento e rastre
 - Agrupe as ferramentas de forma lógica
 - Reutilize as capacidades entre agentes
 - Documente as capacidades
-- **Fluxo recomendado:** você pode passar para `defineCapability()` tanto nomes de ferramentas (strings) quanto objetos Tool diretamente. Se você passar objetos Tool, eles serão registrados automaticamente.
+- **Fluxo recomendado:** você pode passar para `defineCapability()` tanto nomes de ferramentas (strings) quanto objetos Tool diretamente. Se você passar objetos Tool, eles são registrados, ou reutilizados quando um deles já é a ferramenta registrada com o seu nome; outra ferramenta com um nome já ocupado é recusada.
 
 ### Versionamento {#versioning}
 - Use versionamento semântico

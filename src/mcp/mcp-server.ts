@@ -2,6 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { ValidationError } from '../errors/index.js';
+import { isSameTool } from '../registry/tool-registry.js';
 import type { ResourceProvider } from '../types/resource.js';
 import type { Tool, ToolDefinition } from '../types/tool.js';
 import { zodSchemaToJsonSchema } from '../utils/zod-to-json-schema.js';
@@ -133,8 +134,9 @@ export async function serveMcpOverStdio(
 }
 
 /**
- * Names of the exposed tools. Definitions are registered on the host; defining the same
- * definition again (a server created per HTTP session) reuses the registered tool.
+ * Names of the exposed tools. Definitions are registered on the host; the same tool given again
+ * (a server created per HTTP session) reuses the registered one, as an agent's tools do. Another
+ * tool with a taken name is refused, a copy with other metadata too: it would never run.
  */
 function defineListedTools(
   host: GovernedToolHost,
@@ -149,9 +151,9 @@ function defineListedTools(
     const existing = host.listTools().find((tool) => tool.name === entry.name);
     if (!existing) {
       host.defineTool(entry);
-    } else if (existing.handler !== entry.handler) {
+    } else if (!isSameTool(existing, entry)) {
       throw new Error(
-        `Another tool named "${entry.name}" is already defined: give one of them a prefix`
+        `Another tool named "${entry.name}" is already defined: give one of them a prefix, or pass the registered tool`
       );
     }
     names.push(entry.name);
