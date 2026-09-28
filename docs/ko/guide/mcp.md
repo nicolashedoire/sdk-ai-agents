@@ -153,7 +153,7 @@ await crm.close();
 | `http` | Streamable HTTP를 쓰는 원격 서버(`url`, `headers`) |
 | `custom` | 직접 만든 모든 전송 방식(WebSocket, 테스트용 인메모리…) |
 
-가져온 도구는 서버의 JSON Schema를 유지하므로, 모델은 실제 인자를 보고, SDK는 흔히 쓰이는 키워드에 대해 각 호출을 이 스키마와 대조해 검사합니다(`validateArguments: false`로 끌 수 있으며, 나머지는 서버가 검사합니다). 서버의 힌트는 메타데이터가 됩니다. `readOnlyHint`는 `readOnly`가 되고, `destructiveHint: true`는 `riskLevel: 'high'`가 되며, 여러분의 `metadata`의 각 필드가 서버의 값을 대체합니다. 호출하는 쪽이 포기하면 서버에서도 호출이 취소됩니다(`notifications/cancelled`). `sdk.defineTool`로 정의하고 나면 로컬 도구와 똑같이 동작합니다. 허용 목록, 정책, 승인(`metadata: { requiresApproval: true }`를 쓰면 모든 호출이 사람을 기다립니다), 예산, 재시도, 트레이스가 모든 호출에 적용됩니다. 도구 목록 조회에 실패하면, 오류를 던지기 전에 연결(과 stdio 프로세스)을 닫습니다.
+가져온 도구는 서버의 JSON Schema를 유지하므로, 모델은 실제 인자를 보고, SDK는 흔히 쓰이는 키워드에 대해 각 호출을 이 스키마와 대조해 검사합니다(`validateArguments: false`로 끌 수 있으며, 나머지는 서버가 검사합니다). 서버의 힌트는 메타데이터가 됩니다. `readOnlyHint`는 `readOnly`가 되고, `destructiveHint: true`는 읽기 전용으로 표시되지 않은 도구에서 `riskLevel: 'high'`가 되며, 여러분의 `metadata`의 각 필드가 서버의 값을 대체합니다. 호출하는 쪽이 포기하면 서버에서도 호출이 취소됩니다(`notifications/cancelled`). `sdk.defineTool`로 정의하고 나면 로컬 도구와 똑같이 동작합니다. 허용 목록, 정책, 승인(`metadata: { requiresApproval: true }`를 쓰면 모든 호출이 사람을 기다립니다), 예산, 재시도, 트레이스가 모든 호출에 적용됩니다. 도구 목록 조회에 실패하면, 오류를 던지기 전에 연결(과 stdio 프로세스)을 닫습니다.
 
 ::: warning 신뢰하는 서버만 연결하세요
 가져온 도구의 설명과 결과는 한 글자도 바뀌지 않고 모델에게 전달됩니다. 악의적인 서버는 그 안에 지시문을 써 넣을 수 있습니다. 신뢰하는 서버만 연결하고, 각 에이전트에게는 필요한 도구만 주고, 파괴적인 도구는 승인으로 보호하세요.

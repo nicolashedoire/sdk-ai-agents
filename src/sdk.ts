@@ -518,11 +518,7 @@ export class SDKImpl implements SDK {
   createCognitiveAgent(config: CognitiveAgentConfig): CognitiveAgent {
     for (const policy of config.policies ?? []) assertCheckableLimits(policy);
     const agentId = uuidv4();
-    // A tool whose name another tool holds would never run: refused before anything else.
-    this.toolRegistry.registerOrReuse(config.tools ?? []);
-    for (const policy of config.policies ?? []) {
-      this.policyEngine.applyAgentPolicy(agentId, policy);
-    }
+    // Assembled first, which checks its limits; policies are read when it thinks.
     const agent = assembleCognitiveAgent(config, {
       agentId,
       provider: this.provider,
@@ -531,6 +527,12 @@ export class SDKImpl implements SDK {
       policyEngine: this.policyEngine,
       ...(this.decisionClient ? { decisionClient: this.decisionClient } : {}),
     });
+    // Then its tools, all or none: a tool whose name another tool holds would never run. A
+    // refused agent registers nothing and applies no policy.
+    this.toolRegistry.registerOrReuse(config.tools ?? []);
+    for (const policy of config.policies ?? []) {
+      this.policyEngine.applyAgentPolicy(agentId, policy);
+    }
     this.cognitiveAgents.set(agentId, agent);
     return agent;
   }
@@ -744,7 +746,8 @@ export class SDKImpl implements SDK {
       id: uuidv4(),
       name: config.name,
       model: config.model,
-      tools: [...(config.tools ?? [])],
+      // Once per name: a provider may refuse a request that offers two tools of one name.
+      tools: [...new Map((config.tools ?? []).map((tool) => [tool.name, tool])).values()],
       policies: config.policies || [],
       config,
       version: config.version || '1.0.0',

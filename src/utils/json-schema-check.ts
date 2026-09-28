@@ -2,9 +2,11 @@
  * Checks a value against a JSON Schema, for a subset of its keywords: `type`, `enum`, `const`,
  * `properties`, `required`, `additionalProperties`, `items`, `minItems`, `maxItems`,
  * `minLength`, `maxLength`, `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`,
- * `allOf`, `anyOf` and `oneOf` (read as `anyOf`). Any other keyword (`$ref`, `pattern`,
- * `format`, `not`, `if`…) is not checked: the owner of the schema checks it. So a problem
- * reported here is a real one, and a value accepted here may still be refused.
+ * `prefixItems`, `allOf`, `anyOf` and `oneOf` (read as `anyOf`), and OpenAPI's `nullable`.
+ * Any other keyword (`$ref`, `pattern`, `format`, `not`, `if`…) is not checked: the owner of
+ * the schema checks it. So a problem reported here breaks the published schema (a lenient
+ * server may still accept it: extra keys dropped, "5" read as 5), and a value accepted here
+ * may still be refused. A key whose value is `undefined` counts as absent, as in JSON.
  */
 
 export interface SchemaProblem {
@@ -36,6 +38,8 @@ function check(
   }
   // `true`, a missing schema, or a reference this subset does not resolve: nothing to check.
   if (!isRecord(schema) || typeof schema.$ref === 'string') return;
+  // OpenAPI 3.0: `nullable: true` allows null whatever `type` and `enum` say.
+  if (value === null && schema.nullable === true) return;
 
   const types = typeList(schema.type);
   if (types && !types.some((type) => hasType(value, type))) {
@@ -124,12 +128,16 @@ function checkArray(
   if (isCount(schema.maxItems) && value.length > schema.maxItems) {
     problems.push({ path, message: `at most ${schema.maxItems} items` });
   }
-  // A single schema for every item; the tuple forms (`items: [...]`, `prefixItems`) are not checked.
-  if (isRecord(schema.items) || typeof schema.items === 'boolean') {
-    value.forEach((item, index) =>
-      check(schema.items, item, [...path, index], depth + 1, problems)
-    );
-  }
+  // JSON Schema 2020-12: `prefixItems` gives the first items one schema each, and `items`
+  // covers only the items after them. The older tuple form (`items: [...]`) is not checked.
+  const prefix = Array.isArray(schema.prefixItems) ? schema.prefixItems : [];
+  value.forEach((item, index) => {
+    if (index < prefix.length) {
+      check(prefix[index], item, [...path, index], depth + 1, problems);
+    } else if (isRecord(schema.items) || typeof schema.items === 'boolean') {
+      check(schema.items, item, [...path, index], depth + 1, problems);
+    }
+  });
 }
 
 function checkObject(
@@ -142,12 +150,14 @@ function checkObject(
   const properties = isRecord(schema.properties) ? schema.properties : {};
   if (Array.isArray(schema.required)) {
     for (const name of schema.required) {
-      if (typeof name === 'string' && !Object.hasOwn(value, name)) {
+      if (typeof name === 'string' && (!Object.hasOwn(value, name) || value[name] === undefined)) {
         problems.push({ path: [...path, name], message: 'required' });
       }
     }
   }
   for (const [name, item] of Object.entries(value)) {
+    // Absent once sent as JSON.
+    if (item === undefined) continue;
     if (Object.hasOwn(properties, name)) {
       check(properties[name], item, [...path, name], depth + 1, problems);
     } else if (!isRecord(schema.patternProperties)) {

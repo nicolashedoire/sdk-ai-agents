@@ -137,11 +137,14 @@ export class AgentImpl {
 
   /**
    * Gives the agent more tools. They are registered in the SDK first, all or none: a tool whose
-   * name another tool holds is refused with a `ValidationError`, since it would never run.
+   * name another tool holds is refused with a `ValidationError`, since it would never run. A
+   * tool the agent already has is not offered twice.
    */
   addTools(tools: Tool[]): void {
     this.registerTools?.(tools);
-    this.agent.tools.push(...tools);
+    for (const tool of tools) {
+      if (!this.agent.tools.some((held) => held.name === tool.name)) this.agent.tools.push(tool);
+    }
     this.configurationChanged();
   }
 

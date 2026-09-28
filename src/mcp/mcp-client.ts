@@ -88,12 +88,24 @@ export async function connectMcpServer(options: ConnectMcpOptions): Promise<McpC
         ...(options.retry ? { retry: options.retry } : {}),
         handler: async (params: unknown, context?: ToolCallContext) => {
           // When the caller gives up, the request is abandoned and the server is told
-          // (`notifications/cancelled`), so it can stop the work.
-          const result = await client.callTool(
-            { name: tool.name, arguments: isRecord(params) ? params : {} },
-            undefined,
-            context?.signal ? { signal: context.signal } : undefined
-          );
+          // (`notifications/cancelled`), so it can stop the work. Each call gets its own
+          // signal, unlinked once the call ends: the MCP client never removes the listener it
+          // adds, so a run's signal given as is would keep one per call, and cancel them all.
+          const caller = context?.signal;
+          const call = new AbortController();
+          const forward = () => call.abort(caller?.reason);
+          if (caller?.aborted) forward();
+          else caller?.addEventListener('abort', forward, { once: true });
+          let result: Awaited<ReturnType<typeof client.callTool>>;
+          try {
+            result = await client.callTool(
+              { name: tool.name, arguments: isRecord(params) ? params : {} },
+              undefined,
+              caller ? { signal: call.signal } : undefined
+            );
+          } finally {
+            caller?.removeEventListener('abort', forward);
+          }
           const text = extractText(result.content);
           if (result.isError) {
             throw new Error(text || `MCP tool ${tool.name} failed`);
@@ -121,11 +133,17 @@ function importedMetadata(
 ): ToolMetadata | undefined {
   const metadata: ToolMetadata = {};
   if (typeof annotations?.readOnlyHint === 'boolean') metadata.readOnly = annotations.readOnlyHint;
-  if (annotations?.destructiveHint === true && annotations.readOnlyHint !== true) {
-    metadata.riskLevel = 'high';
-  }
   for (const [key, value] of Object.entries(given ?? {})) {
     if (value !== undefined) Object.assign(metadata, { [key]: value });
+  }
+  // After the merge, so a tool your `metadata` marks not read-only is still high risk. A
+  // server that omits `destructiveHint` gives no risk (MCP's default, true, is not applied).
+  if (
+    annotations?.destructiveHint === true &&
+    metadata.readOnly !== true &&
+    metadata.riskLevel === undefined
+  ) {
+    metadata.riskLevel = 'high';
   }
   return Object.keys(metadata).length > 0 ? metadata : undefined;
 }

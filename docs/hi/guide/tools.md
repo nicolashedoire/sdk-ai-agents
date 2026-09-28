@@ -69,7 +69,7 @@ const refundOrder = sdk.defineTool({
 | `await openApiTools({ spec })` | किसी वेब API को कॉल करना, हर operation के लिए एक टूल: डिफ़ॉल्ट रूप से `GET` operations; `include` उनकी जगह उन operations को रखता है जिन्हें वह सूचीबद्ध करता है, लिखने वाले operations पाने का यही एकमात्र तरीका है | `operationId`, वह न हो तो method और path (`get_pets_petId`) | `GET`: कम, केवल-पढ़ने-योग्य। बाकी: उच्च, मंज़ूरी ज़रूरी | एक OpenAPI 3 विवरण (URL, फ़ाइल या ऑब्जेक्ट) | [एक वेब API](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | वेब पर खोजना, कोई पेज या PDF पढ़ना, arXiv, Wikipedia और GitHub में खोजना | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` | `web_fetch` मध्यम, बाकी कम; सभी केवल-पढ़ने-योग्य | शुरू करने के लिए कुछ नहीं (DuckDuckGo); PDF के लिए `unpdf`; code खोजने के लिए एक GitHub token | [वेब पर शोध](./web-research) |
 | `governedAgentTool(agent)`, `cognitiveAgentTool(agent)` | किसी दूसरे एजेंट से पूछना: नियंत्रित एजेंट किसी `message` का जवाब देता है, संज्ञानात्मक एजेंट किसी `problem` पर तर्क करता है और अपना निर्णय लौटाता है | `ask_<agent name>` | मध्यम, केवल-पढ़ने-योग्य चिह्नित नहीं | एक एजेंट, इसलिए एक मॉडल key | [एक एजेंट](./mcp-recipes#an-agent-your-reasoning-twin) |
-| `await connectMcpServer({ name, transport })` | किसी भी MCP सर्वर के टूल इस्तेमाल करना | सर्वर के नाम, `toolPrefix` के बाद | सर्वर के संकेतों से: `readOnlyHint` से `readOnly` मिलता है, `destructiveHint: true` से ऊँचा जोखिम; आपका `metadata` उनकी जगह लेता है | `@sdk-ai-agents/core/mcp` और `@modelcontextprotocol/sdk`; काम पूरा होने पर `close()` | [किसी MCP सर्वर के टूल इस्तेमाल करें](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
+| `await connectMcpServer({ name, transport })` | किसी भी MCP सर्वर के टूल इस्तेमाल करना | सर्वर के नाम, `toolPrefix` के बाद | सर्वर के संकेतों से: `readOnlyHint` से `readOnly` मिलता है, `destructiveHint: true` से ऊँचा जोखिम, जब तक टूल केवल-पढ़ने-योग्य न हो; आपका `metadata` उनकी जगह लेता है | `@sdk-ai-agents/core/mcp` और `@modelcontextprotocol/sdk`; काम पूरा होने पर `close()` | [किसी MCP सर्वर के टूल इस्तेमाल करें](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
 
 MCP टूल के लिए, SDK हर कॉल के arguments को सर्वर के `inputSchema` से जाँचता है, आम JSON Schema keywords के लिए (बाकी की जाँच सर्वर करता है; `validateArguments: false` इसे बंद करता है), और हार मानने वाला कॉलर सर्वर पर भी कॉल रद्द कर देता है। संकेत सर्वर के अपने दावे हैं: वे टूल पर लेबल लगाते हैं, किसी नीति को कभी ढीला नहीं करते।
 
@@ -85,7 +85,7 @@ const support = sdk.createAgent({
 });
 ```
 
-पैकेज से इम्पोर्ट किया गया `defineTool` टूल को रजिस्टर किए बिना बनाता है: SDK उसे तब रजिस्टर करता है जब उसे इस्तेमाल करने वाला कोई एजेंट बनाया जाता है, और कई एजेंट उसे साझा कर सकते हैं। जिस टूल का नाम कोई दूसरा टूल पहले से रखता है, उसे `createAgent`, `createCognitiveAgent`, `addTools` और `defineCapability` एक `ValidationError` के साथ अस्वीकार करते हैं: कॉल नाम से चलती हैं, इसलिए वह कभी नहीं चलता।
+पैकेज से इम्पोर्ट किया गया `defineTool` टूल को रजिस्टर किए बिना बनाता है: SDK उसे तब रजिस्टर करता है जब उसे इस्तेमाल करने वाला कोई एजेंट बनाया जाता है, और कई एजेंट उसे साझा कर सकते हैं। जिस टूल का नाम कोई दूसरा टूल पहले से रखता है, उसे `createAgent`, `createCognitiveAgent`, `addTools` और `defineCapability` एक `ValidationError` के साथ अस्वीकार करते हैं: कॉल नाम से चलती हैं, इसलिए वह कभी नहीं चलता। टूल एक बार बनाएँ और वही ऑब्जेक्ट हर एजेंट को दें: हर एजेंट के लिए दोबारा बनाए गए टूल का `handler` नया होता है, इसलिए वह दूसरा टूल है।
 
 ### क्षमताएँ {#capabilities}
 

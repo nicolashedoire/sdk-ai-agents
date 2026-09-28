@@ -69,7 +69,7 @@ const refundOrder = sdk.defineTool({
 | `await openApiTools({ spec })` | استدعاء واجهة API على الويب، بأداة لكل عملية: عمليات `GET` افتراضيًا؛ ويستبدل بها `include` العمليات التي يسردها، وهو الطريقة الوحيدة للحصول على عمليات الكتابة | قيمة `operationId`، وإلا فالطريقة والمسار (`get_pets_petId`) | `GET`: منخفضة، للقراءة فقط. غيرها: عالية، مع موافقة إلزامية | وصف OpenAPI 3 (عنوان URL، أو ملف، أو كائن) | [واجهة API على الويب](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | البحث على الويب، وقراءة صفحة أو ملف PDF، والبحث في arXiv وWikipedia وGitHub | `web_search`، `web_fetch`، `arxiv_search`، `wikipedia_search`، `github_search` | `web_fetch` متوسطة، والأخرى منخفضة؛ وكلها للقراءة فقط | لا شيء للبدء (DuckDuckGo)؛ و`unpdf` لملفات PDF؛ ورمز GitHub (token) للبحث في الشيفرة | [البحث على الويب](./web-research) |
 | `governedAgentTool(agent)`، `cognitiveAgentTool(agent)` | سؤال وكيل آخر: يجيب الوكيل الخاضع للحوكمة عن `message`، ويستدلّ الوكيل المعرفي بشأن `problem` ويعيد قراره | `ask_<agent name>` | متوسطة، غير موسومة بأنها للقراءة فقط | وكيل، ومن ثَمّ مفتاح نموذج | [وكيل](./mcp-recipes#an-agent-your-reasoning-twin) |
-| `await connectMcpServer({ name, transport })` | استخدام أدوات أي خادم MCP | أسماء الخادم، مسبوقة بـ `toolPrefix` | من تلميحات الخادم: يعطي `readOnlyHint` القيمة `readOnly`، ويعطي `destructiveHint: true` مخاطر عالية؛ و`metadata` الخاصة بك تتغلّب عليها | `@sdk-ai-agents/core/mcp` و`@modelcontextprotocol/sdk`؛ و`close()` عند الانتهاء | [استخدام أدوات خادم MCP](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
+| `await connectMcpServer({ name, transport })` | استخدام أدوات أي خادم MCP | أسماء الخادم، مسبوقة بـ `toolPrefix` | من تلميحات الخادم: يعطي `readOnlyHint` القيمة `readOnly`، ويعطي `destructiveHint: true` مخاطر عالية ما لم تكن الأداة للقراءة فقط؛ و`metadata` الخاصة بك تتغلّب عليها | `@sdk-ai-agents/core/mcp` و`@modelcontextprotocol/sdk`؛ و`close()` عند الانتهاء | [استخدام أدوات خادم MCP](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
 
 في أدوات MCP، تتحقّق حزمة SDK من معاملات كل استدعاء مقابل `inputSchema` الخاص بالخادم، بالنسبة إلى كلمات JSON Schema المفتاحية الشائعة (ويتحقّق الخادم من الباقي؛ ويعطّل `validateArguments: false` هذا الفحص)، والمستدعي الذي يتخلّى يلغي الاستدعاء على الخادم أيضًا. والتلميحات ادعاءات الخادم نفسه: فهي تَسِم الأداة، ولا تخفّف أي سياسة أبدًا.
 
@@ -85,7 +85,7 @@ const support = sdk.createAgent({
 });
 ```
 
-أما `defineTool`، المستوردة من الحزمة، فتبني أداةً دون تسجيلها: وتسجّلها حزمة SDK حين يُنشأ وكيل يستخدمها، ويمكن لعدة وكلاء أن يتشاركوها. والأداة التي يحمل اسمَها أداةٌ أخرى بالفعل تُرفَض بخطأ `ValidationError`، يرميه `createAgent`، و`createCognitiveAgent`، و`addTools`، و`defineCapability`: فالاستدعاءات تُشغَّل بالاسم، فلن تُشغَّل تلك الأداة أبدًا.
+أما `defineTool`، المستوردة من الحزمة، فتبني أداةً دون تسجيلها: وتسجّلها حزمة SDK حين يُنشأ وكيل يستخدمها، ويمكن لعدة وكلاء أن يتشاركوها. والأداة التي يحمل اسمَها أداةٌ أخرى بالفعل تُرفَض بخطأ `ValidationError`، يرميه `createAgent`، و`createCognitiveAgent`، و`addTools`، و`defineCapability`: فالاستدعاءات تُشغَّل بالاسم، فلن تُشغَّل تلك الأداة أبدًا. ابنِ الأداة مرة واحدة وأعطِ ذلك الكائن لكل وكيل: فالأداة المُعاد بناؤها لكل وكيل لها `handler` جديد، فهي أداة أخرى.
 
 ### القدرات {#capabilities}
 

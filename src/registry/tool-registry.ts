@@ -46,7 +46,7 @@ export class ToolRegistry {
       if (taken && !isSameTool(taken, definition)) {
         throw new ValidationError(
           field,
-          `another tool named "${definition.name}" is already registered or given: calls run by name, so this one would never run. Give it another name (for example with a prefix), or pass the registered tool`
+          `another tool named "${definition.name}" is already registered or given: calls run by name, so this one would never run. Give it another name (for example with a prefix), or pass the registered tool (\`sdk.listTools()\` lists them)`
         );
       }
       batch.set(definition.name, taken ?? definition);
@@ -169,11 +169,12 @@ export class ToolRegistry {
 }
 
 /**
- * Whether `definition` is the tool `registered`: the same object, or one built from the same
- * definition (same handler, schema, texts, metadata, retry and version). A copy with other
+ * Whether `definition` is the tool `registered`: the same object, or one with the same handler
+ * and schema (the same functions and objects) and equal texts, version, metadata, retry and JSON
+ * Schema (compared by value, so a copy of the metadata is the same tool). A copy with other
  * metadata (an approval added or removed) is another tool.
  */
-function isSameTool(registered: ToolDefinition, definition: ToolDefinition): boolean {
+export function isSameTool(registered: ToolDefinition, definition: ToolDefinition): boolean {
   if (registered === definition) return true;
   return (
     registered.handler === definition.handler &&
@@ -181,8 +182,44 @@ function isSameTool(registered: ToolDefinition, definition: ToolDefinition): boo
     registered.description === definition.description &&
     (registered.version || '1.0.0') === (definition.version || '1.0.0') &&
     (registered.capability || undefined) === (definition.capability || undefined) &&
-    registered.metadata === definition.metadata &&
-    registered.retry === definition.retry &&
-    registered.inputJsonSchema === definition.inputJsonSchema
+    sameValue(registered.metadata, definition.metadata) &&
+    sameValue(registered.retry, definition.retry) &&
+    sameValue(registered.inputJsonSchema, definition.inputJsonSchema)
+  );
+}
+
+/**
+ * Deep equality of plain data: arrays item by item, objects key by key (a key set to
+ * `undefined` counts as absent), anything else (functions included) by identity.
+ */
+function sameValue(a: unknown, b: unknown, depth = 0): boolean {
+  if (a === b) return true;
+  if (depth > 32 || typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) {
+    return false;
+  }
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((item, index) => sameValue(item, b[index], depth + 1))
+    );
+  }
+  if (Object.getPrototypeOf(a) !== Object.getPrototypeOf(b)) return false;
+  const keysOf = (value: object) =>
+    Object.keys(value).filter((key) => (value as Record<string, unknown>)[key] !== undefined);
+  const keys = keysOf(a);
+  const other = keysOf(b);
+  return (
+    keys.length === other.length &&
+    keys.every(
+      (key) =>
+        Object.hasOwn(b, key) &&
+        sameValue(
+          (a as Record<string, unknown>)[key],
+          (b as Record<string, unknown>)[key],
+          depth + 1
+        )
+    )
   );
 }

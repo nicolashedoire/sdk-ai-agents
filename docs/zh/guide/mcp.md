@@ -153,7 +153,7 @@ await crm.close();
 | `http` | 通过 Streamable HTTP 访问的远程服务器（`url`、`headers`） |
 | `custom` | 你自己构建的任何传输方式（WebSocket、用于测试的内存传输……） |
 
-导入的工具保留服务器的 JSON Schema，所以模型能看到真实的参数，SDK 也会针对常见的关键字，对照它检查每一次调用（`validateArguments: false` 可以关闭这项检查；其余的由服务器检查）。服务器的提示会变成元数据：`readOnlyHint` 对应 `readOnly`，`destructiveHint: true` 对应 `riskLevel: 'high'`；你的 `metadata` 中的每个字段都会替换服务器给出的对应字段。当调用方放弃时，这次调用在服务器上也会被取消（`notifications/cancelled`）。一旦用 `sdk.defineTool` 定义，它们的行为就和本地工具完全一样：允许列表、策略、审批（`metadata: { requiresApproval: true }` 会让每次调用都等待人工决定）、预算、重试和追踪记录都适用于每一次调用。如果列出工具失败，连接（以及 stdio 进程）会在抛出错误之前被关闭。
+导入的工具保留服务器的 JSON Schema，所以模型能看到真实的参数，SDK 也会针对常见的关键字，对照它检查每一次调用（`validateArguments: false` 可以关闭这项检查；其余的由服务器检查）。服务器的提示会变成元数据：`readOnlyHint` 对应 `readOnly`，`destructiveHint: true` 在未标记为只读的工具上对应 `riskLevel: 'high'`；你的 `metadata` 中的每个字段都会替换服务器给出的对应字段。当调用方放弃时，这次调用在服务器上也会被取消（`notifications/cancelled`）。一旦用 `sdk.defineTool` 定义，它们的行为就和本地工具完全一样：允许列表、策略、审批（`metadata: { requiresApproval: true }` 会让每次调用都等待人工决定）、预算、重试和追踪记录都适用于每一次调用。如果列出工具失败，连接（以及 stdio 进程）会在抛出错误之前被关闭。
 
 ::: warning 只连接你信任的服务器
 导入工具的描述和结果会原封不动地到达模型：恶意服务器可以在其中写入指令。只连接你信任的服务器，只给每个智能体它需要的工具，并用审批来保护具有破坏性的工具。
