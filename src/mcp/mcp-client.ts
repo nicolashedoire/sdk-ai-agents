@@ -3,7 +3,13 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { z } from 'zod';
-import type { ToolDefinition, ToolMetadata, ToolRetryPolicy } from '../types/tool.js';
+import type {
+  ToolCallContext,
+  ToolDefinition,
+  ToolMetadata,
+  ToolRetryPolicy,
+} from '../types/tool.js';
+import { jsonSchemaProblems } from '../utils/json-schema-check.js';
 
 export type McpTransportConfig =
   | { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; cwd?: string }
@@ -19,9 +25,19 @@ export interface ConnectMcpOptions {
   toolPrefix?: string;
   /** Only import these MCP tool names. */
   include?: string[];
-  /** Governance metadata applied to every imported tool (risk level, approval). */
+  /**
+   * Governance metadata applied to every imported tool (risk level, approval). Each field you
+   * set replaces the one the server's annotations gave: `readOnlyHint` gives `readOnly`, and
+   * `destructiveHint: true` (on a tool not marked read-only) gives `riskLevel: 'high'`.
+   */
   metadata?: ToolMetadata;
   retry?: ToolRetryPolicy;
+  /**
+   * Check each call's arguments against the tool's `inputSchema` before policies, approvals
+   * and the server see it (a subset of JSON Schema, see `jsonSchemaProblems`; the server checks
+   * the rest). Default `true`.
+   */
+  validateArguments?: boolean;
 }
 
 export interface McpConnection {
@@ -60,26 +76,32 @@ export async function connectMcpServer(options: ConnectMcpOptions): Promise<McpC
   const prefix = options.toolPrefix ?? '';
   const tools: ToolDefinition[] = listed
     .filter((tool) => !options.include || options.include.includes(tool.name))
-    .map((tool) => ({
-      name: `${prefix}${tool.name}`.replace(MCP_NAME_PATTERN, '_').slice(0, 64),
-      description: tool.description ?? `${tool.name} (MCP tool from ${options.name})`,
-      schema: z.record(z.unknown()),
-      inputJsonSchema: tool.inputSchema,
-      capability: `mcp:${options.name}`,
-      ...(options.metadata ? { metadata: options.metadata } : {}),
-      ...(options.retry ? { retry: options.retry } : {}),
-      handler: async (params: unknown) => {
-        const result = await client.callTool({
-          name: tool.name,
-          arguments: isRecord(params) ? params : {},
-        });
-        const text = extractText(result.content);
-        if (result.isError) {
-          throw new Error(text || `MCP tool ${tool.name} failed`);
-        }
-        return result.structuredContent ?? text;
-      },
-    }));
+    .map((tool) => {
+      const metadata = importedMetadata(tool.annotations, options.metadata);
+      return {
+        name: `${prefix}${tool.name}`.replace(MCP_NAME_PATTERN, '_').slice(0, 64),
+        description: tool.description ?? `${tool.name} (MCP tool from ${options.name})`,
+        schema: argumentsSchema(tool.inputSchema, options.validateArguments ?? true),
+        inputJsonSchema: tool.inputSchema,
+        capability: `mcp:${options.name}`,
+        ...(metadata ? { metadata } : {}),
+        ...(options.retry ? { retry: options.retry } : {}),
+        handler: async (params: unknown, context?: ToolCallContext) => {
+          // When the caller gives up, the request is abandoned and the server is told
+          // (`notifications/cancelled`), so it can stop the work.
+          const result = await client.callTool(
+            { name: tool.name, arguments: isRecord(params) ? params : {} },
+            undefined,
+            context?.signal ? { signal: context.signal } : undefined
+          );
+          const text = extractText(result.content);
+          if (result.isError) {
+            throw new Error(text || `MCP tool ${tool.name} failed`);
+          }
+          return result.structuredContent ?? text;
+        },
+      };
+    });
 
   return {
     name: options.name,
@@ -87,6 +109,43 @@ export async function connectMcpServer(options: ConnectMcpOptions): Promise<McpC
     client,
     close: () => client.close(),
   };
+}
+
+/**
+ * The server's annotations as governance metadata, with every field of `given` over them.
+ * Annotations are the server's own claims: they label, they never relax a policy.
+ */
+function importedMetadata(
+  annotations: { readOnlyHint?: boolean; destructiveHint?: boolean } | undefined,
+  given: ToolMetadata | undefined
+): ToolMetadata | undefined {
+  const metadata: ToolMetadata = {};
+  if (typeof annotations?.readOnlyHint === 'boolean') metadata.readOnly = annotations.readOnlyHint;
+  if (annotations?.destructiveHint === true && annotations.readOnlyHint !== true) {
+    metadata.riskLevel = 'high';
+  }
+  for (const [key, value] of Object.entries(given ?? {})) {
+    if (value !== undefined) Object.assign(metadata, { [key]: value });
+  }
+  return Object.keys(metadata).length > 0 ? metadata : undefined;
+}
+
+/** An object of arguments, checked against the tool's JSON Schema unless `validate` is off. */
+function argumentsSchema(
+  inputSchema: unknown,
+  validate: boolean
+): z.ZodType<Record<string, unknown>> {
+  const object = z.record(z.unknown());
+  if (!validate) return object;
+  return object.superRefine((args, context) => {
+    for (const problem of jsonSchemaProblems(inputSchema, args)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: problem.path,
+        message: problem.message,
+      });
+    }
+  });
 }
 
 function createTransport(config: McpTransportConfig): Transport {

@@ -518,11 +518,8 @@ export class SDKImpl implements SDK {
   createCognitiveAgent(config: CognitiveAgentConfig): CognitiveAgent {
     for (const policy of config.policies ?? []) assertCheckableLimits(policy);
     const agentId = uuidv4();
-    for (const tool of config.tools ?? []) {
-      if (!this.toolRegistry.getTool(tool.name)) {
-        this.toolRegistry.registerTool(tool);
-      }
-    }
+    // A tool whose name another tool holds would never run: refused before anything else.
+    this.toolRegistry.registerOrReuse(config.tools ?? []);
     for (const policy of config.policies ?? []) {
       this.policyEngine.applyAgentPolicy(agentId, policy);
     }
@@ -730,12 +727,24 @@ export class SDKImpl implements SDK {
   createAgent(config: AgentConfig): AgentImpl {
     // Before anything is registered: a policy that cannot be checked creates no agent.
     for (const policy of config.policies ?? []) assertCheckableLimits(policy);
+    const capabilities = (config.capabilities ?? []).map((name) => {
+      const capability = this.capabilityRegistry.getCapability(name);
+      if (!capability) {
+        throw new ValidationError(
+          'capabilities',
+          `unknown capability "${name}": define it with sdk.defineCapability before creating the agent`
+        );
+      }
+      return capability;
+    });
+    // Registered first, all or none: a tool whose name another tool holds would never run.
+    this.toolRegistry.registerOrReuse(config.tools ?? []);
     const now = Date.now();
     const agent: Agent = {
       id: uuidv4(),
       name: config.name,
       model: config.model,
-      tools: config.tools || [],
+      tools: [...(config.tools ?? [])],
       policies: config.policies || [],
       config,
       version: config.version || '1.0.0',
@@ -744,27 +753,16 @@ export class SDKImpl implements SDK {
       updatedAt: now,
     };
 
-    if (config.capabilities) {
-      for (const capabilityName of config.capabilities) {
-        const capability = this.capabilityRegistry.getCapability(capabilityName);
-        if (capability) {
-          for (const toolName of capability.tools) {
-            const tool = this.toolRegistry.getTool(toolName);
-            if (tool && !agent.tools.some((t) => t.name === tool.name)) {
-              agent.tools.push(tool);
-            } else if (!tool) {
-              console.warn(
-                `Tool "${toolName}" from capability "${capabilityName}" not found in registry. Make sure to register it first with defineTool().`
-              );
-            }
-          }
+    for (const capability of capabilities) {
+      for (const toolName of capability.tools) {
+        const tool = this.toolRegistry.getTool(toolName);
+        if (tool && !agent.tools.some((t) => t.name === tool.name)) {
+          agent.tools.push(tool);
+        } else if (!tool) {
+          console.warn(
+            `Tool "${toolName}" from capability "${capability.name}" not found in registry. Make sure to register it first with defineTool().`
+          );
         }
-      }
-    }
-
-    for (const tool of agent.tools) {
-      if (!this.toolRegistry.getTool(tool.name)) {
-        this.toolRegistry.registerTool(tool);
       }
     }
     // With the tools its capabilities brought: what the agent will actually use.
@@ -785,7 +783,8 @@ export class SDKImpl implements SDK {
       reasoningEngine,
       this.actionEngine,
       this.policyEngine,
-      this.eventStore
+      this.eventStore,
+      (tools) => this.toolRegistry.registerOrReuse(tools)
     );
 
     this.activeAgentInstances.set(agent.id, agentImpl);
@@ -803,18 +802,14 @@ export class SDKImpl implements SDK {
     version?: string;
     metadata?: Record<string, unknown>;
   }): Capability {
-    const toolNames: string[] = [];
-    const toolsToRegister: Tool[] = [];
-
-    for (const tool of definition.tools) {
-      if (typeof tool === 'string') {
-        toolNames.push(tool);
-      } else {
-        const registeredTool = this.toolRegistry.registerTool(tool);
-        toolNames.push(registeredTool.name);
-        toolsToRegister.push(registeredTool);
-      }
+    if (this.capabilityRegistry.getCapability(definition.name)) {
+      throw new Error(`Capability "${definition.name}" is already registered`);
     }
+    // Tool objects are registered, or reused when they are the registered tool of their name.
+    this.toolRegistry.registerOrReuse(
+      definition.tools.filter((tool): tool is Tool => typeof tool !== 'string')
+    );
+    const toolNames = definition.tools.map((tool) => (typeof tool === 'string' ? tool : tool.name));
 
     return this.capabilityRegistry.registerCapability({
       ...definition,

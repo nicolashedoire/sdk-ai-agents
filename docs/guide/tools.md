@@ -69,9 +69,9 @@ Each source returns tool definitions, ready for `sdk.defineTool` (`connectMcpSer
 | `await openApiTools({ spec })` | Call a web API, one tool per operation: the `GET` operations by default; `include` replaces them with the operations it lists, the only way to get writes | The `operationId`, else method and path (`get_pets_petId`) | `GET`: low, read-only. Others: high, approval required | An OpenAPI 3 description (URL, file or object) | [A web API](./mcp-recipes#a-web-api-from-its-openapi-description) |
 | `webTools()` | Search the Web, read a page or a PDF, search arXiv, Wikipedia and GitHub | `web_search`, `web_fetch`, `arxiv_search`, `wikipedia_search`, `github_search` | `web_fetch` medium, the others low; all read-only | Nothing to start (DuckDuckGo); `unpdf` for PDFs; a GitHub token to search code | [Web research](./web-research) |
 | `governedAgentTool(agent)`, `cognitiveAgentTool(agent)` | Ask another agent: a governed agent answers a `message`, a cognitive agent reasons about a `problem` and returns its decision | `ask_<agent name>` | medium, not marked read-only | An agent, so a model key | [An agent](./mcp-recipes#an-agent-your-reasoning-twin) |
-| `await connectMcpServer({ name, transport })` | Use the tools of any MCP server | The server's names, after `toolPrefix` | None set: `metadata` applies to every imported tool | `@sdk-ai-agents/core/mcp` and `@modelcontextprotocol/sdk`; `close()` when done | [Use the tools of an MCP server](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
+| `await connectMcpServer({ name, transport })` | Use the tools of any MCP server | The server's names, after `toolPrefix` | From the server's hints: `readOnlyHint` gives `readOnly`, `destructiveHint: true` gives high risk; your `metadata` overrides them | `@sdk-ai-agents/core/mcp` and `@modelcontextprotocol/sdk`; `close()` when done | [Use the tools of an MCP server](./mcp#use-the-tools-of-an-mcp-server-in-your-agents) |
 
-Two things differ for MCP tools: the SDK only checks that their arguments form an object (the server checks the rest), and the server's own hints, such as read-only, are not imported: set `metadata` yourself.
+For MCP tools, the SDK checks each call's arguments against the server's `inputSchema`, for the common JSON Schema keywords (the server checks the rest; `validateArguments: false` turns this off), and a caller that gives up cancels the call on the server too. The hints are the server's own claims: they label a tool, they never relax a policy.
 
 ## Giving tools to an agent
 
@@ -85,11 +85,11 @@ const support = sdk.createAgent({
 });
 ```
 
-`defineTool`, imported from the package, builds a tool without registering it: the SDK registers it when an agent that uses it is created. If a tool of that name is already registered, the registered one is kept and runs.
+`defineTool`, imported from the package, builds a tool without registering it: the SDK registers it when an agent that uses it is created, and several agents can share it. A tool whose name another tool already holds is refused with a `ValidationError`, by `createAgent`, `createCognitiveAgent`, `addTools` and `defineCapability`: calls run by name, so it would never run.
 
 ### Capabilities
 
-A capability names a group of tools to give to several agents. The `capability` label of a tool is not one: define it with `sdk.defineCapability`.
+A capability names a group of tools to give to several agents. The `capability` label of a tool is not one: define it with `sdk.defineCapability`. An agent given a capability that was never defined is refused with a `ValidationError`.
 
 ```ts
 sdk.defineCapability({

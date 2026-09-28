@@ -261,7 +261,7 @@ Agents, tools, and capabilities are versioned for tracking and traceability.
 - Group tools logically
 - Reuse capabilities across agents
 - Document capabilities
-- **Recommended workflow:** You can pass either tool names (strings) or Tool objects directly to `defineCapability()`. If you pass Tool objects, they will be automatically registered.
+- **Recommended workflow:** You can pass either tool names (strings) or Tool objects directly to `defineCapability()`. If you pass Tool objects, they are registered, or reused when one is already the registered tool of its name; another tool with a taken name is refused.
 
 ### Versioning
 - Use semantic versioning

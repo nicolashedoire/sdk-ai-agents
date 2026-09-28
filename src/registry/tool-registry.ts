@@ -8,15 +8,10 @@ export class ToolRegistry {
 
   registerTool(definition: ToolDefinition): Tool {
     if (this.tools.has(definition.name)) {
-      const existingTool = this.tools.get(definition.name);
-      if (existingTool) {
-        if (existingTool.version !== (definition.version || '1.0.0')) {
-          throw new Error(
-            `Tool "${definition.name}" is already registered with version ${existingTool.version}. Use a different version or unregister first.`
-          );
-        }
-      }
-      throw new Error(`Tool "${definition.name}" is already registered`);
+      // One tool per name, whatever its version: a version does not make a second one.
+      throw new Error(
+        `Tool "${definition.name}" is already registered: a name is registered once, whatever its version. Give this tool another name (for example with a prefix), or use the registered one.`
+      );
     }
 
     const tool: Tool = {
@@ -34,6 +29,31 @@ export class ToolRegistry {
 
     this.tools.set(definition.name, tool);
     return tool;
+  }
+
+  /**
+   * Registers the tools a caller was given (an agent's `tools`, a capability's tools), all or
+   * none. A tool whose name is taken is accepted when it is that same tool (the object
+   * `sdk.defineTool` returned, or a tool built from the same definition by `defineTool`), and
+   * the registered one is used. Another tool with a taken name is refused with a
+   * `ValidationError` naming `field`: calls run by name, so it would never run and the
+   * registered one would. Returns the registered tools, in order.
+   */
+  registerOrReuse(definitions: readonly ToolDefinition[], field = 'tools'): Tool[] {
+    const batch = new Map<string, ToolDefinition>();
+    for (const definition of definitions) {
+      const taken = this.tools.get(definition.name) ?? batch.get(definition.name);
+      if (taken && !isSameTool(taken, definition)) {
+        throw new ValidationError(
+          field,
+          `another tool named "${definition.name}" is already registered or given: calls run by name, so this one would never run. Give it another name (for example with a prefix), or pass the registered tool`
+        );
+      }
+      batch.set(definition.name, taken ?? definition);
+    }
+    return definitions.map(
+      (definition) => this.tools.get(definition.name) ?? this.registerTool(definition)
+    );
   }
 
   getToolByVersion(name: string, version: string): Tool | null {
@@ -146,4 +166,23 @@ export class ToolRegistry {
   clear(): void {
     this.tools.clear();
   }
+}
+
+/**
+ * Whether `definition` is the tool `registered`: the same object, or one built from the same
+ * definition (same handler, schema, texts, metadata, retry and version). A copy with other
+ * metadata (an approval added or removed) is another tool.
+ */
+function isSameTool(registered: ToolDefinition, definition: ToolDefinition): boolean {
+  if (registered === definition) return true;
+  return (
+    registered.handler === definition.handler &&
+    registered.schema === definition.schema &&
+    registered.description === definition.description &&
+    (registered.version || '1.0.0') === (definition.version || '1.0.0') &&
+    (registered.capability || undefined) === (definition.capability || undefined) &&
+    registered.metadata === definition.metadata &&
+    registered.retry === definition.retry &&
+    registered.inputJsonSchema === definition.inputJsonSchema
+  );
 }
